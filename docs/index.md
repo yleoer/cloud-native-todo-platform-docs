@@ -58,6 +58,7 @@ Linux / Git / Shell
 ## 当前已完成章节
 
 - [第一篇：Linux、Git 与 Shell 基础](chapters/01-linux-git-shell/index.md)
+- [第二篇：Golang 语言基础](chapters/02-go-basic/index.md)
 
 ## 如何本地运行
 
@@ -102,4 +103,3 @@ http://127.0.0.1:8000
 - 引入 PostgreSQL 和 Redis。
 - 编写 Dockerfile 与 Docker Compose 本地环境。
 - 将 Todo API 部署到 Kubernetes。
-

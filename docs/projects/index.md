@@ -26,9 +26,8 @@
 | 阶段 | 项目 | 状态 |
 |---|---|---|
 | Linux / Git / Shell | 搭建云原生学习工作站 | 已开始 |
-| Go 基础 | Todo CLI | 待编写 |
+| Go 基础 | Todo CLI | 已开始 |
 | Go Web API | Todo API v1 | 待编写 |
 | Docker Compose | 本地完整开发环境 | 待编写 |
 | Kubernetes | Todo 平台部署 | 待编写 |
 | Operator | Todo Operator | 待编写 |
-

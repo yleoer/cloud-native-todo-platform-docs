@@ -60,6 +60,8 @@ nav:
   - 学习路线: roadmap.md
   - 第一篇：Linux、Git 与 Shell 基础:
       - 第一章: chapters/01-linux-git-shell/index.md
+  - 第二篇：Golang 语言基础:
+      - 第一章: chapters/02-go-basic/index.md
   - 项目实战: projects/index.md
   - 实验索引: labs/index.md
   - 排障手册: troubleshooting/index.md

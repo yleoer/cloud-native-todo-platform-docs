@@ -3,4 +3,6 @@ site/
 __pycache__/
 .pytest_cache/
 .DS_Store
-
+cli/todo-cli/bin/
+*.test
+coverage.out
