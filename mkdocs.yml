@@ -1,0 +1,71 @@
+site_name: 从 Go、Docker、Kubernetes 到 Operator
+site_description: 一套面向中高级云原生工程能力的系统教程
+site_author: yuanxuefeng
+site_url: https://docs.yxuefeng.com/
+
+repo_name: cloud-native-todo-platform-docs
+
+theme:
+  name: material
+  language: zh
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - search.highlight
+    - search.suggest
+    - content.code.copy
+    - content.code.annotate
+    - content.tabs.link
+  palette:
+    - scheme: default
+      primary: indigo
+      accent: blue
+      toggle:
+        icon: material/weather-night
+        name: 切换到深色模式
+    - scheme: slate
+      primary: indigo
+      accent: blue
+      toggle:
+        icon: material/weather-sunny
+        name: 切换到浅色模式
+
+plugins:
+  - search:
+      lang:
+        - zh
+        - en
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.tabbed:
+      alternate_style: true
+
+nav:
+  - 首页: index.md
+  - 学习路线: roadmap.md
+  - 第一篇：Linux、Git 与 Shell 基础:
+      - 第一章: chapters/01-linux-git-shell/index.md
+  - 项目实战: projects/index.md
+  - 实验索引: labs/index.md
+  - 排障手册: troubleshooting/index.md
+  - 面试题库: interviews/index.md
+  - 课程设计:
+      - 章节写作规范: course-design/00-chapter-writing-standard.md
+      - 课程总设计: course-design/01-course-blueprint.md
+      - 完整课程目录: course-design/02-full-curriculum.md
+      - 项目主线设计: course-design/03-project-mainline-cloud-native-todo-platform.md
