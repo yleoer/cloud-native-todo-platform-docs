@@ -153,85 +153,67 @@ extra:
       link: https://github.com/yleoer
       name: GitHub
 
-  # 版本
-  version:
-    provider: mike
-
 extra_css:
-  - stylesheets/extra.css
+  - stylesheets/extra.css?v=20260526-1
 
 extra_javascript:
-  - javascripts/extra.js
+  - javascripts/extra.js?v=20260526-1
   - javascripts/mathjax.js
-  - https://polyfill.io/v3/polyfill.min.js?features=es6
   - https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js
 
 nav:
   - 首页: index.md
-  - 学习路线: roadmap.md
 
   - 阶段一 基础环境:
-      - 1. 课程导学与环境准备: chapters/01-course-guide-env/index.md
-      - 2. Linux 文件系统与命令: chapters/02-linux-filesystem/index.md
-      - 3. Linux 进程与服务管理: chapters/03-linux-process/index.md
-      - 4. Linux 网络基础与排障: chapters/04-linux-network/index.md
-      - 5. Git 基础与团队协作: chapters/05-git-basics/index.md
-      - 6. Shell 脚本与自动化: chapters/06-shell-scripting/index.md
+      - 1. 课程导学与环境准备: chapters/stage-01-foundation/01-course-guide-env.md
+      - 2. Linux 文件系统与命令: chapters/stage-01-foundation/02-linux-filesystem.md
+      - 3. Linux 进程与服务管理: chapters/stage-01-foundation/03-linux-process.md
+      - 4. Linux 网络基础与排障: chapters/stage-01-foundation/04-linux-network.md
+      - 5. Git 基础与团队协作: chapters/stage-01-foundation/05-git-basics.md
+      - 6. Shell 脚本与自动化: chapters/stage-01-foundation/06-shell-scripting.md
 
   # - 阶段二 Go 后端开发:
-  #     - 7. Go 语言基础: chapters/07-go-basics/index.md
-  #     - 8. Go 并发编程: chapters/08-go-concurrency/index.md
-  #     - 9. Go 工程化与测试: chapters/09-go-engineering/index.md
-  #     - 10. Go Web API 开发: chapters/10-go-web-api/index.md
-  #     - 11. 数据库与持久化: chapters/11-database/index.md
-  #     - 12. Redis 缓存与异步任务: chapters/12-redis-cache/index.md
-  #     - 13. Go 后端生产化: chapters/13-go-production/index.md
+  #     - 7. Go 语言基础: chapters/stage-02-go-backend/07-go-basics.md
+  #     - 8. Go 并发编程: chapters/stage-02-go-backend/08-go-concurrency.md
+  #     - 9. Go 工程化与测试: chapters/stage-02-go-backend/09-go-engineering.md
+  #     - 10. Go Web API 开发: chapters/stage-02-go-backend/10-go-web-api.md
+  #     - 11. 数据库与持久化: chapters/stage-02-go-backend/11-database.md
+  #     - 12. Redis 缓存与异步任务: chapters/stage-02-go-backend/12-redis-cache.md
+  #     - 13. Go 后端生产化: chapters/stage-02-go-backend/13-go-production.md
 
   # - 阶段三 Docker 容器:
-  #     - 14. Docker 基础: chapters/14-docker-basics/index.md
-  #     - 15. Dockerfile 与镜像构建: chapters/15-dockerfile/index.md
-  #     - 16. Docker Compose 编排: chapters/16-docker-compose/index.md
-  #     - 17. 容器运行原理: chapters/17-container-internals/index.md
-  #     - 18. 容器运行时与 CRI: chapters/18-container-runtime/index.md
+  #     - 14. Docker 基础: chapters/stage-03-docker/14-docker-basics.md
+  #     - 15. Dockerfile 与镜像构建: chapters/stage-03-docker/15-dockerfile.md
+  #     - 16. Docker Compose 编排: chapters/stage-03-docker/16-docker-compose.md
+  #     - 17. 容器运行原理: chapters/stage-03-docker/17-container-internals.md
+  #     - 18. 容器运行时与 CRI: chapters/stage-03-docker/18-container-runtime.md
 
   # - 阶段四 Kubernetes:
-  #     - 19. K8s 架构与集群搭建: chapters/19-k8s-architecture/index.md
-  #     - 20. K8s 核心工作负载: chapters/20-k8s-workloads/index.md
-  #     - 21. K8s 服务发现与配置: chapters/21-k8s-service-config/index.md
-  #     - 22. K8s 网络: chapters/22-k8s-networking/index.md
-  #     - 23. K8s 存储: chapters/23-k8s-storage/index.md
-  #     - 24. K8s 安全: chapters/24-k8s-security/index.md
-  #     - 25. Helm 包管理: chapters/25-helm/index.md
-  #     - 26. Kustomize 配置管理: chapters/26-kustomize/index.md
+  #     - 19. K8s 架构与集群搭建: chapters/stage-04-kubernetes/19-k8s-architecture.md
+  #     - 20. K8s 核心工作负载: chapters/stage-04-kubernetes/20-k8s-workloads.md
+  #     - 21. K8s 服务发现与配置: chapters/stage-04-kubernetes/21-k8s-service-config.md
+  #     - 22. K8s 网络: chapters/stage-04-kubernetes/22-k8s-networking.md
+  #     - 23. K8s 存储: chapters/stage-04-kubernetes/23-k8s-storage.md
+  #     - 24. K8s 安全: chapters/stage-04-kubernetes/24-k8s-security.md
+  #     - 25. Helm 包管理: chapters/stage-04-kubernetes/25-helm.md
+  #     - 26. Kustomize 配置管理: chapters/stage-04-kubernetes/26-kustomize.md
 
   # - 阶段五 交付与可观测:
-  #     - 27. CI/CD 自动化交付: chapters/27-cicd/index.md
-  #     - 28. GitOps 与 Argo CD: chapters/28-gitops/index.md
-  #     - 29. Prometheus 与 Grafana: chapters/29-prometheus-grafana/index.md
-  #     - 30. 日志与链路追踪: chapters/30-logging-tracing/index.md
-  #     - 31. K8s 生产排障: chapters/31-k8s-troubleshooting/index.md
+  #     - 27. CI/CD 自动化交付: chapters/stage-05-delivery-observability/27-cicd.md
+  #     - 28. GitOps 与 Argo CD: chapters/stage-05-delivery-observability/28-gitops.md
+  #     - 29. Prometheus 与 Grafana: chapters/stage-05-delivery-observability/29-prometheus-grafana.md
+  #     - 30. 日志与链路追踪: chapters/stage-05-delivery-observability/30-logging-tracing.md
+  #     - 31. K8s 生产排障: chapters/stage-05-delivery-observability/31-k8s-troubleshooting.md
 
   # - 阶段六 Operator 开发:
-  #     - 32. K8s API 扩展机制: chapters/32-k8s-api-extension/index.md
-  #     - 33. CRD 设计与实践: chapters/33-crd-design/index.md
-  #     - 34. Controller 与 Informer: chapters/34-controller-informer/index.md
-  #     - 35. Kubebuilder 框架: chapters/35-kubebuilder/index.md
-  #     - 36. Operator 高级机制: chapters/36-operator-advanced/index.md
-  #     - 37. Operator 测试与发布: chapters/37-operator-release/index.md
-  #     - 38. Operator 生产实践: chapters/38-operator-production/index.md
+  #     - 32. K8s API 扩展机制: chapters/stage-06-operator/32-k8s-api-extension.md
+  #     - 33. CRD 设计与实践: chapters/stage-06-operator/33-crd-design.md
+  #     - 34. Controller 与 Informer: chapters/stage-06-operator/34-controller-informer.md
+  #     - 35. Kubebuilder 框架: chapters/stage-06-operator/35-kubebuilder.md
+  #     - 36. Operator 高级机制: chapters/stage-06-operator/36-operator-advanced.md
+  #     - 37. Operator 测试与发布: chapters/stage-06-operator/37-operator-release.md
+  #     - 38. Operator 生产实践: chapters/stage-06-operator/38-operator-production.md
 
   # - 阶段七 综合项目:
-  #     - 39. 综合项目集成实战: chapters/39-project-integration/index.md
-  #     - 40. 职业能力与面试: chapters/40-career-interview/index.md
-
-  - 辅助资源:
-      - 项目实战: projects/index.md
-      - 实验索引: labs/index.md
-      - 排障手册: troubleshooting/index.md
-      - 面试题库: interviews/index.md
-
-  - 课程设计:
-      - 写作规范: course-design/00-chapter-writing-standard.md
-      - 课程总设计: course-design/01-course-blueprint.md
-      - 完整目录: course-design/02-full-curriculum.md
-      - 项目主线: course-design/03-project-mainline-cloud-native-todo-platform.md
+  #     - 39. 综合项目集成实战: chapters/stage-07-project-career/39-project-integration.md
+  #     - 40. 职业能力与面试: chapters/stage-07-project-career/40-career-interview.md
