@@ -83,7 +83,7 @@ hide:
 </details>
 
 <details markdown="1">
-<summary><strong>阶段二：Go 语言与后端开发（第 7-13 篇，第 7-10 篇已完成）</strong></summary>
+<summary><strong>阶段二：Go 语言与后端开发（第 7-13 篇，第 7-11 篇已完成）</strong></summary>
 
 从 Go 基础语法到 Web API、数据库、Redis、并发编程，完成生产级后端服务开发。
 
@@ -91,7 +91,7 @@ hide:
 - [第 8 篇：Go 进阶与并发编程](chapters/stage-02-go-backend/08-go-concurrency.md)
 - [第 9 篇：Go 工程化与测试](chapters/stage-02-go-backend/09-go-engineering.md)
 - [第 10 篇：Go Web API 开发](chapters/stage-02-go-backend/10-go-web-api.md)
-- 第 11 篇：数据库与持久化开发
+- [第 11 篇：数据库与持久化开发](chapters/stage-02-go-backend/11-database.md)
 - 第 12 篇：Redis、缓存与异步任务
 - 第 13 篇：Go 后端生产化能力
 
@@ -192,6 +192,6 @@ http://127.0.0.1:8000
 
 ## 下一步计划
 
-- 继续进入数据库与持久化开发，把 Todo API 从文件存储迁移到数据库。
-- 逐步接入 Redis 和异步任务，完善后端服务的性能与扩展能力。
+- 继续进入 Redis、缓存与异步任务，减少数据库压力并增强异步处理能力。
+- 逐步完善 Go 后端生产化能力，为容器化和 Kubernetes 部署做准备。
 - 引入 Docker、Kubernetes 与 Operator 实践内容，将 Todo 平台推进到云原生交付形态。
