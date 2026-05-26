@@ -11,7 +11,7 @@
 
 ## 🎯 学习路径
 
-当前已完成 **阶段一：基础环境与工具链**。后续阶段会继续围绕 **Cloud Native Todo Platform** 项目逐步展开。
+当前已完成 **阶段一：基础环境与工具链**，并开始进入 **阶段二：Go 语言与后端开发**。后续阶段会继续围绕 **Cloud Native Todo Platform** 项目逐步展开。
 
 <details open>
 <summary><strong>阶段一：基础环境与工具链（第 1-6 篇 + 出版附录，已完成）</strong></summary>
@@ -30,11 +30,11 @@ Linux 命令、Git 协作、Shell 脚本等云原生开发必备基础。
 </details>
 
 <details>
-<summary><strong>阶段二：Go 语言与后端开发（第 7-13 篇，规划中）</strong></summary>
+<summary><strong>阶段二：Go 语言与后端开发（第 7-13 篇，第 7 篇已完成）</strong></summary>
 
 从 Go 基础到生产级 Web API、数据库、Redis、并发编程。
 
-- 第 7 篇：Go 语言基础
+- [第 7 篇：Go 语言基础](docs/chapters/stage-02-go-backend/07-go-basics.md)
 - 第 8 篇：Go 进阶与并发编程
 - 第 9 篇：Go 工程化与测试
 - 第 10 篇：Go Web API 开发
@@ -178,6 +178,8 @@ docs/
 │   │   ├── 06-shell-scripting.md    # 第 6 篇：Shell 脚本与自动化基础
 │   │   ├── stage-01-acceptance.md   # 阶段一附录 A：作品集验收
 │   │   └── stage-01-cheatsheet-troubleshooting.md # 阶段一附录 B：速查与排障
+│   ├── stage-02-go-backend/    # 阶段二：Go 语言与后端开发
+│   │   └── 07-go-basics.md          # 第 7 篇：Go 语言基础
 │   └── ...                     # 其他阶段章节（待完成）
 ├── projects/                   # 项目实战
 ├── labs/                       # 实验索引
