@@ -238,13 +238,23 @@ cloud-native-todo-platform/
 
 三类环境都能学习本课程：
 
-| 环境 | 推荐程度 | 适合人群 | 注意事项 |
-|---|---|---|---|
-| Windows + WSL2 Ubuntu | 推荐 | 大多数 Windows 用户 | 代码建议放在 WSL 的 Linux 文件系统中 |
-| macOS | 推荐 | Mac 用户 | Docker Desktop 需要分配足够 CPU 和内存 |
-| Linux | 推荐 | 有 Linux 桌面或云服务器经验的人 | 最贴近生产环境，但桌面软件安装门槛略高 |
+=== "Windows + WSL2 Ubuntu"
 
-如果你使用 Windows，强烈建议把主要开发环境放在 WSL2 Ubuntu 里，而不是直接在 Windows PowerShell 中混用所有工具。原因是后续 Docker、Kubernetes、Shell 脚本、路径权限都会更接近真实 Linux 环境。
+    推荐大多数 Windows 用户采用这一方案。你可以继续使用 Windows 桌面软件，同时把课程命令、代码仓库、Go 编译、Docker CLI、kubectl、Helm 都放在 WSL2 Ubuntu 中执行。
+
+    代码建议放在 WSL 的 Linux 文件系统中，例如 `~/workspace`，不要把主要仓库放在 `/mnt/c/Users/...` 下。这样路径、权限、文件监听和 Shell 行为都会更接近真实 Linux 服务器。
+
+=== "macOS"
+
+    推荐 Mac 用户采用本机终端加 Docker Desktop 的方案。macOS 自带类 Unix 终端体验，配合 Homebrew 可以比较顺畅地安装 Go、Git、kubectl、kind、Helm 等工具。
+
+    需要注意 Docker Desktop 的资源配置，建议至少分配 4 核 CPU、6GB 内存和 30GB 磁盘空间，后续运行 kind 和 Kubernetes 组件时会更稳定。
+
+=== "Linux"
+
+    推荐已经使用 Linux 桌面或云服务器的人直接使用本机环境。它最贴近生产服务器和容器运行环境，后续理解路径、权限、systemd、Docker Engine 会更自然。
+
+    如果你是完全新手，Linux 桌面的软件安装和驱动问题可能略有门槛。课程示例主要以 Ubuntu 22.04 / 24.04 为基准。
 
 ### 4.5 WSL2、Ubuntu、终端与 VS Code
 
@@ -516,15 +526,19 @@ The connection to the server localhost:8080 was refused
 
 如果机器只有 8GB 内存，也能学习前期 Go 和 Linux 内容，但 Docker、kind、Kubernetes、监控组件同时运行时会比较紧张。
 
-本篇安装步骤按操作系统分流执行，不要把三套系统命令混在一起跑：
+本篇安装步骤按操作系统分流执行，不要把三套系统命令混在一起跑。先在 6.4-6.6 的标签页中完成自己系统的基础准备，再继续后续工具安装。
 
-| 你的电脑 | 推荐执行路径 |
-|---|---|
-| Windows | 执行 6.4，进入 WSL2 Ubuntu 后再执行 Linux 通用命令；Docker 使用 Docker Desktop + WSL Integration |
-| macOS | 执行 6.5，工具优先用 Homebrew；Docker 使用 Docker Desktop |
-| Linux | 执行 6.6 和 Linux 安装步骤；Docker 使用 Docker Engine |
+=== "Windows + WSL2"
 
-后续 6.7 到 6.20 中没有特别标明系统的命令，默认在 Linux Shell 中执行。Windows 用户指的是 WSL2 Ubuntu 终端，macOS 用户指的是本机 Terminal。
+    先完成 WSL2 Ubuntu、Windows Terminal、Docker Desktop WSL Integration 和 VS Code Remote WSL 配置。进入 Ubuntu 后，后续没有特别标明系统的命令都在 WSL2 Ubuntu 终端执行。
+
+=== "macOS"
+
+    先准备 Homebrew、Terminal、Docker Desktop 和 VS Code。后续没有特别标明系统的命令都在 macOS Terminal 执行。
+
+=== "Linux"
+
+    先准备 Ubuntu 基础软件包、Docker Engine 和 VS Code。后续没有特别标明系统的命令都在本机 Linux Shell 执行。
 
 ### 6.3 文件目录结构
 
@@ -571,399 +585,486 @@ cloud-native-todo-platform/
     └── check-env.sh
 ```
 
-### 6.4 Windows 环境准备
+### 6.4-6.6 按系统准备基础环境
 
-如果你使用 Windows，先用管理员身份打开 PowerShell，执行：
+=== "Windows + WSL2"
 
-```powershell
-wsl --install
-```
+    先用管理员身份打开 PowerShell，执行：
 
-这条命令会启用 WSL 所需功能，并安装默认 Ubuntu 发行版。安装完成后按提示重启电脑。
+    ```powershell
+    wsl --install
+    ```
 
-查看可安装发行版：
+    这条命令会启用 WSL 所需功能，并安装默认 Ubuntu 发行版。安装完成后按提示重启电脑。
 
-```powershell
-wsl --list --online
-```
+    查看可安装发行版：
 
-安装指定 Ubuntu 版本：
+    ```powershell
+    wsl --list --online
+    ```
 
-```powershell
-wsl --install -d Ubuntu-24.04
-```
+    安装指定 Ubuntu 版本：
 
-查看当前 WSL 版本：
+    ```powershell
+    wsl --install -d Ubuntu-24.04
+    ```
 
-```powershell
-wsl -l -v
-```
+    查看当前 WSL 版本：
 
-预期输出类似：
+    ```powershell
+    wsl -l -v
+    ```
 
-```text
-  NAME            STATE           VERSION
-* Ubuntu-24.04    Running         2
-```
+    预期输出类似：
 
-如果 `VERSION` 是 `1`，切换到 WSL2：
+    ```text
+      NAME            STATE           VERSION
+    * Ubuntu-24.04    Running         2
+    ```
 
-```powershell
-wsl --set-version Ubuntu-24.04 2
-```
+    如果 `VERSION` 是 `1`，切换到 WSL2：
 
-启动 Ubuntu 后，建议先更新基础包：
+    ```powershell
+    wsl --set-version Ubuntu-24.04 2
+    ```
 
-```bash
-sudo apt update
-sudo apt upgrade -y
-```
+    启动 Ubuntu 后，建议先更新基础包：
 
-代码建议放在 Linux 文件系统中：
+    ```bash
+    sudo apt update
+    sudo apt upgrade -y
+    ```
 
-```bash
-mkdir -p ~/workspace
-cd ~/workspace
-```
+    代码建议放在 Linux 文件系统中：
 
-不要把课程仓库放在 `/mnt/c/Users/...` 下作为主要开发目录。跨文件系统访问会带来性能、权限、换行符和文件监听问题。
+    ```bash
+    mkdir -p ~/workspace
+    cd ~/workspace
+    ```
 
-### 6.5 macOS 环境准备
+    不要把课程仓库放在 `/mnt/c/Users/...` 下作为主要开发目录。跨文件系统访问会带来性能、权限、换行符和文件监听问题。
 
-macOS 推荐安装 Homebrew，然后用 Homebrew 管理大部分开发工具。
+=== "macOS"
 
-安装 Homebrew 后验证：
+    macOS 推荐安装 Homebrew，然后用 Homebrew 管理大部分开发工具。
 
-```bash
-brew --version
-```
+    安装 Homebrew 后验证：
 
-安装基础工具：
+    ```bash
+    brew --version
+    ```
 
-```bash
-brew install git go kubectl kind helm
-```
+    安装基础工具：
 
-Docker 推荐安装 Docker Desktop。安装后打开 Docker Desktop，并在设置中给它分配足够资源：
+    ```bash
+    brew install git go kubectl kind helm
+    ```
 
-```text
-CPU: 4 核或更多
-Memory: 6GB 或更多
-Disk: 30GB 或更多
-```
+    Docker 推荐安装 Docker Desktop。安装后打开 Docker Desktop，并在设置中给它分配足够资源：
 
-验证 Docker：
+    ```text
+    CPU: 4 核或更多
+    Memory: 6GB 或更多
+    Disk: 30GB 或更多
+    ```
 
-```bash
-docker version
-docker run --rm hello-world
-```
+    验证 Docker：
 
-`hello-world` 会拉取一个测试镜像并运行，看到确认信息说明 Docker 基本可用。
+    ```bash
+    docker version
+    docker run --rm hello-world
+    ```
 
-### 6.6 Linux 环境准备
+    `hello-world` 会拉取一个测试镜像并运行，看到确认信息说明 Docker 基本可用。
 
-以下命令以 Ubuntu 22.04 / 24.04 为例。
+=== "Linux"
 
-更新软件索引并安装基础工具：
+    以下命令以 Ubuntu 22.04 / 24.04 为例。
 
-```bash
-sudo apt update
-sudo apt install -y ca-certificates curl wget gnupg git make vim tar gzip unzip
-```
+    更新软件索引并安装基础工具：
 
-安装这些工具的原因：
+    ```bash
+    sudo apt update
+    sudo apt install -y ca-certificates curl wget gnupg git make vim tar gzip unzip
+    ```
 
-- `ca-certificates` 用于校验 HTTPS 证书。
-- `curl`、`wget` 用于下载工具和测试接口。
-- `gnupg` 用于处理软件源签名。
-- `git` 用于管理代码。
-- `make` 用于统一项目命令入口。
-- `vim` 用于服务器上编辑文件。
-- `tar`、`gzip`、`unzip` 用于解压安装包。
+    安装这些工具的原因：
+
+    - `ca-certificates` 用于校验 HTTPS 证书。
+    - `curl`、`wget` 用于下载工具和测试接口。
+    - `gnupg` 用于处理软件源签名。
+    - `git` 用于管理代码。
+    - `make` 用于统一项目命令入口。
+    - `vim` 用于服务器上编辑文件。
+    - `tar`、`gzip`、`unzip` 用于解压安装包。
 
 ### 6.7 安装 Go
 
-Ubuntu 可以使用官方二进制包安装 Go。先查看系统架构：
+Go 的安装方式和操作系统有关。Windows 用户在 WSL2 Ubuntu 中执行 Linux 安装方式；macOS 用户优先使用 Homebrew；Linux 用户使用官方二进制包。
 
-```bash
-uname -m
-```
+=== "Windows + WSL2"
 
-常见输出：
+    在 WSL2 Ubuntu 终端中执行。先查看系统架构：
 
-| 输出 | 架构 |
-|---|---|
-| `x86_64` | `amd64` |
-| `aarch64` | `arm64` |
+    ```bash
+    uname -m
+    ```
 
-到 Go 官方下载页选择适合自己系统和架构的版本。以下示例使用版本变量和架构判断，便于后续课程统一升级：
+    常见输出：
 
-```bash
-cd /tmp
-GO_VERSION=1.26.3
-case "$(uname -m)" in
-  x86_64) GO_ARCH=amd64 ;;
-  aarch64|arm64) GO_ARCH=arm64 ;;
-  *) echo "unsupported architecture: $(uname -m)" && exit 1 ;;
-esac
-GO_TARBALL="go${GO_VERSION}.linux-${GO_ARCH}.tar.gz"
-curl -LO "https://go.dev/dl/${GO_TARBALL}"
-sha256sum "${GO_TARBALL}"
-sudo rm -rf /usr/local/go
-sudo tar -C /usr/local -xzf "${GO_TARBALL}"
-```
+    | 输出 | 架构 |
+    |---|---|
+    | `x86_64` | `amd64` |
+    | `aarch64` | `arm64` |
+
+    安装 Go：
+
+    ```bash
+    cd /tmp
+    GO_VERSION=1.26.3
+    case "$(uname -m)" in
+      x86_64) GO_ARCH=amd64 ;;
+      aarch64|arm64) GO_ARCH=arm64 ;;
+      *) echo "unsupported architecture: $(uname -m)" && exit 1 ;;
+    esac
+    GO_TARBALL="go${GO_VERSION}.linux-${GO_ARCH}.tar.gz"
+    curl -LO "https://go.dev/dl/${GO_TARBALL}"
+    sha256sum "${GO_TARBALL}"
+    sudo rm -rf /usr/local/go
+    sudo tar -C /usr/local -xzf "${GO_TARBALL}"
+    echo 'export PATH=$PATH:/usr/local/go/bin' >> ~/.profile
+    source ~/.profile
+    go version
+    go env GOPATH
+    ```
+
+=== "macOS"
+
+    使用 Homebrew 安装：
+
+    ```bash
+    brew install go
+    go version
+    go env GOPATH
+    ```
+
+=== "Linux"
+
+    以下命令以 Ubuntu 22.04 / 24.04 为例。先查看系统架构：
+
+    ```bash
+    uname -m
+    ```
+
+    安装 Go：
+
+    ```bash
+    cd /tmp
+    GO_VERSION=1.26.3
+    case "$(uname -m)" in
+      x86_64) GO_ARCH=amd64 ;;
+      aarch64|arm64) GO_ARCH=arm64 ;;
+      *) echo "unsupported architecture: $(uname -m)" && exit 1 ;;
+    esac
+    GO_TARBALL="go${GO_VERSION}.linux-${GO_ARCH}.tar.gz"
+    curl -LO "https://go.dev/dl/${GO_TARBALL}"
+    sha256sum "${GO_TARBALL}"
+    sudo rm -rf /usr/local/go
+    sudo tar -C /usr/local -xzf "${GO_TARBALL}"
+    echo 'export PATH=$PATH:/usr/local/go/bin' >> ~/.profile
+    source ~/.profile
+    go version
+    go env GOPATH
+    ```
 
 `sha256sum` 会输出安装包校验值。学习环境中你至少要知道它的作用；企业环境中应把这个值与 Go 官方下载页对应文件的 SHA256 对比，确认安装包没有被替换。
 
-配置 PATH：
-
-```bash
-echo 'export PATH=$PATH:/usr/local/go/bin' >> ~/.profile
-source ~/.profile
-```
-
-验证：
-
-```bash
-go version
-go env GOPATH
-```
-
-预期输出类似：
-
-```text
-go version go1.26.3 linux/amd64
-/home/your-user/go
-```
-
-如果你使用 macOS，也可以执行：
-
-```bash
-brew install go
-go version
-```
-
 ### 6.8 安装 Git
 
-Ubuntu：
+=== "Windows + WSL2"
 
-```bash
-sudo apt install -y git
-git --version
-```
+    在 WSL2 Ubuntu 中执行：
 
-配置身份信息：
+    ```bash
+    sudo apt install -y git
+    git --version
+    ```
+
+=== "macOS"
+
+    如果基础环境准备时已经执行过 `brew install git`，这里只需验证：
+
+    ```bash
+    git --version
+    ```
+
+    如果还没有安装：
+
+    ```bash
+    brew install git
+    git --version
+    ```
+
+=== "Linux"
+
+    Ubuntu 执行：
+
+    ```bash
+    sudo apt install -y git
+    git --version
+    ```
+
+配置身份信息，各系统都需要执行：
 
 ```bash
 git config --global user.name "Your Name"
 git config --global user.email "you@example.com"
 git config --global init.defaultBranch main
+git config --global --list
 ```
 
 这些配置会写入 `~/.gitconfig`。Git 提交需要作者信息，默认分支设置为 `main` 可以让本地仓库和主流托管平台保持一致。
 
-查看配置：
-
-```bash
-git config --global --list
-```
-
 ### 6.9 安装 Docker
 
-Windows 和 macOS 推荐安装 Docker Desktop，并确认 Docker Desktop 正在运行。
+=== "Windows + WSL2"
 
-如果你使用 Windows + WSL2，本课程推荐使用 Docker Desktop 的 WSL Integration，让 WSL2 Ubuntu 访问 Docker Desktop 提供的 Docker Engine。新手不建议同时在 WSL2 里再安装一套独立 Docker Engine，否则容易出现“两个 Docker 环境互相混淆”的问题。
+    推荐安装 Docker Desktop，并启用 WSL Integration，让 WSL2 Ubuntu 访问 Docker Desktop 提供的 Docker Engine。新手不建议同时在 WSL2 里再安装一套独立 Docker Engine，否则容易出现“两个 Docker 环境互相混淆”的问题。
 
-在 WSL2 Ubuntu 中验证 Docker Desktop 集成：
+    在 WSL2 Ubuntu 中验证 Docker Desktop 集成：
 
-```bash
-docker version
-docker info
-```
+    ```bash
+    docker version
+    docker info
+    docker run --rm hello-world
+    ```
 
-如果这两条命令成功，说明 WSL2 已经能访问 Docker，不需要继续执行下面的 Ubuntu Docker Engine 安装步骤。
+    如果这三条命令成功，说明 WSL2 已经能访问 Docker。
 
-Ubuntu 可以安装 Docker Engine：
+=== "macOS"
 
-```bash
-sudo apt update
-sudo apt install -y ca-certificates curl
-for pkg in docker.io docker-doc docker-compose docker-compose-v2 podman-docker containerd runc; do
-  sudo apt-get remove -y "$pkg" || true
-done
-sudo install -m 0755 -d /etc/apt/keyrings
-sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
-sudo chmod a+r /etc/apt/keyrings/docker.asc
-```
+    推荐安装 Docker Desktop。安装后打开 Docker Desktop，并验证：
 
-添加 Docker 软件源：
+    ```bash
+    docker version
+    docker info
+    docker run --rm hello-world
+    ```
 
-```bash
-sudo tee /etc/apt/sources.list.d/docker.sources >/dev/null <<EOF
-Types: deb
-URIs: https://download.docker.com/linux/ubuntu
-Suites: $(. /etc/os-release && echo "${UBUNTU_CODENAME:-$VERSION_CODENAME}")
-Components: stable
-Architectures: $(dpkg --print-architecture)
-Signed-By: /etc/apt/keyrings/docker.asc
-EOF
-```
+=== "Linux"
 
-安装 Docker：
+    Ubuntu 可以安装 Docker Engine：
 
-```bash
-sudo apt update
-sudo apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
-```
+    ```bash
+    sudo apt update
+    sudo apt install -y ca-certificates curl
+    for pkg in docker.io docker-doc docker-compose docker-compose-v2 podman-docker containerd runc; do
+      sudo apt-get remove -y "$pkg" || true
+    done
+    sudo install -m 0755 -d /etc/apt/keyrings
+    sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+    sudo chmod a+r /etc/apt/keyrings/docker.asc
+    sudo tee /etc/apt/sources.list.d/docker.sources >/dev/null <<EOF
+    Types: deb
+    URIs: https://download.docker.com/linux/ubuntu
+    Suites: $(. /etc/os-release && echo "${UBUNTU_CODENAME:-$VERSION_CODENAME}")
+    Components: stable
+    Architectures: $(dpkg --print-architecture)
+    Signed-By: /etc/apt/keyrings/docker.asc
+    EOF
+    sudo apt update
+    sudo apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+    sudo systemctl enable --now docker
+    sudo docker run --rm hello-world
+    sudo usermod -aG docker "$USER"
+    ```
 
-启动并验证：
+    执行后需要退出当前终端重新登录，或者临时执行：
 
-```bash
-sudo systemctl enable --now docker
-sudo docker run --rm hello-world
-```
-
-让当前用户可以直接运行 Docker：
-
-```bash
-sudo usermod -aG docker "$USER"
-```
-
-执行后需要退出当前终端重新登录，或者在 Linux 中临时执行：
-
-```bash
-newgrp docker
-```
-
-再验证：
-
-```bash
-docker version
-docker ps
-```
-
-如果使用 WSL2 + Docker Desktop，需要在 Docker Desktop 设置中启用 WSL Integration，让 Ubuntu 发行版能访问 Docker Engine。
+    ```bash
+    newgrp docker
+    docker version
+    docker ps
+    ```
 
 ### 6.10 安装 kubectl
 
-kubectl 是 Kubernetes 客户端。下面使用官方稳定版本下载方式：
+kubectl 是 Kubernetes 客户端。真实公司中如果要访问固定版本的生产集群，应按集群版本选择 kubectl，保证客户端与控制面版本差异在 Kubernetes 支持范围内。
 
-```bash
-cd /tmp
-KUBECTL_VERSION="$(curl -L -s https://dl.k8s.io/release/stable.txt)"
-case "$(uname -m)" in
-  x86_64) KUBECTL_ARCH=amd64 ;;
-  aarch64|arm64) KUBECTL_ARCH=arm64 ;;
-  *) echo "unsupported architecture: $(uname -m)" && exit 1 ;;
-esac
-curl -LO "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/${KUBECTL_ARCH}/kubectl"
-curl -LO "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/${KUBECTL_ARCH}/kubectl.sha256"
-echo "$(cat kubectl.sha256)  kubectl" | sha256sum --check
-sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
-```
+=== "Windows + WSL2"
 
-这里下载的是 Kubernetes 官方 stable 客户端。真实公司中如果要访问固定版本的生产集群，应按集群版本选择 kubectl，保证客户端与控制面版本差异在 Kubernetes 支持范围内。
+    在 WSL2 Ubuntu 中执行 Linux 安装方式：
 
-验证：
+    ```bash
+    cd /tmp
+    KUBECTL_VERSION="$(curl -L -s https://dl.k8s.io/release/stable.txt)"
+    case "$(uname -m)" in
+      x86_64) KUBECTL_ARCH=amd64 ;;
+      aarch64|arm64) KUBECTL_ARCH=arm64 ;;
+      *) echo "unsupported architecture: $(uname -m)" && exit 1 ;;
+    esac
+    curl -LO "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/${KUBECTL_ARCH}/kubectl"
+    curl -LO "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/${KUBECTL_ARCH}/kubectl.sha256"
+    echo "$(cat kubectl.sha256)  kubectl" | sha256sum --check
+    sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
+    kubectl version --client
+    kubectl version --client --output=yaml
+    ```
 
-```bash
-kubectl version --client
-kubectl version --client --output=yaml
-```
+=== "macOS"
+
+    ```bash
+    brew install kubectl
+    kubectl version --client
+    ```
+
+=== "Linux"
+
+    ```bash
+    cd /tmp
+    KUBECTL_VERSION="$(curl -L -s https://dl.k8s.io/release/stable.txt)"
+    case "$(uname -m)" in
+      x86_64) KUBECTL_ARCH=amd64 ;;
+      aarch64|arm64) KUBECTL_ARCH=arm64 ;;
+      *) echo "unsupported architecture: $(uname -m)" && exit 1 ;;
+    esac
+    curl -LO "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/${KUBECTL_ARCH}/kubectl"
+    curl -LO "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/${KUBECTL_ARCH}/kubectl.sha256"
+    echo "$(cat kubectl.sha256)  kubectl" | sha256sum --check
+    sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
+    kubectl version --client
+    kubectl version --client --output=yaml
+    ```
 
 此时还没有集群，所以只验证客户端版本即可。
 
-macOS 可以使用：
-
-```bash
-brew install kubectl
-kubectl version --client
-```
-
 ### 6.11 安装 kind
 
-kind 用于创建本地 Kubernetes 集群。
+kind 用于创建本地 Kubernetes 集群。本课程不依赖 kind 的某个极新功能，只要能稳定创建本地集群即可。
 
-Linux：
+=== "Windows + WSL2"
 
-```bash
-cd /tmp
-KIND_VERSION=v0.31.0
-case "$(uname -m)" in
-  x86_64) KIND_ARCH=amd64 ;;
-  aarch64|arm64) KIND_ARCH=arm64 ;;
-  *) echo "unsupported architecture: $(uname -m)" && exit 1 ;;
-esac
-curl -Lo ./kind "https://kind.sigs.k8s.io/dl/${KIND_VERSION}/kind-linux-${KIND_ARCH}"
-sha256sum ./kind
-chmod +x ./kind
-sudo mv ./kind /usr/local/bin/kind
-```
+    在 WSL2 Ubuntu 中执行：
+
+    ```bash
+    cd /tmp
+    KIND_VERSION=v0.31.0
+    case "$(uname -m)" in
+      x86_64) KIND_ARCH=amd64 ;;
+      aarch64|arm64) KIND_ARCH=arm64 ;;
+      *) echo "unsupported architecture: $(uname -m)" && exit 1 ;;
+    esac
+    curl -Lo ./kind "https://kind.sigs.k8s.io/dl/${KIND_VERSION}/kind-linux-${KIND_ARCH}"
+    sha256sum ./kind
+    chmod +x ./kind
+    sudo mv ./kind /usr/local/bin/kind
+    kind version
+    ```
+
+=== "macOS"
+
+    ```bash
+    brew install kind
+    kind version
+    ```
+
+=== "Linux"
+
+    ```bash
+    cd /tmp
+    KIND_VERSION=v0.31.0
+    case "$(uname -m)" in
+      x86_64) KIND_ARCH=amd64 ;;
+      aarch64|arm64) KIND_ARCH=arm64 ;;
+      *) echo "unsupported architecture: $(uname -m)" && exit 1 ;;
+    esac
+    curl -Lo ./kind "https://kind.sigs.k8s.io/dl/${KIND_VERSION}/kind-linux-${KIND_ARCH}"
+    sha256sum ./kind
+    chmod +x ./kind
+    sudo mv ./kind /usr/local/bin/kind
+    kind version
+    ```
 
 `sha256sum ./kind` 用于输出二进制文件校验值。企业环境中建议对照 kind 发布页提供的校验信息，避免使用被篡改的工具。
 
-macOS：
-
-```bash
-brew install kind
-```
-
-验证：
-
-```bash
-kind version
-```
-
-如果官方 quick start 已经发布新版本，可以替换下载 URL 中的版本号。本课程不依赖 kind 的某个极新功能，只要能稳定创建本地集群即可。
-
 ### 6.12 安装 Helm
 
-Ubuntu 使用 Helm Apt 源：
+=== "Windows + WSL2"
 
-```bash
-sudo apt-get install -y curl gpg apt-transport-https
-curl -fsSL https://packages.buildkite.com/helm-linux/helm-debian/gpgkey | gpg --dearmor | sudo tee /usr/share/keyrings/helm.gpg >/dev/null
-echo "deb [signed-by=/usr/share/keyrings/helm.gpg] https://packages.buildkite.com/helm-linux/helm-debian/any/ any main" | sudo tee /etc/apt/sources.list.d/helm-stable-debian.list
-sudo apt-get update
-sudo apt-get install -y helm
-```
+    在 WSL2 Ubuntu 中执行：
 
-macOS：
+    ```bash
+    sudo apt-get install -y curl gpg apt-transport-https
+    curl -fsSL https://packages.buildkite.com/helm-linux/helm-debian/gpgkey | gpg --dearmor | sudo tee /usr/share/keyrings/helm.gpg >/dev/null
+    echo "deb [signed-by=/usr/share/keyrings/helm.gpg] https://packages.buildkite.com/helm-linux/helm-debian/any/ any main" | sudo tee /etc/apt/sources.list.d/helm-stable-debian.list
+    sudo apt-get update
+    sudo apt-get install -y helm
+    helm version
+    ```
 
-```bash
-brew install helm
-```
+=== "macOS"
 
-验证：
+    ```bash
+    brew install helm
+    helm version
+    ```
 
-```bash
-helm version
-```
+=== "Linux"
+
+    Ubuntu 使用 Helm Apt 源：
+
+    ```bash
+    sudo apt-get install -y curl gpg apt-transport-https
+    curl -fsSL https://packages.buildkite.com/helm-linux/helm-debian/gpgkey | gpg --dearmor | sudo tee /usr/share/keyrings/helm.gpg >/dev/null
+    echo "deb [signed-by=/usr/share/keyrings/helm.gpg] https://packages.buildkite.com/helm-linux/helm-debian/any/ any main" | sudo tee /etc/apt/sources.list.d/helm-stable-debian.list
+    sudo apt-get update
+    sudo apt-get install -y helm
+    helm version
+    ```
 
 ### 6.13 配置 VS Code
 
-Windows + WSL2 推荐安装：
+=== "Windows + WSL2"
 
-- VS Code Windows 版本
-- WSL 扩展
-- Go 扩展
-- Docker 扩展
-- Kubernetes 扩展
-- YAML 扩展
+    推荐安装：
 
-从 WSL Ubuntu 进入项目目录后执行：
+    - VS Code Windows 版本
+    - WSL 扩展
+    - Go 扩展
+    - Docker 扩展
+    - Kubernetes 扩展
+    - YAML 扩展
 
-```bash
-code .
-```
+    从 WSL Ubuntu 进入项目目录后执行：
 
-第一次执行时，VS Code 会在 WSL 内安装 VS Code Server。后续编辑、终端、调试都会运行在 WSL 环境中。
+    ```bash
+    code .
+    ```
 
-判断是否打开在 WSL 中：
+    第一次执行时，VS Code 会在 WSL 内安装 VS Code Server。后续编辑、终端、调试都会运行在 WSL 环境中。
 
-- VS Code 左下角显示 `WSL: Ubuntu-24.04` 或类似标识。
-- VS Code 集成终端中执行 `pwd`，路径应类似 `/home/your-user/workspace/...`。
+    判断是否打开在 WSL 中：
+
+    - VS Code 左下角显示 `WSL: Ubuntu-24.04` 或类似标识。
+    - VS Code 集成终端中执行 `pwd`，路径应类似 `/home/your-user/workspace/...`。
+
+=== "macOS"
+
+    推荐安装 VS Code、Go、Docker、Kubernetes、YAML 等扩展。打开项目目录：
+
+    ```bash
+    code .
+    ```
+
+    如果 `code` 命令不存在，在 VS Code 中执行 `Shell Command: Install 'code' command in PATH`。
+
+=== "Linux"
+
+    推荐安装 VS Code、Go、Docker、Kubernetes、YAML 等扩展。进入项目目录后执行：
+
+    ```bash
+    code .
+    ```
 
 ### 6.14 初始化课程仓库
 
@@ -1638,21 +1739,29 @@ docker ps
 
 修复方向：
 
-Windows / macOS：
+=== "Windows + WSL2"
 
-- 打开 Docker Desktop。
-- 确认 Docker Desktop 已完成启动。
-- Windows 用户确认 WSL Integration 已开启。
+    - 打开 Docker Desktop。
+    - 确认 Docker Desktop 已完成启动。
+    - 在 Docker Desktop 设置中启用当前 Ubuntu 发行版的 WSL Integration。
+    - 回到 WSL2 Ubuntu 终端重新执行 `docker version` 和 `docker info`。
 
-Linux：
+=== "macOS"
 
-```bash
-sudo systemctl status docker --no-pager
-sudo systemctl start docker
-sudo usermod -aG docker "$USER"
-```
+    - 打开 Docker Desktop。
+    - 确认 Docker Desktop 已完成启动。
+    - 重新执行 `docker version` 和 `docker info`。
+    - 如果仍失败，检查 Docker Desktop 资源配置和当前用户权限。
 
-重新登录后再试。
+=== "Linux"
+
+    ```bash
+    sudo systemctl status docker --no-pager
+    sudo systemctl start docker
+    sudo usermod -aG docker "$USER"
+    ```
+
+    修改用户组后需要重新登录，或临时执行 `newgrp docker` 后再试。
 
 ### 9.3 检查 kind
 
@@ -1785,11 +1894,48 @@ docker pull nginx:1.27-alpine
 
 修复方向：
 
-```bash
-export http_proxy=http://proxy.example.com:8080
-export https_proxy=http://proxy.example.com:8080
-export NO_PROXY=localhost,127.0.0.1,.local,.cluster.local
-```
+=== "终端代理"
+
+    如果 `curl`、`go env` 或安装脚本无法访问公网，先在当前终端临时设置代理：
+
+    ```bash
+    export http_proxy=http://proxy.example.com:8080
+    export https_proxy=http://proxy.example.com:8080
+    export NO_PROXY=localhost,127.0.0.1,.local,.cluster.local
+    ```
+
+    设置后重新验证：
+
+    ```bash
+    env | grep -i proxy
+    curl -I https://go.dev
+    curl -I https://dl.k8s.io
+    ```
+
+=== "Docker 代理"
+
+    如果 `curl` 成功但 `docker pull` 失败，问题通常不在当前 Shell，而在 Docker Daemon。Windows 和 macOS 优先到 Docker Desktop 的代理设置中配置；Linux Docker Engine 通常通过 systemd drop-in 配置代理。
+
+    配置后重新验证：
+
+    ```bash
+    docker info
+    docker pull nginx:1.27-alpine
+    ```
+
+=== "本地地址绕过代理"
+
+    访问 kind、kubectl、NodePort 或本地服务时，要确保本地地址不走代理：
+
+    ```bash
+    export NO_PROXY=localhost,127.0.0.1,.local,.cluster.local
+    ```
+
+    如果仍然异常，先确认当前终端实际生效的代理变量：
+
+    ```bash
+    env | grep -i proxy || true
+    ```
 
 企业环境应优先使用公司内部软件源、镜像仓库和制品缓存，而不是让每台开发机直接访问公网下载所有依赖。
 

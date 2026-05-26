@@ -649,14 +649,26 @@ Linux 文件系统能力会直接迁移到 Docker 和 Kubernetes：
 | 权限 | 普通用户即可；`chown` 演练需要可使用 `sudo` |
 | 必需命令 | `ls`、`cd`、`cp`、`mv`、`rm`、`cat`、`less`、`grep`、`find`、`chmod`、`chown`、`tar`、`ln` |
 
+不同系统下推荐这样执行本实验：
+
+=== "Windows + WSL2"
+
+    在 WSL2 Ubuntu 终端中执行本章所有命令。课程仓库建议放在 `~/workspace/cloud-native-todo-platform`，不要放在 `/mnt/c/Users/...` 下，避免跨文件系统带来的性能、权限和换行符问题。
+
+=== "macOS"
+
+    在 macOS Terminal 中执行本章命令。macOS 可以完成本实验，但 `stat`、`ls` 的部分字段格式可能和 GNU/Linux 略有不同。学习时以“权限、所有者、所属组、路径含义”这些核心概念为准，不要求输出逐字符一致。
+
+=== "Linux"
+
+    在本机 Linux Shell 中执行本章命令。课程示例以 Ubuntu 22.04 / 24.04 为基准，其他发行版可以完成主要文件系统实验，但软件包命令和部分工具输出可能略有差异。
+
 本实验默认所有命令都在 `cloud-native-todo-platform` 仓库根目录执行。后续如果你关闭并重新打开终端，需要先回到仓库根目录，并重新设置：
 
 ```bash
 cd ~/workspace/cloud-native-todo-platform
 export LAB_ROOT="labs/linux-filesystem/todo-server"
 ```
-
-macOS 也可以完成本实验，但 `stat`、`ls` 的部分字段格式可能和 GNU/Linux 略有不同。学习时以“权限、所有者、所属组、路径含义”这些核心概念为准，不要求输出逐字符一致。
 
 先确认命令是否存在：
 
@@ -1153,80 +1165,102 @@ sudo chown -R todo:todo /opt/todo-platform /var/lib/todo-platform /var/log/todo-
 
 ### 6.15 查看文本内容
 
-查看配置：
+根据文件大小和排障目标选择查看方式：
 
-```bash
-cat "$LAB_ROOT/etc/todo-platform/app.env"
-```
+=== "cat 小文件"
 
-查看日志前几行：
+    一次性查看小型配置文件：
 
-```bash
-head -n 3 "$LAB_ROOT/var/log/todo-platform/todo-api.log"
-```
+    ```bash
+    cat "$LAB_ROOT/etc/todo-platform/app.env"
+    ```
 
-查看日志最后几行：
+    `cat` 适合几十行以内的小文件，例如 `.env`、`.conf`、README 片段。线上日志很大时，不要直接 `cat` 整个文件刷屏。
 
-```bash
-tail -n 3 "$LAB_ROOT/var/log/todo-platform/todo-api.log"
-```
+=== "head 前几行"
 
-分页查看日志：
+    查看日志开头，常用于确认文件格式、启动时间和第一批初始化日志：
 
-```bash
-less "$LAB_ROOT/var/log/todo-platform/todo-api.log"
-```
+    ```bash
+    head -n 3 "$LAB_ROOT/var/log/todo-platform/todo-api.log"
+    ```
 
-在 `less` 中常用按键：
+=== "tail 最后几行"
 
-| 按键 | 作用 |
-|---|---|
-| `Space` | 下一页 |
-| `b` | 上一页 |
-| `/ERROR` | 搜索 `ERROR` |
-| `n` | 下一个匹配 |
-| `q` | 退出 |
+    查看日志末尾，常用于定位最近发生的错误：
 
-`cat` 适合小文件，`less` 适合大文件。线上日志很大时，不要直接 `cat` 整个文件刷屏。
+    ```bash
+    tail -n 3 "$LAB_ROOT/var/log/todo-platform/todo-api.log"
+    ```
+
+=== "less 分页"
+
+    分页查看日志，适合较大的日志文件：
+
+    ```bash
+    less "$LAB_ROOT/var/log/todo-platform/todo-api.log"
+    ```
+
+    在 `less` 中常用按键：
+
+    | 按键 | 作用 |
+    |---|---|
+    | `Space` | 下一页 |
+    | `b` | 上一页 |
+    | `/ERROR` | 搜索 `ERROR` |
+    | `n` | 下一个匹配 |
+    | `q` | 退出 |
 
 ### 6.16 使用 `grep` 搜索日志和配置
 
-搜索错误日志：
+根据排障目标选择搜索方式：
 
-```bash
-grep -n "ERROR" "$LAB_ROOT/var/log/todo-platform/todo-api.log"
-```
+=== "错误日志"
 
-预期输出：
+    搜索错误日志：
 
-```text
-4:2026-05-26T10:02:00Z ERROR failed to connect database request_id=req-004
-```
+    ```bash
+    grep -n "ERROR" "$LAB_ROOT/var/log/todo-platform/todo-api.log"
+    ```
 
-搜索某个请求 ID：
+    预期输出：
 
-```bash
-grep -n "request_id=req-004" "$LAB_ROOT/var/log/todo-platform/"*.log
-```
+    ```text
+    4:2026-05-26T10:02:00Z ERROR failed to connect database request_id=req-004
+    ```
 
-搜索配置项：
+=== "请求 ID"
 
-```bash
-grep -n "^TODO_" "$LAB_ROOT/etc/todo-platform/app.env"
-grep -n "^TODO_LOG_LEVEL=" "$LAB_ROOT/etc/todo-platform/app.env"
-```
+    搜索某个请求 ID，适合把一次请求在多份日志中的轨迹串起来：
 
-统计错误数量：
+    ```bash
+    grep -n "request_id=req-004" "$LAB_ROOT/var/log/todo-platform/"*.log
+    ```
 
-```bash
-grep -c "ERROR" "$LAB_ROOT/var/log/todo-platform/todo-api.log"
-```
+=== "配置项"
 
-忽略大小写搜索：
+    搜索配置项，适合确认服务实际读取的关键变量：
 
-```bash
-grep -ni "database" "$LAB_ROOT/var/log/todo-platform/todo-api.log"
-```
+    ```bash
+    grep -n "^TODO_" "$LAB_ROOT/etc/todo-platform/app.env"
+    grep -n "^TODO_LOG_LEVEL=" "$LAB_ROOT/etc/todo-platform/app.env"
+    ```
+
+=== "错误数量"
+
+    统计错误数量，适合快速判断故障是否持续出现：
+
+    ```bash
+    grep -c "ERROR" "$LAB_ROOT/var/log/todo-platform/todo-api.log"
+    ```
+
+=== "忽略大小写"
+
+    忽略大小写搜索，适合关键字大小写不统一的日志：
+
+    ```bash
+    grep -ni "database" "$LAB_ROOT/var/log/todo-platform/todo-api.log"
+    ```
 
 为什么要掌握 `grep`：
 
@@ -1236,30 +1270,40 @@ grep -ni "database" "$LAB_ROOT/var/log/todo-platform/todo-api.log"
 
 ### 6.17 使用 `find` 查找文件
 
-查找所有配置文件：
+根据要找的对象选择查找方式：
 
-```bash
-find "$LAB_ROOT" -type f -name "*.env"
-find "$LAB_ROOT" -type f -name "*.conf"
-```
+=== "配置文件"
 
-查找所有日志文件：
+    查找所有配置文件：
 
-```bash
-find "$LAB_ROOT/var/log" -type f -name "*.log"
-```
+    ```bash
+    find "$LAB_ROOT" -type f -name "*.env"
+    find "$LAB_ROOT" -type f -name "*.conf"
+    ```
 
-查找可执行文件：
+=== "日志文件"
 
-```bash
-find "$LAB_ROOT/opt/todo-platform/bin" -type f -perm -111
-```
+    查找所有日志文件：
 
-查找最近 1 天修改过的文件：
+    ```bash
+    find "$LAB_ROOT/var/log" -type f -name "*.log"
+    ```
 
-```bash
-find "$LAB_ROOT" -type f -mtime -1
-```
+=== "可执行文件"
+
+    查找可执行文件，适合确认脚本或服务二进制是否具备执行权限：
+
+    ```bash
+    find "$LAB_ROOT/opt/todo-platform/bin" -type f -perm -111
+    ```
+
+=== "最近修改"
+
+    查找最近 1 天修改过的文件，适合排查“谁刚刚改过配置或日志”的问题：
+
+    ```bash
+    find "$LAB_ROOT" -type f -mtime -1
+    ```
 
 `find` 适合回答“文件在哪里”。在大型项目和服务器上，手工一层层 `cd` 很低效。
 
