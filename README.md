@@ -11,26 +11,103 @@
 
 ## 🎯 学习路径
 
-### 阶段一：基础环境与工具链（第 1-6 篇）
-Linux 命令、Git 协作、Shell 脚本等云原生开发必备基础
+当前已完成 **阶段一：基础环境与工具链**。后续阶段会继续围绕 **Cloud Native Todo Platform** 项目逐步展开。
 
-### 阶段二：Go 语言与后端开发（第 7-13 篇）
-从 Go 基础到生产级 Web API、数据库、Redis、并发编程
+<details open>
+<summary><strong>阶段一：基础环境与工具链（第 1-6 篇，已完成）</strong></summary>
 
-### 阶段三：Docker 容器技术（第 14-18 篇）
-Docker 使用、Dockerfile 编写、容器原理和运行时机制
+Linux 命令、Git 协作、Shell 脚本等云原生开发必备基础。
 
-### 阶段四：Kubernetes 核心能力（第 19-26 篇）
-K8s 架构、工作负载、网络、存储、安全、Helm、Kustomize
+- [第 1 篇：课程导学与开发环境准备](docs/chapters/stage-01-foundation/01-course-guide-env.md)
+- [第 2 篇：Linux 文件系统与命令基础](docs/chapters/stage-01-foundation/02-linux-filesystem.md)
+- [第 3 篇：Linux 进程、服务与软件管理](docs/chapters/stage-01-foundation/03-linux-process.md)
+- [第 4 篇：Linux 网络基础与排障](docs/chapters/stage-01-foundation/04-linux-network.md)
+- [第 5 篇：Git 基础与团队协作](docs/chapters/stage-01-foundation/05-git-basics.md)
+- [第 6 篇：Shell 脚本与自动化基础](docs/chapters/stage-01-foundation/06-shell-scripting.md)
 
-### 阶段五：云原生交付与可观测（第 27-31 篇）
-CI/CD、GitOps、Prometheus、Grafana、日志、链路追踪、生产排障
+</details>
 
-### 阶段六：Operator 开发与平台工程（第 32-38 篇）
-CRD、Controller、Kubebuilder、Operator 开发与生产实践
+<details>
+<summary><strong>阶段二：Go 语言与后端开发（第 7-13 篇，规划中）</strong></summary>
 
-### 阶段七：综合项目与职业能力（第 39-40 篇）
-全链路集成、简历准备、面试指导
+从 Go 基础到生产级 Web API、数据库、Redis、并发编程。
+
+- 第 7 篇：Go 语言基础
+- 第 8 篇：Go 进阶与并发编程
+- 第 9 篇：Go 工程化与测试
+- 第 10 篇：Go Web API 开发
+- 第 11 篇：数据库与持久化开发
+- 第 12 篇：Redis、缓存与异步任务
+- 第 13 篇：Go 后端生产化能力
+
+</details>
+
+<details>
+<summary><strong>阶段三：Docker 容器技术（第 14-18 篇，规划中）</strong></summary>
+
+Docker 使用、Dockerfile 编写、容器原理和运行时机制。
+
+- 第 14 篇：Docker 基础
+- 第 15 篇：Dockerfile 与镜像构建
+- 第 16 篇：Docker Compose 本地编排
+- 第 17 篇：容器运行原理
+- 第 18 篇：OCI、containerd、runc 与 CRI
+
+</details>
+
+<details>
+<summary><strong>阶段四：Kubernetes 核心能力（第 19-26 篇，规划中）</strong></summary>
+
+K8s 架构、工作负载、网络、存储、安全、Helm、Kustomize。
+
+- 第 19 篇：Kubernetes 架构与集群搭建
+- 第 20 篇：Kubernetes 核心工作负载
+- 第 21 篇：Kubernetes 服务发现与应用配置
+- 第 22 篇：Kubernetes 网络
+- 第 23 篇：Kubernetes 存储
+- 第 24 篇：Kubernetes 安全
+- 第 25 篇：Helm 包管理
+- 第 26 篇：Kustomize 多环境配置管理
+
+</details>
+
+<details>
+<summary><strong>阶段五：云原生交付与可观测（第 27-31 篇，规划中）</strong></summary>
+
+CI/CD、GitOps、Prometheus、Grafana、日志、链路追踪、生产排障。
+
+- 第 27 篇：CI/CD 自动化交付
+- 第 28 篇：GitOps 与 Argo CD
+- 第 29 篇：Prometheus 与 Grafana 监控
+- 第 30 篇：日志、ELK / Loki 与链路追踪
+- 第 31 篇：Kubernetes 生产排障
+
+</details>
+
+<details>
+<summary><strong>阶段六：Operator 开发与平台工程（第 32-38 篇，规划中）</strong></summary>
+
+CRD、Controller、Kubebuilder、Operator 开发与生产实践。
+
+- 第 32 篇：Kubernetes API 扩展机制
+- 第 33 篇：CRD 设计与实践
+- 第 34 篇：Controller、Informer 与 Workqueue
+- 第 35 篇：Kubebuilder 与 controller-runtime
+- 第 36 篇：Operator 高级机制
+- 第 37 篇：Operator 测试、发布与升级
+- 第 38 篇：Operator 生产实践
+
+</details>
+
+<details>
+<summary><strong>阶段七：综合项目与职业能力（第 39-40 篇，规划中）</strong></summary>
+
+全链路集成、简历准备、面试指导。
+
+- 第 39 篇：综合项目集成实战
+- 第 40 篇：职业能力验收与面试准备
+
+</details>
 
 ## 🚀 快速开始
 
@@ -40,7 +117,8 @@ CRD、Controller、Kubebuilder、Operator 开发与生产实践
 
 ### 本地运行
 
-**Linux / macOS**
+<details open>
+<summary><strong>Linux / macOS</strong></summary>
 
 ```bash
 # 克隆仓库
@@ -58,7 +136,10 @@ pip install -r requirements.txt
 mkdocs serve
 ```
 
-**Windows PowerShell**
+</details>
+
+<details>
+<summary><strong>Windows PowerShell</strong></summary>
 
 ```powershell
 # 克隆仓库
@@ -76,6 +157,8 @@ pip install -r requirements.txt
 mkdocs serve
 ```
 
+</details>
+
 启动后访问：`http://127.0.0.1:8000`
 
 ## 📖 文档结构
@@ -83,15 +166,15 @@ mkdocs serve
 ```
 docs/
 ├── index.md                    # 首页
-├── roadmap.md                  # 学习路线
 ├── chapters/                   # 课程章节
-│   ├── 01-course-guide-env/   # 第 1 篇：课程导学与开发环境准备
-│   ├── 02-linux-filesystem/   # 第 2 篇：Linux 文件系统与命令基础
-│   ├── 03-linux-process/      # 第 3 篇：Linux 进程、服务与软件管理
-│   ├── 04-linux-network/      # 第 4 篇：Linux 网络基础与排障
-│   ├── 05-git-basics/         # 第 5 篇：Git 基础与团队协作
-│   ├── 06-shell-scripting/    # 第 6 篇：Shell 脚本与自动化基础
-│   └── ...                     # 其他章节（待完成）
+│   ├── stage-01-foundation/   # 阶段一：基础环境与工具链
+│   │   ├── 01-course-guide-env.md   # 第 1 篇：课程导学与开发环境准备
+│   │   ├── 02-linux-filesystem.md   # 第 2 篇：Linux 文件系统与命令基础
+│   │   ├── 03-linux-process.md      # 第 3 篇：Linux 进程、服务与软件管理
+│   │   ├── 04-linux-network.md      # 第 4 篇：Linux 网络基础与排障
+│   │   ├── 05-git-basics.md         # 第 5 篇：Git 基础与团队协作
+│   │   └── 06-shell-scripting.md    # 第 6 篇：Shell 脚本与自动化基础
+│   └── ...                     # 其他阶段章节（待完成）
 ├── projects/                   # 项目实战
 ├── labs/                       # 实验索引
 ├── troubleshooting/           # 排障手册
@@ -128,23 +211,6 @@ docs/
 - **监控**：Prometheus、Grafana、Loki、Jaeger
 - **开发框架**：Gin、GORM、Kubebuilder
 
-## 📝 贡献指南
-
-欢迎贡献内容、修正错误或提出建议！
-
-1. Fork 本仓库
-2. 创建特性分支：`git checkout -b feature/your-feature`
-3. 提交更改：`git commit -m 'Add some feature'`
-4. 推送到分支：`git push origin feature/your-feature`
-5. 提交 Pull Request
-
-### 章节编写规范
-
-- 每章使用 `index.md` 作为入口
-- 遵循 [章节写作规范](docs/course-design/00-chapter-writing-standard.md)
-- 更新 `mkdocs.yml` 中的导航配置
-- 本地执行 `mkdocs build` 确认构建通过
-
 ## 🔧 构建与部署
 
 ### 本地构建
@@ -162,9 +228,34 @@ mkdocs build
 1. 推送到 `main` 分支
 2. 自动执行 `.github/workflows/deploy-docs.yml`
 3. 构建并部署到 GitHub Pages
-4. 访问 `https://docs.yxuefeng.com`
+4. 根据是否配置自定义域名选择访问地址
 
-### 自定义域名配置
+<details open>
+<summary><strong>不配置自定义域名</strong></summary>
+
+如果不配置自定义域名，GitHub Pages 默认访问地址通常是：
+
+```text
+https://<GitHub用户名>.github.io/<仓库名>/
+```
+
+以本仓库为例，默认地址可能是：
+
+```text
+https://yleoer.github.io/cloud-native-todo-platform-docs/
+```
+
+GitHub Pages 设置：
+
+1. 进入 `Settings -> Pages`
+2. 选择 `GitHub Actions` 作为部署源
+3. 不填写 `Custom domain`
+4. 等待 GitHub Actions 部署完成后访问默认 Pages 地址
+
+</details>
+
+<details>
+<summary><strong>自定义域名配置</strong></summary>
 
 DNS 配置：
 
@@ -181,18 +272,21 @@ GitHub Pages 设置：
 3. 设置 Custom domain 为 `docs.yxuefeng.com`
 4. 启用 `Enforce HTTPS`
 
+</details>
+
 ## 📄 许可证
 
 本项目采用 [MIT License](LICENSE) 开源协议。
+
+你可以在遵守许可证条款的前提下自由使用、复制、修改、合并、发布、分发和再授权本项目内容。使用时需要保留原始版权声明和许可证声明。
+
+本项目按 “AS IS” 方式提供，不附带任何明示或暗示担保。
 
 ## 🙏 致谢
 
 感谢所有为云原生技术发展做出贡献的开源社区和开发者。
 
-## 📮 联系方式
-
-- GitHub: [@yleoer](https://github.com/yleoer)
-- 网站: [https://docs.yxuefeng.com/](https://docs.yxuefeng.com/)
+感谢 Codex 在课程内容编写、文档结构调整和本地验证过程中的协作支持。
 
 ---
 

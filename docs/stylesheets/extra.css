@@ -11,13 +11,17 @@ code, pre {
   font-family: "JetBrains Mono", "Fira Code", "Consolas", "Monaco", monospace;
 }
 
-/* 扩展课程页面宽度，给正文、表格和代码块更多展示空间 */
-.md-grid {
+/* 扩展课程正文宽度，顶部栏仍保持和首页一致的居中容器 */
+.md-main__inner {
   max-width: 100%;
 }
 
-.md-main__inner {
-  max-width: 100%;
+.md-header__inner,
+.md-tabs__list {
+  box-sizing: border-box;
+  max-width: 61rem;
+  margin-left: auto;
+  margin-right: auto;
 }
 
 .md-content {
