@@ -88,6 +88,7 @@ docs/
 │   ├── 01-course-guide-env/   # 第 1 篇：课程导学与开发环境准备
 │   ├── 02-linux-filesystem/   # 第 2 篇：Linux 文件系统与命令基础
 │   ├── 03-linux-process/      # 第 3 篇：Linux 进程、服务与软件管理
+│   ├── 04-linux-network/      # 第 4 篇：Linux 网络基础与排障
 │   └── ...                     # 其他章节（待完成）
 ├── projects/                   # 项目实战
 ├── labs/                       # 实验索引

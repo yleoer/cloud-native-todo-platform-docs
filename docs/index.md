@@ -112,8 +112,8 @@ http://127.0.0.1:8000
 
 ## 下一步计划
 
-- 编写 Linux 文件系统与命令基础章节。
-- 编写 Git 与 Shell 自动化基础章节。
-- 编写 Go 语言基础与 Todo CLI 章节。
-- 搭建 Go Web API 项目骨架。
-- 引入 Docker、Kubernetes 与 Operator 实践内容。
+- 完善 Git 基础与团队协作章节，建立 Issue、分支、提交和 PR 工作流。
+- 编写 Shell 脚本与自动化章节，沉淀本地环境检查和项目脚本。
+- 进入 Go 语言基础与 Todo CLI 阶段，开始实现项目业务能力。
+- 搭建 Go Web API 项目骨架，并逐步接入数据库、缓存和测试。
+- 引入 Docker、Kubernetes 与 Operator 实践内容，将 Todo 平台推进到云原生交付形态。
