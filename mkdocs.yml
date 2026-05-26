@@ -174,8 +174,8 @@ nav:
       - 附录 A. 基础环境作品集验收: chapters/stage-01-foundation/stage-01-acceptance.md
       - 附录 B. 命令速查与排障手册: chapters/stage-01-foundation/stage-01-cheatsheet-troubleshooting.md
 
-  # - 阶段二 Go 后端开发:
-  #     - 7. Go 语言基础: chapters/stage-02-go-backend/07-go-basics.md
+  - 阶段二 Go 后端开发:
+      - 7. Go 语言基础: chapters/stage-02-go-backend/07-go-basics.md
   #     - 8. Go 并发编程: chapters/stage-02-go-backend/08-go-concurrency.md
   #     - 9. Go 工程化与测试: chapters/stage-02-go-backend/09-go-engineering.md
   #     - 10. Go Web API 开发: chapters/stage-02-go-backend/10-go-web-api.md
