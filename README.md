@@ -11,7 +11,7 @@
 
 ## 🎯 学习路径
 
-当前已完成 **阶段一：基础环境与工具链**，并正在推进 **阶段二：Go 语言与后端开发**。后续阶段会继续围绕 **Cloud Native Todo Platform** 项目逐步展开。
+当前已完成 **阶段一：基础环境与工具链** 和 **阶段二：Go 语言与后端开发**。下一步会进入 **阶段三：Docker 容器技术**，继续围绕 **Cloud Native Todo Platform** 项目推进容器化交付。
 
 <details open>
 <summary><strong>阶段一：基础环境与工具链（第 1-6 篇 + 出版附录，已完成）</strong></summary>
@@ -30,7 +30,7 @@ Linux 命令、Git 协作、Shell 脚本等云原生开发必备基础。
 </details>
 
 <details>
-<summary><strong>阶段二：Go 语言与后端开发（第 7-13 篇，已完成）</strong></summary>
+<summary><strong>阶段二：Go 语言与后端开发（第 7-13 篇 + 出版附录，已完成）</strong></summary>
 
 从 Go 基础到生产级 Web API、数据库、Redis、并发编程。
 
@@ -41,6 +41,7 @@ Linux 命令、Git 协作、Shell 脚本等云原生开发必备基础。
 - [第 11 篇：数据库与持久化开发](docs/chapters/stage-02-go-backend/11-database.md)
 - [第 12 篇：Redis、缓存与异步任务](docs/chapters/stage-02-go-backend/12-redis-cache.md)
 - [第 13 篇：Go 后端生产化能力](docs/chapters/stage-02-go-backend/13-go-production.md)
+- [附录 A：Go 后端项目综合验收](docs/chapters/stage-02-go-backend/stage-02-acceptance.md)
 
 </details>
 
@@ -185,7 +186,8 @@ docs/
 │   │   ├── 10-go-web-api.md         # 第 10 篇：Go Web API 开发
 │   │   ├── 11-database.md           # 第 11 篇：数据库与持久化开发
 │   │   ├── 12-redis-cache.md        # 第 12 篇：Redis、缓存与异步任务
-│   │   └── 13-go-production.md      # 第 13 篇：Go 后端生产化能力
+│   │   ├── 13-go-production.md      # 第 13 篇：Go 后端生产化能力
+│   │   └── stage-02-acceptance.md   # 阶段二附录 A：Go 后端项目综合验收
 │   └── ...                     # 其他阶段章节（待完成）
 ├── projects/                   # 项目实战
 ├── labs/                       # 实验索引
