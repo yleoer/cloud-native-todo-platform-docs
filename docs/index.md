@@ -1,3 +1,9 @@
+---
+hide:
+  - navigation
+  - toc
+---
+
 # 从 Go、Docker、Kubernetes 到 Operator
 
 欢迎来到这套面向真实岗位能力的云原生系统教程。
