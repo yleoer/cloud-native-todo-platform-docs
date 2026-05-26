@@ -178,7 +178,7 @@ nav:
       - 7. Go 语言基础: chapters/stage-02-go-backend/07-go-basics.md
       - 8. Go 并发编程: chapters/stage-02-go-backend/08-go-concurrency.md
       - 9. Go 工程化与测试: chapters/stage-02-go-backend/09-go-engineering.md
-  #     - 10. Go Web API 开发: chapters/stage-02-go-backend/10-go-web-api.md
+      - 10. Go Web API 开发: chapters/stage-02-go-backend/10-go-web-api.md
   #     - 11. 数据库与持久化: chapters/stage-02-go-backend/11-database.md
   #     - 12. Redis 缓存与异步任务: chapters/stage-02-go-backend/12-redis-cache.md
   #     - 13. Go 后端生产化: chapters/stage-02-go-backend/13-go-production.md
