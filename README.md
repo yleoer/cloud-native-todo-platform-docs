@@ -46,13 +46,13 @@ Linux 命令、Git 协作、Shell 脚本等云原生开发必备基础。
 </details>
 
 <details>
-<summary><strong>阶段三：Docker 容器技术（第 14-18 篇，第 14-15 篇已完成）</strong></summary>
+<summary><strong>阶段三：Docker 容器技术（第 14-18 篇，第 14-16 篇已完成）</strong></summary>
 
-Docker 使用、Dockerfile 编写、容器原理和运行时机制。
+Docker 使用、Dockerfile 编写、Docker Compose 本地编排、容器原理和运行时机制。
 
 - [第 14 篇：Docker 基础](docs/chapters/stage-03-docker/14-docker-basics.md)
 - [第 15 篇：Dockerfile 与镜像构建](docs/chapters/stage-03-docker/15-dockerfile.md)
-- 第 16 篇：Docker Compose 本地编排
+- [第 16 篇：Docker Compose 本地编排](docs/chapters/stage-03-docker/16-docker-compose.md)
 - 第 17 篇：容器运行原理
 - 第 18 篇：OCI、containerd、runc 与 CRI
 
@@ -190,7 +190,8 @@ docs/
 │   │   └── stage-02-acceptance.md   # 阶段二附录 A：Go 后端项目综合验收
 │   ├── stage-03-docker/        # 阶段三：Docker 容器技术
 │   │   ├── 14-docker-basics.md      # 第 14 篇：Docker 基础
-│   │   └── 15-dockerfile.md         # 第 15 篇：Dockerfile 与镜像构建
+│   │   ├── 15-dockerfile.md         # 第 15 篇：Dockerfile 与镜像构建
+│   │   └── 16-docker-compose.md     # 第 16 篇：Docker Compose 本地编排
 │   └── ...                     # 后续阶段章节（待完成）
 ├── projects/                   # 项目实战
 ├── labs/                       # 实验索引
