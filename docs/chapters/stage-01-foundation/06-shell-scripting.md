@@ -1172,12 +1172,16 @@ TODO_CLEAN_ALL=true ./scripts/clean.sh
 ```bash
 pwd
 git status --short
+printf 'current directory: %s\n' "$PWD"
+test -f go.mod || { echo "not in project root"; exit 1; }
+test -d .todo-platform && find .todo-platform -maxdepth 2 -type f | head
 rm -rf .todo-platform
 rm -rf cmd/todo-dev-server
 rm -f scripts/dev.sh scripts/check.sh scripts/clean.sh scripts/exit-code-demo.sh
 ```
 
-不要在不确定目录时执行删除命令。真实项目中更推荐用 Git 丢弃未提交的实验文件，但这属于 Git 章节内容，本篇只强调安全删除意识。
+!!! warning "删除前必须确认目录"
+    这组 `rm -rf` 只允许在 `cloud-native-todo-platform` 项目根目录执行。执行前至少确认 `pwd`、`git status --short` 和 `go.mod`，不要在 `/`、`$HOME`、`/tmp` 或不确定目录中复制粘贴删除命令。真实项目中更推荐用 Git 丢弃未提交的实验文件，或让清理脚本像本篇 `safe_rm_dir` 一样限制可删除路径。
 
 ## 7. 真实工作案例
 
@@ -1461,6 +1465,7 @@ jobs:
 | 接口可访问 | `curl -fsS http://127.0.0.1:18080/healthz` | 返回成功 |
 | 服务可清理 | `./scripts/clean.sh` | PID 文件被删除或进程停止 |
 | 日志可清理 | `TODO_CLEAN_LOGS=true ./scripts/clean.sh` | 日志目录被删除或为空 |
+| ShellCheck 通过 | `shellcheck scripts/*.sh` | 没有高风险告警 |
 | CI 可接入 | `bash -n scripts/*.sh` 或 GitHub Actions | PR 能执行脚本检查 |
 
 ### 本篇能力验收标准

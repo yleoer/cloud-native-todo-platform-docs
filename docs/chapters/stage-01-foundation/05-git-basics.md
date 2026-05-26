@@ -961,7 +961,7 @@ Switched to a new branch 'docs/issue-3-git-workflow'
 
     ## Changes
 
-    - TODO
+    - Describe the main changes before submitting this PR.
 
     ## Verification
 
@@ -1087,7 +1087,7 @@ Switched to a new branch 'docs/issue-3-git-workflow'
 
     ## Changes
 
-    - TODO
+    - Describe the main changes before submitting this PR.
 
     ## Verification
 
@@ -1111,6 +1111,9 @@ Switched to a new branch 'docs/issue-3-git-workflow'
 - `.gitattributes` 统一跨平台换行，减少无意义 diff。
 - `.gitmessage` 和 PR 模板让每次变更都包含背景、验证和风险说明。
 - `git-workflow.md` 把团队规则写进仓库，避免只靠口头约定。
+
+!!! note "模板占位符必须替换"
+    `.gitmessage` 和 `.github/pull_request_template.md` 中的 `<type>`、`<summary>`、`Refs #`、`Closes #` 都是占位符。真实提交或 PR 创建前必须替换成具体内容，例如 `docs(git): add branch workflow` 和 `Closes #3`。模板的作用是提醒你补齐背景、变更、验证和风险，不是让占位文本原样进入团队仓库历史。
 
 ### 6.12 查看差异并提交
 
