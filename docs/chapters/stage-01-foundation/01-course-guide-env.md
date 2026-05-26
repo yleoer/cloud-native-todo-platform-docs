@@ -509,6 +509,15 @@ The connection to the server localhost:8080 was refused
 - 编写环境检查脚本。
 - 用 Git 完成第一次提交。
 
+为了让学习曲线更平滑，本实验分为两条路径：
+
+| 路径 | 必做内容 | 适合人群 | 通过标准 |
+|---|---|---|---|
+| 基础必做 | 完成系统环境、VS Code、Go、Git、Docker、kubectl、kind、Helm 安装和版本验证 | 第一次系统学习云原生的新手 | 能执行 `go version`、`git --version`、`docker version`、`kubectl version --client`、`kind version`、`helm version` |
+| 进阶挑战 | 创建 kind 集群、部署 Kubernetes smoke test、编写 `check-env.sh` 和 `Makefile` | 已有一点 Linux / Docker 基础，或想提前验证完整工具链的学习者 | 能执行 `make smoke`，并通过 `curl -I http://127.0.0.1:30080` 访问 smoke test 服务 |
+
+如果你是完全新手，建议先完成基础必做路径，再继续阅读后面的进阶挑战。不要因为 kind 或 Kubernetes smoke test 一时失败就卡住后续学习；它们会在 Kubernetes 阶段再次系统讲解。
+
 ### 6.2 实验环境
 
 推荐配置：
@@ -525,6 +534,17 @@ The connection to the server localhost:8080 was refused
 | Docker | Docker Desktop 或 Docker Engine |
 
 如果机器只有 8GB 内存，也能学习前期 Go 和 Linux 内容，但 Docker、kind、Kubernetes、监控组件同时运行时会比较紧张。
+
+课程验证版本如下。工具版本会随时间更新，出版后请优先参考官方安装页，同时保留团队内部验证过的版本矩阵，避免成员之间版本差异过大。
+
+| 工具 | 课程验证版本或策略 | 说明 |
+|---|---|---|
+| Ubuntu | 22.04 LTS / 24.04 LTS | Windows 学员推荐 WSL2 Ubuntu 24.04 LTS |
+| Go | 1.26.3 | 手动安装时应核对官方 SHA256 |
+| Docker | Docker Desktop 或 Docker Engine 当前稳定版 | Windows / macOS 推荐 Docker Desktop，Linux 可用 Docker Engine |
+| kubectl | 使用 `stable.txt` 获取当前稳定版 | 生产中应遵守 Kubernetes 版本偏差策略，通常不要让 kubectl 与集群版本差距过大 |
+| kind | v0.31.0 | 本课程用于本地 Kubernetes 实验 |
+| Helm | 官方 apt 源或 Homebrew 当前稳定版 | 生产项目应记录 Helm CLI 与 Chart 兼容性 |
 
 本篇安装步骤按操作系统分流执行，不要把三套系统命令混在一起跑。先在 6.4-6.6 的标签页中完成自己系统的基础准备，再继续后续工具安装。
 
@@ -701,6 +721,9 @@ cloud-native-todo-platform/
 ### 6.7 安装 Go
 
 Go 的安装方式和操作系统有关。Windows 用户在 WSL2 Ubuntu 中执行 Linux 安装方式；macOS 用户优先使用 Homebrew；Linux 用户使用官方二进制包。
+
+!!! warning "安装 Go 前先确认路径"
+    Linux / WSL2 安装步骤会执行 `sudo rm -rf /usr/local/go`，它只用于删除旧的 Go 官方安装目录。执行前请先确认命令中的路径确实是 `/usr/local/go`，不要改成变量拼接或不确定路径。生产环境升级语言运行时应先做版本兼容验证和回滚方案。
 
 === "Windows + WSL2"
 
@@ -1188,6 +1211,8 @@ EOF
 这段程序只做一件事：用 Go 编译并运行一个最小程序，输出当前 Go 版本、操作系统和 CPU 架构。它比 `go version` 多验证一步：Go 工具链不仅能显示版本，也能真正编译运行课程仓库中的代码。
 
 ### 6.15 创建 kind 集群配置
+
+从这里开始属于进阶挑战路径，会使用 Docker 和 kind 创建本地 Kubernetes 集群。如果你当前只想完成基础环境准备，可以先跳到 6.17 编写环境检查脚本，确认基础命令可用；等学习到 Kubernetes 阶段，再回来完整执行 kind 集群和 smoke test。
 
 创建 `deployments/kind/cluster.yaml`：
 

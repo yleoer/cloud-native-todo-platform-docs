@@ -14,7 +14,7 @@
 当前已完成 **阶段一：基础环境与工具链**。后续阶段会继续围绕 **Cloud Native Todo Platform** 项目逐步展开。
 
 <details open>
-<summary><strong>阶段一：基础环境与工具链（第 1-6 篇，已完成）</strong></summary>
+<summary><strong>阶段一：基础环境与工具链（第 1-6 篇 + 出版附录，已完成）</strong></summary>
 
 Linux 命令、Git 协作、Shell 脚本等云原生开发必备基础。
 
@@ -24,6 +24,8 @@ Linux 命令、Git 协作、Shell 脚本等云原生开发必备基础。
 - [第 4 篇：Linux 网络基础与排障](docs/chapters/stage-01-foundation/04-linux-network.md)
 - [第 5 篇：Git 基础与团队协作](docs/chapters/stage-01-foundation/05-git-basics.md)
 - [第 6 篇：Shell 脚本与自动化基础](docs/chapters/stage-01-foundation/06-shell-scripting.md)
+- [附录 A：基础环境作品集验收](docs/chapters/stage-01-foundation/stage-01-acceptance.md)
+- [附录 B：命令速查与排障手册](docs/chapters/stage-01-foundation/stage-01-cheatsheet-troubleshooting.md)
 
 </details>
 
@@ -173,7 +175,9 @@ docs/
 │   │   ├── 03-linux-process.md      # 第 3 篇：Linux 进程、服务与软件管理
 │   │   ├── 04-linux-network.md      # 第 4 篇：Linux 网络基础与排障
 │   │   ├── 05-git-basics.md         # 第 5 篇：Git 基础与团队协作
-│   │   └── 06-shell-scripting.md    # 第 6 篇：Shell 脚本与自动化基础
+│   │   ├── 06-shell-scripting.md    # 第 6 篇：Shell 脚本与自动化基础
+│   │   ├── stage-01-acceptance.md   # 阶段一附录 A：作品集验收
+│   │   └── stage-01-cheatsheet-troubleshooting.md # 阶段一附录 B：速查与排障
 │   └── ...                     # 其他阶段章节（待完成）
 ├── projects/                   # 项目实战
 ├── labs/                       # 实验索引
