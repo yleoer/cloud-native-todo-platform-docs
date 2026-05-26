@@ -30,13 +30,13 @@ Linux 命令、Git 协作、Shell 脚本等云原生开发必备基础。
 </details>
 
 <details>
-<summary><strong>阶段二：Go 语言与后端开发（第 7-13 篇，第 7-8 篇已完成）</strong></summary>
+<summary><strong>阶段二：Go 语言与后端开发（第 7-13 篇，第 7-9 篇已完成）</strong></summary>
 
 从 Go 基础到生产级 Web API、数据库、Redis、并发编程。
 
 - [第 7 篇：Go 语言基础](docs/chapters/stage-02-go-backend/07-go-basics.md)
 - [第 8 篇：Go 进阶与并发编程](docs/chapters/stage-02-go-backend/08-go-concurrency.md)
-- 第 9 篇：Go 工程化与测试
+- [第 9 篇：Go 工程化与测试](docs/chapters/stage-02-go-backend/09-go-engineering.md)
 - 第 10 篇：Go Web API 开发
 - 第 11 篇：数据库与持久化开发
 - 第 12 篇：Redis、缓存与异步任务
@@ -180,7 +180,8 @@ docs/
 │   │   └── stage-01-cheatsheet-troubleshooting.md # 阶段一附录 B：速查与排障
 │   ├── stage-02-go-backend/    # 阶段二：Go 语言与后端开发
 │   │   ├── 07-go-basics.md          # 第 7 篇：Go 语言基础
-│   │   └── 08-go-concurrency.md     # 第 8 篇：Go 进阶与并发编程
+│   │   ├── 08-go-concurrency.md     # 第 8 篇：Go 进阶与并发编程
+│   │   └── 09-go-engineering.md     # 第 9 篇：Go 工程化与测试
 │   └── ...                     # 其他阶段章节（待完成）
 ├── projects/                   # 项目实战
 ├── labs/                       # 实验索引
