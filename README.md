@@ -90,6 +90,7 @@ docs/
 │   ├── 03-linux-process/      # 第 3 篇：Linux 进程、服务与软件管理
 │   ├── 04-linux-network/      # 第 4 篇：Linux 网络基础与排障
 │   ├── 05-git-basics/         # 第 5 篇：Git 基础与团队协作
+│   ├── 06-shell-scripting/    # 第 6 篇：Shell 脚本与自动化基础
 │   └── ...                     # 其他章节（待完成）
 ├── projects/                   # 项目实战
 ├── labs/                       # 实验索引
