@@ -182,6 +182,7 @@ nav:
       - 11. 数据库与持久化: chapters/stage-02-go-backend/11-database.md
       - 12. Redis 缓存与异步任务: chapters/stage-02-go-backend/12-redis-cache.md
       - 13. Go 后端生产化: chapters/stage-02-go-backend/13-go-production.md
+      - 附录 A. Go 后端项目综合验收: chapters/stage-02-go-backend/stage-02-acceptance.md
 
   # - 阶段三 Docker 容器:
   #     - 14. Docker 基础: chapters/stage-03-docker/14-docker-basics.md
