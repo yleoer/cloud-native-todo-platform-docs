@@ -207,10 +207,10 @@ bind: address already in use
 dig example.com
 ```
 
-可能返回：
+可能返回一个或多个 A / AAAA 记录。具体 IP 会随 DNS、地区和时间变化，下面只表示输出形态：
 
 ```text
-example.com.  300  IN  A  93.184.216.34
+example.com.  300  IN  A  <IP address>
 ```
 
 但要注意，应用程序的“系统解析”不一定只走 DNS。Linux 可能先查 `/etc/hosts`，再查 DNS。比如 `localhost` 通常来自 `/etc/hosts`，而不是公网 DNS。
@@ -375,6 +375,35 @@ curl -i http://127.0.0.1:18080/healthz
 
     如果服务运行在 WSL2 中，建议优先在 WSL2 终端内执行 Linux 命令，再用 Windows 浏览器验证访问。
 
+### 5.6 从本机端口映射到 Docker 和 Kubernetes
+
+本篇虽然还没有正式进入 Docker 和 Kubernetes，但你现在学习的端口、监听地址和 HTTP 检查，会直接迁移到后面的容器与集群排障。
+
+| 当前阶段 | 访问入口 | 后续对应概念 | 排障重点 |
+|---|---|---|---|
+| 本机进程 | `127.0.0.1:18080` | Linux 进程监听端口 | `ss -lntp` 是否有 `LISTEN` |
+| Docker 容器 | `localhost:18080 -> container:8080` | `docker run -p 18080:8080` | 宿主机端口映射和容器内监听地址 |
+| Kubernetes Pod | `PodIP:8080` | `containerPort` | 容器内进程是否监听正确端口 |
+| Kubernetes Service | `ServiceIP:80 -> PodIP:8080` | `port`、`targetPort`、Endpoints | Service selector 和 Endpoints 是否正确 |
+| Kubernetes Ingress | `https://todo.example.com` | Ingress rule、Service backend | 域名、路径、证书、上游 Service |
+
+同一个 Todo API 在不同阶段的访问链路会变长，但排障顺序不变：
+
+```mermaid
+flowchart LR
+    Client["Client"]
+    DNS["DNS"]
+    HostPort["Host or Ingress Port"]
+    Service["Service or Port Mapping"]
+    Pod["Pod or Process IP"]
+    App["Application Listen Port"]
+    Health["/healthz or /readyz"]
+
+    Client --> DNS --> HostPort --> Service --> Pod --> App --> Health
+```
+
+因此，后面遇到 Docker 端口映射失败、Kubernetes Service 没有 Endpoints、Ingress 返回 502 时，你仍然会回到这几个问题：名字解析到哪里，流量打到哪个 IP，端口有没有监听，请求路径是否正确，应用是否返回健康状态。
+
 ## 6. 手把手实验
 
 ### 6.1 实验目标
@@ -388,8 +417,9 @@ curl -i http://127.0.0.1:18080/healthz
 5. 使用 `dig`、`nslookup`、`getent hosts` 排查域名解析。
 6. 故意制造端口冲突并定位进程。
 7. 对比 `127.0.0.1` 和 `0.0.0.0` 的监听差异。
-8. 使用 `tcpdump` 抓取本机 HTTP 请求。
-9. 清理进程和临时抓包文件。
+8. 可选扩展：检查防火墙规则。
+9. 可选扩展：使用 `tcpdump` 抓取本机 HTTP 请求。
+10. 精确清理实验进程和临时抓包文件。
 
 ### 6.2 实验环境
 
@@ -404,6 +434,8 @@ curl -i http://127.0.0.1:18080/healthz
 | wget | 推荐 |
 | dig / nslookup | 推荐 |
 | tcpdump | 推荐 |
+
+本篇最终验收默认以 **Linux / WSL2 Ubuntu** 为主线环境。macOS 和 Windows 可以完成大部分概念验证，但 `ss`、`getent`、`ip`、回环网卡名称和防火墙命令会有差异。遇到平台差异时，优先使用本篇标签页中的等价命令。
 
 安装工具：
 
@@ -478,10 +510,18 @@ pwd
 初始化 Go 模块。如果前面已经执行过，可以跳过：
 
 ```bash
-go mod init github.com/yourname/cloud-native-todo-platform
+if [ ! -f go.mod ]; then
+  go mod init example.com/cloud-native-todo-platform
+fi
 ```
 
-如果看到下面提示，说明模块已存在，不是错误：
+这里使用 `example.com/cloud-native-todo-platform` 作为本地教学模块路径。真实项目中，如果你准备把代码推送到 GitHub，可以替换成：
+
+```text
+github.com/<你的 GitHub 用户名>/cloud-native-todo-platform
+```
+
+如果你直接执行 `go mod init` 时看到下面提示，说明模块已存在，不是错误：
 
 ```text
 go: /home/dev/workspace/cloud-native-todo-platform/go.mod already exists
@@ -938,16 +978,21 @@ curl -i http://127.0.0.1:18081/healthz
 
 ### 6.11 对比 127.0.0.1 与 0.0.0.0
 
-先停止所有 demo 进程：
+先确认 `18080` 没有被旧实验进程占用：
 
 ```bash
-pkill -f todo-network-demo || true
+ss -lntp 'sport = :18080' || true
 ```
 
-只监听本机：
+如果还能看到 `todo-network-demo`，优先回到启动它的终端按 `Ctrl+C` 停止。不要直接使用 `pkill -f todo-network-demo` 这类模糊匹配命令，因为它可能误杀其他同名实验进程。
+
+只监听本机，并把进程 PID 记录下来：
 
 ```bash
-TODO_ADDR=127.0.0.1:18080 ./bin/todo-network-demo
+TODO_ADDR=127.0.0.1:18080 ./bin/todo-network-demo > /tmp/todo-network-loopback.log 2>&1 &
+DEMO_PID=$!
+echo "${DEMO_PID}" > /tmp/todo-network-demo.pid
+sleep 1
 ```
 
 查看监听：
@@ -962,10 +1007,23 @@ ss -lntp 'sport = :18080'
 127.0.0.1:18080
 ```
 
-停止后，改为监听所有 IPv4 地址：
+精确停止刚才启动的进程：
 
 ```bash
-TODO_ADDR=0.0.0.0:18080 ./bin/todo-network-demo
+DEMO_PID="$(cat /tmp/todo-network-demo.pid)"
+if ps -p "${DEMO_PID}" -o args= | grep -q "todo-network-demo"; then
+  kill "${DEMO_PID}"
+fi
+rm -f /tmp/todo-network-demo.pid
+```
+
+改为监听所有 IPv4 地址：
+
+```bash
+TODO_ADDR=0.0.0.0:18080 ./bin/todo-network-demo > /tmp/todo-network-all.log 2>&1 &
+DEMO_PID=$!
+echo "${DEMO_PID}" > /tmp/todo-network-demo.pid
+sleep 1
 ```
 
 再次查看：
@@ -985,9 +1043,22 @@ ss -lntp 'sport = :18080'
 !!! warning "不要在公共网络暴露实验服务"
     本实验服务没有认证、限流、TLS 和安全加固。只能用于本地学习，不要部署到公网服务器对外开放。
 
-### 6.12 防火墙检查
+完成对比后，精确停止实验进程：
 
-不同系统的防火墙工具不同。
+```bash
+DEMO_PID="$(cat /tmp/todo-network-demo.pid)"
+if ps -p "${DEMO_PID}" -o args= | grep -q "todo-network-demo"; then
+  kill "${DEMO_PID}"
+fi
+rm -f /tmp/todo-network-demo.pid
+```
+
+### 6.12 可选扩展：防火墙检查
+
+不同系统的防火墙工具不同。本节是可选扩展，只建议在个人虚拟机、个人云主机或明确授权的实验机上执行。
+
+!!! warning "先确认你有权限修改防火墙"
+    不要在公司办公电脑、生产服务器、共享开发机或公网机器上随意开放端口。防火墙规则可能影响整台机器的安全边界。执行开放端口命令前，先确认这是受控实验环境，并准备好清理命令。
 
 === "Ubuntu / Debian"
 
@@ -1021,7 +1092,7 @@ ss -lntp 'sport = :18080'
     sudo firewall-cmd --list-all
     ```
 
-    临时开放端口：
+    如果你在受控实验机上测试局域网访问，可以临时开放端口：
 
     ```bash
     sudo firewall-cmd --add-port=18080/tcp
@@ -1060,7 +1131,12 @@ ss -lntp 'sport = :18080'
 
     再检查 Windows 防火墙、公司安全软件和 WSL 网络转发。
 
-### 6.13 使用 tcpdump 抓包
+### 6.13 可选扩展：使用 tcpdump 抓包
+
+`tcpdump` 可以证明请求是否真的经过某块网卡，但它也可能捕获请求头、Token、Cookie、请求体等敏感信息。本节只在本机回环网卡上抓本篇 demo 的 HTTP 请求，仍然建议你把它当成敏感操作对待。
+
+!!! warning "抓包前先限定范围"
+    抓包时要指定网卡、端口和包数量。本篇使用 `tcp port 18080` 和 `-c` 限制范围。不要在未知环境里执行不带过滤条件的全量抓包。
 
 确保 demo 服务正在运行：
 
@@ -1128,6 +1204,9 @@ tcpdump -nn -r /tmp/todo-network-demo.pcap
 
 为了让后续课程可以复用本篇成果，写一个独立的 `Makefile.network`：
 
+!!! note "Makefile.network 的适用范围"
+    下面的 `network-build`、`network-run`、`network-check`、`network-todos` 在 Linux、WSL2 和 macOS 上都比较通用。`network-listen` 和 `network-dns` 默认使用 Linux / WSL2 的 `ss`、`getent`、`dig`。macOS 或 Windows 学员可以使用前文标签页中的 `lsof`、`netstat`、`Get-NetTCPConnection`、`Resolve-DnsName` 等等价命令完成验收。
+
 ```bash
 cat > Makefile.network <<'EOF'
 APP_ADDR ?= 127.0.0.1:18080
@@ -1156,7 +1235,14 @@ network-dns:
 	dig +short example.com || true
 
 network-clean:
-	rm -f /tmp/todo-network-demo.pcap
+	if [ -f /tmp/todo-network-demo.pid ]; then \
+	  DEMO_PID=$$(cat /tmp/todo-network-demo.pid); \
+	  if ps -p "$${DEMO_PID}" -o args= | grep -q "todo-network-demo"; then \
+	    kill "$${DEMO_PID}"; \
+	  fi; \
+	  rm -f /tmp/todo-network-demo.pid; \
+	fi
+	rm -f /tmp/todo-network-demo.pcap /tmp/todo-network-loopback.log /tmp/todo-network-all.log
 EOF
 ```
 
@@ -1180,6 +1266,12 @@ make -f Makefile.network network-check
 make -f Makefile.network network-todos
 ```
 
+清理可选扩展实验产生的临时文件和 PID 文件：
+
+```bash
+make -f Makefile.network network-clean
+```
+
 ### 6.15 清理步骤
 
 停止前台服务：
@@ -1197,13 +1289,25 @@ pgrep -af todo-network-demo || true
 如确认是本实验进程，可以停止：
 
 ```bash
-pkill -f todo-network-demo || true
+if [ -f /tmp/todo-network-demo.pid ]; then
+  DEMO_PID="$(cat /tmp/todo-network-demo.pid)"
+  if ps -p "${DEMO_PID}" -o args= | grep -q "todo-network-demo"; then
+    kill "${DEMO_PID}"
+  fi
+  rm -f /tmp/todo-network-demo.pid
+fi
+```
+
+如果没有 PID 文件，不要直接使用模糊匹配的 `pkill -f`。先用端口定位，再确认 PID 是否属于本实验：
+
+```bash
+ss -lntp 'sport = :18080' || true
 ```
 
 清理抓包文件：
 
 ```bash
-rm -f /tmp/todo-network-demo.pcap
+rm -f /tmp/todo-network-demo.pcap /tmp/todo-network-loopback.log /tmp/todo-network-all.log
 ```
 
 本篇创建的代码建议保留：
@@ -1300,6 +1404,17 @@ Ingress 返回 `502 Bad Gateway` 时，常见路径是：
 Client -> DNS -> Ingress -> Service -> Pod IP:containerPort -> 应用进程
 ```
 
+把本篇命令映射到 Kubernetes 时，可以这样理解：
+
+| 本篇排查点 | Kubernetes 中对应对象 | 常用命令 |
+|---|---|---|
+| 域名是否解析 | Ingress Host、CoreDNS | `kubectl get ingress`、`kubectl -n kube-system logs deploy/coredns` |
+| 入口是否转发 | Ingress Controller | `kubectl describe ingress todo-api` |
+| 服务是否有后端 | Service、Endpoints | `kubectl get svc,endpoints todo-api` |
+| Pod 是否可接流量 | Pod Ready 状态 | `kubectl get pod -l app=todo-api -o wide` |
+| 应用端口是否监听 | 容器内进程 | `kubectl exec deploy/todo-api -- ss -lntp` |
+| HTTP 是否正常 | 健康检查路径 | `kubectl port-forward svc/todo-api 18080:80` 后执行 `curl` |
+
 对应排查：
 
 ```bash
@@ -1326,6 +1441,9 @@ kubectl exec deploy/todo-api -- ss -lntp
 | `tcpdump` 没输出 | 抓错网卡、过滤条件错误、请求没发出 | 换 `-i any` 或确认请求 |
 | `ping` 成功但 HTTP 失败 | ICMP 通，不代表 TCP 端口通 | 用 `curl` 和 `ss` |
 | `dig` 正常但应用解析异常 | `/etc/hosts` 或系统解析顺序不同 | 用 `getent hosts` 对比 |
+| 复制了占位模块路径 | `go.mod` 中仍是示例路径 | 换成自己的模块路径，或仅用于本地实验 |
+| 防火墙实验后忘记清理 | 端口持续对外开放 | 删除临时规则并复查防火墙状态 |
+| 模糊清理进程 | `pkill -f` 误杀其他同名进程 | 使用 PID 文件或端口定位后再精确停止 |
 
 ## 9. 排障方法
 
@@ -1438,6 +1556,39 @@ curl -i http://127.0.0.1:18080/todos
 ```
 
 这个文件可以附到 Issue、工单或故障复盘中，帮助团队快速理解现场。
+
+提交排障信息时，建议同时补一份人工可读的故障记录：
+
+````markdown
+## 故障现象
+
+- 访问 URL：
+- 失败时间：
+- 报错信息：
+
+## 当前判断
+
+- DNS 解析结果：
+- 目标 IP 和端口：
+- 端口监听情况：
+- HTTP 状态码：
+- 是否抓到请求包：
+
+## 已执行命令
+
+```text
+curl -v ...
+ss -lntp ...
+getent hosts ...
+```
+
+## 初步结论
+
+- 失败发生在哪一层：
+- 下一步修复动作：
+````
+
+这类记录比“访问不了”更有价值。团队成员看到它，就能知道问题卡在 DNS、网络、端口、网关还是应用层。
 
 ## 10. 生产环境注意事项
 
@@ -1557,6 +1708,8 @@ cloud-native-todo-platform/
 
 ### 验收步骤
 
+以下验收默认在 Linux / WSL2 Ubuntu 中执行。macOS 学员可以用 `lsof`、`netstat` 替代 `ss`，Windows 学员可以用 `Get-NetTCPConnection`、`Resolve-DnsName`、`Test-NetConnection` 完成等价检查。
+
 启动服务：
 
 ```bash
@@ -1602,7 +1755,7 @@ cat network-debug-report.txt
 - 能通过 HTTP 状态码判断服务是否正常。
 - 能说明 `localhost` 如何解析。
 - 能制造并定位一次端口冲突。
-- 能使用 `tcpdump` 证明请求经过本机网卡。
+- 能在 Linux / WSL2 中使用 `tcpdump` 证明请求经过本机网卡，或在 macOS / Windows 中说清对应替代检查方式。
 
 ## 12. 本章练习题
 
@@ -1619,8 +1772,8 @@ cat network-debug-report.txt
 1. 将 Todo Demo 改为监听 `127.0.0.1:18081`，并用 `curl` 验证。
 2. 保持一个服务占用 `18080`，再次启动同端口服务，记录错误并找出 PID。
 3. 使用 `TODO_READY=false` 启动服务，观察 `/readyz` 返回的 HTTP 状态码。
-4. 使用 `tcpdump` 抓取一次 `/todos` 请求，并保存为 `/tmp/todo-network-demo.pcap`。
-5. 修改 `/etc/hosts` 增加一条本地域名，例如 `todo.local` 指向 `127.0.0.1`，再用 `curl http://todo.local:18080/healthz` 验证。实验结束后恢复 `/etc/hosts`。
+4. 可选：在个人实验机上使用 `tcpdump` 抓取一次 `/todos` 请求，并保存为 `/tmp/todo-network-demo.pcap`。
+5. 可选：在个人实验机上备份 `/etc/hosts` 后增加一条本地域名，例如 `todo.local` 指向 `127.0.0.1`，再用 `curl http://todo.local:18080/healthz` 验证。实验结束后必须恢复 `/etc/hosts`。
 
 ### 思考题
 
