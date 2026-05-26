@@ -1,235 +1,196 @@
-# 从 Go、Docker、Kubernetes 到 Operator 文档站
+# 从 Go、Docker、Kubernetes 到 Operator
 
-这是教程 **《从 Go 后端开发、Docker 容器化、Kubernetes 到 Operator 开发与生产实践》** 的 MkDocs Material 文档站。
+一套面向中高级云原生工程能力的系统教程，共 **40 大篇，200 个章节**，围绕 **Cloud Native Todo Platform** 项目主线展开。
 
-站点主线项目是 **Cloud Native Todo Platform**。教程会从 Linux、Git、Shell 基础开始，逐步覆盖 Go 后端、Docker、Kubernetes、Helm、CI/CD、GitOps、监控日志、生产排障、CRD、Controller 和 Operator 开发。
+## 📚 课程特色
 
-## 项目介绍
+- **系统性**：从 Linux 基础到 Operator 开发，完整覆盖云原生技术栈
+- **实战性**：每个阶段都有配套项目，最终完成完整的云原生平台
+- **渐进性**：7 个学习阶段，循序渐进，适合不同基础的学习者
+- **职业导向**：对标真实岗位能力，包含面试题库和职业规划
 
-本仓库用于维护教程文档，技术栈为：
+## 🎯 学习路径
 
-- MkDocs
-- MkDocs Material
-- GitHub Actions
-- GitHub Pages
+### 阶段一：基础环境与工具链（第 1-6 篇）
+Linux 命令、Git 协作、Shell 脚本等云原生开发必备基础
 
-站点访问域名规划：
+### 阶段二：Go 语言与后端开发（第 7-13 篇）
+从 Go 基础到生产级 Web API、数据库、Redis、并发编程
 
-```text
-https://docs.yxuefeng.com
-```
+### 阶段三：Docker 容器技术（第 14-18 篇）
+Docker 使用、Dockerfile 编写、容器原理和运行时机制
 
-## 本地预览方式
+### 阶段四：Kubernetes 核心能力（第 19-26 篇）
+K8s 架构、工作负载、网络、存储、安全、Helm、Kustomize
 
-### Linux / macOS
+### 阶段五：云原生交付与可观测（第 27-31 篇）
+CI/CD、GitOps、Prometheus、Grafana、日志、链路追踪、生产排障
+
+### 阶段六：Operator 开发与平台工程（第 32-38 篇）
+CRD、Controller、Kubebuilder、Operator 开发与生产实践
+
+### 阶段七：综合项目与职业能力（第 39-40 篇）
+全链路集成、简历准备、面试指导
+
+## 🚀 快速开始
+
+### 在线阅读
+
+访问：[https://docs.yxuefeng.com/](https://docs.yxuefeng.com/)
+
+### 本地运行
+
+**Linux / macOS**
 
 ```bash
+# 克隆仓库
+git clone https://github.com/yleoer/cloud-native-todo-platform-docs.git
+cd cloud-native-todo-platform-docs
+
+# 创建虚拟环境
 python3 -m venv .venv
 source .venv/bin/activate
+
+# 安装依赖
 pip install -r requirements.txt
+
+# 启动开发服务器
 mkdocs serve
 ```
 
-### Windows PowerShell
+**Windows PowerShell**
 
 ```powershell
+# 克隆仓库
+git clone https://github.com/yleoer/cloud-native-todo-platform-docs.git
+cd cloud-native-todo-platform-docs
+
+# 创建虚拟环境
 py -m venv .venv
 .\.venv\Scripts\Activate.ps1
+
+# 安装依赖
 pip install -r requirements.txt
+
+# 启动开发服务器
 mkdocs serve
 ```
 
-启动后访问：
+启动后访问：`http://127.0.0.1:8000`
 
-```text
-http://127.0.0.1:8000
+## 📖 文档结构
+
+```
+docs/
+├── index.md                    # 首页
+├── roadmap.md                  # 学习路线
+├── chapters/                   # 课程章节
+│   ├── 01-course-guide-env/   # 第 1 篇：课程导学与开发环境准备
+│   ├── 02-linux-filesystem/   # 第 2 篇：Linux 文件系统与命令基础
+│   └── ...                     # 其他章节（待完成）
+├── projects/                   # 项目实战
+├── labs/                       # 实验索引
+├── troubleshooting/           # 排障手册
+├── interviews/                # 面试题库
+├── course-design/             # 课程设计文档
+├── stylesheets/               # 自定义样式
+├── javascripts/               # 自定义脚本
+└── includes/                  # 公共内容（缩写等）
 ```
 
-## 安装依赖方式
+## 🎓 适合人群
 
-依赖记录在 `requirements.txt` 中：
+- Linux 基础薄弱或中等的新手
+- 想系统学习 Go 后端开发的学习者
+- 想掌握 Docker、Kubernetes、Helm、CI/CD 的开发者
+- 想从传统运维转向 DevOps、SRE 或云原生平台工程的人
+- 想学习 CRD、Controller、Operator 开发的工程师
+
+## 💼 学完后可以胜任的工作
+
+- **Go 后端开发工程师**：独立开发 RESTful API 服务
+- **DevOps 工程师**：搭建 CI/CD、GitOps 流程，管理 K8s 集群
+- **云原生平台工程师**：设计云原生架构，接入可观测系统
+- **Kubernetes Operator 开发工程师**：开发 CRD、Controller、Operator
+- **SRE 工程师**：排查生产故障，优化系统可靠性
+
+## 🛠️ 技术栈
+
+- **语言**：Go
+- **容器**：Docker、containerd、runc
+- **编排**：Kubernetes、Helm、Kustomize
+- **数据库**：PostgreSQL、Redis
+- **CI/CD**：GitHub Actions、GitLab CI、Argo CD
+- **监控**：Prometheus、Grafana、Loki、Jaeger
+- **开发框架**：Gin、GORM、Kubebuilder
+
+## 📝 贡献指南
+
+欢迎贡献内容、修正错误或提出建议！
+
+1. Fork 本仓库
+2. 创建特性分支：`git checkout -b feature/your-feature`
+3. 提交更改：`git commit -m 'Add some feature'`
+4. 推送到分支：`git push origin feature/your-feature`
+5. 提交 Pull Request
+
+### 章节编写规范
+
+- 每章使用 `index.md` 作为入口
+- 遵循 [章节写作规范](docs/course-design/00-chapter-writing-standard.md)
+- 更新 `mkdocs.yml` 中的导航配置
+- 本地执行 `mkdocs build` 确认构建通过
+
+## 🔧 构建与部署
+
+### 本地构建
 
 ```bash
-pip install -r requirements.txt
+mkdocs build
 ```
 
-当前至少包含：
+构建产物生成到 `site/` 目录。
 
-```text
-mkdocs-material
+### GitHub Pages 自动部署
+
+本仓库配置了 GitHub Actions 自动部署：
+
+1. 推送到 `main` 分支
+2. 自动执行 `.github/workflows/deploy-docs.yml`
+3. 构建并部署到 GitHub Pages
+4. 访问 `https://docs.yxuefeng.com`
+
+### 自定义域名配置
+
+DNS 配置：
+
 ```
-
-## 构建方式
-
-本地严格构建：
-
-```bash
-mkdocs build --strict
-```
-
-构建产物会生成到：
-
-```text
-site/
-```
-
-`site/` 已加入 `.gitignore`，不需要提交到仓库。
-
-## GitHub Pages 自动部署说明
-
-已创建 workflow：
-
-```text
-.github/workflows/deploy-docs.yml
-```
-
-当代码 push 到 `main` 分支时，会自动执行：
-
-1. Checkout 仓库。
-2. 安装 Python。
-3. 安装 `requirements.txt`。
-4. 执行 `mkdocs build --strict`。
-5. 上传 `site/` 为 GitHub Pages artifact。
-6. 部署到 GitHub Pages。
-
-GitHub 仓库后台需要设置：
-
-1. 进入 `Settings -> Pages`。
-2. 在 `Build and deployment` 中选择 `GitHub Actions`。
-3. 等待 workflow 成功执行。
-
-## 自定义域名 docs.yxuefeng.com 配置说明
-
-仓库中已创建：
-
-```text
-docs/CNAME
-```
-
-内容为：
-
-```text
-docs.yxuefeng.com
-```
-
-DNS 需要配置：
-
-```text
 类型: CNAME
 主机记录: docs
-记录值: <我的 GitHub 用户名>.github.io
+记录值: <GitHub用户名>.github.io
 ```
 
-请注意：
+GitHub Pages 设置：
 
-- `<我的 GitHub 用户名>.github.io` 需要替换为实际 GitHub Pages 默认域名。
-- 如果 GitHub 用户名是 `yuanxuefeng`，记录值通常是 `yuanxuefeng.github.io`。
-- 在 GitHub 仓库 `Settings -> Pages` 中选择 GitHub Actions 作为 Build and deployment source。
-- 部署后在 Pages 中设置 Custom domain 为 `docs.yxuefeng.com`。
-- 等待 DNS 生效。
-- DNS 生效后启用 `Enforce HTTPS`。
+1. 进入 `Settings -> Pages`
+2. 选择 `GitHub Actions` 作为部署源
+3. 设置 Custom domain 为 `docs.yxuefeng.com`
+4. 启用 `Enforce HTTPS`
 
-最终访问地址：
+## 📄 许可证
 
-```text
-https://docs.yxuefeng.com
-```
+本项目采用 [MIT License](LICENSE) 开源协议。
 
-## 新增章节方法
+## 🙏 致谢
 
-推荐每章使用独立目录：
+感谢所有为云原生技术发展做出贡献的开源社区和开发者。
 
-```text
-docs/chapters/<chapter-slug>/index.md
-```
+## 📮 联系方式
 
-例如：
+- GitHub: [@yleoer](https://github.com/yleoer)
+- 网站: [https://docs.yxuefeng.com/](https://docs.yxuefeng.com/)
 
-```text
-docs/chapters/02-go-basic/index.md
-```
+---
 
-新增章节后，需要更新 `mkdocs.yml` 的 `nav`：
-
-```yaml
-nav:
-  - 第一篇：Linux、Git 与 Shell 基础:
-      - 第一章: chapters/01-linux-git-shell/index.md
-```
-
-提交前请执行：
-
-```bash
-mkdocs build --strict
-```
-
-## 当前章节
-
-第一章已移动到：
-
-```text
-docs/chapters/01-linux-git-shell/index.md
-```
-
-原始路径：
-
-```text
-docs/04-part-01-linux-git-shell-basics.md
-```
-
-移动时保留了正文内容。
-
-## 常见问题
-
-### 1. `mkdocs` 命令不存在
-
-先确认是否安装依赖：
-
-```bash
-pip install -r requirements.txt
-```
-
-如果使用虚拟环境，请确认已经激活 `.venv`。
-
-### 2. `mkdocs build --strict` 失败
-
-常见原因：
-
-- `mkdocs.yml` 的 `nav` 引用了不存在的 Markdown 文件。
-- Markdown 中存在无效链接。
-- YAML 缩进错误。
-
-处理方式：
-
-```bash
-mkdocs build --strict
-```
-
-根据终端错误修复对应文件。
-
-### 3. GitHub Pages 没有更新
-
-检查：
-
-- 是否 push 到 `main` 分支。
-- Actions 是否成功执行。
-- `Settings -> Pages` 是否选择 GitHub Actions。
-- 自定义域名 DNS 是否生效。
-
-### 4. 自定义域名无法访问
-
-检查 DNS：
-
-```text
-类型: CNAME
-主机记录: docs
-记录值: <你的 GitHub 用户名>.github.io
-```
-
-然后在 GitHub Pages 中设置：
-
-```text
-Custom domain: docs.yxuefeng.com
-Enforce HTTPS: enabled
-```
+⭐ 如果这个项目对你有帮助，欢迎 Star 支持！
 

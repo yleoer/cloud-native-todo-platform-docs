@@ -6,8 +6,7 @@
 
 | 实验 | 对应章节 | 目标 |
 |---|---|---|
-| 搭建云原生学习工作站 | 第一篇：Linux、Git 与 Shell 基础 | 准备 Ubuntu、Git、SSH、Shell、目录结构和检查脚本 |
-| Go 命令行任务管理器 | 第二篇：Golang 语言基础 | 使用 Go、JSON、测试和 Makefile 构建 Todo CLI |
+| 统一实验环境与仓库初始化 | 第一篇：课程导学与开发环境准备 | 安装 Go、Git、Docker、kubectl、kind、Helm，并初始化 `cloud-native-todo-platform` |
 
 ## 后续分类
 

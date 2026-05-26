@@ -1,0 +1,422 @@
+/* 自定义样式 */
+
+/* 优化中文字体显示 */
+body {
+  font-family: "Noto Sans SC", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  line-height: 1.8;
+}
+
+/* 代码字体 */
+code, pre {
+  font-family: "JetBrains Mono", "Fira Code", "Consolas", "Monaco", monospace;
+}
+
+/* 优化标题间距 */
+.md-typeset h1 {
+  margin-top: 0;
+  margin-bottom: 1.5rem;
+  font-weight: 600;
+}
+
+.md-typeset h2 {
+  margin-top: 2.5rem;
+  margin-bottom: 1rem;
+  font-weight: 600;
+}
+
+.md-typeset h3 {
+  margin-top: 2rem;
+  margin-bottom: 0.8rem;
+  font-weight: 600;
+}
+
+/* 优化段落间距 */
+.md-typeset p {
+  margin-bottom: 1rem;
+}
+
+/* 优化列表样式 */
+.md-typeset ul, .md-typeset ol {
+  margin-bottom: 1rem;
+}
+
+.md-typeset li {
+  margin-bottom: 0.5rem;
+}
+
+/* 优化表格样式 */
+.md-typeset table:not([class]) {
+  font-size: 0.9rem;
+  border-collapse: collapse;
+  width: 100%;
+  margin: 1.5rem 0;
+}
+
+.md-typeset table:not([class]) th {
+  background-color: var(--md-primary-fg-color--light);
+  color: var(--md-primary-bg-color);
+  font-weight: 600;
+  padding: 0.8rem 1rem;
+}
+
+.md-typeset table:not([class]) td {
+  padding: 0.8rem 1rem;
+}
+
+/* 优化代码块样式 */
+.md-typeset pre > code {
+  padding: 1rem;
+  border-radius: 0.3rem;
+}
+
+/* 优化行内代码样式 */
+.md-typeset code {
+  padding: 0.2rem 0.4rem;
+  border-radius: 0.2rem;
+  font-size: 0.9em;
+}
+
+/* 优化提示框样式 */
+.md-typeset .admonition {
+  margin: 1.5rem 0;
+  padding: 0.8rem 1rem;
+  border-left: 0.3rem solid;
+  border-radius: 0.3rem;
+}
+
+.md-typeset .admonition-title {
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
+/* 优化导航栏 */
+.md-tabs {
+  background-color: var(--md-primary-fg-color);
+  max-height: 2.4rem;
+  overflow: hidden;
+  transition: max-height 180ms ease, opacity 160ms ease, transform 180ms ease;
+}
+
+/* 优化侧边栏 */
+.md-sidebar--primary {
+  width: 15rem;
+}
+
+.md-nav__item--nested > .md-nav__link {
+  font-weight: 600;
+  color: var(--md-primary-fg-color);
+}
+
+/* 优化面包屑导航 */
+.md-path {
+  font-size: 0.85rem;
+  color: var(--md-default-fg-color--light);
+}
+
+/* 优化搜索框 */
+.md-search__input {
+  border-radius: 0.3rem;
+}
+
+/* 课程路线图与架构图 */
+.md-typeset .mermaid {
+  display: flex;
+  justify-content: center;
+  min-height: 7rem;
+  margin: 1.5rem 0 1.8rem;
+  overflow-x: auto;
+  padding: 0.4rem 0;
+}
+
+.md-typeset .content-zoom-target {
+  cursor: zoom-in;
+}
+
+.md-typeset .content-zoom-diagram:focus-visible {
+  outline: 0.12rem solid var(--md-accent-fg-color);
+  outline-offset: 0.25rem;
+}
+
+body.content-lightbox-open {
+  overflow: hidden;
+}
+
+.content-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4rem 1.2rem 1.2rem;
+  background: rgba(0, 0, 0, 0.9);
+}
+
+.content-lightbox__stage {
+  display: flex;
+  max-width: min(96vw, 90rem);
+  max-height: 88vh;
+  overflow: auto;
+  cursor: default;
+}
+
+.content-lightbox__stage--image {
+  align-items: center;
+  justify-content: center;
+}
+
+.content-lightbox__stage--diagram {
+  align-items: center;
+  box-sizing: border-box;
+  justify-content: center;
+  width: 96vw;
+  max-width: 96vw;
+  height: 86vh;
+  max-height: 86vh;
+  padding: 1.2rem;
+  border-radius: 0.4rem;
+  background: var(--md-default-bg-color);
+  overflow: hidden;
+}
+
+.content-lightbox__image {
+  display: block;
+  max-width: 100%;
+  max-height: 88vh;
+  object-fit: contain;
+}
+
+.content-lightbox__diagram {
+  flex: 0 0 auto;
+  position: relative;
+}
+
+.content-lightbox .mermaid.is-zoomed {
+  position: absolute;
+  top: 0;
+  left: 0;
+  min-height: 0;
+  margin: 0;
+  overflow: visible;
+  padding: 0;
+  transform: scale(var(--course-diagram-scale, 2));
+  transform-origin: top left;
+}
+
+.content-lightbox__close {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.4rem;
+  height: 2.4rem;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+  cursor: pointer;
+}
+
+.content-lightbox__close:hover,
+.content-lightbox__close:focus-visible {
+  background: rgba(255, 255, 255, 0.24);
+  outline: none;
+}
+
+.content-lightbox__close svg {
+  width: 1.2rem;
+  height: 1.2rem;
+  fill: currentColor;
+}
+
+/* 阅读时收起顶部阶段导航，回到页面顶部后自动展开 */
+body.top-nav-collapsed .md-tabs {
+  max-height: 0;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-0.25rem);
+}
+
+body.top-nav-collapsed .md-header__inner {
+  min-height: 2rem;
+  padding-top: 0.15rem;
+  padding-bottom: 0.15rem;
+}
+
+body.top-nav-collapsed .md-header__title {
+  font-size: 0.82rem;
+}
+
+body.top-nav-collapsed .md-header__button {
+  width: 1.8rem;
+  height: 1.8rem;
+  padding: 0.35rem;
+}
+
+body.top-nav-collapsed .md-main__inner {
+  margin-top: 0.6rem;
+}
+
+/* 右下角返回顶部火箭按钮 */
+.md-top,
+.md-top.rocket-top {
+  position: fixed !important;
+  inset: auto 1.1rem 1.1rem auto !important;
+  right: 1.1rem !important;
+  bottom: 1.1rem !important;
+  left: auto !important;
+  top: auto !important;
+  inset-block-start: auto !important;
+  inset-block-end: 1.1rem !important;
+  inset-inline-start: auto !important;
+  inset-inline-end: 1.1rem !important;
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  width: 2.45rem;
+  height: 2.45rem;
+  margin: 0 !important;
+  padding: 0;
+  border-radius: 50%;
+  background: var(--md-primary-fg-color);
+  color: var(--md-primary-bg-color);
+  font-size: 0;
+  line-height: 0;
+  box-shadow: 0 0.35rem 1rem rgba(0, 0, 0, 0.18);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translateY(0.45rem) scale(0.96);
+  transition: opacity 160ms ease, visibility 160ms ease, transform 160ms ease, background-color 160ms ease;
+  z-index: 8;
+}
+
+.md-top.is-visible,
+.md-top.rocket-top.is-visible {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transform: translateY(0) scale(1);
+}
+
+.md-top:hover,
+.md-top:focus-visible,
+.md-top.rocket-top:hover,
+.md-top.rocket-top:focus-visible {
+  background: var(--md-accent-fg-color);
+  outline: none;
+}
+
+.md-top svg,
+.md-top.rocket-top svg {
+  width: 1.35rem;
+  height: 1.35rem;
+  fill: currentColor;
+}
+
+/* 优化标签样式 */
+.md-tag {
+  font-size: 0.75rem;
+  padding: 0.2rem 0.5rem;
+  border-radius: 0.2rem;
+  margin-right: 0.3rem;
+}
+
+/* 课程阶段标签样式 */
+.stage-badge {
+  display: inline-block;
+  padding: 0.2rem 0.6rem;
+  margin-right: 0.5rem;
+  border-radius: 0.3rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  background-color: var(--md-primary-fg-color--light);
+  color: var(--md-primary-bg-color);
+}
+
+/* 能力验收标准样式 */
+.skill-check {
+  background-color: var(--md-code-bg-color);
+  padding: 1rem;
+  border-radius: 0.3rem;
+  margin: 1rem 0;
+  border-left: 0.3rem solid var(--md-accent-fg-color);
+}
+
+.skill-check h4 {
+  margin-top: 0;
+  color: var(--md-accent-fg-color);
+}
+
+/* 项目产出物样式 */
+.project-output {
+  background-color: var(--md-default-bg-color);
+  padding: 1rem;
+  border-radius: 0.3rem;
+  margin: 1rem 0;
+  border: 1px solid var(--md-default-fg-color--lightest);
+}
+
+/* 学习路径图样式 */
+.learning-path {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin: 2rem 0;
+}
+
+.learning-path-item {
+  display: flex;
+  align-items: center;
+  padding: 1rem;
+  background-color: var(--md-code-bg-color);
+  border-radius: 0.3rem;
+  border-left: 0.3rem solid var(--md-primary-fg-color);
+}
+
+.learning-path-item::before {
+  content: "→";
+  font-size: 1.5rem;
+  margin-right: 1rem;
+  color: var(--md-primary-fg-color);
+}
+
+.learning-path-item:first-child::before {
+  content: "▶";
+}
+
+/* 响应式优化 */
+@media screen and (max-width: 76.1875em) {
+  .md-sidebar--primary {
+    width: 12rem;
+  }
+}
+
+@media screen and (max-width: 60em) {
+  .md-typeset h1 {
+    font-size: 1.6rem;
+  }
+
+  .md-typeset h2 {
+    font-size: 1.3rem;
+  }
+
+  .md-typeset table:not([class]) {
+    font-size: 0.8rem;
+  }
+}
+
+/* 打印样式优化 */
+@media print {
+  .md-header,
+  .md-tabs,
+  .md-sidebar,
+  .md-footer {
+    display: none;
+  }
+
+  .md-content {
+    max-width: 100%;
+  }
+}

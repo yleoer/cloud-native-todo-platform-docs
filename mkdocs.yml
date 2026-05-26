@@ -1,73 +1,237 @@
 site_name: 从 Go、Docker、Kubernetes 到 Operator
-site_description: 一套面向中高级云原生工程能力的系统教程
+site_description: 一套面向中高级云原生工程能力的系统教程 - 40 大篇 200 个章节，围绕 Cloud Native Todo Platform 项目主线
 site_author: yuanxuefeng
 site_url: https://docs.yxuefeng.com/
 
 repo_name: cloud-native-todo-platform-docs
+repo_url: https://github.com/yleoer/cloud-native-todo-platform-docs
+edit_uri: edit/main/docs/
+
+copyright: Copyright &copy; 2026 yuanxuefeng
 
 theme:
   name: material
   language: zh
+  icon:
+    repo: fontawesome/brands/github
+    edit: material/pencil
+    view: material/eye
   features:
-    - navigation.tabs
-    - navigation.sections
-    - navigation.expand
-    - navigation.top
-    - search.highlight
-    - search.suggest
-    - content.code.copy
-    - content.code.annotate
-    - content.tabs.link
+    # 导航
+    - navigation.tabs              # 顶部标签页导航
+    - navigation.tabs.sticky       # 标签页固定在顶部
+    - navigation.sections          # 侧边栏分组
+    - navigation.expand            # 默认展开所有章节
+    - navigation.path              # 显示面包屑导航
+    - navigation.top               # 返回顶部按钮
+    - navigation.footer            # 底部上一页/下一页导航
+    - navigation.tracking          # 锚点跟踪
+
+    # 搜索
+    - search.highlight             # 搜索结果高亮
+    - search.suggest               # 搜索建议
+    - search.share                 # 搜索分享
+
+    # 内容
+    - content.code.copy            # 代码复制按钮
+    - content.code.annotate        # 代码注释
+    - content.tabs.link            # 内容标签页链接
+    - content.tooltips             # 工具提示
+    - content.action.edit          # 编辑此页
+    - content.action.view          # 查看源码
+
+    # 其他
+    - toc.follow                   # 目录跟随
+
   palette:
-    - scheme: default
+    # 浅色模式
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
       primary: indigo
       accent: blue
       toggle:
         icon: material/weather-night
         name: 切换到深色模式
-    - scheme: slate
+
+    # 深色模式
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
       primary: indigo
       accent: blue
       toggle:
         icon: material/weather-sunny
         name: 切换到浅色模式
 
+  font:
+    text: Noto Sans SC
+    code: JetBrains Mono
+
 plugins:
   - search:
       lang:
         - zh
         - en
+      separator: '[\s​\-]'
+
+  - tags
+
+  # 显示最后更新时间
+  - git-revision-date-localized:
+      enable_creation_date: true
+      type: datetime
+      timezone: Asia/Shanghai
+      locale: zh
+      fallback_to_build_date: true
+      enable_git_follow: false
 
 markdown_extensions:
-  - admonition
-  - attr_list
-  - md_in_html
+  # 基础扩展
+  - abbr                           # 缩写
+  - admonition                     # 提示框
+  - attr_list                      # 属性列表
+  - def_list                       # 定义列表
+  - footnotes                      # 脚注
+  - md_in_html                     # HTML 中的 Markdown
+  - meta                           # 元数据
+
+  # 目录
   - toc:
       permalink: true
-  - pymdownx.details
-  - pymdownx.inlinehilite
-  - pymdownx.snippets
-  - pymdownx.superfences
-  - pymdownx.highlight:
+      permalink_title: 锚点链接
+      slugify: !!python/object/apply:pymdownx.slugs.slugify
+        kwds:
+          case: lower
+
+  # 表格
+  - tables
+
+  # PyMdown 扩展
+  - pymdownx.arithmatex:           # 数学公式
+      generic: true
+  - pymdownx.betterem:             # 更好的强调
+      smart_enable: all
+  - pymdownx.caret                 # 上标和插入
+  - pymdownx.mark                  # 标记
+  - pymdownx.tilde                 # 下标和删除
+  - pymdownx.critic                # 批注
+  - pymdownx.details               # 可折叠块
+  - pymdownx.emoji:                # Emoji
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - pymdownx.highlight:            # 代码高亮
       anchor_linenums: true
       line_spans: __span
       pygments_lang_class: true
-  - pymdownx.tabbed:
+      auto_title: true
+      linenums: true
+  - pymdownx.inlinehilite          # 行内代码高亮
+  - pymdownx.keys                  # 键盘按键
+  - pymdownx.magiclink:            # 自动链接
+      repo_url_shorthand: true
+      user: yleoer
+      repo: cloud-native-todo-platform-docs
+  - pymdownx.smartsymbols          # 智能符号
+  - pymdownx.snippets:             # 代码片段
+      auto_append:
+        - includes/abbreviations.md
+  - pymdownx.superfences:          # 超级围栏
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:               # 标签页
       alternate_style: true
+      combine_header_slug: true
+  - pymdownx.tasklist:             # 任务列表
+      custom_checkbox: true
+      clickable_checkbox: false
+
+extra:
+  # 社交链接
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/yleoer
+      name: GitHub
+
+  # 版本
+  version:
+    provider: mike
+
+extra_css:
+  - stylesheets/extra.css
+
+extra_javascript:
+  - javascripts/extra.js
+  - javascripts/mathjax.js
+  - https://polyfill.io/v3/polyfill.min.js?features=es6
+  - https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js
 
 nav:
   - 首页: index.md
   - 学习路线: roadmap.md
-  - 第一篇：Linux、Git 与 Shell 基础:
-      - 第一章: chapters/01-linux-git-shell/index.md
-  - 第二篇：Golang 语言基础:
-      - 第一章: chapters/02-go-basic/index.md
-  - 项目实战: projects/index.md
-  - 实验索引: labs/index.md
-  - 排障手册: troubleshooting/index.md
-  - 面试题库: interviews/index.md
+
+  - 阶段一 基础环境:
+      - 1. 课程导学与环境准备: chapters/01-course-guide-env/index.md
+      - 2. Linux 文件系统与命令: chapters/02-linux-filesystem/index.md
+      - 3. Linux 进程与服务管理: chapters/03-linux-process/index.md
+      - 4. Linux 网络基础与排障: chapters/04-linux-network/index.md
+      - 5. Git 基础与团队协作: chapters/05-git-basics/index.md
+      - 6. Shell 脚本与自动化: chapters/06-shell-scripting/index.md
+
+  # - 阶段二 Go 后端开发:
+  #     - 7. Go 语言基础: chapters/07-go-basics/index.md
+  #     - 8. Go 并发编程: chapters/08-go-concurrency/index.md
+  #     - 9. Go 工程化与测试: chapters/09-go-engineering/index.md
+  #     - 10. Go Web API 开发: chapters/10-go-web-api/index.md
+  #     - 11. 数据库与持久化: chapters/11-database/index.md
+  #     - 12. Redis 缓存与异步任务: chapters/12-redis-cache/index.md
+  #     - 13. Go 后端生产化: chapters/13-go-production/index.md
+
+  # - 阶段三 Docker 容器:
+  #     - 14. Docker 基础: chapters/14-docker-basics/index.md
+  #     - 15. Dockerfile 与镜像构建: chapters/15-dockerfile/index.md
+  #     - 16. Docker Compose 编排: chapters/16-docker-compose/index.md
+  #     - 17. 容器运行原理: chapters/17-container-internals/index.md
+  #     - 18. 容器运行时与 CRI: chapters/18-container-runtime/index.md
+
+  # - 阶段四 Kubernetes:
+  #     - 19. K8s 架构与集群搭建: chapters/19-k8s-architecture/index.md
+  #     - 20. K8s 核心工作负载: chapters/20-k8s-workloads/index.md
+  #     - 21. K8s 服务发现与配置: chapters/21-k8s-service-config/index.md
+  #     - 22. K8s 网络: chapters/22-k8s-networking/index.md
+  #     - 23. K8s 存储: chapters/23-k8s-storage/index.md
+  #     - 24. K8s 安全: chapters/24-k8s-security/index.md
+  #     - 25. Helm 包管理: chapters/25-helm/index.md
+  #     - 26. Kustomize 配置管理: chapters/26-kustomize/index.md
+
+  # - 阶段五 交付与可观测:
+  #     - 27. CI/CD 自动化交付: chapters/27-cicd/index.md
+  #     - 28. GitOps 与 Argo CD: chapters/28-gitops/index.md
+  #     - 29. Prometheus 与 Grafana: chapters/29-prometheus-grafana/index.md
+  #     - 30. 日志与链路追踪: chapters/30-logging-tracing/index.md
+  #     - 31. K8s 生产排障: chapters/31-k8s-troubleshooting/index.md
+
+  # - 阶段六 Operator 开发:
+  #     - 32. K8s API 扩展机制: chapters/32-k8s-api-extension/index.md
+  #     - 33. CRD 设计与实践: chapters/33-crd-design/index.md
+  #     - 34. Controller 与 Informer: chapters/34-controller-informer/index.md
+  #     - 35. Kubebuilder 框架: chapters/35-kubebuilder/index.md
+  #     - 36. Operator 高级机制: chapters/36-operator-advanced/index.md
+  #     - 37. Operator 测试与发布: chapters/37-operator-release/index.md
+  #     - 38. Operator 生产实践: chapters/38-operator-production/index.md
+
+  # - 阶段七 综合项目:
+  #     - 39. 综合项目集成实战: chapters/39-project-integration/index.md
+  #     - 40. 职业能力与面试: chapters/40-career-interview/index.md
+
+  - 辅助资源:
+      - 项目实战: projects/index.md
+      - 实验索引: labs/index.md
+      - 排障手册: troubleshooting/index.md
+      - 面试题库: interviews/index.md
+
   - 课程设计:
-      - 章节写作规范: course-design/00-chapter-writing-standard.md
+      - 写作规范: course-design/00-chapter-writing-standard.md
       - 课程总设计: course-design/01-course-blueprint.md
-      - 完整课程目录: course-design/02-full-curriculum.md
-      - 项目主线设计: course-design/03-project-mainline-cloud-native-todo-platform.md
+      - 完整目录: course-design/02-full-curriculum.md
+      - 项目主线: course-design/03-project-mainline-cloud-native-todo-platform.md

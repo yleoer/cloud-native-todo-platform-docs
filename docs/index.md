@@ -2,7 +2,7 @@
 
 欢迎来到这套面向真实岗位能力的云原生系统教程。
 
-本教程以 **Cloud Native Todo Platform** 为项目主线，带你从 Linux、Git、Shell 基础开始，逐步完成 Go 后端开发、Docker 容器化、Kubernetes 部署、CI/CD、GitOps、监控日志、生产排障，最后进入 CRD、Controller、Kubebuilder 与 Operator 开发。
+本教程以 **Cloud Native Todo Platform** 为项目主线，带你从课程导学与开发环境准备开始，逐步完成 Linux / Git / Shell 基础、Go 后端开发、Docker 容器化、Kubernetes 部署、CI/CD、GitOps、监控日志、生产排障，最后进入 CRD、Controller、Kubebuilder 与 Operator 开发。
 
 ## 教程定位
 
@@ -39,26 +39,34 @@
 
 ## 完整学习路径
 
-```text
-Linux / Git / Shell
-  -> Go 语言基础
-  -> Go Web API
-  -> PostgreSQL / Redis
-  -> Docker / Dockerfile / Docker Compose
-  -> 容器运行原理
-  -> Kubernetes 架构与核心对象
-  -> Kubernetes 网络 / 存储 / 安全 / 排障
-  -> Helm / CI/CD / GitOps
-  -> Prometheus / Grafana / 日志 / 链路追踪
-  -> Kubernetes API 扩展
-  -> CRD / Controller / Kubebuilder / Operator
-  -> 综合项目交付
-```
+本课程共 **40 大篇，200 个章节**，分为 7 个学习阶段：
 
-## 当前已完成章节
+### 阶段一：基础环境与工具链（第 1-6 篇）
+掌握 Linux 命令、Git 协作、Shell 脚本等云原生开发必备基础。
 
-- [第一篇：Linux、Git 与 Shell 基础](chapters/01-linux-git-shell/index.md)
-- [第二篇：Golang 语言基础](chapters/02-go-basic/index.md)
+### 阶段二：Go 语言与后端开发（第 7-13 篇）
+从 Go 基础语法到 Web API、数据库、Redis、并发编程，完成生产级后端服务开发。
+
+### 阶段三：Docker 容器技术（第 14-18 篇）
+掌握 Docker 使用、Dockerfile 编写、容器原理和运行时机制。
+
+### 阶段四：Kubernetes 核心能力（第 19-26 篇）
+系统学习 Kubernetes 架构、工作负载、网络、存储、安全、Helm 和 Kustomize。
+
+### 阶段五：云原生交付与可观测（第 27-31 篇）
+建立 CI/CD、GitOps、监控、日志、链路追踪和生产排障能力。
+
+### 阶段六：Operator 开发与平台工程（第 32-38 篇）
+深入 Kubernetes API 扩展机制，掌握 CRD、Controller、Kubebuilder 和 Operator 开发。
+
+### 阶段七：综合项目与职业能力（第 39-40 篇）
+完成 Cloud Native Todo Platform 全链路集成，准备简历和面试。
+
+## 快速开始
+
+- [查看完整学习路线](roadmap.md)
+- [开始第一篇：课程导学与开发环境准备](chapters/01-course-guide-env/index.md)
+- [查看完整课程目录（40 篇 200 章）](course-design/02-full-curriculum.md)
 
 ## 如何本地运行
 
@@ -98,8 +106,8 @@ http://127.0.0.1:8000
 
 ## 下一步计划
 
+- 编写 Linux 文件系统与命令基础章节。
+- 编写 Git 与 Shell 自动化基础章节。
 - 编写 Go 语言基础与 Todo CLI 章节。
 - 搭建 Go Web API 项目骨架。
-- 引入 PostgreSQL 和 Redis。
-- 编写 Dockerfile 与 Docker Compose 本地环境。
-- 将 Todo API 部署到 Kubernetes。
+- 引入 Docker、Kubernetes 与 Operator 实践内容。
