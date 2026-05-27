@@ -1,119 +1,415 @@
-# 第 3 篇：Linux 进程、服务与软件管理
+# 第 3 篇：Linux 进程、服务与软件管理 [A]
 
-本篇继续沿着 `Cloud Native Todo Platform` 的主线前进：前一篇我们已经能规划 Linux 目录、配置、日志和权限；这一篇开始让程序真正运行起来，并学会用 Linux 的方式管理它。
+第 2 篇已经完成 Todo 平台的目录、配置、日志、数据目录和权限设计。本篇继续向前走一步：让一个程序真正运行起来，并学会用 Linux 的方式管理它。
 
-后端服务、容器进程、Kubernetes Pod、CI Runner，本质上都绕不开一个问题：程序在 Linux 上如何启动、如何停止、如何被托管、如何观察资源占用、如何定位异常。
+Go 服务运行在 Linux 之上，无论它将来是在虚拟机、Docker 容器还是 Kubernetes Pod 中。服务能不能启动、监听了哪个端口、为什么异常退出、CPU 和内存是否异常，这些问题都离不开进程、服务管理和资源排查能力。
 
 本篇对应 5 个章节主题：
 
 - 3.1 进程、PID、前台与后台任务
 - 3.2 `ps`、`top`、`htop`、`kill` 排查进程
 - 3.3 systemd 与服务管理
-- 3.4 软件包管理：apt、dnf 与遗留 yum
+- 3.4 软件包管理：`apt`、`yum`、`dnf`
 - 3.5 CPU、内存、磁盘基础排查
 
 本篇特色项目是：**将一个简单 Go HTTP 程序注册为 Linux systemd 服务**。
 
-你会在 `cloud-native-todo-platform` 仓库中编写一个最小 Go HTTP 服务，把它安装到 `/opt/todo-platform/bin`，用 `/etc/todo-platform/process-demo.env` 管理配置，再交给 systemd 托管，最后用进程、服务、日志和资源排查命令完成验收。
+你会在 `cloud-native-todo-platform` 仓库中编写一个最小 HTTP 服务 `todo-process-demo`，把它安装到 `/opt/todo-platform/bin`，用 `/etc/todo-platform/process-demo.env` 管理运行参数，再交给 systemd 托管。完成后，你可以用 `systemctl status todo-process-demo`、`journalctl -u todo-process-demo`、`ps`、`ss`、`top`、`free`、`df` 完成服务状态和资源排查。
 
 ## 1. 本章学习目标
 
-学完本篇后，你应该能够理解程序在 Linux 上的运行方式，并具备排查服务进程问题的基本能力。
+学完本篇后，你应该能解释一个程序在 Linux 上如何变成进程，能把一个 Go 服务注册为 systemd 服务，并能用常见命令定位服务启动、端口、CPU、内存和磁盘问题。
 
-具体目标如下：
+### 1.1 知识目标
 
-- 能解释进程、PID、PPID、前台任务、后台任务和信号的含义。
-- 能使用 `ps`、`pgrep`、`top`、`htop`、`kill` 查看和管理进程。
-- 能理解 systemd、unit、service、journalctl 的关系。
-- 能使用 `systemctl start`、`stop`、`restart`、`status`、`enable`、`disable` 管理服务。
-- 能编写一份基本可用的 systemd service unit。
-- 能使用 apt、dnf 安装常见排障工具，并能识别 yum 在遗留系统中的使用场景。
-- 能使用 `free`、`df`、`du`、`ss`、`lsof` 等命令定位 CPU、内存、磁盘和端口问题。
-- 能把一个 Go HTTP 程序作为 Linux 服务运行，并通过日志和健康检查验证服务状态。
-- 能说明 systemd 服务管理能力和后续 Docker、Kubernetes 管理进程之间的联系。
+- 能解释程序、进程、PID、PPID、前台任务、后台任务和信号的关系。
+- 能描述 `ps`、`top`、`htop`、`kill`、`pgrep` 等命令分别解决什么排障问题。
+- 能解释 systemd、service unit、`systemctl`、`journalctl` 的职责边界。
+- 能对比 `apt`、`dnf`、遗留 `yum` 在不同 Linux 发行版中的使用场景。
+- 能说明 CPU、内存、磁盘、端口资源异常为什么会影响后端服务稳定性。
 
-本篇结束时，你至少应该能独立完成以下任务：
+### 1.2 技能目标
+
+- 能使用 `ps`、`pgrep`、`top`、`kill` 查看和管理服务进程。
+- 能编写并安装一份基础 systemd service unit。
+- 能使用 `systemctl start|stop|restart|status` 和 `journalctl -u` 管理服务生命周期和日志。
+- 能使用 `ss`、`free`、`df`、`du` 定位端口监听、内存紧张和磁盘空间问题。
+- 能将 `todo-process-demo` 作为 systemd 服务运行，并用检查脚本完成验收。
+
+本篇结束时，你至少应该能独立完成下面这组任务：
 
 ```bash
-systemctl status todo-process-demo --no-pager
-journalctl -u todo-process-demo -n 50 --no-pager
-PID="$(systemctl show -p MainPID --value todo-process-demo)"
-ps -p "$PID" -o pid,ppid,user,stat,%cpu,%mem,etime,cmd
-top -p "$PID"
-sudo ss -lntp | grep 18080
-curl -fsS http://127.0.0.1:18080/healthz
-sudo systemctl restart todo-process-demo
+$ systemctl status todo-process-demo --no-pager
+$ journalctl -u todo-process-demo -n 30 --no-pager
+$ PID="$(systemctl show -p MainPID --value todo-process-demo)"
+$ ps -p "$PID" -o pid,ppid,user,stat,%cpu,%mem,etime,cmd
+$ sudo ss -lntp | grep 18080
+$ curl -fsS http://127.0.0.1:18080/healthz
+$ sudo systemctl restart todo-process-demo
 ```
 
-这些命令就是 Linux 服务器、传统虚拟机、容器宿主机和 Kubernetes 节点排障的基础工具箱。
+这些命令是 Linux 服务器、容器宿主机、CI Runner 和 Kubernetes Node 排障时经常会用到的基础工具箱。
 
-## 2. 本章工作场景
+## 2. 本章工作场景与真实案例
 
-在真实公司里，后端工程师不能只会写代码，还要能判断代码运行后发生了什么。
+### 2.1 技术痛点
 
-典型工作场景包括：
+真实公司里，后端工程师不能只会写代码，还要知道代码运行后发生了什么。常见问题包括：
 
-- 后端开发把 Go API 发布到测试服务器后，需要确认服务是否启动、监听了哪个端口、读取了哪些配置。
-- 测试同学反馈接口访问失败时，需要查看 systemd 状态和日志，判断是程序崩溃、端口占用还是配置错误。
-- DevOps 需要把应用注册为系统服务，配置开机自启、失败重启、运行用户和日志采集。
-- SRE 排查线上故障时，需要快速判断某个进程是否占用过高 CPU、内存是否接近耗尽、磁盘是否被日志写满。
-- 安全同学会关注服务是否以 root 运行、systemd unit 是否限制了不必要的权限。
-- 后续学习 Docker 和 Kubernetes 时，你会发现容器里的主进程、Pod 的重启策略、健康检查、日志输出都和本篇知识直接相关。
+- Go 服务发到测试机后接口访问失败，原因可能是进程没有启动、端口没有监听，或监听在错误地址。
+- 测试同学反馈服务偶发 500，开发需要查看服务日志、进程 PID 和资源状态，而不是只看代码。
+- DevOps 配置了开机自启，但服务重启后立刻退出，原因可能是 `ExecStart` 路径错误、配置文件权限不足或端口冲突。
+- SRE 收到 CPU 或内存告警，需要快速确认是请求量升高、死循环、内存泄漏还是日志把磁盘写满。
+- 后续在 Kubernetes 中看到 `CrashLoopBackOff`、`OOMKilled`、端口探针失败，本质上仍然要理解进程、信号、日志和资源限制。
 
-本篇不会把 `ps`、`top`、`systemctl` 当作孤立命令背诵，而是围绕一个实际服务来学习：Todo 平台有一个 Go HTTP 服务，我们如何把它变成一个可启动、可停止、可观察、可排障的 Linux 服务。
+如果跳过本篇，后续学习 Docker 和 Kubernetes 时会容易把一切都归因于“平台问题”，却看不懂最底层的进程证据。
 
-## 3. 前置知识
+### 2.2 团队协作场景
 
-### 必须掌握
+一个服务从代码变成可运行进程，通常需要多人协作：
 
-学习本篇前，你需要已经完成前两篇内容，并具备以下基础：
+- 后端开发负责提供可执行文件、启动参数、健康检查接口、优雅关闭逻辑。
+- DevOps 负责 systemd unit、运行用户、目录权限、开机自启、失败重启策略。
+- 测试同学负责用 HTTP 接口和日志验证功能，并记录故障复现步骤。
+- SRE 负责监控进程状态、CPU、内存、磁盘、端口和服务日志。
+- 安全团队会关注服务是否以 root 运行、配置文件是否过宽、systemd unit 是否有基础安全限制。
 
-- 已经准备好 Go、Git、终端和课程仓库 `cloud-native-todo-platform`。
-- 能使用 `cd`、`ls`、`mkdir`、`chmod`、`chown`、`cat`、`grep`、`find` 等基础命令。
-- 知道 `/opt`、`/etc`、`/var/log`、`/var/lib` 这些目录的典型用途。
-- 能理解“配置、程序、日志、数据分开管理”的价值。
+本篇不是背命令清单，而是围绕一个真实服务生命周期来学习：如何让 Todo 平台的一个 Go HTTP 服务可启动、可停止、可观察、可排障。
 
-### 建议了解
+### 2.3 课程项目关联
 
-以下内容不要求熟练，但建议有初步印象：
+本篇产出会被后续多章复用：
 
-- HTTP 服务通常会监听一个本地端口，例如 `127.0.0.1:18080`。
-- Go 程序可以编译成一个独立二进制文件。
-- Linux 中普通用户和 root 用户权限不同。
-- 后续 Docker 和 Kubernetes 都会管理进程生命周期。
+- 第 4 篇会继续使用本篇服务监听的 `127.0.0.1:18080`，学习端口、DNS、HTTP 和抓包。
+- 第 6 篇会把服务启动、检查和清理固化成 Shell 自动化脚本。
+- 第 9 到第 14 篇会复用本篇的健康检查、启动参数、优雅关闭、日志输出和服务运行思路，并逐步演进为真正的 Todo API。
+- 第 15 到第 19 篇会把进程管理迁移到 Docker 容器、Compose 和容器运行时中。
+- 第 20 篇以后会把 systemd 中的重启、日志、运行用户和资源限制思想迁移到 Pod、Deployment、Probe 和 `resources` 中。
 
-### 实验系统要求
+本篇真实案例是：
 
-本篇的核心实验需要 systemd，所以不是所有终端都能完整执行。
+> 团队已经为 Todo 平台设计了服务器目录结构，现在需要把一个 Go HTTP 程序部署到 Linux 测试机，由 systemd 托管，并提供标准的启动、停止、状态查看、日志查看和资源排查方法。
+
+## 3. 核心概念
+
+### 3.1 程序、进程、PID 与 PPID
+
+程序是磁盘上的文件，进程是程序运行起来后的实例。一个 Go 二进制文件本身只是文件；当它被启动后，Linux 会为它分配 PID、内存、文件描述符、环境变量、运行用户和 CPU 调度状态。
+
+```mermaid
+flowchart LR
+    Binary["程序文件<br/>/opt/todo-platform/bin/todo-process-demo"]
+    Start["启动动作<br/>systemd ExecStart"]
+    Process["进程<br/>PID / PPID / User / CPU / Memory"]
+    Port["监听端口<br/>127.0.0.1:18080"]
+    Log["日志输出<br/>stdout / stderr"]
+
+    Binary --> Start --> Process
+    Process --> Port
+    Process --> Log
+```
+
+查看当前 Shell 的 PID：
+
+```bash
+$ echo $$
+$ ps -p $$ -o pid,ppid,user,stat,cmd
+```
+
+`PID` 是 Process ID，表示当前进程编号；`PPID` 是 Parent Process ID，表示父进程编号。在 systemd 管理的 Linux 系统中，PID 1 通常是 `systemd`，它负责启动和管理系统服务。
+
+### 3.2 前台任务、后台任务与信号
+
+前台任务会占用当前终端；后台任务不会阻塞当前终端。临时实验时可以把命令放到后台运行：
+
+```bash
+$ sleep 300 &
+$ jobs
+```
+
+预期输出类似：
+
+```text
+[1]+  Running                 sleep 300 &
+```
+
+常用任务控制：
+
+| 命令 | 作用 |
+|---|---|
+| `command &` | 把命令放到后台运行 |
+| `jobs` | 查看当前终端的后台任务 |
+| `fg %1` | 把 1 号任务切回前台 |
+| `Ctrl+Z` | 暂停当前前台任务 |
+| `bg %1` | 让暂停任务继续在后台运行 |
+| `kill %1` | 给 1 号后台任务发送终止信号 |
+
+`kill` 的本质是给进程发送信号，不是只有“强杀”一种含义。
+
+| 信号 | 数字 | 含义 | 常见场景 |
+|---|---:|---|---|
+| `SIGTERM` | 15 | 请求进程正常退出 | 默认优雅停止 |
+| `SIGKILL` | 9 | 强制结束进程 | 进程无响应时最后手段 |
+| `SIGHUP` | 1 | 常用于重新加载配置 | 部分服务支持 reload |
+| `SIGINT` | 2 | 中断前台进程 | `Ctrl+C` |
+
+生产环境不要一上来就 `kill -9`。它会绕过程序清理逻辑，可能导致连接未关闭、临时文件未删除、数据没有 flush。
+
+### 3.3 进程排查命令：`ps`、`top`、`htop`、`pgrep`
+
+`ps` 用于查看某一刻的进程快照：
+
+```bash
+$ ps -ef | grep todo-process-demo
+$ ps -p "$PID" -o pid,ppid,user,stat,%cpu,%mem,rss,etime,cmd
+```
+
+`pgrep` 用于按进程名查找 PID：
+
+```bash
+$ pgrep -af todo-process-demo
+```
+
+`top` 用于动态观察 CPU 和内存：
+
+```bash
+$ top -p "$PID"
+```
+
+`htop` 是更友好的交互式工具，适合人工排查，但很多最小化服务器默认不安装。脚本中优先使用 `ps`、`top`、`pgrep` 这类更基础的命令。
+
+### 3.4 systemd、service unit 与日志
+
+systemd 是现代 Linux 中常见的系统和服务管理器。它可以根据 unit 文件启动服务、停止服务、配置开机自启、失败重启、运行用户和资源限制，并把服务输出收集到 journald。
+
+```mermaid
+flowchart TB
+    Unit["todo-process-demo.service<br/>服务定义文件"]
+    Systemd["systemd<br/>PID 1"]
+    Process["todo-process-demo<br/>Go HTTP 进程"]
+    Journal["journald<br/>服务日志"]
+    Admin["systemctl / journalctl<br/>管理与查看"]
+
+    Unit --> Systemd
+    Admin --> Systemd
+    Systemd --> Process
+    Process --> Journal
+    Admin --> Journal
+```
+
+常用命令：
+
+| 命令 | 作用 |
+|---|---|
+| `systemctl start name` | 启动服务 |
+| `systemctl stop name` | 停止服务 |
+| `systemctl restart name` | 重启服务 |
+| `systemctl status name` | 查看服务状态 |
+| `systemctl enable name` | 设置开机自启 |
+| `systemctl disable name` | 取消开机自启 |
+| `journalctl -u name` | 查看服务日志 |
+| `systemctl daemon-reload` | 重新加载 unit 文件 |
+
+systemd 适合管理单机服务；Kubernetes 适合管理集群中的容器化服务。两者层级不同，但都在解决“进程如何被声明、启动、观察、恢复”的问题。
+
+### 3.5 软件包管理：`apt`、`dnf` 与遗留 `yum`
+
+Linux 发行版通常通过软件包管理器安装工具和依赖：
+
+=== "Ubuntu / Debian：apt"
+
+    ```bash
+    $ sudo apt update
+    $ sudo apt install -y procps curl htop lsof psmisc
+    ```
+
+=== "Rocky / Alma / Fedora：dnf"
+
+    ```bash
+    $ sudo dnf install -y procps-ng curl htop lsof psmisc
+    ```
+
+=== "遗留 CentOS 7：yum"
+
+    ```bash
+    $ sudo yum install -y procps-ng curl htop lsof psmisc
+    ```
+
+`procps` 或 `procps-ng` 提供 `ps`、`top`、`free` 等命令；`curl` 用于访问 HTTP 服务；`lsof` 和 `ss` 常用于端口排查；`psmisc` 提供 `pstree`、`killall` 等工具。
+
+CentOS Linux 7 已经停止维护，不建议作为新学习环境和新生产环境首选。公司遗留环境中可能仍有 `yum`，但新系统优先使用 `dnf` 或发行版对应的现代包管理器。
+
+### 3.6 CPU、内存、磁盘和端口排查
+
+服务异常不一定是代码逻辑问题，也可能是资源问题：
+
+| 资源 | 常用命令 | 关注点 |
+|---|---|---|
+| CPU | `top`、`ps -o %cpu` | 是否持续高占用，是否有热点接口 |
+| 内存 | `free -h`、`ps -o rss,vsz,%mem` | RSS 是否持续增长，available 是否过低 |
+| 磁盘 | `df -h`、`du -sh` | 文件系统是否满，日志目录是否异常膨胀 |
+| 端口 | `ss -lntp`、`lsof -i` | 是否监听，是否被其他进程占用 |
+
+例如查看监听端口：
+
+```bash
+$ sudo ss -lntp | grep 18080
+```
+
+`ss -lnt` 只看监听端口，通常普通用户也能执行；`ss -lntp` 会额外显示进程名和 PID，在很多系统上需要 `sudo` 才能看全。因此脚本里只做端口存在性检查，人工排障时再用 `sudo ss -lntp` 确认进程归属。
+
+查看磁盘空间：
+
+```bash
+$ df -h
+$ sudo du -sh /var/log/* 2>/dev/null | sort -h | tail
+```
+
+这些命令会在后续 Kubernetes 排障中继续出现，只是对象会从 Linux 进程扩展为容器、Pod 和 Node。
+
+## 4. 原理深入
+
+### 4.1 一次 systemd 启动发生了什么
+
+当你执行：
+
+```bash
+$ sudo systemctl start todo-process-demo
+```
+
+系统大致经历下面的过程：
+
+```mermaid
+sequenceDiagram
+    participant User as 用户
+    participant Systemctl as systemctl
+    participant Systemd as systemd
+    participant Unit as service unit
+    participant Proc as Go 进程
+    participant Journal as journald
+
+    User->>Systemctl: start todo-process-demo
+    Systemctl->>Systemd: 通过 D-Bus 请求启动服务
+    Systemd->>Unit: 读取 unit 配置
+    Systemd->>Proc: 按 User / EnvironmentFile / ExecStart 创建进程
+    Proc->>Journal: 输出启动日志
+    Systemd->>Systemd: 记录 MainPID 和 Active 状态
+    User->>Systemctl: status
+    Systemctl->>Systemd: 查询服务状态
+    Systemctl->>Journal: 展示最近日志
+```
+
+关键字段对应关系：
+
+- `ExecStart` 决定启动哪个程序。
+- `User` 和 `Group` 决定进程以什么身份运行。
+- `EnvironmentFile` 决定服务读取哪些环境变量。
+- `Restart` 决定异常退出后是否自动重启。
+- `RuntimeDirectory` 决定 `/run` 下的运行时目录如何创建和清理。
+
+### 4.2 为什么不要长期用 `nohup` 和后台任务跑服务
+
+临时后台运行可以这样做：
+
+```bash
+$ nohup ./todo-api > todo-api.log 2>&1 &
+```
+
+这适合临时验证，不适合长期生产服务。
+
+| 能力 | `nohup &` | systemd |
+|---|---|---|
+| 开机自启 | 需要额外脚本 | 原生支持 |
+| 失败重启 | 不支持 | `Restart=on-failure` |
+| 状态查看 | 手工查 PID | `systemctl status` |
+| 日志查看 | 手工管理文件 | `journalctl -u` |
+| 运行用户 | 容易混乱 | `User=` 明确控制 |
+| 安全限制 | 基本没有 | 支持 sandbox 选项 |
+
+学习后台任务有助于理解进程，但正式服务应该交给更可靠的进程管理器。
+
+### 4.3 systemd 与 Kubernetes 的关系
+
+systemd 管理单机服务，Kubernetes 管理集群应用。它们不是同一个层次，但思想相通：
+
+| systemd | Kubernetes | 共同思想 |
+|---|---|---|
+| service unit | Pod / Deployment | 声明程序如何运行 |
+| `Restart=on-failure` | `restartPolicy` / Deployment 控制器 | 异常后自动恢复 |
+| `EnvironmentFile` | ConfigMap / Secret / env | 配置注入 |
+| `journalctl` | `kubectl logs` | 查看应用输出 |
+| `systemctl status` | `kubectl get` / `describe` | 查看运行状态 |
+| `User=` | `securityContext.runAsUser` | 控制运行身份 |
+| `MemoryMax=` / `CPUQuota=` | `resources.limits` | 资源约束 |
+
+所以本篇并不是传统运维知识的孤岛，而是后续理解容器主进程、Pod 重启、日志输出、探针和资源限制的底层铺垫。
+
+## 5. 手把手实验
+
+### 5.1 实验目标
+
+本实验会编写一个最小 Go HTTP 服务，把它安装为 `todo-process-demo` systemd 服务，并完成启动、日志、进程、端口、资源和清理验证。
+
+说明：本篇不编写 Kubernetes YAML。这里的 systemd unit 是 INI 风格的 Linux 服务配置；等进入 Kubernetes 阶段后，我们会把服务启动、健康检查、重启策略、运行用户和资源限制迁移到 Pod 与 Deployment YAML 中。
+
+### 5.2 实验环境
+
+建议在第 1 篇创建的仓库中执行：
+
+```bash
+$ cd ~/workspace/cloud-native-todo-platform
+```
+
+推荐环境：
+
+| 项目 | 要求 |
+|---|---|
+| 操作系统 | WSL2 Ubuntu 24.04 或带 systemd 的 Linux |
+| Go | Go 1.26.x，能在执行实验的 WSL/Linux 终端中执行 `go version` |
+| systemd | PID 1 为 `systemd` |
+| 权限 | 当前用户可以使用 `sudo` |
+| 必需命令 | `go`、`systemctl`、`journalctl`、`ps`、`top`、`ss`、`curl`、`free`、`df` |
+| 可选命令 | `htop`、`lsof`、`pstree` |
+
+确认 systemd 可用：
+
+```bash
+$ ps -p 1 -o pid,comm,args
+$ systemctl --version
+```
+
+预期输出类似：
+
+```text
+    PID COMMAND         COMMAND
+      1 systemd         /sbin/init
+systemd 255 (255.4-1ubuntu8.12)
+```
+
+确认 Go 在同一个 WSL/Linux 环境中可用：
+
+```bash
+$ go version
+```
+
+预期输出类似：
+
+```text
+go version go1.26.2 linux/amd64
+```
+
+注意：如果 Windows PowerShell 中能执行 `go version`，但 WSL2 Ubuntu 中不能执行，仍然无法完成本篇实验。systemd 启动的是 Linux 环境里的二进制文件，Go 编译也应在同一个 WSL/Linux 环境中完成。
+
+平台说明：
 
 === "Windows + WSL2"
 
-    推荐在 WSL2 Ubuntu 22.04 / 24.04 中完成实验。现代 WSL2 已支持 systemd，如果 `systemctl` 无法使用，需要先确认 WSL 版本并启用 systemd。
+    在 WSL2 Ubuntu 终端中执行本篇实验。课程仓库建议放在 WSL2 Linux 文件系统中，例如 `~/workspace/cloud-native-todo-platform`。不要放在 `/mnt/c/...`、`/mnt/d/...` 这类 Windows 挂载盘下做 systemd、权限和脚本实验。
 
-    先在 Windows PowerShell 中检查 WSL 版本：
-
-    ```powershell
-    wsl --version
-    ```
-
-    如果命令不存在或版本太旧，先更新 WSL：
-
-    ```powershell
-    wsl --update
-    wsl --shutdown
-    ```
-
-    在 WSL2 Ubuntu 中检查：
+    如果 `ps -p 1 -o comm=` 不是 `systemd`，可以在 WSL2 Ubuntu 中编辑 `/etc/wsl.conf`：
 
     ```bash
-    ps -p 1 -o comm=
-    systemctl --version
-    ```
-
-    如果 PID 1 不是 `systemd`，在 WSL2 Ubuntu 中编辑 `/etc/wsl.conf`：
-
-    ```bash
-    sudo tee /etc/wsl.conf >/dev/null <<'EOF'
+    $ sudo tee /etc/wsl.conf >/dev/null <<'EOF'
     [boot]
     systemd=true
     EOF
@@ -129,333 +425,36 @@ sudo systemctl restart todo-process-demo
 
 === "Linux"
 
-    推荐使用 Ubuntu 22.04 / 24.04、Debian、Rocky Linux、AlmaLinux、Fedora、CentOS Stream 等带 systemd 的发行版。
-
-    检查：
-
-    ```bash
-    ps -p 1 -o comm=
-    systemctl --version
-    ```
-
-    如果 PID 1 是 `systemd`，即可完成本篇完整实验。
+    Ubuntu、Debian、Rocky Linux、AlmaLinux、Fedora、CentOS Stream 等带 systemd 的发行版都可以完成实验。课程示例以 Ubuntu 24.04 为基准。
 
 === "macOS"
 
-    macOS 可以阅读本章、编译 Go 程序、理解进程命令，但不能原生运行 systemd。要完整完成 systemd 实验，请使用 Linux 虚拟机、云服务器、WSL2 Ubuntu，或后续 Docker/Kubernetes 章节中的 Linux 环境。
+    macOS 可以阅读本篇、理解概念、编译 Go 程序，但不能原生运行 systemd。要完整完成实验，请使用 WSL2、Linux 虚拟机或云服务器。
 
-    本章涉及 `systemctl`、`journalctl` 的步骤不要直接在 macOS Terminal 中执行。
+安装排障工具：
 
-## 4. 核心概念
-
-### 4.1 程序与进程
-
-程序是磁盘上的文件，进程是程序运行起来后的实例。
-
-例如：
-
-```bash
-/opt/todo-platform/bin/todo-process-demo
-```
-
-这是一个程序文件。当它被 systemd 启动后，Linux 会为它创建进程，分配 PID、内存、文件描述符、环境变量和运行权限。
-
-可以用一个简单关系理解：
-
-```mermaid
-flowchart LR
-    Binary["程序文件<br/>/opt/todo-platform/bin/todo-process-demo"]
-    Exec["启动命令<br/>ExecStart"]
-    Process["运行中的进程<br/>PID / 内存 / CPU / 文件描述符"]
-    Port["监听端口<br/>127.0.0.1:18080"]
-    Logs["日志输出<br/>journald"]
-
-    Binary --> Exec --> Process
-    Process --> Port
-    Process --> Logs
-```
-
-同一个程序可以启动多个进程。每个进程都有自己的 PID。
-
-### 4.2 PID、PPID 与进程树
-
-PID 是 Process ID，表示进程编号。PPID 是 Parent Process ID，表示父进程编号。
-
-查看当前 Shell：
-
-```bash
-echo $$
-ps -p $$ -o pid,ppid,user,stat,cmd
-```
-
-查看进程树：
-
-```bash
-ps -ef --forest | head -n 30
-```
-
-在 systemd 管理的 Linux 系统中，PID 1 通常是 `systemd`。它负责启动系统服务、回收子进程、记录服务状态。
-
-### 4.3 前台任务与后台任务
-
-前台任务会占用当前终端，后台任务不会阻塞当前终端。
-
-示例：
-
-```bash
-sleep 300 &
-jobs
-```
-
-输出类似：
-
-```text
-[1]+  Running                 sleep 300 &
-```
-
-常用任务控制：
-
-| 命令 | 作用 |
-|---|---|
-| `command &` | 把命令放到后台运行 |
-| `jobs` | 查看当前终端的后台任务 |
-| `fg %1` | 把 1 号任务切回前台 |
-| `Ctrl+Z` | 暂停当前前台任务 |
-| `bg %1` | 让暂停的任务继续在后台运行 |
-| `kill %1` | 结束 1 号后台任务 |
-
-后台任务适合临时实验，不适合生产服务。生产服务应该交给 systemd、容器运行时或 Kubernetes 托管。
-
-### 4.4 信号与 kill
-
-Linux 通过信号通知进程执行某些动作。`kill` 不是只能“杀死”进程，它本质上是发送信号。
-
-常见信号：
-
-| 信号 | 数字 | 含义 | 使用场景 |
-|---|---:|---|---|
-| `SIGTERM` | 15 | 请求进程正常退出 | 默认优雅停止 |
-| `SIGKILL` | 9 | 强制结束进程 | 进程无响应时最后手段 |
-| `SIGHUP` | 1 | 常用于重新加载配置 | 部分服务支持 reload |
-| `SIGINT` | 2 | 中断前台进程 | `Ctrl+C` |
-
-示例：
-
-```bash
-kill -TERM 12345
-kill -KILL 12345
-```
-
-生产环境不要一上来就 `kill -9`。它会绕过程序的清理逻辑，可能导致连接未关闭、临时文件未清理、数据未 flush。
-
-### 4.5 systemd 与 service
-
-systemd 是现代 Linux 中常见的系统和服务管理器。它可以启动服务、停止服务、开机自启、失败重启、记录状态，并把标准输出和标准错误收集到 journald。
-
-核心关系如下：
-
-```mermaid
-flowchart TB
-    Unit["todo-process-demo.service<br/>服务定义文件"]
-    Systemd["systemd<br/>PID 1 服务管理器"]
-    Process["todo-process-demo<br/>Go HTTP 进程"]
-    Journal["journald<br/>服务日志"]
-    Admin["systemctl / journalctl<br/>管理与查看"]
-
-    Unit --> Systemd
-    Admin --> Systemd
-    Systemd --> Process
-    Process --> Journal
-    Admin --> Journal
-```
-
-常见命令：
-
-| 命令 | 作用 |
-|---|---|
-| `systemctl start name` | 启动服务 |
-| `systemctl stop name` | 停止服务 |
-| `systemctl restart name` | 重启服务 |
-| `systemctl status name` | 查看服务状态 |
-| `systemctl enable name` | 设置开机自启 |
-| `systemctl disable name` | 取消开机自启 |
-| `journalctl -u name` | 查看服务日志 |
-| `systemctl daemon-reload` | 重新加载 unit 文件 |
-
-### 4.6 软件包管理：apt、dnf 与遗留 yum
-
-Linux 发行版通常使用软件包管理器安装工具。
-
-=== "Ubuntu / Debian：apt"
+=== "Ubuntu / Debian"
 
     ```bash
-    sudo apt update
-    sudo apt install -y procps curl htop lsof psmisc
+    $ sudo apt update
+    $ sudo apt install -y procps curl htop lsof psmisc
     ```
 
-    - `procps` 提供 `ps`、`top`、`free` 等命令。
-    - `curl` 用于访问 HTTP 服务。
-    - `htop` 是交互式进程观察工具。
-    - `lsof` 可查看进程打开的文件和端口。
-    - `psmisc` 提供 `pstree`、`killall` 等工具。
-
-=== "Rocky / Alma / Fedora：dnf"
+=== "Rocky / Alma / Fedora"
 
     ```bash
-    sudo dnf install -y procps-ng curl htop lsof psmisc
+    $ sudo dnf install -y procps-ng curl htop lsof psmisc
     ```
 
-    `dnf` 是现代 RPM 系发行版常用包管理器，适用于 Rocky Linux、AlmaLinux、Fedora、CentOS Stream 等系统。
-
-=== "遗留 CentOS 7：yum"
+=== "遗留 CentOS 7"
 
     ```bash
-    sudo yum install -y procps-ng curl htop lsof psmisc
+    $ sudo yum install -y procps-ng curl htop lsof psmisc
     ```
 
-    `yum` 常见于较旧的 CentOS / RHEL 系统。CentOS Linux 7 已经停止维护，不建议作为新项目学习和生产环境首选；如果公司仍有遗留机器，需要理解它的包管理方式，但新系统优先使用 `dnf`。
+### 5.3 文件目录结构
 
-包管理器解决的是“工具从哪里来、版本如何安装、依赖如何处理”的问题。生产环境中通常会使用公司内部软件源，避免每台服务器直接从公网拉包。
-
-## 5. 原理深入
-
-### 5.1 一次服务启动发生了什么
-
-当你执行：
-
-```bash
-sudo systemctl start todo-process-demo
-```
-
-系统大致会经历以下过程：
-
-```mermaid
-sequenceDiagram
-    participant User as 运维/开发者
-    participant Systemctl as systemctl
-    participant Systemd as systemd
-    participant Unit as service unit
-    participant Proc as Go 进程
-    participant Journal as journald
-
-    User->>Systemctl: start todo-process-demo
-    Systemctl->>Systemd: 通过 D-Bus 请求启动服务
-    Systemd->>Unit: 读取 unit 配置
-    Systemd->>Proc: 按 User/EnvironmentFile/ExecStart 创建进程
-    Proc->>Journal: 输出启动日志
-    Systemd->>Systemd: 记录 MainPID 和服务状态
-    User->>Systemctl: status
-    Systemctl->>Systemd: 查询状态
-    Systemctl->>Journal: 展示最近日志
-```
-
-关键点：
-
-- `ExecStart` 决定启动哪个程序。
-- `User` 和 `Group` 决定进程以什么身份运行。
-- `EnvironmentFile` 决定服务读取哪些环境变量。
-- `Restart` 决定进程异常退出后是否自动重启。
-- `journalctl` 查看的是服务输出到 stdout/stderr 后被 journald 收集的日志。
-
-### 5.2 为什么不要只用 `nohup` 和后台任务跑服务
-
-你可能见过这样的启动方式：
-
-```bash
-nohup ./todo-api > todo-api.log 2>&1 &
-```
-
-这种方式能临时让程序在后台运行，但缺少生产服务管理能力：
-
-| 能力 | `nohup &` | systemd |
-|---|---|---|
-| 开机自启 | 需要额外脚本 | 原生支持 |
-| 失败重启 | 不支持 | `Restart=on-failure` |
-| 状态查看 | 需要手工查 PID | `systemctl status` |
-| 日志查看 | 手工管理文件 | `journalctl -u` |
-| 运行用户 | 容易混乱 | `User=` 明确控制 |
-| 安全限制 | 基本没有 | 支持多种 sandbox 选项 |
-
-学习 `nohup` 有助于理解后台进程，但正式服务应该使用更可靠的进程管理器。
-
-### 5.3 systemd 与 Kubernetes 的关系
-
-systemd 管理一台 Linux 机器上的服务。Kubernetes 管理集群中的容器化应用。两者场景不同，但很多思想相通：
-
-| systemd | Kubernetes | 共同思想 |
-|---|---|---|
-| service unit | Pod / Deployment | 声明程序如何运行 |
-| `Restart=on-failure` | `restartPolicy`、Deployment 控制器 | 异常后自动恢复 |
-| `EnvironmentFile` | ConfigMap / Secret / env | 配置注入 |
-| `journalctl` | `kubectl logs` | 查看应用输出 |
-| `systemctl status` | `kubectl get/describe` | 查看运行状态 |
-| `User=` | `securityContext.runAsUser` | 控制运行身份 |
-| `MemoryMax=`、`CPUQuota=` | resources limits | 资源约束 |
-
-所以本篇不是传统运维知识的孤岛，而是后续理解容器和 Kubernetes 的底层铺垫。
-
-## 6. 手把手实验
-
-### 6.1 实验目标
-
-本实验将完成以下任务：
-
-- 编写一个 Go HTTP 进程演示服务。
-- 编译生成 Linux 可执行文件。
-- 安装程序、配置文件和 systemd unit。
-- 用 systemd 启动、停止、重启、查看服务状态。
-- 用 `journalctl` 查看服务日志。
-- 用 `ps`、`top`、`ss`、`free`、`df` 排查进程和资源。
-- 编写一个检查脚本验收本篇实验结果。
-
-本篇不编写 Kubernetes YAML。原因是本篇目标是先理解 Linux 单机上的进程与服务管理；后续进入 Kubernetes 时，再把这些能力迁移到 Pod、Deployment、Probe、资源限制和日志排查中。
-
-### 6.2 实验环境
-
-| 项目 | 要求 |
-|---|---|
-| 操作系统 | WSL2 Ubuntu 或带 systemd 的 Linux |
-| Go | 已安装并能执行 `go version` |
-| 权限 | 当前用户可以使用 `sudo` |
-| 网络 | 本机能访问 `127.0.0.1:18080` |
-| 必需命令 | `systemctl`、`journalctl`、`ps`、`top`、`ss`、`curl`、`free`、`df` |
-| 可选命令 | `htop`、`lsof`、`pstree` |
-
-确认 systemd 可用：
-
-```bash
-ps -p 1 -o pid,comm,args
-systemctl --version
-```
-
-预期能看到 PID 1 的命令是 `systemd`，并且 `systemctl --version` 正常输出版本。
-
-安装实验工具：
-
-=== "Ubuntu / Debian：apt"
-
-    ```bash
-    sudo apt update
-    sudo apt install -y procps curl htop lsof psmisc
-    ```
-
-=== "Rocky / Alma / Fedora：dnf"
-
-    ```bash
-    sudo dnf install -y procps-ng curl htop lsof psmisc
-    ```
-
-=== "遗留 CentOS 7：yum"
-
-    ```bash
-    sudo yum install -y procps-ng curl htop lsof psmisc
-    ```
-
-    CentOS Linux 7 已经停止维护，本标签只用于遗留环境参考。新学习环境和新项目优先选择 Ubuntu LTS、Rocky Linux、AlmaLinux、Fedora 或 CentOS Stream。
-
-### 6.3 文件目录结构
-
-本实验会在课程仓库中新增这些文件：
+本实验会在课程仓库中创建：
 
 ```text
 cloud-native-todo-platform/
@@ -472,46 +471,24 @@ cloud-native-todo-platform/
     └── check-process-service.sh
 ```
 
-同时会在 Linux 系统目录中安装：
+同时会安装到 Linux 系统目录：
 
 ```text
 /opt/todo-platform/bin/todo-process-demo
 /etc/todo-platform/process-demo.env
 /etc/systemd/system/todo-process-demo.service
-/var/log/todo-platform/
 /var/lib/todo-platform/
-/run/todo-platform/
+/var/log/todo-platform/
+/run/todo-platform/todo-process-demo.pid
 ```
 
-这些路径承接了第 2 篇的目录设计：程序放 `/opt`，配置放 `/etc`，日志和数据放 `/var`，PID 文件这类运行时状态放 `/run`。
+这些路径承接第 2 篇的目录设计：程序放 `/opt`，配置放 `/etc`，数据放 `/var/lib`，日志放 `/var/log`，运行时状态放 `/run`。
 
-### 6.4 回到课程仓库
+### 5.4 完整代码和配置
 
-```bash
-cd ~/workspace/cloud-native-todo-platform
-pwd
-```
+Go HTTP 服务 `api/cmd/todo-process-demo/main.go`：
 
-如果你的仓库不在默认路径，请切换到自己的实际仓库根目录。
-
-如果仓库还没有 Go module，先初始化：
-
-```bash
-test -f go.mod || go mod init github.com/your-name/cloud-native-todo-platform
-```
-
-### 6.5 编写 Go HTTP 服务
-
-创建目录：
-
-```bash
-mkdir -p api/cmd/todo-process-demo bin deployments/systemd scripts
-```
-
-写入完整代码：
-
-```bash
-cat > api/cmd/todo-process-demo/main.go <<'EOF'
+```go title="api/cmd/todo-process-demo/main.go"
 package main
 
 import (
@@ -543,7 +520,7 @@ func main() {
 	pidFile := getenv("TODO_PID_FILE", "")
 
 	if pidFile != "" {
-		if err := writePIDFile(pidFile); err != nil {
+		if err := os.WriteFile(pidFile, []byte(fmt.Sprintf("%d\n", os.Getpid())), 0644); err != nil {
 			log.Fatalf("write pid file failed: %v", err)
 		}
 		defer func() {
@@ -556,7 +533,6 @@ func main() {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", withLog(indexHandler))
 	mux.HandleFunc("/healthz", withLog(healthHandler(env)))
-	mux.HandleFunc("/readyz", withLog(readyHandler))
 	mux.HandleFunc("/work", withLog(workHandler))
 	mux.HandleFunc("/memory", withLog(memoryHandler))
 	mux.HandleFunc("/metrics-lite", withLog(metricsHandler))
@@ -594,20 +570,12 @@ func main() {
 	}
 }
 
-func indexHandler(w http.ResponseWriter, r *http.Request) {
-	writeText(w, http.StatusOK, `todo-process-demo
-
-available endpoints:
-  GET /healthz
-  GET /readyz
-  GET /work?ms=500
-  GET /memory?mb=32&hold=10
-  GET /metrics-lite
-`)
+func indexHandler(w http.ResponseWriter, _ *http.Request) {
+	writeText(w, http.StatusOK, "todo-process-demo\n\nGET /healthz\nGET /work?ms=500\nGET /memory?mb=16&hold=true\nGET /memory?clear=true\nGET /metrics-lite\n")
 }
 
 func healthHandler(env string) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, _ *http.Request) {
 		hostname, _ := os.Hostname()
 		writeJSON(w, http.StatusOK, map[string]any{
 			"status":   "ok",
@@ -621,74 +589,66 @@ func healthHandler(env string) http.HandlerFunc {
 	}
 }
 
-func readyHandler(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, map[string]string{
-		"status": "ready",
-	})
-}
-
 func workHandler(w http.ResponseWriter, r *http.Request) {
-	ms := boundedInt(r, "ms", 500, 1, 5000)
-	deadline := time.Now().Add(time.Duration(ms) * time.Millisecond)
+	ms := parseInt(r.URL.Query().Get("ms"), 300)
+	if ms < 1 {
+		ms = 1
+	}
+	if ms > 5000 {
+		ms = 5000
+	}
 
+	deadline := time.Now().Add(time.Duration(ms) * time.Millisecond)
 	var n uint64
 	for time.Now().Before(deadline) {
 		n++
-		if n%100000 == 0 {
-			runtime.Gosched()
-		}
 	}
 
 	writeJSON(w, http.StatusOK, map[string]any{
-		"status":     "ok",
-		"work_ms":    ms,
-		"iterations": n,
+		"worked_ms": ms,
+		"loops":     n,
 	})
 }
 
 func memoryHandler(w http.ResponseWriter, r *http.Request) {
-	mb := boundedInt(r, "mb", 32, 1, 256)
-	hold := boundedInt(r, "hold", 10, 1, 60)
+	if r.URL.Query().Get("clear") == "true" {
+		memoryMu.Lock()
+		memoryHolds = nil
+		memoryMu.Unlock()
+		runtime.GC()
+		writeJSON(w, http.StatusOK, map[string]any{"cleared": true})
+		return
+	}
+
+	mb := parseInt(r.URL.Query().Get("mb"), 8)
+	if mb < 1 {
+		mb = 1
+	}
+	if mb > 64 {
+		mb = 64
+	}
 
 	buf := make([]byte, mb*1024*1024)
 	for i := range buf {
 		buf[i] = byte(i)
 	}
 
-	memoryMu.Lock()
-	memoryHolds = append(memoryHolds, buf)
-	index := len(memoryHolds) - 1
-	memoryMu.Unlock()
-
-	go func() {
-		time.Sleep(time.Duration(hold) * time.Second)
+	held := r.URL.Query().Get("hold") == "true"
+	if held {
 		memoryMu.Lock()
-		if index >= 0 && index < len(memoryHolds) {
-			memoryHolds[index] = nil
-		}
+		memoryHolds = append(memoryHolds, buf)
 		memoryMu.Unlock()
-	}()
+	}
 
 	writeJSON(w, http.StatusOK, map[string]any{
-		"status":       "ok",
 		"allocated_mb": mb,
-		"hold_seconds": hold,
+		"held":         held,
 	})
 }
 
-func metricsHandler(w http.ResponseWriter, r *http.Request) {
+func metricsHandler(w http.ResponseWriter, _ *http.Request) {
 	uptime := int64(time.Since(startedAt).Seconds())
-	body := fmt.Sprintf(`# HELP todo_process_uptime_seconds Process uptime in seconds.
-# TYPE todo_process_uptime_seconds gauge
-todo_process_uptime_seconds %d
-# HELP todo_process_requests_total Total handled HTTP requests.
-# TYPE todo_process_requests_total counter
-todo_process_requests_total %d
-# HELP todo_process_goroutines Current goroutine count.
-# TYPE todo_process_goroutines gauge
-todo_process_goroutines %d
-`, uptime, requestsTotal.Load(), runtime.NumGoroutine())
-	writeText(w, http.StatusOK, body)
+	writeText(w, http.StatusOK, fmt.Sprintf("todo_process_requests_total %d\ntodo_process_uptime_seconds %d\n", requestsTotal.Load(), uptime))
 }
 
 func withLog(next http.HandlerFunc) http.HandlerFunc {
@@ -696,26 +656,8 @@ func withLog(next http.HandlerFunc) http.HandlerFunc {
 		start := time.Now()
 		requestsTotal.Add(1)
 		next(w, r)
-		log.Printf("method=%s path=%s remote=%s duration=%s", r.Method, r.URL.RequestURI(), r.RemoteAddr, time.Since(start))
+		log.Printf("method=%s path=%s remote=%s duration=%s", r.Method, r.URL.Path, r.RemoteAddr, time.Since(start))
 	}
-}
-
-func boundedInt(r *http.Request, key string, fallback, min, max int) int {
-	raw := r.URL.Query().Get(key)
-	if raw == "" {
-		return fallback
-	}
-	value, err := strconv.Atoi(raw)
-	if err != nil {
-		return fallback
-	}
-	if value < min {
-		return min
-	}
-	if value > max {
-		return max
-	}
-	return value
 }
 
 func getenv(key, fallback string) string {
@@ -726,131 +668,47 @@ func getenv(key, fallback string) string {
 	return value
 }
 
-func writePIDFile(path string) error {
-	return os.WriteFile(path, []byte(strconv.Itoa(os.Getpid())+"\n"), 0644)
+func parseInt(value string, fallback int) int {
+	if value == "" {
+		return fallback
+	}
+	n, err := strconv.Atoi(value)
+	if err != nil {
+		return fallback
+	}
+	return n
 }
 
-func writeJSON(w http.ResponseWriter, status int, data any) {
+func writeJSON(w http.ResponseWriter, status int, v any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(data)
+	if err := json.NewEncoder(w).Encode(v); err != nil {
+		log.Printf("write json failed: %v", err)
+	}
 }
 
 func writeText(w http.ResponseWriter, status int, body string) {
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.WriteHeader(status)
-	_, _ = w.Write([]byte(body))
+	if _, err := w.Write([]byte(body)); err != nil {
+		log.Printf("write text failed: %v", err)
+	}
 }
-EOF
 ```
 
-这段程序包含几个用于排障练习的接口：
+环境变量文件 `/etc/todo-platform/process-demo.env`：
 
-| 接口 | 作用 |
-|---|---|
-| `/healthz` | 返回进程状态、PID、主机名和运行时间 |
-| `/readyz` | 模拟就绪检查 |
-| `/work?ms=500` | 模拟 CPU 工作负载 |
-| `/memory?mb=32&hold=10` | 临时分配内存，便于观察内存变化 |
-| `/metrics-lite` | 输出简化版指标文本 |
-
-### 6.6 本地编译和前台运行
-
-编译：
-
-```bash
-go mod tidy
-go build -o bin/todo-process-demo ./api/cmd/todo-process-demo
-```
-
-前台运行一次：
-
-```bash
-TODO_HTTP_ADDR=127.0.0.1:18080 TODO_ENV=dev ./bin/todo-process-demo
-```
-
-另开一个终端验证：
-
-```bash
-curl -fsS http://127.0.0.1:18080/healthz
-curl -fsS http://127.0.0.1:18080/metrics-lite
-```
-
-预期 `/healthz` 输出类似：
-
-```json
-{"env":"dev","hostname":"ubuntu","pid":12345,"service":"todo-process-demo","status":"ok","time":"2026-05-26T10:00:00+08:00","uptime":"5s"}
-```
-
-回到运行服务的终端，按 `Ctrl+C` 停止。你应该能看到程序收到信号并优雅退出的日志。
-
-Checkpoint 1：Go 程序能编译，前台运行后能通过 `curl` 访问。
-
-### 6.7 创建运行用户和系统目录
-
-真实服务不建议长期使用 root 运行。创建一个专用系统用户：
-
-```bash
-NOLOGIN_SHELL="$(command -v nologin || echo /usr/sbin/nologin)"
-if ! getent group todo >/dev/null 2>&1; then
-  sudo groupadd --system todo
-fi
-if ! id todo >/dev/null 2>&1; then
-  sudo useradd --system --gid todo --home-dir /opt/todo-platform --shell "$NOLOGIN_SHELL" todo
-fi
-```
-
-这里先找 `nologin` 的真实路径，是为了兼容不同发行版。`nologin` 可以防止这个系统用户被当成普通登录用户使用。
-
-创建目录：
-
-```bash
-sudo install -d -o root -g root -m 0755 /opt/todo-platform/bin
-sudo install -d -o root -g root -m 0755 /etc/todo-platform
-sudo install -d -o todo -g todo -m 0755 /var/log/todo-platform
-sudo install -d -o todo -g todo -m 0755 /var/lib/todo-platform
-```
-
-`/run/todo-platform` 不在这里手工创建，后面由 systemd 的 `RuntimeDirectory=todo-platform` 自动创建。`/run` 用于运行时文件，重启后可以清空，适合放 PID 文件这类临时状态。
-
-安装二进制文件：
-
-```bash
-sudo install -o root -g root -m 0755 bin/todo-process-demo /opt/todo-platform/bin/todo-process-demo
-```
-
-写入配置文件：
-
-```bash
-sudo tee /etc/todo-platform/process-demo.env >/dev/null <<'EOF'
+```text title="/etc/todo-platform/process-demo.env"
 TODO_ENV=dev
 TODO_HTTP_ADDR=127.0.0.1:18080
 TODO_PID_FILE=/run/todo-platform/todo-process-demo.pid
-EOF
 ```
 
-调整配置权限：
+systemd unit `deployments/systemd/todo-process-demo.service`：
 
-```bash
-sudo chown root:todo /etc/todo-platform/process-demo.env
-sudo chmod 640 /etc/todo-platform/process-demo.env
-ls -l /etc/todo-platform/process-demo.env
-```
-
-为什么这样做：
-
-- 程序文件由 root 管理，普通服务用户只能执行，不能随意修改。
-- 配置文件允许 `todo` 组读取，但不允许其他用户读取。
-- 日志、数据和运行时目录由 `todo` 用户拥有，便于服务写入。
-
-### 6.8 编写 systemd service unit
-
-创建 unit 文件：
-
-```bash
-cat > deployments/systemd/todo-process-demo.service <<'EOF'
+```ini title="deployments/systemd/todo-process-demo.service"
 [Unit]
-Description=Todo Platform process demo service
+Description=Todo Process Demo Service
 After=network-online.target
 Wants=network-online.target
 
@@ -860,769 +718,580 @@ User=todo
 Group=todo
 EnvironmentFile=/etc/todo-platform/process-demo.env
 ExecStart=/opt/todo-platform/bin/todo-process-demo
-WorkingDirectory=/opt/todo-platform
 Restart=on-failure
-RestartSec=3s
-KillSignal=SIGTERM
-TimeoutStopSec=10s
+RestartSec=2s
+WorkingDirectory=/var/lib/todo-platform
 RuntimeDirectory=todo-platform
-RuntimeDirectoryMode=0755
+RuntimeDirectoryMode=0750
+KillSignal=SIGTERM
+TimeoutStopSec=10
 MemoryMax=256M
-CPUQuota=100%
+CPUQuota=80%
 NoNewPrivileges=true
 PrivateTmp=true
-ProtectHome=true
 ProtectSystem=full
-ReadWritePaths=/var/log/todo-platform /var/lib/todo-platform /run/todo-platform
+ProtectHome=true
+ReadWritePaths=/var/lib/todo-platform /var/log/todo-platform /run/todo-platform
 
 [Install]
 WantedBy=multi-user.target
-EOF
 ```
 
 关键字段说明：
 
-| 字段 | 含义 |
+| 字段 | 作用 |
 |---|---|
-| `[Unit]` | 描述服务元信息和依赖关系 |
-| `After=network-online.target` | 网络就绪后再启动 |
-| `Type=simple` | `ExecStart` 启动的进程就是主进程 |
-| `User=todo`、`Group=todo` | 使用专用低权限用户运行 |
-| `EnvironmentFile` | 从配置文件注入环境变量 |
-| `ExecStart` | 服务启动命令 |
-| `Restart=on-failure` | 异常退出时自动重启 |
-| `KillSignal=SIGTERM` | 停止服务时发送优雅退出信号 |
-| `RuntimeDirectory` | 由 systemd 创建 `/run/todo-platform`，适合 PID 文件等运行时状态 |
-| `MemoryMax`、`CPUQuota` | 给服务设置基础资源上限，避免实验服务无限占用资源 |
-| `NoNewPrivileges=true` | 禁止进程获取额外权限 |
-| `ProtectSystem=full` | 限制对系统目录的写入 |
-| `ReadWritePaths` | 明确允许写入的业务目录 |
-| `WantedBy=multi-user.target` | 支持开机进入多用户模式时自启 |
-
-安装 unit：
-
-```bash
-sudo cp deployments/systemd/todo-process-demo.service /etc/systemd/system/todo-process-demo.service
-sudo systemctl daemon-reload
-```
-
-`daemon-reload` 很重要。修改或新增 unit 文件后，systemd 不会自动重新读取文件，必须显式 reload。
-
-### 6.9 启动、查看、重启和停止服务
-
-启动并设置开机自启：
-
-```bash
-sudo systemctl enable --now todo-process-demo
-```
-
-查看状态：
-
-```bash
-systemctl status todo-process-demo --no-pager
-```
-
-关键观察点：
-
-- `Loaded` 应显示 unit 文件路径。
-- `Active` 应显示 `active (running)`。
-- `Main PID` 是 Go 服务进程的 PID。
-- 最近日志中应能看到 `todo-process-demo starting`。
-
-查看日志：
-
-```bash
-journalctl -u todo-process-demo -n 50 --no-pager
-```
-
-访问服务：
-
-```bash
-curl -fsS http://127.0.0.1:18080/healthz
-curl -fsS http://127.0.0.1:18080/metrics-lite
-cat /run/todo-platform/todo-process-demo.pid
-```
-
-`curl -fsS` 比 `curl -s` 更适合验收：HTTP 错误会让命令失败，同时仍然显示错误信息。`/run/todo-platform/todo-process-demo.pid` 是服务启动后写入的 PID 文件，后面可以用它和 systemd 的 `MainPID` 做交叉验证。
-
-重启服务：
-
-```bash
-sudo systemctl restart todo-process-demo
-systemctl status todo-process-demo --no-pager
-```
-
-停止服务：
-
-```bash
-sudo systemctl stop todo-process-demo
-systemctl status todo-process-demo --no-pager
-```
-
-重新启动，继续后续实验：
-
-```bash
-sudo systemctl start todo-process-demo
-```
-
-Checkpoint 2：你能用 systemd 完成服务启动、停止、重启、状态查看和日志查看。
-
-### 6.10 验证失败自动重启
-
-`Restart=on-failure` 不能只停留在 unit 文件里，还要真正验证它是否生效。
-
-先记录当前主进程 PID：
-
-```bash
-OLD_PID="$(systemctl show -p MainPID --value todo-process-demo)"
-echo "$OLD_PID"
-```
-
-模拟进程被异常杀死：
-
-```bash
-sudo kill -KILL "$OLD_PID"
-sleep 5
-```
-
-再次查看服务：
-
-```bash
-systemctl status todo-process-demo --no-pager
-NEW_PID="$(systemctl show -p MainPID --value todo-process-demo)"
-echo "$NEW_PID"
-cat /run/todo-platform/todo-process-demo.pid
-journalctl -u todo-process-demo -n 30 --no-pager
-```
-
-判断依据：
-
-- 服务状态应重新回到 `active (running)`。
-- `NEW_PID` 应该和 `OLD_PID` 不同，说明 systemd 拉起了新进程。
-- journal 日志中能看到旧进程被杀死，以及新进程重新启动的记录。
-- PID 文件内容应等于新的 `MainPID`。
-
-这里故意使用 `SIGKILL` 是为了模拟异常崩溃。真实生产环境不要把 `kill -9` 当作常规停止服务的方法，正常停止仍应使用 `systemctl stop` 或 `SIGTERM`。
-
-Checkpoint 3：你能验证 systemd 的失败自动重启能力，而不是只会写 `Restart=on-failure`。
-
-### 6.11 使用 ps 和 pgrep 定位进程
-
-获取服务主进程 PID：
-
-```bash
-PID="$(systemctl show -p MainPID --value todo-process-demo)"
-echo "$PID"
-```
-
-查看进程详情：
-
-```bash
-ps -p "$PID" -o pid,ppid,user,group,stat,%cpu,%mem,rss,vsz,etime,cmd
-```
-
-字段说明：
-
-| 字段 | 含义 |
-|---|---|
-| `PID` | 当前进程 ID |
-| `PPID` | 父进程 ID |
-| `USER` | 运行用户 |
-| `STAT` | 进程状态 |
-| `%CPU` | CPU 使用比例 |
-| `%MEM` | 内存使用比例 |
-| `RSS` | 常驻内存，单位 KB |
-| `VSZ` | 虚拟内存，单位 KB |
-| `ELAPSED` | 进程已运行时间 |
-| `CMD` | 启动命令 |
-
-按名称查找：
-
-```bash
-pgrep -af todo-process-demo
-```
-
-查看进程树：
-
-```bash
-pstree -aps "$PID"
-```
-
-用 PID 文件交叉验证：
-
-```bash
-cat /run/todo-platform/todo-process-demo.pid
-test "$(cat /run/todo-platform/todo-process-demo.pid)" = "$PID"
-```
-
-Checkpoint 4：你能从 systemd 状态和 PID 文件定位到真实 Linux 进程，并看懂基本字段。
-
-### 6.12 使用 top 和 htop 观察 CPU
-
-模拟一次 CPU 工作：
-
-```bash
-curl -fsS "http://127.0.0.1:18080/work?ms=5000" >/dev/null &
-```
-
-观察进程：
-
-```bash
-top -p "$PID"
-```
-
-在 `top` 中常用按键：
-
-| 按键 | 作用 |
-|---|---|
-| `P` | 按 CPU 排序 |
-| `M` | 按内存排序 |
-| `c` | 显示完整命令 |
-| `q` | 退出 |
-
-如果安装了 `htop`，可以执行：
-
-```bash
-htop -p "$PID"
-```
-
-`top` 更常见，几乎所有服务器都有；`htop` 更适合交互观察，但生产服务器不一定预装。
-
-### 6.13 观察内存使用
-
-触发临时内存分配：
-
-```bash
-curl -fsS "http://127.0.0.1:18080/memory?mb=64&hold=20"
-```
-
-查看进程内存：
-
-```bash
-ps -p "$PID" -o pid,%mem,rss,vsz,cmd
-```
-
-查看系统内存：
-
-```bash
-free -h
-```
-
-判断思路：
-
-- `RSS` 变大，说明进程常驻内存增长。
-- `free -h` 中 `available` 很低，说明系统可用内存紧张。
-- 如果某个进程持续增长且不回落，可能存在内存泄漏或缓存未限制。
-
-### 6.14 查看端口占用
-
-确认服务监听端口：
-
-```bash
-sudo ss -lntp | grep 18080 || true
-```
-
-如果安装了 `lsof`：
-
-```bash
-sudo lsof -iTCP:18080 -sTCP:LISTEN
-```
-
-输出中应该能看到 `todo-process-demo` 或对应 PID。部分系统上普通用户执行 `ss -lntp` 只能看到监听端口，看不到进程名和 PID，所以定位端口归属时建议使用 `sudo ss -lntp` 或 `sudo lsof`。
-
-端口排查在下一篇 Linux 网络基础中会进一步展开，本篇先掌握“端口由哪个进程监听”。
-
-### 6.15 查看磁盘和日志占用
-
-查看磁盘空间：
-
-```bash
-df -h
-```
-
-查看目录大小：
-
-```bash
-sudo du -sh /var/log/todo-platform /var/lib/todo-platform /opt/todo-platform 2>/dev/null || true
-```
-
-查看 journald 占用：
-
-```bash
-journalctl --disk-usage
-```
-
-生产环境中，服务日志如果不做轮转和保留策略，最终可能写满磁盘。磁盘满会导致服务无法写日志、数据库无法写入、甚至系统无法正常运行。
-
-### 6.16 验证资源限制和安全基线
-
-先查看 systemd 实际加载到的资源限制：
-
-```bash
-systemctl show todo-process-demo -p MemoryMax -p CPUQuotaPerSecUSec
-```
-
-触发一次 CPU 和内存请求：
-
-```bash
-curl -fsS "http://127.0.0.1:18080/work?ms=3000" >/dev/null &
-curl -fsS "http://127.0.0.1:18080/memory?mb=64&hold=20"
-```
-
-观察进程资源：
-
-```bash
-PID="$(systemctl show -p MainPID --value todo-process-demo)"
-ps -p "$PID" -o pid,%cpu,%mem,rss,vsz,cmd
-```
-
-这里的 `MemoryMax=256M` 和 `CPUQuota=100%` 不是生产推荐值，而是演示 systemd 能限制单个服务的资源上限。真实生产值要根据压测、服务基线和机器容量决定。
-
-检查安全基线：
-
-```bash
-systemd-analyze security todo-process-demo
-```
-
-如果当前系统没有 `systemd-analyze security` 子命令，可以跳过这一步。这个命令会根据 unit 中的安全选项给出风险评分，帮助你发现服务是否过度暴露系统权限。
-
-Checkpoint 5：你能说明服务的资源限制和安全限制不是装饰字段，而是能被 systemd 读取和检查的运行约束。
-
-### 6.17 编写服务检查脚本
-
-创建脚本：
-
-```bash
-cat > scripts/check-process-service.sh <<'EOF'
+| `User` / `Group` | 让服务以低权限 `todo` 用户运行 |
+| `EnvironmentFile` | 从配置文件注入运行参数 |
+| `ExecStart` | 指定服务启动的二进制文件 |
+| `Restart=on-failure` | 进程异常退出后自动重启 |
+| `RuntimeDirectory` | 由 systemd 创建 `/run/todo-platform` |
+| `MemoryMax` / `CPUQuota` | 对服务设置基础资源限制 |
+| `NoNewPrivileges` | 禁止服务进程获得新权限 |
+| `ProtectSystem` / `ProtectHome` | 降低服务误写系统目录和用户目录的风险 |
+
+严格来说，`RuntimeDirectory=todo-platform` 创建的 `/run/todo-platform` 会自动给服务进程可写权限，本篇把它也写进 `ReadWritePaths` 是为了让初学者更直观看到哪些目录属于服务运行时写入范围。
+
+检查脚本 `scripts/check-process-service.sh`：
+
+```bash title="scripts/check-process-service.sh"
 #!/usr/bin/env bash
-set -euo pipefail
+set -Eeuo pipefail
 
 SERVICE="${1:-todo-process-demo}"
-URL="${2:-http://127.0.0.1:18080/healthz}"
-PORT="${3:-18080}"
+URL="${TODO_DEMO_URL:-http://127.0.0.1:${TODO_DEMO_PORT:-18080}}"
+PORT="${TODO_DEMO_PORT:-}"
+FAILURES=0
 
-echo "checking service: ${SERVICE}"
+ok() {
+  printf '[OK] %s\n' "$1"
+}
 
-command -v systemctl >/dev/null
-command -v journalctl >/dev/null
-command -v curl >/dev/null
-command -v ps >/dev/null
-command -v ss >/dev/null
+fail() {
+  printf '[FAIL] %s\n' "$1"
+  FAILURES=$((FAILURES + 1))
+}
 
-if ! systemctl is-active --quiet "${SERVICE}"; then
-  echo "service is not active: ${SERVICE}" >&2
-  systemctl status "${SERVICE}" --no-pager || true
-  exit 1
-fi
+parse_port() {
+  local value="${1#http://}"
+  value="${value#https://}"
+  value="${value%%/*}"
+  if [[ "$value" == *:* ]]; then
+    printf '%s\n' "${value##*:}"
+  elif [[ "$1" == https://* ]]; then
+    printf '443\n'
+  else
+    printf '80\n'
+  fi
+}
 
-pid="$(systemctl show -p MainPID --value "${SERVICE}")"
-if [ -z "${pid}" ] || [ "${pid}" = "0" ]; then
-  echo "service has no MainPID" >&2
-  exit 1
-fi
+require_command() {
+  if command -v "$1" >/dev/null 2>&1; then
+    ok "command exists: $1"
+  else
+    fail "command missing: $1"
+  fi
+}
 
-echo "main pid: ${pid}"
-ps -p "${pid}" -o pid,ppid,user,stat,%cpu,%mem,etime,cmd
+require_file() {
+  if [[ -f "$1" ]]; then
+    ok "file exists: $1"
+  else
+    fail "file missing: $1"
+  fi
+}
 
-pid_file="/run/todo-platform/todo-process-demo.pid"
-if [ ! -f "${pid_file}" ]; then
-  echo "pid file not found: ${pid_file}" >&2
-  exit 1
-fi
+main() {
+  if [[ -z "$PORT" ]]; then
+    PORT="$(parse_port "$URL")"
+  fi
 
-if [ "$(cat "${pid_file}")" != "${pid}" ]; then
-  echo "pid file does not match MainPID" >&2
-  exit 1
-fi
+  require_command systemctl
+  require_command journalctl
+  require_command curl
+  require_command ps
+  require_command ss
 
-if ! curl -fsS "${URL}" >/dev/null; then
-  echo "health check failed: ${URL}" >&2
-  exit 1
-fi
+  require_file /opt/todo-platform/bin/todo-process-demo
+  require_file /etc/todo-platform/process-demo.env
+  require_file /etc/systemd/system/todo-process-demo.service
 
-if ! ss -lnt | grep -q ":${PORT} "; then
-  echo "port is not listening: ${PORT}" >&2
-  exit 1
-fi
+  if systemctl is-active --quiet "$SERVICE"; then
+    ok "service active: $SERVICE"
+  else
+    fail "service is not active: $SERVICE"
+  fi
 
-echo "recent logs:"
-journalctl -u "${SERVICE}" -n 10 --no-pager
+  local pid
+  pid="$(systemctl show -p MainPID --value "$SERVICE")"
+  if [[ "$pid" =~ ^[0-9]+$ && "$pid" -gt 0 ]]; then
+    ok "MainPID is valid: $pid"
+  else
+    fail "MainPID is invalid: $pid"
+  fi
 
-echo "process service lab ok"
+  if [[ -f /run/todo-platform/todo-process-demo.pid ]]; then
+    local file_pid
+    file_pid="$(cat /run/todo-platform/todo-process-demo.pid)"
+    if [[ "$file_pid" == "$pid" ]]; then
+      ok "pid file matches MainPID"
+    else
+      fail "pid file mismatch: file=$file_pid systemd=$pid"
+    fi
+  else
+    fail "pid file missing: /run/todo-platform/todo-process-demo.pid"
+  fi
+
+  if curl -fsS "$URL/healthz" >/dev/null; then
+    ok "health endpoint ok: $URL/healthz"
+  else
+    fail "health endpoint failed: $URL/healthz"
+  fi
+
+  # Do not use -p here: showing process names often requires sudo.
+  if ss -lnt | grep -q ":${PORT} "; then
+    ok "port listening: $PORT"
+  else
+    fail "port not listening: $PORT"
+  fi
+
+  if journalctl -u "$SERVICE" --since "1 hour ago" --no-pager | grep -q 'todo-process-demo'; then
+    ok "journal contains recent service log"
+  else
+    fail "recent service log not found in journal"
+  fi
+
+  if [[ "$FAILURES" -gt 0 ]]; then
+    printf '\nProcess service check failed: %s issue(s).\n' "$FAILURES"
+    exit 1
+  fi
+
+  printf '\nProcess service check completed.\n'
+}
+
+main "$@"
+```
+
+### 5.5 执行命令
+
+先确认你在课程仓库根目录：
+
+```bash
+$ pwd
+$ ls
+```
+
+预期能看到 `README.md`、`docs/` 等文件或目录。
+
+如果仓库还没有 Go module，先初始化：
+
+```bash
+$ test -f go.mod || go mod init github.com/your-name/cloud-native-todo-platform
+```
+
+请把 `your-name` 替换为你的 GitHub 用户名或组织名；如果只是本地实验，保留这个示例模块名也不影响本篇编译。
+
+创建实验目录：
+
+```bash
+$ mkdir -p api/cmd/todo-process-demo bin deployments/systemd scripts
+```
+
+将 5.4 中的 Go 代码保存为 `api/cmd/todo-process-demo/main.go`，再格式化并编译：
+
+```bash
+$ gofmt -w api/cmd/todo-process-demo/main.go
+$ go mod tidy
+$ go build -o bin/todo-process-demo ./api/cmd/todo-process-demo
+```
+
+先以前台方式运行一次，确认程序本身没问题：
+
+```bash
+$ TODO_HTTP_ADDR=127.0.0.1:18080 TODO_ENV=dev ./bin/todo-process-demo
+```
+
+另开一个终端访问健康检查：
+
+```bash
+$ curl -fsS http://127.0.0.1:18080/healthz
+```
+
+确认前台服务能访问后，在运行服务的终端按 `Ctrl+C` 停止。这样做是为了先排除 Go 程序本身的问题，再进入 systemd 安装步骤。
+
+创建低权限用户和系统目录：
+
+```bash
+$ sudo groupadd --system todo 2>/dev/null || true
+$ sudo useradd --system --gid todo --home /var/lib/todo-platform --shell /usr/sbin/nologin todo 2>/dev/null || true
+$ sudo mkdir -p /opt/todo-platform/bin /etc/todo-platform /var/lib/todo-platform /var/log/todo-platform
+$ sudo chown -R todo:todo /var/lib/todo-platform /var/log/todo-platform
+$ sudo chmod 750 /var/lib/todo-platform /var/log/todo-platform
+```
+
+安装二进制文件：
+
+```bash
+$ sudo install -o root -g root -m 0755 bin/todo-process-demo /opt/todo-platform/bin/todo-process-demo
+```
+
+写入配置文件：
+
+```bash
+$ sudo tee /etc/todo-platform/process-demo.env >/dev/null <<'EOF'
+TODO_ENV=dev
+TODO_HTTP_ADDR=127.0.0.1:18080
+TODO_PID_FILE=/run/todo-platform/todo-process-demo.pid
 EOF
+$ sudo chown root:todo /etc/todo-platform/process-demo.env
+$ sudo chmod 640 /etc/todo-platform/process-demo.env
 ```
 
-增加执行权限：
+这里使用 `<<'EOF'` 是为了让 Shell 原样写入内容，不展开文件里的 `$VARIABLE`。写配置文件时推荐使用这种写法，避免环境变量被当前终端提前替换。
+
+将 5.4 中的 unit 内容保存为 `deployments/systemd/todo-process-demo.service`，再安装到 systemd：
 
 ```bash
-chmod +x scripts/check-process-service.sh
+$ sudo cp deployments/systemd/todo-process-demo.service /etc/systemd/system/todo-process-demo.service
+$ systemd-analyze verify /etc/systemd/system/todo-process-demo.service
+$ echo $?
+$ sudo systemctl daemon-reload
 ```
 
-运行：
+`systemd-analyze verify` 用来提前检查 unit 语法。判断标准以退出码为准：`echo $?` 输出 `0` 表示语法检查通过；如果有错误，它会打印具体配置问题。如果提示 `Command ... is not executable`，优先检查二进制文件是否已经安装到 `/opt/todo-platform/bin/todo-process-demo`。
+
+启动服务并设置开机自启：
 
 ```bash
-./scripts/check-process-service.sh
+$ sudo systemctl enable --now todo-process-demo
 ```
 
-预期输出包含：
+查看服务状态：
+
+```bash
+$ systemctl status todo-process-demo --no-pager
+```
+
+查看服务日志：
+
+```bash
+$ journalctl -u todo-process-demo -n 30 --no-pager
+```
+
+查看主进程和端口：
+
+```bash
+$ PID="$(systemctl show -p MainPID --value todo-process-demo)"
+$ ps -p "$PID" -o pid,ppid,user,stat,%cpu,%mem,rss,etime,cmd
+$ sudo ss -lntp | grep 18080
+```
+
+访问接口并制造一点 CPU 和内存观察数据：
+
+```bash
+$ curl -fsS http://127.0.0.1:18080/healthz
+$ curl -fsS "http://127.0.0.1:18080/work?ms=1000"
+$ curl -fsS "http://127.0.0.1:18080/memory?mb=16&hold=true"
+$ curl -fsS "http://127.0.0.1:18080/memory?clear=true"
+$ ps -p "$PID" -o pid,%cpu,%mem,rss,vsz,cmd
+$ free -h
+$ df -h
+```
+
+`/memory?mb=16&hold=true` 会让进程短暂持有一块内存，便于观察 RSS 变化；随后访问 `/memory?clear=true` 是为了释放这块实验内存，避免影响后续观察。
+
+`/work?ms=1000` 使用忙循环制造短暂 CPU 占用，只用于教学观察；真实生产代码不要用忙循环模拟等待，应该使用正常业务逻辑、定时器或队列任务。
+
+将 5.4 中的检查脚本保存为 `scripts/check-process-service.sh`，再赋予执行权限：
+
+```bash
+$ chmod +x scripts/check-process-service.sh
+$ ./scripts/check-process-service.sh
+```
+
+如果你临时把端口改成了 `18081`，可以这样检查：
+
+```bash
+$ TODO_DEMO_PORT=18081 TODO_DEMO_URL=http://127.0.0.1:18081 ./scripts/check-process-service.sh
+```
+
+测试重启和停止：
+
+```bash
+$ sudo systemctl restart todo-process-demo
+$ systemctl status todo-process-demo --no-pager
+$ sudo systemctl stop todo-process-demo
+$ systemctl status todo-process-demo --no-pager
+$ sudo systemctl start todo-process-demo
+```
+
+### 5.6 预期输出
+
+健康检查输出类似：
+
+```json
+{"env":"dev","hostname":"ubuntu","pid":12345,"service":"todo-process-demo","status":"ok","time":"2026-05-27T13:00:00+08:00","uptime":"8.2s"}
+```
+
+服务状态中应看到：
 
 ```text
-checking service: todo-process-demo
-main pid: ...
-process service lab ok
+Active: active (running)
+Main PID: 12345 (todo-process-de)
 ```
 
-这个脚本体现了真实工作的自动化意识：不要只靠肉眼看服务是否正常，而是用脚本检查服务状态、主进程、PID 文件、健康接口、端口监听和最近日志。
+端口监听输出类似：
 
-### 6.18 补充 Makefile 入口
-
-第 1 篇已经创建过 `Makefile`。本篇可以继续在同一个文件中补充进程服务相关目标，让常用操作有统一入口。
-
-追加 Makefile 目标：
-
-```bash
-cat >> Makefile <<'EOF'
-
-.PHONY: process-build process-install process-status process-logs process-check process-clean
-
-process-build:
-	go test ./api/cmd/todo-process-demo
-	go build -o bin/todo-process-demo ./api/cmd/todo-process-demo
-
-process-install: process-build
-	sudo install -o root -g root -m 0755 bin/todo-process-demo /opt/todo-platform/bin/todo-process-demo
-	sudo cp deployments/systemd/todo-process-demo.service /etc/systemd/system/todo-process-demo.service
-	sudo systemctl daemon-reload
-	sudo systemctl restart todo-process-demo
-
-process-status:
-	systemctl status todo-process-demo --no-pager
-
-process-logs:
-	journalctl -u todo-process-demo -n 50 --no-pager
-
-process-check:
-	./scripts/check-process-service.sh
-
-process-clean:
-	sudo systemctl disable --now todo-process-demo || true
-	sudo rm -f /etc/systemd/system/todo-process-demo.service
-	sudo systemctl daemon-reload
-	sudo systemctl reset-failed todo-process-demo || true
-EOF
+```text
+LISTEN 0 4096 127.0.0.1:18080 0.0.0.0:* users:(("todo-process-demo",pid=12345,fd=3))
 ```
 
-执行：
+检查脚本预期输出类似：
 
-```bash
-make process-build
-make process-status
-make process-check
+```text
+[OK] command exists: systemctl
+[OK] command exists: journalctl
+[OK] command exists: curl
+[OK] command exists: ps
+[OK] command exists: ss
+[OK] file exists: /opt/todo-platform/bin/todo-process-demo
+[OK] file exists: /etc/todo-platform/process-demo.env
+[OK] file exists: /etc/systemd/system/todo-process-demo.service
+[OK] service active: todo-process-demo
+[OK] MainPID is valid: 12345
+[OK] pid file matches MainPID
+[OK] health endpoint ok: http://127.0.0.1:18080/healthz
+[OK] port listening: 18080
+[OK] journal contains recent service log
+
+Process service check completed.
 ```
 
-如果你的 `Makefile` 中已经存在同名目标，不要重复追加，直接更新原目标即可。真实团队会把这些命令沉淀到统一入口中，减少新人记忆成本，也方便后续 CI/CD 复用。
+### 5.7 验证方法
 
-### 6.19 统一验证命令
-
-在仓库根目录执行：
+集中执行下面命令：
 
 ```bash
-go test ./api/cmd/todo-process-demo
-go build -o bin/todo-process-demo ./api/cmd/todo-process-demo
-systemctl status todo-process-demo --no-pager
-journalctl -u todo-process-demo -n 20 --no-pager
-curl -fsS http://127.0.0.1:18080/healthz
-curl -fsS http://127.0.0.1:18080/metrics-lite
-PID="$(systemctl show -p MainPID --value todo-process-demo)"
-ps -p "$PID" -o pid,ppid,user,stat,%cpu,%mem,etime,cmd
-test "$(cat /run/todo-platform/todo-process-demo.pid)" = "$PID"
-sudo ss -lntp | grep 18080 || true
-free -h
-df -h
-./scripts/check-process-service.sh
-make process-check
+$ go build -o bin/todo-process-demo ./api/cmd/todo-process-demo
+$ systemctl is-active todo-process-demo
+$ systemctl status todo-process-demo --no-pager
+$ journalctl -u todo-process-demo -n 20 --no-pager
+$ curl -fsS http://127.0.0.1:18080/healthz
+$ PID="$(systemctl show -p MainPID --value todo-process-demo)"
+$ ps -p "$PID" -o pid,ppid,user,stat,%cpu,%mem,rss,etime,cmd
+$ test "$(cat /run/todo-platform/todo-process-demo.pid)" = "$PID"
+$ sudo ss -lntp | grep 18080
+$ ./scripts/check-process-service.sh
 ```
 
-### 6.20 清理步骤
+这里的 `go build` 只验证源码还能编译，并不会自动更新 systemd 正在运行的 `/opt/todo-platform/bin/todo-process-demo`。如果你修改代码后希望服务运行新版本，需要重新执行 `sudo install -o root -g root -m 0755 bin/todo-process-demo /opt/todo-platform/bin/todo-process-demo`，再执行 `sudo systemctl restart todo-process-demo`。
 
-如果你只是练习，想清理本篇安装到系统中的服务：
+判断标准：
+
+- `go build` 能成功生成 `bin/todo-process-demo`。
+- `systemctl is-active todo-process-demo` 输出 `active`。
+- `curl /healthz` 返回 JSON，且 `status` 为 `ok`。
+- `ps` 能看到服务以 `todo` 用户运行。
+- `/run/todo-platform/todo-process-demo.pid` 和 systemd `MainPID` 一致。
+- `ss` 能看到 `127.0.0.1:18080` 正在监听。
+- 检查脚本输出 `Process service check completed.`。
+
+### 5.8 清理步骤
+
+如果你只是临时停止服务：
 
 ```bash
-sudo systemctl disable --now todo-process-demo || true
-sudo rm -f /etc/systemd/system/todo-process-demo.service
-sudo systemctl daemon-reload
-sudo systemctl reset-failed todo-process-demo || true
-sudo rm -f /opt/todo-platform/bin/todo-process-demo
-sudo rm -f /etc/todo-platform/process-demo.env
+$ sudo systemctl stop todo-process-demo
+```
+
+如果要完全清理本篇实验安装到系统中的内容：
+
+```bash
+$ sudo systemctl disable --now todo-process-demo || true
+$ sudo rm -f /etc/systemd/system/todo-process-demo.service
+$ sudo systemctl daemon-reload
+$ sudo systemctl reset-failed todo-process-demo || true
+$ sudo rm -f /opt/todo-platform/bin/todo-process-demo
+$ sudo rm -f /etc/todo-platform/process-demo.env
 ```
 
 如果这些目录只用于本课程实验，也可以清理空目录：
 
 ```bash
-sudo rmdir /var/lib/todo-platform /var/log/todo-platform 2>/dev/null || true
+$ sudo rmdir /var/lib/todo-platform /var/log/todo-platform 2>/dev/null || true
 ```
 
-`/run/todo-platform` 由 systemd 的 `RuntimeDirectory` 管理，服务停止后会自动清理。不建议自动删除 `todo` 用户和 `/opt/todo-platform`、`/etc/todo-platform`，因为它们可能被前后章节复用。
+`/run/todo-platform` 由 systemd 的 `RuntimeDirectory` 管理，服务停止后会自动清理。不建议自动删除 `todo` 用户和 `/opt/todo-platform`、`/etc/todo-platform` 目录，因为它们可能被后续章节复用。
 
-## 7. 真实工作案例
+预计耗时：75 分钟（动手操作约 50 分钟）。
 
-某团队开发了 Todo API 的第一个内部测试版本。开发同学把 Go 程序编译后交给测试环境，DevOps 需要把它部署到一台 Linux 测试服务器上。
+## 6. 常见错误与排障
 
-团队采用的方案是：
+### 错误 1：`System has not been booted with systemd`
 
-- 后端负责提供可执行文件、启动参数、健康检查接口和退出信号处理。
-- DevOps 负责 systemd unit、运行用户、目录权限、开机自启和失败重启策略。
-- 测试同学通过 HTTP 接口验证功能，通过日志提供请求 ID 和错误现象。
-- SRE 负责监控 CPU、内存、磁盘、端口和服务状态，发现异常后按排障流程定位。
+- **现象**：
 
-一次故障中，测试反馈接口访问失败。排查过程如下：
+  ```text
+  System has not been booted with systemd as init system (PID 1). Can't operate.
+  Failed to connect to bus: Host is down
+  ```
 
-```bash
-systemctl status todo-process-demo --no-pager
-journalctl -u todo-process-demo -n 100 --no-pager
-sudo ss -lntp | grep 18080 || true
-```
+- **原因**：当前环境不是以 systemd 作为 PID 1 启动，例如旧版 WSL、普通容器或精简环境。
 
-发现服务状态是 `failed`，日志中显示配置文件权限不足。进一步检查：
+- **排查**：
 
-```bash
-ls -l /etc/todo-platform/process-demo.env
-id todo
-```
+  ```bash
+  $ ps -p 1 -o pid,comm,args
+  $ systemctl --version
+  ```
 
-最终发现配置文件只允许 root 读取，而服务以 `todo` 用户运行。修复方式是：
+  如果 PID 1 不是 `systemd`，本篇 systemd 实验无法完整执行。
 
-```bash
-sudo chown root:todo /etc/todo-platform/process-demo.env
-sudo chmod 640 /etc/todo-platform/process-demo.env
-sudo systemctl restart todo-process-demo
-```
+- **修复**：WSL2 中按 §5.2 启用 systemd；其他环境换成 Linux 虚拟机、云服务器或带 systemd 的实验机。
 
-这个案例说明：服务启动失败不一定是代码 bug，进程用户、配置权限、服务日志和 systemd 状态都要一起看。
+- **预防**：开始实验前先检查 PID 1，不要等到安装 unit 后才发现环境不支持。
 
-## 8. 常见错误
+### 错误 2：`Unit todo-process-demo.service not found`
 
-| 错误现象 | 常见原因 | 修复方向 |
-|---|---|---|
-| `System has not been booted with systemd` | 当前环境没有使用 systemd，例如旧 WSL 或普通容器 | 启用 WSL2 systemd，或换 Linux VM / 云服务器 |
-| `Unit todo-process-demo.service not found` | unit 没复制到 `/etc/systemd/system`，或未执行 `daemon-reload` | 复制 unit 后执行 `sudo systemctl daemon-reload` |
-| 服务 `failed` | `ExecStart` 路径错、程序没有执行权限、配置读取失败 | 看 `systemctl status` 和 `journalctl -u` |
-| `Permission denied` | 服务用户无权读取配置或执行程序 | 检查 `User=`、`ls -l`、`id todo` |
-| `Address already in use` | 端口已被其他进程占用 | 用 `sudo ss -lntp` 或 `sudo lsof` 找到占用进程 |
-| 修改 service 后不生效 | 忘记执行 `systemctl daemon-reload` | reload 后再 restart |
-| `curl` 访问失败 | 服务未启动、监听地址不对、端口不对 | 看 `systemctl status`、`sudo ss -lntp`、配置文件 |
-| 进程 CPU 高 | 业务请求量大、死循环、热点代码、压测接口 | 用 `top -p`、日志和请求路径定位 |
-| 内存持续增长 | 缓存未限制、内存泄漏、大对象堆积 | 看 `ps RSS`、`free -h`，结合应用日志 |
-| 磁盘满 | 日志过多、临时文件未清理、备份堆积 | `df -h`、`du -sh` 定位目录 |
-| 直接 `kill -9` 后数据异常 | 强制终止跳过清理逻辑 | 优先 `systemctl stop` 或 `SIGTERM` |
+- **现象**：
 
-## 9. 排障方法
+  ```text
+  Unit todo-process-demo.service could not be found.
+  ```
 
-### 9.1 排查服务无法启动
+- **原因**：unit 没有复制到 `/etc/systemd/system/`，或者复制后没有执行 `systemctl daemon-reload`。
 
-命令：
+- **排查**：
 
-```bash
-systemctl status todo-process-demo --no-pager
-journalctl -u todo-process-demo -n 100 --no-pager
-journalctl -xeu todo-process-demo --no-pager
-```
+  ```bash
+  $ ls -l /etc/systemd/system/todo-process-demo.service
+  $ systemctl cat todo-process-demo
+  ```
 
-判断依据：
+  `systemctl cat` 可以确认 systemd 实际读到的 unit 内容。
 
-- `Active: failed` 表示服务启动失败或运行后退出。
-- `status=203/EXEC` 常见于 `ExecStart` 路径错误或文件不可执行。
-- 日志中出现 `permission denied`，优先排查用户、目录和文件权限。
-- 日志中出现 `address already in use`，说明端口冲突。
+- **修复**：
 
-修复方向：
+  ```bash
+  $ sudo cp deployments/systemd/todo-process-demo.service /etc/systemd/system/todo-process-demo.service
+  $ sudo systemctl daemon-reload
+  $ sudo systemctl start todo-process-demo
+  ```
 
-```bash
-ls -l /opt/todo-platform/bin/todo-process-demo
-sudo chmod 755 /opt/todo-platform/bin/todo-process-demo
-sudo systemctl daemon-reload
-sudo systemctl restart todo-process-demo
-```
+- **预防**：每次新增或修改 unit 文件后，都执行 `daemon-reload` 再启动或重启服务。
 
-### 9.2 排查端口被占用
+### 错误 3：服务启动失败并出现 `status=203/EXEC`
 
-命令：
+- **现象**：
 
-```bash
-sudo ss -lntp | grep 18080 || true
-sudo lsof -iTCP:18080 -sTCP:LISTEN
-```
+  ```text
+  todo-process-demo.service: Failed at step EXEC spawning /opt/todo-platform/bin/todo-process-demo: No such file or directory
+  Main process exited, code=exited, status=203/EXEC
+  ```
 
-判断依据：
+- **原因**：`ExecStart` 指向的文件不存在、路径写错，或者文件没有执行权限。
 
-- 如果看到另一个进程监听 `18080`，当前服务无法绑定同一地址端口。
-- 如果监听地址是 `127.0.0.1:18080`，只允许本机访问。
-- 如果监听地址是 `0.0.0.0:18080`，表示所有网卡都监听，暴露面更大。
-- 如果普通用户执行 `ss -lntp` 看不到进程名，使用 `sudo` 重新执行。
+- **排查**：
 
-修复方向：
+  ```bash
+  $ systemctl status todo-process-demo --no-pager
+  $ journalctl -u todo-process-demo -n 50 --no-pager
+  $ ls -l /opt/todo-platform/bin/todo-process-demo
+  ```
 
-```bash
-sudo systemctl stop todo-process-demo
-sudo sed -i 's/TODO_HTTP_ADDR=.*/TODO_HTTP_ADDR=127.0.0.1:18081/' /etc/todo-platform/process-demo.env
-sudo systemctl restart todo-process-demo
-```
+  如果文件不存在或权限中没有 `x`，systemd 无法执行它。
 
-修改端口后要同步调整健康检查脚本或调用方配置。
+- **修复**：
 
-### 9.3 排查 CPU 占用高
+  ```bash
+  $ sudo install -o root -g root -m 0755 bin/todo-process-demo /opt/todo-platform/bin/todo-process-demo
+  $ sudo systemctl restart todo-process-demo
+  ```
 
-命令：
+- **预防**：unit 中的 `ExecStart` 使用绝对路径，并在启动前检查目标文件存在且可执行。
 
-```bash
-PID="$(systemctl show -p MainPID --value todo-process-demo)"
-top -p "$PID"
-ps -p "$PID" -o pid,stat,%cpu,%mem,etime,cmd
-journalctl -u todo-process-demo -n 100 --no-pager
-```
+### 错误 4：服务日志出现 `permission denied`
 
-判断依据：
+- **现象**：
 
-- `%CPU` 持续很高，说明进程正在消耗 CPU。
-- 如果日志中某个接口频繁出现，例如 `/work`，可能是请求压力导致。
-- 如果没有请求但 CPU 仍高，可能存在死循环或后台任务异常。
+  ```text
+  write pid file failed: open /run/todo-platform/todo-process-demo.pid: permission denied
+  ```
 
-修复方向：
+  或者：
 
-- 先确认是否有压测或批处理任务。
-- 临时降载或停止异常请求来源。
-- 收集日志、CPU profile 或更详细诊断信息后再重启。
-- 不要在没有证据时反复重启服务掩盖问题。
+  ```text
+  Failed to load environment files: Permission denied
+  ```
 
-### 9.4 排查内存占用高
+- **原因**：服务以 `todo` 用户运行，但运行时目录、配置文件或数据目录权限不允许它读写。
 
-命令：
+- **排查**：
 
-```bash
-PID="$(systemctl show -p MainPID --value todo-process-demo)"
-ps -p "$PID" -o pid,%mem,rss,vsz,etime,cmd
-free -h
-journalctl -u todo-process-demo -n 100 --no-pager
-```
+  ```bash
+  $ id todo
+  $ ls -l /etc/todo-platform/process-demo.env
+  $ ls -ld /run/todo-platform /var/lib/todo-platform /var/log/todo-platform
+  $ journalctl -u todo-process-demo -n 50 --no-pager
+  ```
 
-判断依据：
+- **修复**：
 
-- `RSS` 持续增长，说明进程实际占用内存增长。
-- `available` 很低，说明系统可用内存紧张。
-- 如果触发了内存限制，服务可能被系统杀死或被 systemd 标记失败。
+  ```bash
+  $ sudo chown root:todo /etc/todo-platform/process-demo.env
+  $ sudo chmod 640 /etc/todo-platform/process-demo.env
+  $ sudo chown -R todo:todo /var/lib/todo-platform /var/log/todo-platform
+  $ sudo systemctl restart todo-process-demo
+  ```
 
-修复方向：
+- **预防**：服务使用低权限用户时，要同时设计配置文件读取权限、数据目录写入权限和运行时目录权限。
 
-- 判断是否是正常缓存、短期峰值还是持续泄漏。
-- 对服务设置合理资源限制，例如 systemd 的 `MemoryMax=`。
-- 在 Go 服务中结合 pprof 或指标定位内存热点。
-- 后续 Kubernetes 中要设置 `resources.requests` 和 `resources.limits`。
+### 错误 5：`bind: address already in use`
 
-### 9.5 排查磁盘空间不足
+- **现象**：
 
-命令：
+  ```text
+  server error: listen tcp 127.0.0.1:18080: bind: address already in use
+  ```
 
-```bash
-df -h
-sudo du -sh /var/log/* 2>/dev/null | sort -h | tail
-journalctl --disk-usage
-```
+- **原因**：`18080` 端口已经被其他进程监听，当前服务无法绑定同一个地址和端口。
 
-判断依据：
+- **排查**：
 
-- `Use%` 接近 100% 的文件系统需要立即处理。
-- `/var/log` 过大通常和日志轮转策略有关。
-- journald 占用过大说明系统日志保留策略需要调整。
+  ```bash
+  $ sudo ss -lntp | grep 18080 || true
+  $ sudo lsof -iTCP:18080 -sTCP:LISTEN
+  ```
 
-修复方向：
+  找到 PID 后，再用 `ps -p <PID> -o pid,user,cmd` 判断它属于哪个服务。
 
-- 清理明确可删除的临时文件和旧备份。
-- 配置 logrotate 或 journald 保留策略。
-- 从根因上减少重复错误日志，而不是只删日志。
+- **修复**：停止冲突服务，或者修改 `/etc/todo-platform/process-demo.env` 中的端口。
 
-### 9.6 排查 service 修改后不生效
+  ```bash
+  $ sudo sed -i 's/TODO_HTTP_ADDR=.*/TODO_HTTP_ADDR=127.0.0.1:18081/' /etc/todo-platform/process-demo.env
+  $ sudo systemctl restart todo-process-demo
+  ```
 
-命令：
+- **预防**：部署前检查端口规划；同一台机器上多个服务不要随意复用端口。
 
-```bash
-systemctl cat todo-process-demo
-sudo systemctl daemon-reload
-sudo systemctl restart todo-process-demo
-systemctl status todo-process-demo --no-pager
-```
+## 7. 生产环境注意事项
 
-判断依据：
+1. **业务服务不要以 root 运行。**
+   root 运行看起来省事，但一旦应用漏洞被利用，攻击者会直接获得过高权限。生产环境应创建专用低权限用户，例如本篇的 `todo` 用户，并配合目录权限、`NoNewPrivileges` 和 systemd sandbox 选项收缩影响范围。
 
-- `systemctl cat` 展示 systemd 实际读取到的 unit 内容。
-- 如果文件已修改但 `systemctl cat` 仍是旧内容，可能改错路径。
-- 修改 unit 后必须 `daemon-reload`。
+2. **服务管理要保留证据，再执行恢复动作。**
+   线上故障发生时，不要第一反应就是重启。应先收集 `systemctl status`、`journalctl`、PID、端口监听、CPU、内存、磁盘等证据。否则服务重启后，关键现场可能消失，后续无法判断是配置问题、端口冲突、资源耗尽还是程序崩溃。
 
-修复方向：
+3. **失败重启策略不能替代根因分析。**
+   `Restart=on-failure` 能提高可用性，但如果服务因为配置错误持续崩溃，自动重启只会形成重启风暴。生产服务应结合告警、限速重启、健康检查和日志分析，明确什么时候自动恢复，什么时候需要人工介入。
 
-- 确认 unit 位于 `/etc/systemd/system/todo-process-demo.service`。
-- 修改后执行 `daemon-reload` 和 `restart`。
-- 如果只修改环境变量文件，通常只需 `restart`，不一定需要 `daemon-reload`。
+4. **资源限制要和业务容量一起设计。**
+   systemd 的 `MemoryMax`、`CPUQuota` 可以限制单机服务资源，Kubernetes 中对应 `resources.requests` 和 `resources.limits`。限制过松会影响整机稳定性，限制过紧会造成误杀或性能抖动，需要结合压测、监控和容量评估逐步调整。
 
-### 9.7 排查软件包命令不存在
+5. **软件包来源要可信且可追溯。**
+   生产环境不要随意从公网复制脚本执行，也不要在关键机器上临时安装来历不明的工具。常见做法是使用公司内部软件源、固定版本、审计安装记录，并在镜像或基础环境中预置必要排障工具。
 
-命令：
-
-```bash
-command -v htop || true
-command -v lsof || true
-cat /etc/os-release
-```
-
-判断依据：
-
-- 命令不存在，说明没有安装或 PATH 不包含。
-- `/etc/os-release` 可以判断当前发行版和适合的包管理器。
-
-修复方向：
-
-=== "Ubuntu / Debian：apt"
-
-    ```bash
-    sudo apt update
-    sudo apt install -y htop lsof
-    ```
-
-=== "Rocky / Alma / Fedora：dnf"
-
-    ```bash
-    sudo dnf install -y htop lsof
-    ```
-
-=== "遗留 CentOS 7：yum"
-
-    ```bash
-    sudo yum install -y htop lsof
-    ```
-
-    只建议在公司遗留 CentOS 7 机器上使用。新环境优先使用 `dnf` 或 `apt` 对应的发行版。
-
-## 10. 生产环境注意事项
-
-Linux 服务管理在生产环境中要关注稳定性、安全性、可观测性和可恢复性。
-
-- 普通业务服务不要以 root 运行，应该使用专用低权限用户。
-- `ExecStart` 使用绝对路径，避免依赖不确定的当前目录和 PATH。
-- 配置文件权限要收紧，敏感配置不要对所有用户可读。
-- 修改 systemd unit 后必须 `daemon-reload`，修改配置后要重启或 reload 服务。
-- 优先使用 `systemctl stop` 让服务收到 `SIGTERM` 优雅退出，避免直接 `kill -9`。
-- 为服务设置合理的 `Restart` 策略，但不要让崩溃服务无限重启掩盖根因。
-- 生产服务需要健康检查、指标、结构化日志和告警，不要只靠人工 `ssh` 上去看。
-- 日志要有保留策略，防止 journald 或文件日志写满磁盘。
-- 关键服务要限制资源使用，systemd 可用 `MemoryMax=`、`CPUQuota=`，Kubernetes 中使用 resource requests/limits。
-- systemd 的安全选项如 `NoNewPrivileges`、`ProtectSystem`、`ProtectHome` 可以降低服务被入侵后的影响范围。
-- `systemd-analyze security` 可以帮助检查 unit 安全基线，但它不能替代人工威胁建模和最小权限设计。
-- 软件包安装应使用可信源和固定版本策略，生产环境不建议随意从公网复制脚本执行。
-- 端口监听地址要谨慎，`127.0.0.1` 只允许本机访问，`0.0.0.0` 会监听所有网卡。
-- 生产排障先保留证据，例如状态、日志、PID、资源使用，再执行重启。
-
-当应用迁移到 Kubernetes 后，systemd 不再直接管理业务进程，但这些原则仍然存在：低权限运行、优雅退出、健康检查、日志到 stdout/stderr、资源限制和可观测性，都会体现在 Pod 和 Deployment 配置中。
-
-## 11. 本章小项目
+## 8. 本章小项目
 
 本章小项目：**Todo Go HTTP 服务的 systemd 托管**。
 
@@ -1635,23 +1304,18 @@ Linux 服务管理在生产环境中要关注稳定性、安全性、可观测�
 - `/opt/todo-platform/bin/todo-process-demo`
 - `/etc/todo-platform/process-demo.env`
 - `/etc/systemd/system/todo-process-demo.service`
-- `/run/todo-platform/todo-process-demo.pid`
-- 一个可运行的 `todo-process-demo` systemd 服务
+- 一个处于 `active (running)` 状态的 `todo-process-demo` systemd 服务
 
 验收命令：
 
 ```bash
-cd ~/workspace/cloud-native-todo-platform
-systemctl status todo-process-demo --no-pager
-journalctl -u todo-process-demo -n 20 --no-pager
-curl -fsS http://127.0.0.1:18080/healthz
-curl -fsS http://127.0.0.1:18080/metrics-lite
-PID="$(systemctl show -p MainPID --value todo-process-demo)"
-ps -p "$PID" -o pid,ppid,user,stat,%cpu,%mem,etime,cmd
-test "$(cat /run/todo-platform/todo-process-demo.pid)" = "$PID"
-sudo ss -lntp | grep 18080 || true
-./scripts/check-process-service.sh
-make process-check
+$ systemctl status todo-process-demo --no-pager
+$ journalctl -u todo-process-demo -n 20 --no-pager
+$ curl -fsS http://127.0.0.1:18080/healthz
+$ PID="$(systemctl show -p MainPID --value todo-process-demo)"
+$ ps -p "$PID" -o pid,ppid,user,stat,%cpu,%mem,etime,cmd
+$ sudo ss -lntp | grep 18080
+$ ./scripts/check-process-service.sh
 ```
 
 能力验收标准：
@@ -1659,132 +1323,86 @@ make process-check
 | 能力项 | 验收方式 |
 |---|---|
 | 进程理解 | 能说明程序、进程、PID、PPID 的关系 |
-| 前后台任务 | 能使用 `command &`、`jobs`、`fg`、`bg`、`kill` 做临时任务管理 |
+| 任务管理 | 能使用 `command &`、`jobs`、`fg`、`bg`、`kill` 管理临时任务 |
 | 进程查看 | 能用 `ps`、`pgrep` 找到 Todo 服务进程 |
-| 资源观察 | 能用 `top`、`free`、`df` 查看 CPU、内存、磁盘，并能解释 `MemoryMax`、`CPUQuota` |
-| 端口定位 | 能用 `sudo ss` 或 `sudo lsof` 找到监听 `18080` 的进程 |
 | 服务管理 | 能用 `systemctl` 启动、停止、重启、查看服务 |
 | 日志查看 | 能用 `journalctl -u` 查看服务日志 |
-| unit 编写 | 能解释 `User`、`EnvironmentFile`、`ExecStart`、`Restart`、`RuntimeDirectory` 等字段 |
-| 自动化检查 | 能运行 `scripts/check-process-service.sh` 和 `make process-check` 完成验收 |
-| 生产意识 | 能说明为什么不用 root、为什么避免 `kill -9`、为什么需要日志保留 |
+| 端口定位 | 能用 `ss` 或 `lsof` 找到监听 `18080` 的进程 |
+| 资源观察 | 能用 `top`、`free`、`df` 查看 CPU、内存、磁盘 |
+| unit 编写 | 能解释 `User`、`EnvironmentFile`、`ExecStart`、`Restart`、`RuntimeDirectory` 字段 |
+| 自动化检查 | 能运行 `scripts/check-process-service.sh` 完成验收 |
 
-## 12. 本章练习题
+## 9. 本章练习题
 
 ### 基础题
 
-1. 程序和进程有什么区别？
-2. PID 和 PPID 分别表示什么？
-3. 前台任务和后台任务有什么区别？
-4. `kill` 命令为什么不等于“强制杀死”？
-5. `SIGTERM` 和 `SIGKILL` 有什么区别？
-6. systemd 在 Linux 中解决了什么问题？
-7. `systemctl status` 和 `journalctl -u` 分别查看什么？
-8. 修改 systemd unit 后为什么要执行 `daemon-reload`？
-9. `apt`、`dnf` 和遗留 `yum` 分别常见于哪些发行版？
-10. `RSS` 和 `%CPU` 在进程排查中有什么意义？
+1. 程序和进程有什么区别？请用 `todo-process-demo` 举例。
+2. PID 和 PPID 分别表示什么？为什么 systemd 常常是 PID 1？
+3. `SIGTERM` 和 `SIGKILL` 有什么区别？为什么生产环境不建议优先使用 `kill -9`？
+4. `systemctl status` 和 `journalctl -u` 分别解决什么问题？
+5. `apt`、`dnf`、遗留 `yum` 分别常见于哪些发行版？
 
 ### 实操题
 
-1. 编译 `todo-process-demo`，确认 `bin/todo-process-demo` 存在。
-2. 前台运行服务，并用 `curl` 访问 `/healthz`。
-3. 使用 `Ctrl+C` 停止前台服务，观察退出日志。
-4. 把服务安装到 `/opt/todo-platform/bin`，并创建 `/etc/todo-platform/process-demo.env`。
-5. 安装 systemd unit，执行 `daemon-reload`。
-6. 使用 `systemctl enable --now todo-process-demo` 启动服务。
-7. 使用 `journalctl -u todo-process-demo -n 50 --no-pager` 查看日志。
-8. 使用 `ps` 和 `pgrep` 找到服务进程。
-9. 访问 `/work?ms=5000`，用 `top -p` 观察 CPU 变化。
-10. 访问 `/memory?mb=64&hold=20`，用 `ps` 和 `free -h` 观察内存变化。
-11. 使用 `sudo ss -lntp` 或 `sudo lsof` 找出监听 `18080` 的进程。
-12. 使用 `sudo kill -KILL "$PID"` 验证 `Restart=on-failure` 能自动拉起服务。
-13. 使用 `systemd-analyze security todo-process-demo` 查看服务安全基线。
-14. 运行 `scripts/check-process-service.sh` 和 `make process-check` 完成本篇验收。
+1. 使用 `ps` 和 `pgrep` 找到 `todo-process-demo` 的 PID。当 `ps -p "$PID"` 能显示进程信息时，说明操作成功。
+2. 访问 `/work?ms=3000`，同时用 `top -p "$PID"` 观察 CPU 变化。当 `top` 中能看到该进程 CPU 短时升高时，说明操作成功。
+3. 修改 `/etc/todo-platform/process-demo.env` 中的端口为 `18081` 并重启服务。当 `curl http://127.0.0.1:18081/healthz` 成功且 `ss` 显示 `18081` 监听时，说明操作成功。完成后把端口改回 `18080` 并再次重启服务，避免影响本篇验收脚本和下一篇网络实验。
 
 ### 思考题
 
-1. 为什么生产服务不建议用 `nohup command &` 长期运行？
-2. 为什么业务服务应该使用专门的低权限用户，而不是 root？
-3. 如果服务不断自动重启，你会如何判断是 systemd 配置问题还是程序自身崩溃？
-4. 如果一个服务 CPU 很高，但日志没有错误，你下一步会收集哪些证据？
-5. 如果磁盘被日志写满，除了删除日志，还应该如何避免再次发生？
-6. systemd 的 `Restart=on-failure` 和 Kubernetes Deployment 的自动拉起有什么相似之处？
+1. 如果一个服务每隔几秒自动重启，你会如何判断是 systemd 配置问题还是程序自身崩溃？
+2. 如果服务 CPU 很高但日志没有错误，你下一步会收集哪些证据？为什么？
 
-## 13. 本章面试题
+## 10. 本章面试题
 
 ### 1. Linux 中程序和进程有什么区别？
 
-参考答案：
+**一句话结论**：程序是磁盘上的可执行文件，进程是程序运行起来后的实例。
 
-程序是磁盘上的可执行文件或脚本，进程是程序运行起来后的实例。进程有 PID、运行用户、内存、CPU、文件描述符、环境变量等运行时状态。同一个程序可以启动多个进程。排查线上问题时，我们关注的是运行中的进程，而不仅是程序文件是否存在。
+**展开解释**：进程有 PID、PPID、运行用户、环境变量、CPU、内存、文件描述符和信号处理等运行时状态。同一个程序可以启动多个进程。线上排障时，确认程序文件存在还不够，还要确认进程是否真的运行、状态是否正常、资源是否异常。
 
-### 2. 如何查看某个服务是否正在运行？
+**深入追问**：如果服务由 systemd 管理，可以用 `systemctl show -p MainPID --value 服务名` 获取主进程 PID，再用 `ps -p PID -o pid,ppid,user,stat,%cpu,%mem,cmd` 查看运行状态。
 
-参考答案：
+### 2. 服务启动失败时你会怎么排查？
 
-如果服务由 systemd 管理，先用 `systemctl status 服务名` 查看整体状态，再用 `journalctl -u 服务名` 查看日志。然后可以通过 `systemctl show -p MainPID --value 服务名` 获取主进程 PID，用 `ps -p PID` 查看进程详情。如果服务提供 HTTP 接口，还应访问健康检查接口，并用 `sudo ss -lntp` 确认端口监听和进程归属。
+**一句话结论**：先看 systemd 状态和日志，再检查启动路径、权限、配置和端口。
+
+**展开解释**：第一步执行 `systemctl status 服务名 --no-pager` 看 `Active` 状态、退出码和最近日志；第二步执行 `journalctl -u 服务名 -n 100 --no-pager` 看完整错误；随后检查 `ExecStart` 文件是否存在且可执行、配置文件是否可读、运行用户是否有权限、端口是否被占用。
+
+**深入追问**：如果看到 `status=203/EXEC`，通常是二进制路径错误或不可执行；如果看到 `permission denied`，要检查 `User=`、目录权限和配置文件权限；如果看到 `address already in use`，要用 `ss` 或 `lsof` 查端口占用。
 
 ### 3. `SIGTERM` 和 `SIGKILL` 有什么区别？
 
-参考答案：
+**一句话结论**：`SIGTERM` 请求进程正常退出，`SIGKILL` 强制结束且进程无法处理。
 
-`SIGTERM` 是请求进程正常退出，进程可以捕获这个信号并执行清理逻辑，例如关闭连接、刷盘、释放资源。`SIGKILL` 是强制结束，进程无法捕获或处理。生产环境优先使用 `SIGTERM` 或 `systemctl stop`，只有进程无响应时才考虑 `SIGKILL`。
+**展开解释**：服务收到 `SIGTERM` 后可以关闭监听、处理未完成请求、释放资源和写入日志；`SIGKILL` 会立即终止进程，无法执行清理逻辑。生产环境优先使用 `systemctl stop` 或 `kill -TERM`，只有进程无响应时才考虑 `kill -KILL`。
+
+**深入追问**：Kubernetes 删除 Pod 时也会先发送终止信号，并等待 `terminationGracePeriodSeconds`，这和 systemd 的 `TimeoutStopSec` 思想类似。
 
 ### 4. systemd service unit 中 `ExecStart`、`User`、`Restart` 分别有什么作用？
 
-参考答案：
+**一句话结论**：`ExecStart` 定义启动命令，`User` 定义运行身份，`Restart` 定义异常退出后的恢复策略。
 
-`ExecStart` 定义服务启动时执行的命令，通常使用绝对路径。`User` 指定服务以哪个 Linux 用户运行，用于降低权限和隔离风险。`Restart` 定义进程异常退出后的重启策略，例如 `on-failure` 可以在程序崩溃时自动拉起。三者分别控制启动入口、运行身份和故障恢复行为。
+**展开解释**：`ExecStart` 应使用绝对路径，避免依赖当前目录和 PATH；`User` 用来让服务以低权限用户运行，减少安全风险；`Restart=on-failure` 可以在程序崩溃时自动拉起服务，提高可用性。
 
-### 5. 服务启动失败时你会怎么排查？
+**深入追问**：这三个字段在 Kubernetes 中分别能对应到容器 `command/args`、`securityContext.runAsUser` 和 Deployment 控制器的自动恢复能力。
 
-参考答案：
+### 5. 如何定位端口被哪个进程占用？
 
-先执行 `systemctl status 服务名 --no-pager` 查看 active 状态、退出码和最近日志。再执行 `journalctl -u 服务名 -n 100 --no-pager` 查看更完整日志。然后检查 `ExecStart` 路径是否存在、文件是否可执行、配置文件是否可读、运行用户是否有权限、端口是否被占用。修改 unit 后执行 `daemon-reload`，再重启服务验证。
+**一句话结论**：用 `ss` 或 `lsof` 找到监听端口的 PID，再用 `ps` 判断进程身份。
 
-### 6. 如何定位端口被哪个进程占用？
+**展开解释**：常用命令是 `sudo ss -lntp | grep 18080` 或 `sudo lsof -iTCP:18080 -sTCP:LISTEN`。找到 PID 后，用 `ps -p PID -o pid,user,cmd` 查看进程属于哪个用户、启动命令是什么。
 
-参考答案：
+**深入追问**：不要看到端口占用就直接 kill。生产环境要先判断该进程是否属于其他业务、是否有流量、是否能平滑迁移，必要时走变更流程。
 
-可以使用 `sudo ss -lntp | grep 端口` 查看监听 TCP 端口和对应进程，也可以使用 `sudo lsof -iTCP:端口 -sTCP:LISTEN`。找到 PID 后，再用 `ps -p PID -o pid,user,cmd` 查看进程身份和启动命令。处理时要先判断这个进程是否应该存在，不能直接杀掉未知生产进程。
+## 11. 本章总结
 
-### 7. 如何判断一个 Linux 服务 CPU 或内存异常？
+本篇完成了从“文件如何组织”到“程序如何运行”的过渡。你学习了程序、进程、PID、PPID、前台后台任务、信号、systemd、service unit、软件包管理，以及 CPU、内存、磁盘和端口排查命令。它们看起来是 Linux 基础，实际是后端服务和云原生排障的底座。
 
-参考答案：
+项目成果上，你编写了 `todo-process-demo` Go HTTP 服务，将它安装到 `/opt/todo-platform/bin`，通过 `/etc/todo-platform/process-demo.env` 注入配置，并用 systemd 托管为 `todo-process-demo.service`。你还编写了 `scripts/check-process-service.sh`，可以自动验收服务状态、PID、健康检查、端口和日志。
 
-先用 `systemctl` 找到服务主 PID，再用 `top -p PID` 观察 CPU 和内存变化，用 `ps -p PID -o pid,%cpu,%mem,rss,vsz,cmd` 获取快照。CPU 高要结合请求量、日志、压测、热点接口判断；内存高要观察 RSS 是否持续增长、系统 `free -h` 是否紧张。必要时结合应用指标、pprof 或更细粒度监控定位。
+能力价值上，你现在可以在 Linux 测试机上独立启动、停止、观察和排查一个后端服务。后续学习 Docker、Kubernetes、Probe、资源限制、日志和服务暴露时，本篇的进程、信号、端口和资源证据会反复出现。
 
-### 8. systemd 和 Kubernetes 在进程管理上有什么相似点？
+## 12. 下一章衔接
 
-参考答案：
-
-systemd 管理单机服务，Kubernetes 管理集群中的容器化应用，但思想相似：都用声明式配置描述进程如何运行，都支持异常恢复，都能注入环境变量，都提供日志和状态查看能力，也都强调运行用户、健康检查和资源限制。理解 systemd 有助于理解 Pod 主进程、Deployment 重启、日志输出和资源治理。
-
-## 14. 本章总结
-
-本篇完成了从“文件在服务器上如何组织”到“程序在服务器上如何运行”的过渡。
-
-你已经理解：
-
-- 程序运行后会变成进程，进程有 PID、PPID、运行用户、CPU、内存等状态。
-- 前台和后台任务适合临时操作，生产服务应该交给 systemd 托管。
-- `systemctl` 管服务生命周期，`journalctl` 查服务日志。
-- systemd unit 可以声明启动命令、运行用户、环境变量、重启策略和安全限制。
-- `ps`、`pgrep`、`top`、`htop`、`kill` 是进程排查的基础工具。
-- `free`、`df`、`du`、`ss`、`lsof` 可以帮助定位内存、磁盘和端口问题。
-- apt、dnf 是现代发行版中安装排障工具的常见入口，yum 主要用于遗留 CentOS / RHEL 环境。
-
-本篇项目成果是一个已经能被 systemd 托管的 Go HTTP 服务 `todo-process-demo`，它为后续网络访问、Shell 自动化、Go Web API、Docker 容器化和 Kubernetes 部署提供了真实服务样本。
-
-## 15. 下一章衔接
-
-下一篇将进入 Linux 网络基础与排障。
-
-本篇已经让 Todo 服务监听了 `127.0.0.1:18080`，并学会用 `ss` 找到端口和进程。下一篇会继续追问：
-
-- 为什么本机能访问，其他机器不一定能访问？
-- `127.0.0.1`、`0.0.0.0`、本机 IP 有什么区别？
-- 如何用 `curl`、`wget`、`dig`、`nslookup` 排查访问问题？
-- 防火墙、DNS、HTTP 状态码和端口监听之间是什么关系？
-
-从下一篇开始，我们会把“服务已经运行”继续推进到“服务能被正确访问和排障”，为后续 Go API、Docker 端口映射、Kubernetes Service 和 Ingress 打基础。
+下一篇进入 **Linux 网络基础与排障**。本篇已经让 `todo-process-demo` 监听 `127.0.0.1:18080`，并学会用 `ss` 找到端口和进程；下一篇会继续追问为什么本机能访问、其他机器不一定能访问，以及如何用 `curl`、`dig`、`tcpdump` 排查 HTTP 访问链路。

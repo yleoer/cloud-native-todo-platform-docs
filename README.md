@@ -21,7 +21,7 @@
 
 - [第 1 篇：课程导学与开发环境准备 [A]](docs/chapters/stage-01-foundation/01-course-guide-env.md)
 - [第 2 篇：Linux 文件系统与命令基础 [A]](docs/chapters/stage-01-foundation/02-linux-filesystem.md)
-- [第 3 篇：Linux 进程、服务与软件管理](docs/chapters/stage-01-foundation/03-linux-process.md)
+- [第 3 篇：Linux 进程、服务与软件管理 [A]](docs/chapters/stage-01-foundation/03-linux-process.md)
 - [第 4 篇：Linux 网络基础与排障](docs/chapters/stage-01-foundation/04-linux-network.md)
 - [第 5 篇：Git 基础与团队协作](docs/chapters/stage-01-foundation/05-git-basics.md)
 - [第 6 篇：Shell 脚本与自动化基础](docs/chapters/stage-01-foundation/06-shell-scripting.md)
@@ -169,7 +169,7 @@ docs/
 │   ├── stage-01-foundation/   # 阶段一：基础能力
 │   │   ├── 01-course-guide-env.md   # 第 1 篇：课程导学与开发环境准备 [A]
 │   │   ├── 02-linux-filesystem.md   # 第 2 篇：Linux 文件系统与命令基础 [A]
-│   │   ├── 03-linux-process.md      # 第 3 篇：Linux 进程、服务与软件管理
+│   │   ├── 03-linux-process.md      # 第 3 篇：Linux 进程、服务与软件管理 [A]
 │   │   ├── 04-linux-network.md      # 第 4 篇：Linux 网络基础与排障
 │   │   ├── 05-git-basics.md         # 第 5 篇：Git 基础与团队协作
 │   │   ├── 06-shell-scripting.md    # 第 6 篇：Shell 脚本与自动化基础

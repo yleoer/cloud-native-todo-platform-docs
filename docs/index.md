@@ -73,7 +73,7 @@ hide:
 
 - [第 1 篇：课程导学与开发环境准备 [A]](chapters/stage-01-foundation/01-course-guide-env.md)
 - [第 2 篇：Linux 文件系统与命令基础 [A]](chapters/stage-01-foundation/02-linux-filesystem.md)
-- [第 3 篇：Linux 进程、服务与软件管理](chapters/stage-01-foundation/03-linux-process.md)
+- [第 3 篇：Linux 进程、服务与软件管理 [A]](chapters/stage-01-foundation/03-linux-process.md)
 - [第 4 篇：Linux 网络基础与排障](chapters/stage-01-foundation/04-linux-network.md)
 - [第 5 篇：Git 基础与团队协作](chapters/stage-01-foundation/05-git-basics.md)
 - [第 6 篇：Shell 脚本与自动化基础](chapters/stage-01-foundation/06-shell-scripting.md)
