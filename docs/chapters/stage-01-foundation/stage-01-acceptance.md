@@ -28,12 +28,13 @@ cloud-native-todo-platform/
 ├── .gitignore
 ├── .gitattributes
 ├── .gitmessage
+├── .env.example
 ├── .github/
-│   └── pull_request_template.md
+│   ├── pull_request_template.md
+│   └── workflows/
+│       └── scripts-check.yml        # 可选：如果已启用脚本 CI
 ├── api/
 ├── cli/
-│   └── env-check/
-│       └── main.go
 ├── cmd/
 │   ├── todo-dev-server/
 │   │   └── main.go
@@ -42,15 +43,15 @@ cloud-native-todo-platform/
 │   └── todo-process-demo/
 │       └── main.go
 ├── deployments/
-│   ├── kind/
-│   │   └── cluster.yaml
-│   ├── k8s-yaml/
-│   │   └── smoke-test.yaml
 │   └── systemd/
 │       └── todo-process-demo.service
 ├── docs/
 │   ├── contributing/
 │   │   └── git-workflow.md
+│   ├── examples/
+│   │   ├── basic.yaml
+│   │   ├── multi-doc.yaml
+│   │   └── anchors.yaml
 │   ├── environment.md
 │   └── stage-01-acceptance.md
 ├── labs/
@@ -58,6 +59,7 @@ cloud-native-todo-platform/
 └── scripts/
     ├── check-env.sh
     ├── check-process-service.sh
+    ├── versions.conf
     ├── dev.sh
     ├── check.sh
     └── clean.sh
@@ -96,7 +98,7 @@ bash --version:
 
 ## 实验成果
 
-- [ ] 第 1 篇：完成开发环境安装，并能运行 Kubernetes smoke test。
+- [ ] 第 1 篇：完成开发环境安装，能运行 YAML 客户端 dry-run；如果 Docker daemon 可用，再完成可选 kind smoke test。
 - [ ] 第 2 篇：完成 Todo 平台 Linux 服务器目录结构。
 - [ ] 第 3 篇：完成 Go HTTP 服务 systemd 托管实验。
 - [ ] 第 4 篇：完成 Todo HTTP 服务网络访问链路排障。
@@ -105,14 +107,20 @@ bash --version:
 
 ## 关键验证输出
 
-粘贴以下命令的关键输出：
+粘贴以下基础必过命令的关键输出：
 
 - `git status --short --branch`
 - `go test ./...`
 - `bash -n scripts/*.sh`
 - `./scripts/check.sh`
+- `kubectl apply --dry-run=client --validate=false -f docs/examples/multi-doc.yaml`
+
+如果你完成了第 1 篇的可选 kind smoke test，再补充以下增强输出：
+
+- `kind get clusters`
 - `kubectl get nodes`
-- `kubectl get pod,svc`
+- `kubectl get namespace todo-dev`
+- `kubectl -n todo-dev get configmap todo-env`
 
 ## 排障复盘
 
@@ -202,14 +210,16 @@ main() {
   echo '==> project files'
   check_file README.md
   check_file .gitignore
-  check_optional_file .github/pull_request_template.md
-  check_optional_file docs/environment.md
+  check_file .github/pull_request_template.md
+  check_file docs/environment.md
+  check_file docs/examples/multi-doc.yaml
   check_optional_file docs/stage-01-acceptance.md
 
   echo '==> scripts'
-  check_optional_file scripts/dev.sh
-  check_optional_file scripts/check.sh
-  check_optional_file scripts/clean.sh
+  check_file scripts/check-env.sh
+  check_file scripts/dev.sh
+  check_file scripts/check.sh
+  check_file scripts/clean.sh
 
   if compgen -G "scripts/*.sh" >/dev/null; then
     bash -n scripts/*.sh || fail "bash syntax check failed"
@@ -314,7 +324,8 @@ make check-foundation
 | 现象 | 常见原因 | 处理方式 |
 |---|---|---|
 | `docker version` 失败 | Docker Desktop 未启动或 WSL Integration 未开启 | 启动 Docker Desktop，检查 WSL 集成 |
-| `kubectl get nodes` 失败 | 没有集群或 kubeconfig 上下文错误 | 执行 `kind get clusters`、`kubectl config get-contexts` |
+| `kubectl apply --dry-run=client` 失败 | YAML 格式错误或文件路径不对 | 检查缩进、冒号、文件位置 |
+| `kubectl get nodes` 失败 | 这是增强验收；可能没有集群或 kubeconfig 上下文错误 | 执行 `kind get clusters`、`kubectl config get-contexts`，或仅保留基础 dry-run 验收 |
 | `bash -n scripts/*.sh` 失败 | Shell 脚本语法错误 | 根据行号修复，再运行 ShellCheck |
 | `go test ./...` 失败 | Go 模块未初始化或代码未完成 | 执行 `go mod tidy`，检查包路径 |
 | PR 模板仍有占位符 | 创建 PR 前没有替换模板内容 | 补充 Summary、Changes、Verification、Risk |

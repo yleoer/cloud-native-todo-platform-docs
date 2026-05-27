@@ -213,20 +213,21 @@ git branch --show-current
 ```bash
 git switch main
 git pull --ff-only
-git switch -c docs/issue-3-stage-01-foundation
+git switch -c docs/stage-01-foundation-portfolio
 ```
 
 提交：
 
 ```bash
 git add .
+git diff --check
 git commit -m "docs: update foundation stage" -m "Refs #3"
 ```
 
 推送：
 
 ```bash
-git push -u origin docs/issue-3-stage-01-foundation
+git push -u origin docs/stage-01-foundation-portfolio
 ```
 
 处理冲突：

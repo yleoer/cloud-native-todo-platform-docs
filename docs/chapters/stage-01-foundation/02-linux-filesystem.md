@@ -1008,7 +1008,7 @@ $ rm -f scripts/check-server-layout.sh
 
 - **预防**：发布脚本里先检查目标版本目录存在，再切换 `current`。
 
-### 错误 5：WSL2 中脚本出现 `$'\r': command not found`
+### 错误 5：WSL2 文件换行或挂载盘权限异常
 
 - **现象**：
 
@@ -1016,15 +1016,25 @@ $ rm -f scripts/check-server-layout.sh
   ./scripts/check-server-layout.sh: line 2: $'\r': command not found
   ```
 
-- **原因**：脚本使用了 Windows CRLF 换行符，Linux Bash 期望 LF 换行。
+  或者权限检查一直失败：
+
+  ```text
+  [FAIL] mode expected 750, got 777: server/todo-platform/config
+  [FAIL] mode expected 640, got 777: server/todo-platform/config/app.env
+  ```
+
+- **原因**：前一种现象通常是脚本使用了 Windows CRLF 换行符，Linux Bash 期望 LF 换行。后一种现象通常是课程仓库位于 `/mnt/c`、`/mnt/d` 这类 Windows 挂载盘，WSL2 访问 Windows 文件系统时可能不按 Linux 原生方式保存 Unix 权限位。
 
 - **排查**：
 
   ```bash
+  $ pwd
   $ file scripts/check-server-layout.sh
+  $ ls -ld server/todo-platform/config
+  $ stat server/todo-platform/config/app.env
   ```
 
-  如果输出包含 `CRLF line terminators`，说明换行符不符合 Linux 脚本习惯。
+  如果 `file` 输出包含 `CRLF line terminators`，说明换行符不符合 Linux 脚本习惯。如果 `pwd` 以 `/mnt/` 开头，并且 `chmod 640` 后仍显示 `777`，基本可以确认是 Windows 挂载盘权限语义导致的。
 
 - **修复**：
 
@@ -1033,29 +1043,7 @@ $ rm -f scripts/check-server-layout.sh
   $ chmod +x scripts/check-server-layout.sh
   ```
 
-- **预防**：VS Code 右下角选择 `LF`；课程仓库放在 WSL2 的 Linux 文件系统下，不要放在 `/mnt/c`、`/mnt/d` 这类 Windows 挂载盘下反复执行脚本。
-
-### 错误 6：WSL2 中 `chmod` 后权限仍显示 `777`
-
-- **现象**：
-
-  ```text
-  [FAIL] mode expected 750, got 777: server/todo-platform/config
-  [FAIL] mode expected 640, got 777: server/todo-platform/config/app.env
-  ```
-
-- **原因**：课程仓库位于 `/mnt/c`、`/mnt/d` 这类 Windows 挂载盘。WSL2 访问 Windows 文件系统时可能不按 Linux 原生方式保存 Unix 权限位，`chmod` 看起来执行了，但 `stat` 看到的权限仍可能是 `777`。
-
-- **排查**：
-
-  ```bash
-  $ pwd
-  $ stat server/todo-platform/config/app.env
-  ```
-
-  如果 `pwd` 以 `/mnt/` 开头，并且 `chmod 640` 后仍显示 `777`，基本可以确认是 Windows 挂载盘权限语义导致的。
-
-- **修复**：把仓库放到 WSL2 Linux 文件系统中重新执行实验。
+  如果是 `/mnt/c`、`/mnt/d` 挂载盘权限问题，把仓库放到 WSL2 Linux 文件系统中重新执行实验：
 
   ```bash
   $ mkdir -p ~/workspace
