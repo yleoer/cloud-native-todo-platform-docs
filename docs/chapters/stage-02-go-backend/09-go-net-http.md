@@ -1,6 +1,6 @@
 # 第 9 篇：Go net/http 标准库与 HTTP 服务 [C]
 
-第 7 篇已经完成内存版 `todo-cli`，第 8 篇会把 Go 项目工程化、测试和验证入口补齐。从本篇开始，Todo 能力要从“命令行里调用”升级为“通过 HTTP API 被其他系统调用”。
+第 7 篇已经完成内存版 `todo-cli`；按照阶段二新计划，第 8 篇负责 Go 项目工程化、测试和验证入口。从本篇开始，Todo 能力要从“命令行里调用”升级为“通过 HTTP API 被其他系统调用”。
 
 本篇属于 **C 类：实践/开发章**。你会使用 Go 标准库 `net/http` 实现 Todo API v1，不引入 Gin、Chi 或其他 Web 框架。这样做不是为了拒绝框架，而是为了先看清 HTTP 服务的底层模型：`Handler` 如何接收请求，`ServeMux` 如何分发路由，`ResponseWriter` 如何写状态码和响应体，中间件如何层层包装请求链路。
 
@@ -111,6 +111,8 @@ cloud-native-todo-platform/
 ```
 
 `api/internal/handler/http` 是本篇的标准库 Handler 版本。第 10 篇会用 Gin 重构同一组 Todo API，让你对比“标准库手写”和“框架封装”的差异。第 11 篇会把 HTTP 请求并发、超时和 `context` 继续讲深。第 12 篇会把内存存储替换为 PostgreSQL。
+
+这里没有直接复用第 7 篇的 `internal/todo`，是因为 CLI 和 API 是两个不同入口：CLI 关注命令行参数和终端输出，API 关注 HTTP 契约、状态码和 JSON 响应。两者的业务模型、Repository 思路和错误处理习惯是一致的，但 API 需要单独形成后续 Gin、数据库和 Kubernetes 部署都能复用的目录边界。
 
 ## 3. 核心概念
 
@@ -456,6 +458,7 @@ import (
 var ErrNotFound = errors.New("todo not found")
 
 // MemoryRepository stores Todo items in process memory.
+// Access to items is protected by sync.RWMutex.
 // It is safe for concurrent HTTP requests, but data is lost after process exit.
 type MemoryRepository struct {
 	mu     sync.RWMutex
@@ -806,7 +809,7 @@ func requestIDFrom(r *http.Request) string {
 }
 ```
 
-这个 `statusRecorder` 适合本篇 JSON API，用来记录状态码和响应字节数。生产中如果要支持流式响应、WebSocket 或其他高级能力，包装 `ResponseWriter` 时还要谨慎处理 `http.Flusher`、`http.Hijacker` 等接口，避免中间件把底层能力“包没了”。
+这个 `statusRecorder` 适合本篇 JSON API，用来记录状态码和响应字节数。生产中如果要支持流式响应、WebSocket 或其他高级能力，包装 `ResponseWriter` 时还要谨慎处理 `http.Flusher`、`http.Hijacker` 等接口，避免中间件掩盖底层能力。
 
 创建 `api/internal/handler/http/handler.go`：
 
@@ -1031,6 +1034,8 @@ func (h *Handler) handleError(w http.ResponseWriter, err error) {
 }
 ```
 
+`todoService` 接口定义在 Handler 所在的包中，只声明 Handler 真正需要的方法。这是 Go 中常见的“接口在使用方定义”模式：Handler 不依赖整个 `service.Service` 结构体，只依赖它需要的几个能力。不过这里为了教学清晰，错误映射仍然直接引用了 `service` 和 `repository` 包中的哨兵错误，没有做过度抽象。
+
 创建 `api/cmd/todo-api/main.go`：
 
 ```go title="api/cmd/todo-api/main.go"
@@ -1134,7 +1139,7 @@ func run(ctx context.Context, args []string, logger *slog.Logger) error {
 
 func loadConfig() config {
 	return config{
-		Addr:            getenv("TODO_API_ADDR", "127.0.0.1:8080"),
+		Addr:            getenv("TODO_API_ADDR", "127.0.0.1:18080"),
 		ShutdownTimeout: 5 * time.Second,
 	}
 }
@@ -1329,6 +1334,8 @@ func request(t *testing.T, server *httptest.Server, method, path, body string) (
 
 ### 5.5 执行命令
 
+确认已经保存以上 8 个 Go 源文件，再继续执行下面的命令。
+
 格式化代码：
 
 ```bash
@@ -1364,6 +1371,8 @@ TODO_API_ADDR=127.0.0.1:18080 ./bin/todo-api config-check
 ```bash
 TODO_API_ADDR=127.0.0.1:18080 ./bin/todo-api
 ```
+
+环境变量 `TODO_API_ADDR` 控制监听地址。本篇代码的默认值也是 `127.0.0.1:18080`，这里显式设置是为了让命令意图更清楚；如果你改用其他端口，后续 `curl` 命令也要同步修改。
 
 另开一个终端验证 API：
 
@@ -1417,6 +1426,13 @@ DELETE /api/v1/todos/{id}
 HTTP/1.1 204 No Content
 X-Request-Id: req-8
 Date: Wed, 27 May 2026 10:00:00 GMT
+```
+
+按 `Ctrl+C` 停止服务时，日志会看到类似输出：
+
+```json
+{"time":"2026-05-27T10:00:00Z","level":"INFO","msg":"shutdown signal received"}
+{"time":"2026-05-27T10:00:00Z","level":"INFO","msg":"todo api stopped"}
 ```
 
 ### 5.7 验证方法
@@ -1678,7 +1694,7 @@ TODO_API_ADDR=127.0.0.1:18080 ./bin/todo-api config-check
 
 1. 给 `GET /api/v1/todos` 增加 `status=bad` 的测试，确认返回 `400` 和 `invalid_status`。
 2. 给 `POST /api/v1/todos` 增加空标题测试，确认返回 `400` 和 `invalid_title`。
-3. 新增 `GET /api/v1/todos/count`，返回当前 Todo 总数。注意它应注册在 `/api/v1/todos/{id}` 之前，避免路径语义混乱。
+3. 新增 `GET /api/v1/todos/count`，返回当前 Todo 总数。Go 1.22+ 的 `ServeMux` 会按模式具体性匹配，但把字面量路径放在通配路径之前，仍然是更清晰的编码习惯。
 4. 给 access log 增加 `query` 字段，观察 `GET /api/v1/todos?status=done` 的日志输出。
 5. 把 `TODO_API_ADDR` 改成 `127.0.0.1:18081` 启动，验证端口切换是否成功。
 
@@ -1729,7 +1745,7 @@ TODO_API_ADDR=127.0.0.1:18080 ./bin/todo-api config-check
 
 **展开解释**：本篇中 request ID 在最外层，先给请求生成 ID；access log 包装内部 Handler，等请求处理完后记录状态码和耗时；recover 包住路由和业务处理，捕获内部 panic 并返回 `500`。
 
-**深入追问**：顺序设计很重要。日志如果在 recover 外层，就能记录 panic 后的 `500`；request ID 如果在最外层，后续日志和错误都能拿到同一个 ID。
+**深入追问**：顺序设计很重要。日志如果在 recover 外层，就能记录 panic 后的 `500`；request ID 如果在最外层，后续日志和错误都能拿到同一个 ID。注意：如果 Handler 在 panic 前已经写出了响应头，状态码就不能再可靠改写，这也是 Handler 应尽量先完成业务操作、最后统一写响应的原因之一。
 
 ### 6. `/healthz` 和 `/readyz` 有什么区别？
 
