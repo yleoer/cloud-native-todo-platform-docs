@@ -39,12 +39,7 @@ which go || true
 ls -l /usr/local/go/bin/go 2>/dev/null || true
 ```
 
-Windows + WSL2 学员还应检查：
-
-```powershell
-wsl --status
-wsl --list --verbose
-```
+课程统一使用 Ubuntu 24.04。若系统版本不一致，先切换到课程指定环境再继续排障。
 
 ## 3. Linux 文件与权限速查
 

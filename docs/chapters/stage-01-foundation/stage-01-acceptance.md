@@ -362,7 +362,7 @@ bash -n scripts/*.sh
 
 | 现象 | 常见原因 | 处理方式 |
 |---|---|---|
-| `docker version` 失败 | Docker Desktop 未启动或 WSL Integration 未开启 | 启动 Docker Desktop，检查 WSL 集成 |
+| `docker version` 失败 | Docker Engine 未安装、未启动，或当前用户无权限访问 Docker daemon | 执行 `sudo systemctl status docker`，必要时启动 Docker 并检查 `docker` 用户组 |
 | `kubectl apply --dry-run=client` 失败 | YAML 格式错误或文件路径不对 | 检查缩进、冒号、文件位置 |
 | `kubectl get nodes` 失败 | 这是增强验收；可能没有集群或 kubeconfig 上下文错误 | 执行 `kind get clusters`、`kubectl config get-contexts`，或仅保留基础 dry-run 验收 |
 | `bash -n scripts/*.sh` 失败 | Shell 脚本语法错误 | 根据行号修复，再运行 ShellCheck |

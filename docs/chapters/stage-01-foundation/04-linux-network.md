@@ -41,14 +41,14 @@
 本篇结束时，你至少应该能独立完成下面这组任务：
 
 ```bash
-$ ip -br addr
-$ ip route
-$ ss -lntp
-$ curl -i http://127.0.0.1:18080/healthz
-$ curl -i http://localhost:18080/todos
-$ getent hosts localhost
-$ dig example.com
-$ sudo tcpdump -i lo -nn 'tcp port 18080' -c 6
+ip -br addr
+ip route
+ss -lntp
+curl -i http://127.0.0.1:18080/healthz
+curl -i http://localhost:18080/todos
+getent hosts localhost
+dig example.com
+sudo tcpdump -i lo -nn 'tcp port 18080' -c 6
 ```
 
 这些命令是后端开发、DevOps、SRE 和 Kubernetes 排障每天都会用到的网络基本功。
@@ -101,7 +101,7 @@ $ sudo tcpdump -i lo -nn 'tcp port 18080' -c 6
 当你执行：
 
 ```bash
-$ curl http://localhost:18080/healthz
+curl http://localhost:18080/healthz
 ```
 
 系统至少会经历这些步骤：
@@ -163,7 +163,7 @@ listen tcp 127.0.0.1:18080: bind: address already in use
 人更容易记住域名，机器需要 IP 地址。DNS 负责把域名解析为 IP。
 
 ```bash
-$ dig example.com
+dig example.com
 ```
 
 输出可能包含一个或多个 A / AAAA 记录。具体 IP 会随 DNS、地区和时间变化，下面只表示输出形态：
@@ -177,7 +177,7 @@ example.com.  300  IN  A  <IP address>
 Linux 中可以用：
 
 ```bash
-$ getent hosts localhost
+getent hosts localhost
 ```
 
 查看系统最终如何解析一个名字。
@@ -257,7 +257,7 @@ curl: (7) Failed to connect to 127.0.0.1 port 18080: Connection refused
 优先检查：
 
 ```bash
-$ ss -lntp | grep 18080
+ss -lntp | grep 18080
 ```
 
 `Connection timed out` 通常表示请求发出去了，但长时间没有响应。原因可能是防火墙丢弃、路由不通、云安全组未放行、目标机器不可达。
@@ -269,8 +269,8 @@ curl: (28) Failed to connect to 10.0.0.10 port 18080 after 10000 ms: Timeout was
 优先检查：
 
 ```bash
-$ ping 10.0.0.10
-$ sudo tcpdump -i any -nn 'host 10.0.0.10 and tcp port 18080'
+ping 10.0.0.10
+sudo tcpdump -i any -nn 'host 10.0.0.10 and tcp port 18080'
 ```
 
 ### 4.3 `ping` 不能证明 HTTP 服务正常
@@ -283,7 +283,7 @@ $ sudo tcpdump -i any -nn 'host 10.0.0.10 and tcp port 18080'
 判断 HTTP 服务是否可用，应使用：
 
 ```bash
-$ curl -i http://127.0.0.1:18080/healthz
+curl -i http://127.0.0.1:18080/healthz
 ```
 
 ### 4.4 `ss` 比 `netstat` 更适合现代 Linux
@@ -317,8 +317,8 @@ $ curl -i http://127.0.0.1:18080/healthz
 端口冲突可以用固定顺序处理：先确认端口被谁占用，再判断是否属于本实验，最后决定停止旧进程还是换端口。
 
 ```bash
-$ sudo ss -lntp 'sport = :18080'
-$ ps -fp <PID>
+sudo ss -lntp 'sport = :18080'
+ps -fp <PID>
 ```
 
 不要看到端口冲突就直接 `kill -9`。先确认进程用途，优先用正常退出、`systemctl stop` 或 `Ctrl+C` 停止服务。
@@ -345,13 +345,13 @@ sequenceDiagram
 Linux 本机回环请求通常抓 `lo` 网卡：
 
 ```bash
-$ sudo tcpdump -i lo -nn 'tcp port 18080' -c 6
+sudo tcpdump -i lo -nn 'tcp port 18080' -c 6
 ```
 
 如果不知道包会经过哪张网卡，可以先用 `-i any`：
 
 ```bash
-$ sudo tcpdump -i any -nn 'tcp port 18080' -c 6
+sudo tcpdump -i any -nn 'tcp port 18080' -c 6
 ```
 
 ### 4.7 从本机网络映射到 Docker 和 Kubernetes
@@ -385,46 +385,30 @@ $ sudo tcpdump -i any -nn 'tcp port 18080' -c 6
 建议在第 1 篇创建的仓库中执行：
 
 ```bash
-$ cd ~/workspace/cloud-native-todo-platform
+cd ~/workspace/cloud-native-todo-platform
 ```
 
-主实验环境建议使用 Linux / WSL2 Ubuntu。macOS 可以做等价观察，但后文命令以 Linux / WSL2 为主线。
+主实验环境统一使用 Ubuntu 24.04。后文命令以 Ubuntu 24.04 的 GNU/Linux 工具链为准。
 
 | 项目 | 要求 |
 |---|---|
-| 操作系统 | WSL2 Ubuntu 24.04 或 Linux |
+| 操作系统 | Ubuntu 24.04 LTS |
 | Go | Go 1.26.x |
 | Shell | Bash 5.x |
 | 必需命令 | `go`、`curl`、`ss`、`ip`、`getent` |
 | 推荐命令 | `wget`、`dig`、`nslookup`、`lsof`、`tcpdump` |
 
-Linux / WSL2 Ubuntu 安装工具：
+安装网络排障工具：
 
 ```bash
-$ sudo apt update
-$ sudo apt install -y curl wget dnsutils iproute2 net-tools lsof tcpdump traceroute
+sudo apt update
+sudo apt install -y curl wget dnsutils iproute2 net-tools lsof tcpdump traceroute
 ```
-
-macOS 可使用 Homebrew 安装补充工具：
-
-```bash
-$ brew install wget bind
-```
-
-macOS 没有 Linux 的 `ip`、`ss`、`getent` 命令。macOS 学员可以按下表做等价观察：
-
-| Linux / WSL2 命令 | macOS 等价观察 |
-|---|---|
-| `ip -br addr` | `ifconfig` |
-| `ip route` | `route -n get default` |
-| `ss -lnt 'sport = :18080'` | `lsof -nP -iTCP:18080 -sTCP:LISTEN` |
-| `getent hosts localhost` | `dscacheutil -q host -a name localhost` |
-| `tcpdump -i lo -nn 'tcp port 18080'` | `sudo tcpdump -i lo0 -nn 'tcp port 18080'` |
 
 确认 Go 在当前终端可用：
 
 ```bash
-$ go version
+go version
 ```
 
 预期输出类似：
@@ -753,8 +737,8 @@ network-clean:
 先确认你在课程仓库根目录：
 
 ```bash
-$ pwd
-$ ls
+pwd
+ls
 ```
 
 预期能看到 `README.md`、`docs/` 等文件或目录。
@@ -762,7 +746,7 @@ $ ls
 如果仓库还没有 Go module，先初始化：
 
 ```bash
-$ test -f go.mod || go mod init github.com/your-name/cloud-native-todo-platform
+test -f go.mod || go mod init github.com/your-name/cloud-native-todo-platform
 ```
 
 请把 `your-name` 替换为你的 GitHub 用户名或组织名；如果只是本地实验，保留这个示例模块名也不影响本篇编译。
@@ -770,37 +754,37 @@ $ test -f go.mod || go mod init github.com/your-name/cloud-native-todo-platform
 创建目录：
 
 ```bash
-$ mkdir -p api/cmd/todo-network-demo bin scripts
+mkdir -p api/cmd/todo-network-demo bin scripts
 ```
 
 将 5.4 中的 Go 代码、检查脚本和 Makefile 分别保存到对应文件，然后赋予脚本执行权限：
 
 ```bash
-$ chmod +x scripts/check-network-demo.sh
+chmod +x scripts/check-network-demo.sh
 ```
 
 格式化并编译服务：
 
 ```bash
-$ gofmt -w api/cmd/todo-network-demo/main.go
-$ go mod tidy
-$ go build -o bin/todo-network-demo ./api/cmd/todo-network-demo
+gofmt -w api/cmd/todo-network-demo/main.go
+go mod tidy
+go build -o bin/todo-network-demo ./api/cmd/todo-network-demo
 ```
 
 在第一个终端启动服务：
 
 ```bash
-$ TODO_ADDR=127.0.0.1:18080 ./bin/todo-network-demo
+TODO_ADDR=127.0.0.1:18080 ./bin/todo-network-demo
 ```
 
 保持第一个终端运行，不要关闭。另开第二个终端执行访问检查：
 
 ```bash
-$ curl -i http://127.0.0.1:18080/healthz
-$ curl -i http://127.0.0.1:18080/readyz
-$ curl -i http://localhost:18080/todos
-$ curl -i -H 'X-Request-ID: demo-001' 'http://127.0.0.1:18080/debug/request?from=course'
-$ curl -i http://127.0.0.1:18080/not-found
+curl -i http://127.0.0.1:18080/healthz
+curl -i http://127.0.0.1:18080/readyz
+curl -i http://localhost:18080/todos
+curl -i -H 'X-Request-ID: demo-001' 'http://127.0.0.1:18080/debug/request?from=course'
+curl -i http://127.0.0.1:18080/not-found
 ```
 
 默认 `TODO_READY=true`，所以 `/readyz` 会返回 `200`。后面的练习会让你用 `TODO_READY=false` 启动服务，观察就绪检查变成 `503`。
@@ -808,10 +792,10 @@ $ curl -i http://127.0.0.1:18080/not-found
 查看地址、路由和监听端口：
 
 ```bash
-$ ip -br addr
-$ ip route
-$ ss -lnt 'sport = :18080'
-$ sudo ss -lntp 'sport = :18080'
+ip -br addr
+ip route
+ss -lnt 'sport = :18080'
+sudo ss -lntp 'sport = :18080'
 ```
 
 `ss -lnt` 不显示进程名，通常不需要 root；`sudo ss -lntp` 会显示进程名和 PID，更适合人工排障。
@@ -819,9 +803,9 @@ $ sudo ss -lntp 'sport = :18080'
 检查 DNS 和系统解析：
 
 ```bash
-$ getent hosts localhost
-$ dig +short example.com
-$ nslookup localhost
+getent hosts localhost
+dig +short example.com
+nslookup localhost
 ```
 
 如果课堂网络无法访问公网 DNS，可以先完成 `getent hosts localhost` 和 `nslookup localhost`。`example.com` 用来观察真实 DNS 查询，不影响本地 Todo 服务实验主线。
@@ -829,13 +813,13 @@ $ nslookup localhost
 运行检查脚本：
 
 ```bash
-$ ./scripts/check-network-demo.sh
+./scripts/check-network-demo.sh
 ```
 
 制造端口冲突。保持第一个终端中的服务运行，不要关闭；然后另开终端再次启动同端口服务：
 
 ```bash
-$ TODO_ADDR=127.0.0.1:18080 ./bin/todo-network-demo
+TODO_ADDR=127.0.0.1:18080 ./bin/todo-network-demo
 ```
 
 预期第二个进程会失败，提示 `address already in use` 或 `bind: address already in use`。这说明端口已经被第一个服务占用。
@@ -843,13 +827,13 @@ $ TODO_ADDR=127.0.0.1:18080 ./bin/todo-network-demo
 观察 `127.0.0.1` 与 `0.0.0.0` 的差异。先按 `Ctrl+C` 停止第一个终端中的服务，再监听所有 IPv4 网卡：
 
 ```bash
-$ TODO_ADDR=0.0.0.0:18080 ./bin/todo-network-demo
+TODO_ADDR=0.0.0.0:18080 ./bin/todo-network-demo
 ```
 
 另一个终端查看监听地址：
 
 ```bash
-$ ss -lnt 'sport = :18080'
+ss -lnt 'sport = :18080'
 ```
 
 完成观察后按 `Ctrl+C` 停止服务，再用 `127.0.0.1` 重新启动，以便后续实验保持一致。
@@ -857,25 +841,25 @@ $ ss -lnt 'sport = :18080'
 使用 `tcpdump` 抓取本机 HTTP 请求。第一个终端运行服务后，在第二个终端启动抓包：
 
 ```bash
-$ sudo tcpdump -i lo -nn 'tcp port 18080' -c 6
+sudo tcpdump -i lo -nn 'tcp port 18080' -c 6
 ```
 
 第三个终端发起请求：
 
 ```bash
-$ curl -i http://127.0.0.1:18080/healthz
+curl -i http://127.0.0.1:18080/healthz
 ```
 
 如果你的环境中 `lo` 抓不到包，可以改用：
 
 ```bash
-$ sudo tcpdump -i any -nn 'tcp port 18080' -c 6
+sudo tcpdump -i any -nn 'tcp port 18080' -c 6
 ```
 
 生成排障报告：
 
 ```bash
-$ make -f Makefile.network network-report
+make -f Makefile.network network-report
 ```
 
 ### 5.6 预期输出
@@ -957,22 +941,22 @@ Network demo check completed.
 验证前请确认服务正在另一个终端中运行：
 
 ```bash
-$ TODO_ADDR=127.0.0.1:18080 ./bin/todo-network-demo
+TODO_ADDR=127.0.0.1:18080 ./bin/todo-network-demo
 ```
 
 然后在当前终端集中执行下面命令。以下命令假设服务已经在另一个终端中运行；`go build` 只验证代码可编译，不影响已经运行的服务进程。
 
 ```bash
-$ go build -o bin/todo-network-demo ./api/cmd/todo-network-demo
-$ curl -fsS http://127.0.0.1:18080/healthz
-$ curl -fsS http://127.0.0.1:18080/readyz
-$ curl -fsS http://127.0.0.1:18080/todos
-$ test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:18080/not-found)" = "404"
-$ ss -lnt 'sport = :18080'
-$ getent hosts localhost
-$ ./scripts/check-network-demo.sh
-$ make -f Makefile.network network-report
-$ test -f network-debug-report.txt
+go build -o bin/todo-network-demo ./api/cmd/todo-network-demo
+curl -fsS http://127.0.0.1:18080/healthz
+curl -fsS http://127.0.0.1:18080/readyz
+curl -fsS http://127.0.0.1:18080/todos
+test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:18080/not-found)" = "404"
+ss -lnt 'sport = :18080'
+getent hosts localhost
+./scripts/check-network-demo.sh
+make -f Makefile.network network-report
+test -f network-debug-report.txt
 ```
 
 判断标准：
@@ -998,14 +982,14 @@ $ test -f network-debug-report.txt
 确认没有残留进程：
 
 ```bash
-$ pgrep -af todo-network-demo || true
+pgrep -af todo-network-demo || true
 ```
 
 如果还有残留进程，先确认 PID 属于本实验，再停止：
 
 ```bash
-$ ps -fp <PID>
-$ kill <PID>
+ps -fp <PID>
+kill <PID>
 ```
 
 不要直接使用模糊的 `pkill -f todo`，避免误杀后续章节或其他项目中的 Todo 服务。
@@ -1013,7 +997,7 @@ $ kill <PID>
 清理临时文件：
 
 ```bash
-$ rm -f /tmp/todo-network-demo.pcap network-debug-report.txt
+rm -f /tmp/todo-network-demo.pcap network-debug-report.txt
 ```
 
 本篇创建的源码建议保留：
@@ -1027,7 +1011,7 @@ Makefile.network
 `bin/todo-network-demo` 是编译产物，可以按需删除：
 
 ```bash
-$ rm -f bin/todo-network-demo
+rm -f bin/todo-network-demo
 ```
 
 预计耗时：75 分钟（动手操作约 50 分钟）。
@@ -1047,8 +1031,8 @@ $ rm -f bin/todo-network-demo
 - **排查**：
 
   ```bash
-  $ ss -lnt 'sport = :18080'
-  $ pgrep -af todo-network-demo || true
+  ss -lnt 'sport = :18080'
+  pgrep -af todo-network-demo || true
   ```
 
   如果没有 `LISTEN`，说明端口没有服务在监听。
@@ -1056,7 +1040,7 @@ $ rm -f bin/todo-network-demo
 - **修复**：
 
   ```bash
-  $ TODO_ADDR=127.0.0.1:18080 ./bin/todo-network-demo
+  TODO_ADDR=127.0.0.1:18080 ./bin/todo-network-demo
   ```
 
 - **预防**：访问前先用 `ss` 或检查脚本确认端口监听状态。
@@ -1074,9 +1058,9 @@ $ rm -f bin/todo-network-demo
 - **排查**：
 
   ```bash
-  $ ip route
-  $ ping -c 3 10.0.0.10
-  $ sudo tcpdump -i any -nn 'host 10.0.0.10 and tcp port 18080'
+  ip route
+  ping -c 3 10.0.0.10
+  sudo tcpdump -i any -nn 'host 10.0.0.10 and tcp port 18080'
   ```
 
   如果抓不到包，可能请求没有发到当前机器；如果只有请求没有响应，可能被服务端或中间网络丢弃。
@@ -1098,10 +1082,10 @@ $ rm -f bin/todo-network-demo
 - **排查**：
 
   ```bash
-  $ getent hosts todo.local
-  $ dig todo.local
-  $ nslookup todo.local
-  $ grep todo.local /etc/hosts || true
+  getent hosts todo.local
+  dig todo.local
+  nslookup todo.local
+  grep todo.local /etc/hosts || true
   ```
 
   `dig` 查 DNS，`getent hosts` 更接近应用程序看到的系统解析结果。
@@ -1127,9 +1111,9 @@ $ rm -f bin/todo-network-demo
 - **排查**：
 
   ```bash
-  $ ss -lntp 'sport = :18080'
-  $ ip -br addr
-  $ sudo tcpdump -i any -nn 'tcp port 18080'
+  ss -lntp 'sport = :18080'
+  ip -br addr
+  sudo tcpdump -i any -nn 'tcp port 18080'
   ```
 
   如果监听地址是 `127.0.0.1:18080`，远程机器无法通过内网 IP 访问。
@@ -1152,9 +1136,9 @@ $ rm -f bin/todo-network-demo
 - **排查**：
 
   ```bash
-  $ ip -br addr
-  $ sudo tcpdump -i any -nn 'tcp port 18080' -c 6
-  $ curl -i http://127.0.0.1:18080/healthz
+  ip -br addr
+  sudo tcpdump -i any -nn 'tcp port 18080' -c 6
+  curl -i http://127.0.0.1:18080/healthz
   ```
 
   `-i any` 可以先粗略确认是否有包，再缩小到具体网卡。
@@ -1196,29 +1180,29 @@ $ rm -f bin/todo-network-demo
 验收命令分三个终端执行。终端一启动服务并保持运行：
 
 ```bash
-$ make -f Makefile.network network-build
-$ TODO_ADDR=127.0.0.1:18080 ./bin/todo-network-demo
+make -f Makefile.network network-build
+TODO_ADDR=127.0.0.1:18080 ./bin/todo-network-demo
 ```
 
 终端二启动抓包并等待请求：
 
 ```bash
-$ sudo tcpdump -i lo -nn 'tcp port 18080' -c 6
+sudo tcpdump -i lo -nn 'tcp port 18080' -c 6
 ```
 
 如果 `lo` 抓不到包，可以改为：
 
 ```bash
-$ sudo tcpdump -i any -nn 'tcp port 18080' -c 6
+sudo tcpdump -i any -nn 'tcp port 18080' -c 6
 ```
 
 终端三执行 HTTP 检查和报告生成：
 
 ```bash
-$ curl -i http://127.0.0.1:18080/healthz
-$ ./scripts/check-network-demo.sh
-$ make -f Makefile.network network-report
-$ cat network-debug-report.txt
+curl -i http://127.0.0.1:18080/healthz
+./scripts/check-network-demo.sh
+make -f Makefile.network network-report
+cat network-debug-report.txt
 ```
 
 当终端三发起 `/healthz` 请求后，终端二应能看到 `127.0.0.1.<client-port> > 127.0.0.1.18080` 或类似方向的数据包。看到这个输出，说明请求确实经过了本机网络栈。

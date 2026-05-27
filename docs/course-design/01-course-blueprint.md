@@ -71,9 +71,9 @@
 建议准备：
 
 - 一台 16GB 内存以上的电脑
-- Windows + WSL2、macOS 或 Linux 均可
-- 能访问 GitHub、Docker Hub 或可替代镜像源
-- 推荐安装 VS Code、Go、Docker Desktop、kubectl、kind / minikube
+- Ubuntu 24.04 LTS 学习环境
+- 能访问 GitHub、Docker Hub，或准备可信国内镜像源、公司代理与制品库缓存
+- 推荐安装 VS Code、Go、Docker Engine、kubectl、kind、Helm
 
 ## 5. 版本与环境锁定
 
