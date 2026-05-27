@@ -190,6 +190,8 @@ nav:
       - 16. Docker Compose 本地编排: chapters/stage-03-docker/16-docker-compose.md
       - 17. 容器运行原理: chapters/stage-03-docker/17-container-internals.md
       - 18. 容器运行时与 CRI: chapters/stage-03-docker/18-container-runtime.md
+      - 附录 A. Docker 容器技术综合验收: chapters/stage-03-docker/stage-03-acceptance.md
+      - 附录 B. Docker 速查与排障手册: chapters/stage-03-docker/stage-03-cheatsheet-troubleshooting.md
 
   # - 阶段四 Kubernetes:
   #     - 19. K8s 架构与集群搭建: chapters/stage-04-kubernetes/19-k8s-architecture.md

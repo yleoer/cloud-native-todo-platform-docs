@@ -99,7 +99,7 @@ hide:
 </details>
 
 <details markdown="1">
-<summary><strong>阶段三：Docker 容器技术（第 14-18 篇，已完成）</strong></summary>
+<summary><strong>阶段三：Docker 容器技术（第 14-18 篇 + 出版附录，已完成）</strong></summary>
 
 掌握 Docker 使用、Dockerfile 编写、Docker Compose 本地编排、容器原理和运行时机制。
 
@@ -108,6 +108,8 @@ hide:
 - [第 16 篇：Docker Compose 本地编排](chapters/stage-03-docker/16-docker-compose.md)
 - [第 17 篇：容器运行原理](chapters/stage-03-docker/17-container-internals.md)
 - [第 18 篇：OCI、containerd、runc 与 CRI](chapters/stage-03-docker/18-container-runtime.md)
+- [附录 A：Docker 容器技术综合验收](chapters/stage-03-docker/stage-03-acceptance.md)
+- [附录 B：Docker 速查与排障手册](chapters/stage-03-docker/stage-03-cheatsheet-troubleshooting.md)
 
 </details>
 
@@ -195,4 +197,4 @@ http://127.0.0.1:8000
 
 - 开始编写 Kubernetes 架构与集群搭建，承接容器运行时和 CRI 知识。
 - 继续推进 Kubernetes 工作负载、网络、存储、安全、Helm 与 Kustomize 实践内容。
-- 继续完善阶段三 Docker 容器技术的综合验收，让 Todo 平台形成可展示的容器化作品集。
+- 使用阶段三综合验收和排障手册整理 Todo 平台容器化作品集。

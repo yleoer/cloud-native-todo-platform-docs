@@ -115,6 +115,9 @@ kubectl apply
 !!! warning "本篇包含节点运行时观察命令"
     `crictl`、`ctr`、`nerdctl`、`runc` 都比普通应用命令更接近节点底层。请只在本地学习机、WSL2、虚拟机或 kind 节点中执行。不要在生产节点上随意删除镜像、停止容器、修改 containerd 配置或手动清理运行时目录。
 
+!!! tip "本篇学习策略"
+    本篇的主线是理解 Docker、containerd、runc、CRI 和 Kubernetes 的关系，并能在 kind 节点中用 `crictl` 观察 Pod 容器。`nerdctl`、`ctr`、`runc` 的低层实验用于加深理解，环境暂时不满足时可以先作为选做内容，不要因此阻塞进入第 19 篇 Kubernetes 架构与集群搭建。
+
 ### 环境选择
 
 === "Linux / WSL2 Ubuntu"

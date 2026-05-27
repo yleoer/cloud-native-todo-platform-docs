@@ -105,7 +105,10 @@ Docker CLI / Compose
     namespace、mount、chroot、cgroup 相关命令需要管理员权限。请只在个人学习机、虚拟机或 WSL2 Ubuntu 中执行，不要在生产服务器、共享跳板机或公司核心环境中练习。
 
 !!! note "关于 Alpine 版本"
-    本篇使用 `alpine:3.20` 作为固定教学版本，是为了让命令输出和前后章节保持稳定。真实项目应定期评估基础镜像版本，结合漏洞扫描、兼容性测试和团队基线决定是否升级到更新稳定版本。
+    本篇使用 `alpine:3.23` 作为固定教学版本，是为了使用仍处于支持周期内的稳定分支，并让命令输出和前后章节保持稳定。真实项目应定期评估基础镜像版本，结合漏洞扫描、兼容性测试和团队基线决定何时升级到后续稳定版本。
+
+!!! tip "本篇学习策略"
+    第 14-16 篇是阶段三主线能力，必须完整完成；本篇属于底层原理训练。没有 Linux 管理员权限时，不要强行在公司机器上执行 `sudo`、`mount`、`unshare`、cgroup 写入等命令。你可以先完成 Docker 容器观察、镜像分层观察和原理复盘，把手动 namespace / cgroup 实验安排到 WSL2 Ubuntu、虚拟机或个人学习机中完成。
 
 ### 环境选择
 
@@ -170,7 +173,7 @@ Docker 让容器用起来像一个小系统，但它的底层仍然是进程隔�
 启动一个容器后，容器内通常会看到自己的 1 号进程：
 
 ```bash
-docker run --rm alpine:3.20 sh -c 'ps -o pid,ppid,comm'
+docker run --rm alpine:3.23 sh -c 'ps -o pid,ppid,comm'
 ```
 
 预期类似：
@@ -301,7 +304,7 @@ docker CLI
 执行：
 
 ```bash
-docker run --rm -m 128m --cpus=0.5 --name demo alpine:3.20 sh
+docker run --rm -m 128m --cpus=0.5 --name demo alpine:3.23 sh
 ```
 
 底层大致会发生：
@@ -385,7 +388,7 @@ cpu.max = 50000 100000
 Dockerfile 中每个会改变文件系统的步骤，通常会形成一个镜像层：
 
 ```dockerfile
-FROM alpine:3.20
+FROM alpine:3.23
 RUN apk add --no-cache ca-certificates
 COPY todo-api /app/todo-api
 ```
@@ -411,7 +414,7 @@ flowchart TB
 很多容器内显示用户是 root：
 
 ```bash
-docker run --rm alpine:3.20 id
+docker run --rm alpine:3.23 id
 ```
 
 输出可能是：
@@ -590,7 +593,7 @@ docker inspect "$TODO_API_CONTAINER" --format 'Memory={{.HostConfig.Memory}} Nan
 先运行一个短生命周期容器：
 
 ```bash
-docker run --rm alpine:3.20 sh -c 'echo "hostname=$(hostname)"; ps -o pid,ppid,comm; cat /proc/1/cgroup'
+docker run --rm alpine:3.23 sh -c 'echo "hostname=$(hostname)"; ps -o pid,ppid,comm; cat /proc/1/cgroup'
 ```
 
 你会看到容器内自己的主机名、进程列表和 cgroup 信息。
@@ -598,7 +601,7 @@ docker run --rm alpine:3.20 sh -c 'echo "hostname=$(hostname)"; ps -o pid,ppid,c
 再启动一个长运行容器：
 
 ```bash
-docker run -d --name internals-demo alpine:3.20 sleep 1d
+docker run -d --name internals-demo alpine:3.23 sleep 1d
 docker inspect internals-demo --format 'State.Pid={{.State.Pid}}'
 ```
 
@@ -773,8 +776,8 @@ sudo umount "$LAB/mnt" 2>/dev/null || true
 ```bash
 cd "$LAB"
 mkdir -p rootfs
-docker pull alpine:3.20
-CID="$(docker create alpine:3.20)"
+docker pull alpine:3.23
+CID="$(docker create alpine:3.23)"
 docker export "$CID" | tar -C rootfs -xf -
 docker rm "$CID"
 ```
@@ -904,13 +907,13 @@ cat "$CG/cgroup.procs"
 如果你的系统不适合手动写 cgroup，可以用 Docker 命令观察相同思想：
 
 ```bash
-docker run --rm --memory=64m --cpus=0.5 alpine:3.20 sh -c 'cat /proc/self/cgroup; echo ok'
+docker run --rm --memory=64m --cpus=0.5 alpine:3.23 sh -c 'cat /proc/self/cgroup; echo ok'
 ```
 
 查看 Docker 容器资源参数：
 
 ```bash
-docker run -d --name limit-demo --memory=64m --cpus=0.5 alpine:3.20 sleep 1d
+docker run -d --name limit-demo --memory=64m --cpus=0.5 alpine:3.23 sleep 1d
 docker inspect limit-demo --format 'Memory={{.HostConfig.Memory}} NanoCpus={{.HostConfig.NanoCpus}}'
 docker rm -f limit-demo
 ```
@@ -1124,7 +1127,7 @@ sudo rmdir /sys/fs/cgroup/todo-mini 2>/dev/null || true
 启动一个 demo 容器：
 
 ```bash
-docker run -d --name nsenter-demo alpine:3.20 sleep 1d
+docker run -d --name nsenter-demo alpine:3.23 sleep 1d
 DEMO_PID="$(docker inspect nsenter-demo --format '{{.State.Pid}}')"
 echo "$DEMO_PID"
 ```
@@ -1195,7 +1198,7 @@ esac
 export LAB="$HOME/container-lab"
 mkdir -p "$LAB"
 
-docker run -d --name internals-demo alpine:3.20 sleep 1d
+docker run -d --name internals-demo alpine:3.23 sleep 1d
 HOST_PID="$(docker inspect internals-demo --format '{{.State.Pid}}')"
 echo "$HOST_PID"
 sudo ls -l /proc/"$HOST_PID"/ns
@@ -1205,7 +1208,7 @@ docker rm -f internals-demo
 stat -fc %T /sys/fs/cgroup
 test -f /sys/fs/cgroup/cgroup.controllers && cat /sys/fs/cgroup/cgroup.controllers || true
 
-docker run --rm --memory=64m --cpus=0.5 alpine:3.20 sh -c 'cat /proc/self/cgroup; echo ok'
+docker run --rm --memory=64m --cpus=0.5 alpine:3.23 sh -c 'cat /proc/self/cgroup; echo ok'
 ```
 
 如果你已经完成 rootfs、OverlayFS 和 `mini-container.sh` 实验，还应能执行：
@@ -1432,7 +1435,7 @@ docker inspect "$CONTAINER" --format '{{json .Mounts}}'
 ### 9.8 排查镜像层过大
 
 ```bash
-IMAGE=alpine:3.20
+IMAGE=alpine:3.23
 docker history "$IMAGE"
 docker image inspect "$IMAGE" --format '{{.Size}}'
 ```
@@ -1488,7 +1491,7 @@ docker run --rm \
   --cap-drop=ALL \
   --security-opt no-new-privileges \
   --read-only \
-  alpine:3.20 echo "locked down"
+  alpine:3.23 echo "locked down"
 ```
 
 这些参数的含义是：
@@ -1595,7 +1598,7 @@ Rootless Docker、user namespace remap 可以降低容器内 root 对宿主机�
 export LAB="$HOME/container-lab"
 mkdir -p "$LAB"
 
-docker run -d --name internals-demo alpine:3.20 sleep 1d
+docker run -d --name internals-demo alpine:3.23 sleep 1d
 HOST_PID="$(docker inspect internals-demo --format '{{.State.Pid}}')"
 sudo ls -l /proc/"$HOST_PID"/ns
 cat /proc/"$HOST_PID"/cgroup
@@ -1603,7 +1606,7 @@ docker rm -f internals-demo
 
 stat -fc %T /sys/fs/cgroup
 test -f /sys/fs/cgroup/cgroup.controllers && cat /sys/fs/cgroup/cgroup.controllers || true
-docker run --rm --memory=64m --cpus=0.5 alpine:3.20 sh -c 'cat /proc/self/cgroup; echo ok'
+docker run --rm --memory=64m --cpus=0.5 alpine:3.23 sh -c 'cat /proc/self/cgroup; echo ok'
 ```
 
 如果你已经完成 rootfs 和简化容器脚本，还要能执行：

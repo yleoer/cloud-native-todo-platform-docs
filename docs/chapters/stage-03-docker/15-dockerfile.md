@@ -86,7 +86,7 @@ Dockerfile 是构建镜像的说明书。它把“如何准备运行环境、复
 一个最小示例：
 
 ```dockerfile
-FROM alpine:3.20
+FROM alpine:3.23
 CMD ["echo", "hello dockerfile"]
 ```
 
@@ -219,7 +219,7 @@ flowchart LR
 ```mermaid
 flowchart TB
     subgraph Builder["builder 阶段"]
-        A["FROM golang:1.24-bookworm"] --> B["COPY go.mod go.sum"]
+        A["FROM golang:1.26-bookworm"] --> B["COPY go.mod go.sum"]
         B --> C["go mod download"]
         C --> D["COPY 源码"]
         D --> E["go test ./..."]
@@ -352,7 +352,7 @@ docker buildx version
 
 `docker buildx` 是现代 Docker 构建能力入口。即使本篇主要使用 `docker build`，了解 buildx 对后续多平台镜像和 CI/CD 很重要。
 
-本篇 Dockerfile 默认使用 Go `1.24`，这是课程前后章节保持一致的工具链基线。真实项目可以替换为团队当前使用的 Go 稳定版本，但要同步检查 `go.mod`、CI 构建镜像和本地开发环境，避免不同环境构建出不一致的结果。
+本篇 Dockerfile 默认使用 Go `1.26`，这是当前阶段的工具链基线。真实项目可以替换为团队当前使用的 Go 稳定版本，但要同步检查 `go.mod`、CI 构建镜像和本地开发环境，避免不同环境构建出不一致的结果。
 
 ### 6.3 本篇新增文件
 
@@ -416,7 +416,7 @@ docker-compose.override.yml
 ```dockerfile title="Dockerfile"
 # syntax=docker/dockerfile:1.7
 
-ARG GO_VERSION=1.24
+ARG GO_VERSION=1.26
 ARG APP_NAME=todo-api
 ARG VERSION=dev
 ARG COMMIT=unknown
@@ -1336,13 +1336,13 @@ FROM golang:latest
 更推荐：
 
 ```dockerfile
-FROM golang:1.24-bookworm
+FROM golang:1.26-bookworm
 ```
 
 严格场景可以固定 digest：
 
 ```dockerfile
-FROM golang:1.24-bookworm@sha256:<digest>
+FROM golang:1.26-bookworm@sha256:<digest>
 ```
 
 固定 digest 可复现性更强，但升级需要主动维护。
