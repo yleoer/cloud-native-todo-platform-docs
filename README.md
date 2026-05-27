@@ -19,7 +19,7 @@
 
 环境准备、YAML、Linux 文件/进程/网络、Git 协作和 Shell 自动化。
 
-- [第 1 篇：课程导学、YAML 与开发环境准备](docs/chapters/stage-01-foundation/01-course-guide-env.md)
+- [第 1 篇：课程导学与开发环境准备 [A]](docs/chapters/stage-01-foundation/01-course-guide-env.md)
 - [第 2 篇：Linux 文件系统与命令基础](docs/chapters/stage-01-foundation/02-linux-filesystem.md)
 - [第 3 篇：Linux 进程、服务与软件管理](docs/chapters/stage-01-foundation/03-linux-process.md)
 - [第 4 篇：Linux 网络基础与排障](docs/chapters/stage-01-foundation/04-linux-network.md)
@@ -167,7 +167,7 @@ docs/
 ├── index.md                    # 首页
 ├── chapters/                   # 课程章节
 │   ├── stage-01-foundation/   # 阶段一：基础能力
-│   │   ├── 01-course-guide-env.md   # 第 1 篇：课程导学、YAML 与开发环境准备
+│   │   ├── 01-course-guide-env.md   # 第 1 篇：课程导学与开发环境准备 [A]
 │   │   ├── 02-linux-filesystem.md   # 第 2 篇：Linux 文件系统与命令基础
 │   │   ├── 03-linux-process.md      # 第 3 篇：Linux 进程、服务与软件管理
 │   │   ├── 04-linux-network.md      # 第 4 篇：Linux 网络基础与排障
