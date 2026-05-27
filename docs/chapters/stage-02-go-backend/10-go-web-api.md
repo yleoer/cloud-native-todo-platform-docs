@@ -1,2452 +1,1872 @@
-# 第 10 篇：Go Web API 开发
+# 第 10 篇：Go Web API 开发——Gin 框架 [C]
 
-第 9 篇已经把 Todo 平台整理成了 Go 后端工程骨架：有 `cmd/todo-api` 启动入口，有 `internal/config` 配置管理，有 `internal/logger` 结构化日志，也有 `internal/todo.Service` 业务服务层。
+第 9 篇已经用 `net/http` 标准库实现了 Todo API v1。你已经看过 HTTP 请求怎样进入 `http.Server`，`ServeMux` 怎样分发路由，Handler 怎样解析 JSON，ResponseWriter 怎样写状态码和响应体。
 
-但到目前为止，`todo-api` 还只是一个能启动并打印统计信息的后端骨架。真实后端服务必须能通过 HTTP 对外提供能力，让前端、移动端、自动化脚本、其他微服务都能通过统一接口访问 Todo 数据。
-
-本篇特色项目是：**开发 Todo Platform API v1，支持 Todo CRUD**。
-
-你会在上一篇工程骨架上新增 `internal/httpapi` 包，使用 `chi` 构建 RESTful API，提供统一 JSON 响应、请求绑定、参数校验、错误码、健康检查、API 文档和优雅关闭。完成后，`todo-api` 会从“后端启动骨架”升级为“可运行、可测试、可维护的 Web API 服务”。
+本篇属于 **C 类：实践/开发章**。我们会在同一个项目里新增 `api/internal/handler/gin`，用 Gin 重构 Todo API v2。这样做不是为了把标准库版本推翻，而是为了对比框架到底帮你省掉了什么：路由组、路径参数、JSON 绑定、参数校验、中间件编排和 API 文档入口。
 
 本篇对应 5 个章节主题：
 
-- 10.1 HTTP 协议与 Web 服务基础
-- 10.2 Gin / Chi 路由、中间件与请求绑定
+- 10.1 Gin 与 `net/http` 的关系：框架省掉了什么
+- 10.2 路由组、中间件与请求绑定
 - 10.3 RESTful API 设计与统一响应格式
 - 10.4 参数校验、错误码与异常处理
-- 10.5 健康检查、优雅关闭与 API 文档
+- 10.5 健康检查、优雅关闭与 OpenAPI 文档生成
+
+本篇特色项目是：**Todo API v2（Gin 框架版）**。
+
+完成后，你将拥有一个可运行、可测试、可维护的 Gin Web API 服务，支持：
+
+- `GET /healthz`
+- `GET /readyz`
+- `GET /openapi.yaml`
+- `GET /api/v2/todos`
+- `POST /api/v2/todos`
+- `GET /api/v2/todos/:id`
+- `PUT /api/v2/todos/:id`
+- `PATCH /api/v2/todos/:id/done`
+- `DELETE /api/v2/todos/:id`
 
 ## 1. 本章学习目标
 
-学完本篇后，你应该能独立开发一个中小型 Go RESTful API 服务。
+学完本篇后，你应该能独立开发一个 Gin RESTful API 服务，并能解释它与第 9 篇标准库版本的关系。
 
-具体目标如下：
+### 1.1 知识目标
 
-- 能解释 HTTP 方法、路径、状态码、Header、Body 的作用。
-- 能理解 Web 框架解决了什么问题，以及 Gin 和 Chi 的常见差异。
-- 能使用 Chi 定义路由、路由组和中间件。
-- 能用标准库 `encoding/json` 完成请求绑定和响应编码。
-- 能设计 RESTful Todo API 路径和语义。
-- 能实现统一响应格式和统一错误响应。
-- 能完成 Todo 的新增、查询、更新、完成、删除接口。
-- 能通过查询参数过滤 Todo 状态。
-- 能实现 `/healthz` 和 `/readyz` 健康检查接口。
-- 能用 `httptest` 编写 Handler 测试。
-- 能让 HTTP server 支持 `SIGTERM` 优雅关闭。
-- 能写出最小可用 API 文档，方便前端和测试协作。
+- 能解释 Gin 为什么仍然运行在 `net/http` 之上。
+- 能对比 `http.Handler` 与 `gin.HandlerFunc` 的差异。
+- 能说明 Gin 路由组、中间件、`Context`、JSON 绑定和参数校验的职责。
+- 能解释统一响应、错误码和 OpenAPI 文档为什么是团队协作契约。
+- 能说明 Gin 默认能力和生产环境必补能力之间的边界。
 
-本篇结束时，你至少应该能独立完成下面命令组合：
+### 1.2 技能目标
+
+- 能用 Gin 实现 Todo API v2 的 CRUD 接口。
+- 能使用 `c.Param`、`c.Query`、`ShouldBindJSON` 和 binding tag 解析并校验请求。
+- 能编写 request ID、访问日志、panic 恢复、请求超时和请求体大小限制中间件。
+- 能生成并暴露 `openapi.yaml`，让前端、测试和调用方对齐接口契约。
+- 能继续使用 `http.Server` 设置超时和优雅关闭。
+- 能用 `curl`、`go test ./api/...` 和 `go build` 验证 Gin API 行为。
+
+本篇结束时，你至少应该能成功执行：
 
 ```bash
+cd ~/workspace/cloud-native-todo-platform
+go get github.com/gin-gonic/gin@v1.12.0
 go mod tidy
-go fmt ./...
-go test ./...
-go build ./cmd/todo-api
-go run ./cmd/todo-api
-curl -s http://127.0.0.1:8080/healthz
-curl -s -X POST http://127.0.0.1:8080/api/v1/todos -H 'Content-Type: application/json' -d '{"title":"learn Go Web API"}'
-curl -s http://127.0.0.1:8080/api/v1/todos
+go fmt ./api/...
+go test ./api/...
+go build -o bin/todo-api ./api/cmd/todo-api
+TODO_API_ADDR=127.0.0.1:18080 ./bin/todo-api
 ```
 
-这些能力会直接支撑后续数据库持久化、Redis 缓存、Docker 镜像、Kubernetes Deployment、Service、Ingress、探针和 Operator 管理能力。
-
-## 2. 本章工作场景
-
-真实公司里的后端服务通常不是给人手动运行命令用的，而是通过 HTTP API 被其他系统调用。
-
-常见工作场景包括：
-
-- 前端页面调用 `POST /api/v1/todos` 创建 Todo。
-- 移动端调用 `GET /api/v1/todos?status=pending` 展示未完成任务。
-- 测试工程师根据 API 文档编写接口测试。
-- 网关、负载均衡或 Kubernetes 探针调用 `/healthz` 和 `/readyz` 判断服务是否可用。
-- SRE 通过请求日志、状态码和错误码定位接口失败原因。
-- 后端团队通过统一响应格式降低前后端联调成本。
-- 平台团队把 API 服务容器化后部署到 Kubernetes，并依赖优雅关闭减少滚动更新时的请求中断。
-
-本篇会把第 9 篇工程骨架演进为下面结构：
-
-```mermaid
-flowchart LR
-    Client["Client<br/>curl / frontend / tests"]
-    Server["cmd/todo-api<br/>HTTP server"]
-    Router["internal/httpapi<br/>router + middleware"]
-    Handler["Todo Handler<br/>RESTful endpoints"]
-    Service["internal/todo.Service<br/>business logic"]
-    Store["FileStore<br/>JSON persistence"]
-    Health["/healthz /readyz<br/>health checks"]
-
-    Client --> Server --> Router
-    Router --> Handler --> Service --> Store
-    Router --> Health
-```
-
-学习本篇时要记住一条主线：Web API 不是把函数暴露出去就结束了。它还要考虑协议语义、错误表达、输入校验、日志、测试、关闭流程和后续部署形态。
-
-## 3. 前置知识
-
-学习本篇前，建议已经完成：
-
-- 第 7 篇：Go 语言基础，理解结构体、方法、interface、error 和 Go module。
-- 第 8 篇：Go 并发编程，理解 `context`、超时取消和 goroutine 生命周期。
-- 第 9 篇：Go 工程化与测试，已经具备 `cmd/todo-api`、`internal/config`、`internal/logger`、`internal/app` 和 `internal/todo.Service`。
-- 阶段一 Linux 网络基础，理解端口、监听地址、`curl`、`ss` 或 `netstat`。
-
-必须掌握：
-
-- Go 1.21 或更高版本。
-- 能在 Go module 根目录运行 `go test ./...`。
-- 能理解 JSON 基本格式。
-- 能使用 `curl` 发送 GET、POST、PUT、DELETE 请求。
-- 能区分 HTTP 2xx、4xx、5xx 状态码的大致含义。
-
-建议了解：
-
-- 前后端为什么需要 API 文档。
-- Kubernetes 为什么需要健康检查。
-- 网关和负载均衡为什么依赖状态码判断请求结果。
-
-本篇会引入一个外部依赖：
-
-```text
-github.com/go-chi/chi/v5 v5.3.0
-```
-
-选择 Chi 作为主线，是因为它贴近 Go 标准库 `net/http`，学习成本低，适合从原理过渡到工程实践。Gin 也会讲到，但本篇不同时实现 Gin 和 Chi 两套代码，避免学习者在框架差异中分心。
-
-## 4. 核心概念
-
-### 4.1 HTTP 请求与响应
-
-HTTP 是客户端和服务端交换数据的协议。一次请求通常包含：
-
-- Method：动作，例如 `GET`、`POST`、`PUT`、`DELETE`。
-- Path：资源路径，例如 `/api/v1/todos/1`。
-- Query：查询参数，例如 `?status=pending`。
-- Header：元信息，例如 `Content-Type: application/json`。
-- Body：请求体，例如 JSON 数据。
-
-一次响应通常包含：
-
-- Status Code：状态码，例如 `200`、`201`、`400`、`404`、`500`。
-- Header：响应元信息。
-- Body：响应数据，常见格式是 JSON。
-
-Todo API 的典型交互如下：
-
-```text
-POST /api/v1/todos
-Content-Type: application/json
-
-{"title":"learn Go Web API"}
-```
-
-服务端返回：
-
-```json
-{
-  "data": {
-    "id": 1,
-    "title": "learn Go Web API",
-    "status": "pending"
-  }
-}
-```
-
-### 4.2 RESTful API
-
-RESTful API 的核心思想是：用 URL 表达资源，用 HTTP 方法表达动作。
-
-本篇 Todo API 设计如下：
-
-| 方法 | 路径 | 含义 |
-|---|---|---|
-| `GET` | `/healthz` | 进程存活检查 |
-| `GET` | `/readyz` | 服务就绪检查 |
-| `GET` | `/api/v1/todos` | 查询 Todo 列表 |
-| `POST` | `/api/v1/todos` | 创建 Todo |
-| `GET` | `/api/v1/todos/{id}` | 查询单个 Todo |
-| `PUT` | `/api/v1/todos/{id}` | 更新 Todo 标题 |
-| `POST` | `/api/v1/todos/{id}/done` | 标记 Todo 完成 |
-| `DELETE` | `/api/v1/todos/{id}` | 删除 Todo |
-
-注意 `done` 这里使用 `POST /todos/{id}/done`，是为了表达一个业务动作。也可以设计成 `PATCH /todos/{id}` 更新状态，但本篇先选择更容易理解和测试的动作接口。
-
-### 4.3 Gin 与 Chi
-
-Gin 和 Chi 都是 Go 生态中常见的 Web 框架。
-
-| 对比项 | Gin | Chi |
-|---|---|---|
-| 风格 | 功能完整，内置绑定、渲染、中间件较多 | 轻量，贴近 `net/http` |
-| Handler 形态 | `func(*gin.Context)` | 标准 `http.Handler` / `http.HandlerFunc` |
-| 学习重点 | 框架能力和开发效率 | HTTP 原理和组合方式 |
-| 适合场景 | 快速开发业务 API | 想保留标准库风格、便于测试和组合 |
-
-本篇使用 Chi，原因是：
-
-- 它直接兼容标准库 `http.Handler`。
-- `httptest` 测试非常自然。
-- 中间件就是标准 HTTP 中间件。
-- 后续接入 Kubernetes 探针、pprof、metrics 时更容易理解底层机制。
-
-企业项目中选择 Gin 或 Chi 都可以，关键不在“哪个框架更高级”，而在团队是否能保持清晰路由、统一错误、稳定测试和可观测性。
-
-### 4.4 中间件
-
-中间件是在请求进入业务 Handler 前后执行的一段逻辑。
-
-常见中间件包括：
-
-- 请求日志。
-- panic 恢复。
-- Request ID。
-- 超时控制。
-- CORS。
-- 认证鉴权。
-- 指标采集。
-
-简化后的中间件形态如下：
-
-```go
-func middleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// 请求前逻辑
-		next.ServeHTTP(w, r)
-		// 请求后逻辑
-	})
-}
-```
-
-本篇会实现请求日志中间件，记录方法、路径、状态码和耗时。
-
-### 4.5 请求绑定与参数校验
-
-请求绑定是把 JSON 请求体解析成 Go 结构体：
-
-```go
-type createTodoRequest struct {
-	Title string `json:"title"`
-}
-```
-
-参数校验是判断请求是否符合业务要求：
-
-- `title` 不能为空。
-- `id` 必须是正整数。
-- `status` 只能是 `pending`、`done` 或空。
-- JSON 格式必须合法。
-- JSON 请求必须声明 `Content-Type: application/json`。
-- 请求体大小必须有上限，避免超大 body 占用内存。
-
-校验失败应该返回 4xx，而不是 500。因为这是客户端请求不合法，不是服务端崩了。
-
-### 4.6 统一响应格式
-
-统一响应格式可以降低前端、测试和调用方的理解成本。
-
-本篇成功响应格式：
-
-```json
-{
-  "data": {}
-}
-```
-
-错误响应格式：
-
-```json
-{
-  "error": {
-    "code": "invalid_request",
-    "message": "request body is invalid"
-  }
-}
-```
-
-这里的 `code` 面向程序判断，`message` 面向人阅读。生产项目中还可以增加 `request_id`、`details`、`trace_id` 等字段。
-
-## 5. 原理深入
-
-### 5.1 HTTP Server 运行流程
-
-Go HTTP 服务的核心流程如下：
-
-```mermaid
-sequenceDiagram
-    participant OS as Operating System
-    participant Server as http.Server
-    participant Router as chi.Router
-    participant MW as Middleware
-    participant Handler as Todo Handler
-    participant Service as todo.Service
-
-    OS->>Server: TCP connection
-    Server->>Router: ServeHTTP
-    Router->>MW: match route and run middleware
-    MW->>Handler: call business handler
-    Handler->>Service: execute business use case
-    Service-->>Handler: result or error
-    Handler-->>Server: JSON response
-```
-
-`http.Server` 负责监听端口和处理连接，Router 负责把不同路径分发给不同 Handler，Handler 负责协议转换，Service 负责业务逻辑。
-
-不要把业务规则写在 Handler 里。Handler 应该主要做三件事：
-
-- 解析请求。
-- 调用服务层。
-- 写出响应。
-
-### 5.2 Handler 与 Service 的边界
-
-Handler 层关心 HTTP：
-
-- URL 参数。
-- Query 参数。
-- JSON 请求体。
-- 状态码。
-- Header。
-- 响应格式。
-
-Service 层关心业务：
-
-- Todo 标题不能为空。
-- Todo 是否存在。
-- Todo 状态如何统计。
-- 存储失败如何包装错误。
-
-如果把这两个层次混在一起，后续会出现两个问题：
-
-- Web API 难测试，因为必须通过 HTTP 才能验证业务。
-- 业务逻辑难复用，因为 CLI、后台任务、Operator controller 都不应该依赖 HTTP。
-
-### 5.3 状态码设计
-
-状态码不是随便选的。
-
-| 状态码 | 使用场景 |
-|---|---|
-| `200 OK` | 查询、更新、完成等成功返回 |
-| `201 Created` | 创建资源成功 |
-| `204 No Content` | 删除成功且不返回 body |
-| `400 Bad Request` | JSON 错误、参数非法 |
-| `413 Payload Too Large` | 请求体超过服务端允许大小 |
-| `415 Unsupported Media Type` | 请求体类型不是 `application/json` |
-| `404 Not Found` | Todo 不存在 |
-| `405 Method Not Allowed` | 路径存在但方法不允许 |
-| `500 Internal Server Error` | 服务端内部错误 |
-
-清晰状态码能让调用方快速判断问题属于客户端还是服务端，也方便网关和监控按状态码统计错误率。
-
-### 5.4 优雅关闭
-
-服务关闭时，如果直接退出进程，正在处理的请求可能被中断。
-
-优雅关闭流程如下：
-
-```mermaid
-sequenceDiagram
-    participant User as Ctrl+C / SIGTERM
-    participant Main as cmd/todo-api
-    participant Server as http.Server
-    participant Handler as In-flight Requests
-
-    User->>Main: send signal
-    Main->>Server: Shutdown(ctx)
-    Server->>Server: stop accepting new requests
-    Server->>Handler: wait existing requests
-    Handler-->>Server: finished
-    Server-->>Main: shutdown complete
-```
-
-在 Kubernetes 中，滚动更新或删除 Pod 时通常会发送 `SIGTERM`。服务应该停止接收新请求，并在宽限期内完成已有请求。
-
-### 5.5 健康检查与就绪检查
-
-健康检查通常分两类：
-
-- `/healthz`：进程是否活着。
-- `/readyz`：服务是否准备好接收流量。
-
-本篇先用文件存储，所以 `/readyz` 会尝试读取 Todo 统计，验证服务层和数据路径可用。后续接入数据库后，`/readyz` 会继续扩展为数据库连接、缓存连接、依赖服务状态检查。
-
-### 5.6 API 文档的最小闭环
-
-API 文档不是一定要一开始就上 Swagger 或 OpenAPI。最小可用文档至少要说明：
-
-- 方法和路径。
-- 请求参数。
-- 请求示例。
-- 响应示例。
-- 错误码。
-
-本篇会新增 `docs/api/todo-api-v1.md` 作为项目内 API 文档。后续 CI/CD 或平台化阶段，可以再演进到 OpenAPI 规范和自动生成文档。
-
-## 6. 手把手实验
-
-### 6.1 实验目标
-
-本实验会把第 9 篇的 `todo-api` 改造成真正的 HTTP API 服务。
-
-你会完成：
-
-- 引入 `github.com/go-chi/chi/v5`。
-- 新增 `internal/httpapi` 包。
-- 实现路由、中间件、统一响应和错误处理。
-- 实现 Todo CRUD API。
-- 实现 `/healthz` 和 `/readyz`。
-- 修改 `internal/app`，让应用启动 HTTP server。
-- 修改 `cmd/todo-api`，支持优雅关闭。
-- 编写 Handler 单元测试。
-- 新增 API 文档 `docs/api/todo-api-v1.md`。
-
-本篇不涉及 Kubernetes YAML。HTTP 服务会先在本地进程中跑通；后续 Docker 和 Kubernetes 章节会继续补充 Dockerfile、Deployment、Service、Ingress、ConfigMap、Secret、探针和滚动更新。
-
-### 6.2 实验环境
-
-请在第 9 篇同一个 Go module 根目录执行命令。
-
-=== "Linux / macOS / WSL2"
-
-    ```bash
-    cd ~/workspace/cloud-native-todo-platform
-    go env GOMOD
-    go version
-    ```
-
-=== "Windows PowerShell"
-
-    ```powershell
-    cd D:\workspace\cloud-native-todo-platform
-    go env GOMOD
-    go version
-    ```
-
-预期 `go env GOMOD` 指向当前项目的 `go.mod`。如果输出为空，说明你没有站在 module 根目录。
-
-### 6.3 安装 Chi
-
-执行：
+另开一个终端验证：
 
 ```bash
-go get github.com/go-chi/chi/v5@v5.3.0
+curl -s http://127.0.0.1:18080/healthz
+curl -s -X POST http://127.0.0.1:18080/api/v2/todos -H 'Content-Type: application/json' -d '{"title":"learn Gin"}'
+curl -s http://127.0.0.1:18080/api/v2/todos
+curl -s http://127.0.0.1:18080/openapi.yaml | head
 ```
 
-执行后，`go.mod` 会增加类似内容：
+## 2. 本章工作场景与真实案例
+
+### 2.1 技术痛点
+
+标准库版本让你看清了 HTTP 服务的底层模型，但企业项目通常不会让每个团队都重复手写路由分组、路径参数解析、JSON 绑定、校验错误转换和中间件链。重复代码越多，团队越容易出现风格分裂：同一个错误有的接口返回 `400`，有的返回 `500`；有的接口校验未知字段，有的接口静默忽略；有的路由有 request ID，有的路由没有。
+
+Gin 解决的不是“不会写 HTTP”的问题，而是“把常见 Web API 结构收敛成统一写法”的问题。你仍然要理解 HTTP、状态码、超时和优雅关闭，但可以把更多注意力放在业务路径、请求契约和错误语义上。
+
+### 2.2 团队协作场景
+
+真实团队中，Gin API 通常会被多个角色共同使用：
+
+- 后端开发实现 Handler、Service、Repository 和 Handler 测试。
+- 前端开发根据 OpenAPI 文档确认路径、字段、错误码和示例响应。
+- 测试工程师用 API 文档生成接口测试或手写自动化用例。
+- SRE 通过 `/healthz`、`/readyz`、结构化日志和 request ID 定位线上问题。
+- 架构师审查路由版本、统一响应、超时、请求体大小限制和中间件顺序。
+
+本篇会保持第 9 篇的 `model`、`repository`、`service` 分层，只替换 HTTP 入口层。这样你能清楚看到框架应该停留在哪一层：Gin 属于 Handler 层，它不应该渗透进业务服务层和存储层。
+
+### 2.3 课程项目关联
+
+本篇会把项目推进到 `v0.3-api-gin`：
+
+```text
+cloud-native-todo-platform/
+├── api/
+│   ├── cmd/todo-api/
+│   └── internal/
+│       ├── handler/
+│       │   └── gin/
+│       ├── model/
+│       ├── repository/
+│       └── service/
+├── cmd/todo-cli/
+├── internal/todo/
+└── go.mod
+```
+
+`api/internal/handler/gin` 是本篇新增的框架版 Handler。第 9 篇留下的 `api/internal/handler/http` 可以继续保留，用来对比标准库版和 Gin 版的差异；本篇会在 service 层保留少量兼容函数，确保 `go test ./api/...` 同时覆盖两套 Handler 时也能通过。第 11 篇会继续围绕这个 API 讲并发、压测和 `context`；第 12 篇会把内存存储替换成 PostgreSQL；后续 Docker 和 Kubernetes 章节会直接运行这个服务。
+
+## 3. 核心概念
+
+### 3.1 Gin 与 net/http 的关系
+
+Gin 不是另一个 HTTP 协议实现。它最终仍然作为 `http.Server.Handler` 被标准库调用。
+
+最小结构可以这样理解：
+
+```go
+router := gin.New()
+server := &http.Server{
+	Addr:    "127.0.0.1:18080",
+	Handler: router,
+}
+server.ListenAndServe()
+```
+
+`gin.Engine` 实现了标准库的 `ServeHTTP` 方法，所以它可以放进 `http.Server`。这也是为什么第 9 篇学过的超时、优雅关闭、端口监听、`curl` 验证仍然适用。
+
+### 3.2 gin.Context
+
+在标准库 Handler 中，你直接接触 `http.ResponseWriter` 和 `*http.Request`。Gin 把常用操作收进 `*gin.Context`：
+
+| 操作 | 标准库写法 | Gin 写法 |
+|---|---|---|
+| 路径参数 | `r.PathValue("id")` | `c.Param("id")` |
+| 查询参数 | `r.URL.Query().Get("status")` | `c.Query("status")` |
+| JSON 响应 | `json.NewEncoder(w).Encode(...)` | `c.JSON(status, payload)` |
+| 状态码 | `w.WriteHeader(status)` | `c.Status(status)` |
+| JSON 绑定 | `json.NewDecoder(r.Body).Decode(&req)` | `c.ShouldBindJSON(&req)` |
+
+`gin.Context` 不是 Go 标准库的 `context.Context`。当你要把请求生命周期传给 service 或 repository 时，仍然使用：
+
+```go
+ctx := c.Request.Context()
+```
+
+### 3.3 路由组
+
+路由组用来表达一组接口的共同前缀和共同中间件。Todo API v2 使用 `/api/v2` 作为版本前缀：
+
+```go
+api := router.Group("/api/v2")
+api.GET("/todos", h.listTodos)
+api.POST("/todos", h.createTodo)
+api.GET("/todos/:id", h.getTodo)
+```
+
+这比到处手写 `/api/v2/...` 更清晰，也方便后续给某一组路由单独加认证、限流或审计中间件。
+
+### 3.4 请求绑定与参数校验
+
+Gin 的 `ShouldBindJSON` 可以把 JSON 请求体绑定到结构体，并根据 tag 做基础校验：
+
+```go
+type todoRequest struct {
+	Title string `json:"title" binding:"required,min=1,max=120"`
+}
+```
+
+这行 tag 的含义是：
+
+- `json:"title"`：JSON 字段名是 `title`。
+- `required`：字段必须存在且非零值。
+- `min=1`：字符串长度至少为 1。
+- `max=120`：字符串长度最多为 120。
+
+框架校验只能解决协议层输入问题。真正的业务规则仍然放在 service 层。本篇仍然保留 `service.ErrInvalidTitle`，避免 Handler 成为业务规则的唯一来源。
+
+### 3.5 统一响应与错误码
+
+统一响应不是为了“包一层看起来高级”，而是为了让调用方稳定解析。
+
+成功响应：
+
+```json
+{"data":{"id":1,"title":"learn Gin","status":"pending"}}
+```
+
+错误响应：
+
+```json
+{"error":{"code":"invalid_title","message":"title must be between 1 and 120 characters"}}
+```
+
+前端可以根据 `error.code` 做国际化或提示；测试可以断言错误码；日志可以统计某类错误是否突然升高。
+
+### 3.6 OpenAPI 文档
+
+OpenAPI 是描述 HTTP API 契约的标准格式。它能说明路径、方法、参数、请求体、响应和数据结构。团队有了 OpenAPI 文档，前端、测试、后端和平台侧就不必靠口头约定同步接口。
+
+本篇会把 OpenAPI 文档嵌入服务，并通过两个方式使用：
+
+- `go run ./api/cmd/todo-api openapi > api/openapi.yaml` 生成文档文件。
+- `GET /openapi.yaml` 在运行时暴露文档内容。
+
+## 4. 原理深入
+
+### 4.1 请求链路
+
+图 10-1 展示 Gin 版 Todo API v2 的请求处理流程：
+
+```mermaid
+sequenceDiagram
+    participant Client as Client/curl
+    participant Server as http.Server
+    participant Gin as gin.Engine
+    participant MW as Gin Middleware
+    participant Handler as Gin Handler
+    participant Service as Todo Service
+    participant Repo as Memory Repository
+
+    Client->>Server: POST /api/v2/todos
+    Server->>Gin: ServeHTTP
+    Gin->>MW: RequestID -> AccessLog -> Recovery -> Timeout -> BodyLimit
+    MW->>Handler: matched route
+    Handler->>Handler: ShouldBindJSON and validate protocol
+    Handler->>Service: Create(ctx, title)
+    Service->>Repo: Create(ctx, title)
+    Repo-->>Service: model.Todo
+    Service-->>Handler: model.Todo
+    Handler-->>Client: 201 JSON envelope
+```
+
+第 9 篇中路由匹配、路径参数读取和 JSON 编码都由我们自己写。Gin 版把这些重复动作封装到了 `gin.Engine` 和 `gin.Context` 中，但业务调用链没有变：Handler 仍然只负责 HTTP 边界，Service 仍然负责业务规则，Repository 仍然负责数据存取。
+
+### 4.2 中间件顺序
+
+本篇中间件顺序是：
+
+```text
+RequestID -> AccessLog -> Recovery -> Timeout -> BodyLimit -> Router Handler
+```
+
+这个顺序有实际含义：
+
+- `RequestID` 放最外层，后续日志和错误都能带同一个 ID。
+- `AccessLog` 包在外层，能记录正常响应和 panic 恢复后的响应。
+- `Recovery` 包住业务 Handler，避免 panic 直接终止请求链路。
+- `Timeout` 给下游 service 和 repository 一个有期限的 `context.Context`。
+- `BodyLimit` 在 JSON 绑定前限制请求体大小，避免大请求占满内存。
+
+注意：如果 Handler 在 panic 前已经写出了响应头，后续 `Recovery` 不能再把状态码改成 `500`。这也是生产代码应尽量“先完成业务操作，最后统一写响应”的原因。
+
+### 4.3 Handler 层接口边界
+
+本篇在 Gin Handler 包里定义 `todoService` 接口：
+
+```go
+type todoService interface {
+	List(ctx context.Context, status model.Status) ([]model.Todo, error)
+	Get(ctx context.Context, id int) (model.Todo, error)
+	Create(ctx context.Context, title string) (model.Todo, error)
+	Update(ctx context.Context, id int, title string) (model.Todo, error)
+	MarkDone(ctx context.Context, id int) (model.Todo, error)
+	Delete(ctx context.Context, id int) error
+}
+```
+
+这是 Go 中常见的“接口定义在使用方”模式。Handler 不依赖整个 `service.TodoService` 具体类型，只声明自己真正需要的方法。测试时也可以替换成假服务。
+
+同时，错误映射仍然直接引用 `service.ErrInvalidTitle` 和 `repository.ErrNotFound`。这是教学项目里的务实折中：我们保留清晰的错误来源，不额外引入复杂的错误翻译层。大型项目可以把错误码收敛到单独的 API error 包。
+
+### 4.4 API 版本
+
+本篇使用 `/api/v2`，不是因为业务字段发生了巨大变化，而是为了在课程中清楚区分两套实现：
+
+- `/api/v1`：第 9 篇标准库版本。
+- `/api/v2`：第 10 篇 Gin 框架版本。
+
+真实生产环境里，API 版本不是随便升级的。只有当响应结构、字段语义、兼容性或行为约定发生破坏性变化时，才应该发布新的主版本路径。
+
+## 5. 手把手实验
+
+### 5.1 实验目标
+
+把第 9 篇标准库 Todo API 重构为 Gin Todo API v2，并生成 OpenAPI 文档。
+
+### 5.2 实验环境
+
+| 工具 | 版本 | 用途 |
+|---|---|---|
+| Ubuntu | 24.04 LTS | 统一实验环境 |
+| Go | 1.26.x | 编译和测试 API |
+| Gin | 1.12.0 | Web API 框架 |
+| curl | Ubuntu 24.04 默认版本 | 验证 HTTP 接口 |
+
+进入课程项目根目录：
+
+```bash
+cd ~/workspace/cloud-native-todo-platform
+```
+
+确认 Go module 已存在：
+
+```bash
+test -f go.mod
+```
+
+如果这条命令没有输出，说明文件存在。若提示 `No such file or directory`，请先完成第 7 篇到第 9 篇的 Go 项目初始化。
+
+### 5.3 文件目录结构
+
+创建本篇需要的目录：
+
+```bash
+mkdir -p api/cmd/todo-api api/internal/handler/gin api/internal/model api/internal/repository api/internal/service bin
+```
+
+本篇完成后的核心结构如下：
+
+```text
+cloud-native-todo-platform/
+├── api/
+│   ├── cmd/
+│   │   └── todo-api/
+│   │       └── main.go
+│   └── internal/
+│       ├── handler/
+│       │   └── gin/
+│       │       ├── config.go
+│       │       ├── handler.go
+│       │       ├── handler_test.go
+│       │       ├── middleware.go
+│       │       ├── openapi.go
+│       │       ├── openapi.yaml
+│       │       └── response.go
+│       ├── model/
+│       │   └── todo.go
+│       ├── repository/
+│       │   └── memory.go
+│       └── service/
+│           └── todo_service.go
+├── bin/
+└── go.mod
+```
+
+第 9 篇已经创建过 `model`、`repository` 和 `service`。本篇为了保证教程可独立复制执行，会把这些文件再次完整列出。你可以直接覆盖同名文件。
+
+### 5.4 完整代码
+
+先用 `go get` 加入 Gin 依赖。这样不会覆盖第 9 篇或后续章节已经写入 `go.mod` 的其他依赖：
+
+```bash
+go get github.com/gin-gonic/gin@v1.12.0
+```
+
+执行后，确认 `go.mod` 至少包含下面内容：
 
 ```go title="go.mod"
 module cloud-native-todo-platform
 
-go 1.21
+go 1.26
 
-require github.com/go-chi/chi/v5 v5.3.0
+require github.com/gin-gonic/gin v1.12.0
 ```
 
-如果你的本地 Go 版本较新，`go` 行可能是 `1.22`、`1.23` 或更高。这没有问题。课程要求 Go 1.21+，是因为第 9 篇开始使用标准库 `log/slog`。
+创建 `api/internal/model/todo.go`：
 
-### 6.4 创建目录
+```go title="api/internal/model/todo.go"
+package model
 
-=== "Linux / macOS / WSL2"
+import "time"
 
-    ```bash
-    mkdir -p internal/httpapi docs/api
-    ```
+// Status describes whether a Todo is still pending or already done.
+type Status string
 
-=== "Windows PowerShell"
+const (
+	StatusPending Status = "pending"
+	StatusDone    Status = "done"
+)
 
-    ```powershell
-    New-Item -ItemType Directory -Force internal\httpapi, docs\api
-    ```
+// Todo is the API-facing task resource.
+type Todo struct {
+	ID        int       `json:"id"`
+	Title     string    `json:"title"`
+	Status    Status    `json:"status"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
 
-新增结构如下：
-
-```text
-cloud-native-todo-platform/
-├── cmd/
-│   └── todo-api/
-├── docs/
-│   └── api/
-│       └── todo-api-v1.md
-├── internal/
-│   ├── app/
-│   ├── config/
-│   ├── httpapi/
-│   └── todo/
+// ValidStatus reports whether status is accepted by the Todo API.
+func ValidStatus(status Status) bool {
+	switch status {
+	case "", StatusPending, StatusDone:
+		return true
+	default:
+		return false
+	}
+}
 ```
 
-### 6.5 补充 Todo 服务层 CRUD 能力
+创建 `api/internal/repository/memory.go`：
 
-第 9 篇的服务层只有 `Create`、`List` 和 `Stats`。Web API 需要查询单个、更新、完成和删除能力。
-
-修改 `internal/todo/service.go`：
-
-```go title="internal/todo/service.go"
-package todo
+```go title="api/internal/repository/memory.go"
+package repository
 
 import (
 	"context"
-	"fmt"
-	"log/slog"
-	"strings"
+	"errors"
+	"sort"
+	"sync"
+	"time"
+
+	"cloud-native-todo-platform/api/internal/model"
 )
 
-type Service struct {
-	repo   Repository
-	logger *slog.Logger
+// ErrNotFound is returned when a Todo ID does not exist.
+var ErrNotFound = errors.New("todo not found")
+
+// MemoryRepository stores Todos in memory. It is safe for concurrent HTTP requests.
+type MemoryRepository struct {
+	mu     sync.RWMutex
+	nextID int
+	items  map[int]model.Todo
+	now    func() time.Time
 }
 
-type CreateRequest struct {
-	Title string
-}
-
-type UpdateRequest struct {
-	Title string
-}
-
-type ListRequest struct {
-	Status Status
-}
-
-type Stats struct {
-	Total   int `json:"total"`
-	Done    int `json:"done"`
-	Pending int `json:"pending"`
-}
-
-func NewService(repo Repository, logger *slog.Logger) *Service {
-	if logger == nil {
-		logger = slog.Default()
-	}
-	return &Service{
-		repo:   repo,
-		logger: logger,
+// NewMemoryRepository creates an empty in-memory repository.
+func NewMemoryRepository() *MemoryRepository {
+	return &MemoryRepository{
+		nextID: 1,
+		items:  make(map[int]model.Todo),
+		now:    time.Now,
 	}
 }
 
-func (s *Service) Create(ctx context.Context, req CreateRequest) (Item, error) {
-	if err := checkContext(ctx); err != nil {
-		return Item{}, err
-	}
-
-	title := strings.TrimSpace(req.Title)
-	if title == "" {
-		return Item{}, ErrEmptyTitle
-	}
-
-	item, err := s.repo.Add(title)
-	if err != nil {
-		return Item{}, fmt.Errorf("create todo: %w", err)
-	}
-
-	s.logger.Info("todo created", "id", item.ID, "title", item.Title)
-	return item, nil
-}
-
-func (s *Service) List(ctx context.Context, req ListRequest) ([]Item, error) {
-	if err := checkContext(ctx); err != nil {
+// List returns Todos filtered by status. An empty status means no filter.
+func (r *MemoryRepository) List(ctx context.Context, status model.Status) ([]model.Todo, error) {
+	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
 
-	items, err := s.repo.List()
-	if err != nil {
-		return nil, fmt.Errorf("list todos: %w", err)
-	}
+	r.mu.RLock()
+	defer r.mu.RUnlock()
 
-	if req.Status == "" {
-		return items, nil
-	}
-
-	filtered := make([]Item, 0, len(items))
-	for _, item := range items {
-		if item.Status == req.Status {
-			filtered = append(filtered, item)
+	items := make([]model.Todo, 0, len(r.items))
+	for _, item := range r.items {
+		if status == "" || item.Status == status {
+			items = append(items, item)
 		}
 	}
-
-	return filtered, nil
+	sort.Slice(items, func(i, j int) bool {
+		return items[i].ID < items[j].ID
+	})
+	return items, nil
 }
 
-func (s *Service) Get(ctx context.Context, id int) (Item, error) {
-	if err := checkContext(ctx); err != nil {
-		return Item{}, err
-	}
-	if id <= 0 {
-		return Item{}, ErrNotFound
+// Get returns a Todo by ID.
+func (r *MemoryRepository) Get(ctx context.Context, id int) (model.Todo, error) {
+	if err := ctx.Err(); err != nil {
+		return model.Todo{}, err
 	}
 
-	items, err := s.repo.List()
-	if err != nil {
-		return Item{}, fmt.Errorf("get todo %d: %w", id, err)
-	}
+	r.mu.RLock()
+	defer r.mu.RUnlock()
 
-	for _, item := range items {
-		if item.ID == id {
-			return item, nil
-		}
+	item, ok := r.items[id]
+	if !ok {
+		return model.Todo{}, ErrNotFound
 	}
-	return Item{}, ErrNotFound
-}
-
-func (s *Service) Update(ctx context.Context, id int, req UpdateRequest) (Item, error) {
-	if err := checkContext(ctx); err != nil {
-		return Item{}, err
-	}
-
-	title := strings.TrimSpace(req.Title)
-	if title == "" {
-		return Item{}, ErrEmptyTitle
-	}
-
-	item, err := s.repo.Update(id, title)
-	if err != nil {
-		return Item{}, fmt.Errorf("update todo %d: %w", id, err)
-	}
-
-	s.logger.Info("todo updated", "id", item.ID)
 	return item, nil
 }
 
-func (s *Service) Done(ctx context.Context, id int) (Item, error) {
-	if err := checkContext(ctx); err != nil {
-		return Item{}, err
+// Create inserts a new pending Todo.
+func (r *MemoryRepository) Create(ctx context.Context, title string) (model.Todo, error) {
+	if err := ctx.Err(); err != nil {
+		return model.Todo{}, err
 	}
 
-	item, err := s.repo.Done(id)
-	if err != nil {
-		return Item{}, fmt.Errorf("mark todo %d done: %w", id, err)
-	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
 
-	s.logger.Info("todo marked done", "id", item.ID)
+	now := r.now().UTC()
+	item := model.Todo{
+		ID:        r.nextID,
+		Title:     title,
+		Status:    model.StatusPending,
+		CreatedAt: now,
+		UpdatedAt: now,
+	}
+	r.items[item.ID] = item
+	r.nextID++
 	return item, nil
 }
 
-func (s *Service) Delete(ctx context.Context, id int) error {
-	if err := checkContext(ctx); err != nil {
+// Update changes a Todo title.
+func (r *MemoryRepository) Update(ctx context.Context, id int, title string) (model.Todo, error) {
+	if err := ctx.Err(); err != nil {
+		return model.Todo{}, err
+	}
+
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	item, ok := r.items[id]
+	if !ok {
+		return model.Todo{}, ErrNotFound
+	}
+	item.Title = title
+	item.UpdatedAt = r.now().UTC()
+	r.items[id] = item
+	return item, nil
+}
+
+// MarkDone marks a Todo as done.
+func (r *MemoryRepository) MarkDone(ctx context.Context, id int) (model.Todo, error) {
+	if err := ctx.Err(); err != nil {
+		return model.Todo{}, err
+	}
+
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	item, ok := r.items[id]
+	if !ok {
+		return model.Todo{}, ErrNotFound
+	}
+	item.Status = model.StatusDone
+	item.UpdatedAt = r.now().UTC()
+	r.items[id] = item
+	return item, nil
+}
+
+// Delete removes a Todo by ID.
+func (r *MemoryRepository) Delete(ctx context.Context, id int) error {
+	if err := ctx.Err(); err != nil {
 		return err
 	}
 
-	if err := s.repo.Delete(id); err != nil {
-		return fmt.Errorf("delete todo %d: %w", id, err)
-	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
 
-	s.logger.Info("todo deleted", "id", id)
+	if _, ok := r.items[id]; !ok {
+		return ErrNotFound
+	}
+	delete(r.items, id)
 	return nil
-}
-
-func (s *Service) Stats(ctx context.Context) (Stats, error) {
-	items, err := s.List(ctx, ListRequest{})
-	if err != nil {
-		return Stats{}, err
-	}
-
-	stats := Stats{Total: len(items)}
-	for _, item := range items {
-		switch item.Status {
-		case StatusDone:
-			stats.Done++
-		default:
-			stats.Pending++
-		}
-	}
-
-	return stats, nil
-}
-
-func checkContext(ctx context.Context) error {
-	if ctx == nil {
-		return nil
-	}
-
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	default:
-		return nil
-	}
 }
 ```
 
-关键变化：
+创建 `api/internal/service/todo_service.go`：
 
-- `UpdateRequest` 用于更新标题。
-- `Stats` 增加 JSON tag，方便健康检查返回。
-- `Get` 通过 `repo.List` 查找单个 Todo。
-- `Update`、`Done`、`Delete` 调用第 7 篇已有 `Repository` 方法。
-- Handler 不直接操作 `FileStore`，所有业务动作都通过 `Service`。
+```go title="api/internal/service/todo_service.go"
+package service
 
-### 6.6 编写 HTTP API 类型
+import (
+	"context"
+	"errors"
+	"strings"
 
-创建 `internal/httpapi/types.go`：
+	"cloud-native-todo-platform/api/internal/model"
+)
 
-```go title="internal/httpapi/types.go"
-package httpapi
+// ErrInvalidTitle is returned when a Todo title is empty or too long.
+var ErrInvalidTitle = errors.New("invalid todo title")
 
-import "cloud-native-todo-platform/internal/todo"
+// ErrInvalidStatus is returned when a list filter contains an unknown status.
+var ErrInvalidStatus = errors.New("invalid todo status")
 
-type response struct {
-	Data any `json:"data,omitempty"`
+// Repository is the storage behavior required by TodoService.
+type Repository interface {
+	List(ctx context.Context, status model.Status) ([]model.Todo, error)
+	Get(ctx context.Context, id int) (model.Todo, error)
+	Create(ctx context.Context, title string) (model.Todo, error)
+	Update(ctx context.Context, id int, title string) (model.Todo, error)
+	MarkDone(ctx context.Context, id int) (model.Todo, error)
+	Delete(ctx context.Context, id int) error
 }
 
-type errorResponse struct {
-	Error apiError `json:"error"`
+// TodoService contains Todo business rules.
+type TodoService struct {
+	repo Repository
 }
 
-type apiError struct {
+// NewTodoService creates a TodoService.
+func NewTodoService(repo Repository) *TodoService {
+	return &TodoService{repo: repo}
+}
+
+// New keeps compatibility with the net/http handler from chapter 9.
+func New(repo Repository) *TodoService {
+	return NewTodoService(repo)
+}
+
+// List returns Todos filtered by status.
+func (s *TodoService) List(ctx context.Context, status model.Status) ([]model.Todo, error) {
+	if !model.ValidStatus(status) {
+		return nil, ErrInvalidStatus
+	}
+	return s.repo.List(ctx, status)
+}
+
+// Get returns one Todo.
+func (s *TodoService) Get(ctx context.Context, id int) (model.Todo, error) {
+	return s.repo.Get(ctx, id)
+}
+
+// Create validates and creates a Todo.
+func (s *TodoService) Create(ctx context.Context, title string) (model.Todo, error) {
+	title, err := normalizeTitle(title)
+	if err != nil {
+		return model.Todo{}, err
+	}
+	return s.repo.Create(ctx, title)
+}
+
+// Update validates and updates a Todo title.
+func (s *TodoService) Update(ctx context.Context, id int, title string) (model.Todo, error) {
+	title, err := normalizeTitle(title)
+	if err != nil {
+		return model.Todo{}, err
+	}
+	return s.repo.Update(ctx, id, title)
+}
+
+// MarkDone marks a Todo as done.
+func (s *TodoService) MarkDone(ctx context.Context, id int) (model.Todo, error) {
+	return s.repo.MarkDone(ctx, id)
+}
+
+// Delete removes a Todo.
+func (s *TodoService) Delete(ctx context.Context, id int) error {
+	return s.repo.Delete(ctx, id)
+}
+
+// ParseStatus normalizes the status query parameter used by HTTP handlers.
+func ParseStatus(raw string) (model.Status, error) {
+	status := model.Status(strings.TrimSpace(raw))
+	if !model.ValidStatus(status) {
+		return "", ErrInvalidStatus
+	}
+	return status, nil
+}
+
+func normalizeTitle(title string) (string, error) {
+	title = strings.TrimSpace(title)
+	if title == "" || len([]rune(title)) > 120 {
+		return "", ErrInvalidTitle
+	}
+	return title, nil
+}
+```
+
+创建 `api/internal/handler/gin/response.go`：
+
+```go title="api/internal/handler/gin/response.go"
+package ginapi
+
+import (
+	"net/http"
+
+	"github.com/gin-gonic/gin"
+)
+
+// Envelope is the stable JSON response wrapper used by the API.
+type Envelope struct {
+	Data  any        `json:"data,omitempty"`
+	Error *ErrorBody `json:"error,omitempty"`
+}
+
+// ErrorBody describes an API error in a machine-readable way.
+type ErrorBody struct {
 	Code    string `json:"code"`
 	Message string `json:"message"`
 }
 
-type createTodoRequest struct {
-	Title string `json:"title"`
+func writeJSON(c *gin.Context, status int, data any) {
+	c.JSON(status, Envelope{Data: data})
 }
 
-type updateTodoRequest struct {
-	Title string `json:"title"`
+func writeError(c *gin.Context, status int, code, message string) {
+	c.JSON(status, Envelope{Error: &ErrorBody{Code: code, Message: message}})
 }
 
-type todoResponse struct {
-	ID        int         `json:"id"`
-	Title     string      `json:"title"`
-	Status    todo.Status `json:"status"`
-	CreatedAt string      `json:"created_at"`
-	UpdatedAt string      `json:"updated_at"`
-}
-
-type listTodosResponse struct {
-	Items []todoResponse `json:"items"`
-}
-
-type healthResponse struct {
-	Status string `json:"status"`
-}
-
-type readinessResponse struct {
-	Status string     `json:"status"`
-	Stats  todo.Stats `json:"stats"`
-}
-
-func newTodoResponse(item todo.Item) todoResponse {
-	return todoResponse{
-		ID:        item.ID,
-		Title:     item.Title,
-		Status:    item.Status,
-		CreatedAt: item.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
-		UpdatedAt: item.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
-	}
+func noContent(c *gin.Context) {
+	c.Status(http.StatusNoContent)
 }
 ```
 
-这里没有直接把 `todo.Item` 原样返回给外部调用方，而是定义了 API 响应模型。这样做的好处是：内部领域对象以后可以变化，外部 API 契约仍然保持稳定。
+创建 `api/internal/handler/gin/config.go`：
 
-### 6.7 编写响应和错误处理
+```go title="api/internal/handler/gin/config.go"
+package ginapi
 
-创建 `internal/httpapi/respond.go`：
+import "time"
 
-```go title="internal/httpapi/respond.go"
-package httpapi
-
-import (
-	"encoding/json"
-	"errors"
-	"log/slog"
-	"net/http"
-
-	"cloud-native-todo-platform/internal/todo"
-)
-
-const (
-	errorCodeInvalidRequest       = "invalid_request"
-	errorCodeUnsupportedMediaType = "unsupported_media_type"
-	errorCodeRequestTooLarge      = "request_body_too_large"
-	errorCodeNotFound             = "not_found"
-	errorCodeInternal             = "internal_error"
-)
-
-func writeJSON(w http.ResponseWriter, status int, payload any) {
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	w.WriteHeader(status)
-	if payload == nil {
-		return
-	}
-	if err := json.NewEncoder(w).Encode(payload); err != nil {
-		slog.Default().Error("encode json response", "error", err)
-	}
-}
-
-func writeData(w http.ResponseWriter, status int, data any) {
-	writeJSON(w, status, response{Data: data})
-}
-
-func writeError(w http.ResponseWriter, status int, code string, message string) {
-	writeJSON(w, status, errorResponse{
-		Error: apiError{
-			Code:    code,
-			Message: message,
-		},
-	})
-}
-
-func writeServiceError(w http.ResponseWriter, err error) {
-	switch {
-	case errors.Is(err, todo.ErrEmptyTitle):
-		writeError(w, http.StatusBadRequest, errorCodeInvalidRequest, "title is required")
-	case errors.Is(err, todo.ErrNotFound):
-		writeError(w, http.StatusNotFound, errorCodeNotFound, "todo not found")
-	default:
-		writeError(w, http.StatusInternalServerError, errorCodeInternal, "internal server error")
-	}
-}
+const defaultRequestTimeout = 5 * time.Second
 ```
 
-这里把错误映射集中在一个地方，避免每个 Handler 各自决定状态码和错误格式。`writeJSON` 也会记录响应编码错误，虽然当前返回结构体几乎不会触发这个问题，但公共工具函数应该养成不静默吞错的习惯。
+创建 `api/internal/handler/gin/middleware.go`：
 
-### 6.8 编写中间件
-
-创建 `internal/httpapi/middleware.go`：
-
-```go title="internal/httpapi/middleware.go"
-package httpapi
+```go title="api/internal/handler/gin/middleware.go"
+package ginapi
 
 import (
+	"context"
 	"log/slog"
 	"net/http"
+	"strconv"
+	"sync/atomic"
 	"time"
+
+	"github.com/gin-gonic/gin"
 )
 
-type statusRecorder struct {
-	http.ResponseWriter
-	status int
-}
+type requestIDKey struct{}
 
-func (r *statusRecorder) WriteHeader(status int) {
-	r.status = status
-	r.ResponseWriter.WriteHeader(status)
-}
+var requestSeq uint64
 
-func requestLogger(logger *slog.Logger) func(http.Handler) http.Handler {
-	if logger == nil {
-		logger = slog.Default()
+// RequestID attaches a request ID to the response header and request context.
+func RequestID() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		id := c.GetHeader("X-Request-ID")
+		if id == "" {
+			id = strconv.FormatUint(atomic.AddUint64(&requestSeq, 1), 10)
+		}
+		c.Header("X-Request-ID", id)
+		ctx := context.WithValue(c.Request.Context(), requestIDKey{}, id)
+		c.Request = c.Request.WithContext(ctx)
+		c.Next()
 	}
+}
 
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			start := time.Now()
-			recorder := &statusRecorder{
-				ResponseWriter: w,
-				status:         http.StatusOK,
+// AccessLog writes one structured log line for each request.
+func AccessLog(logger *slog.Logger) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		started := time.Now()
+		c.Next()
+		logger.Info("http request",
+			"method", c.Request.Method,
+			"path", c.Request.URL.Path,
+			"status", c.Writer.Status(),
+			"bytes", c.Writer.Size(),
+			"duration_ms", time.Since(started).Milliseconds(),
+			"request_id", c.Writer.Header().Get("X-Request-ID"),
+		)
+	}
+}
+
+// Recovery converts panics into JSON 500 responses.
+func Recovery(logger *slog.Logger) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		defer func() {
+			if recovered := recover(); recovered != nil {
+				logger.Error("panic recovered",
+					"panic", recovered,
+					"method", c.Request.Method,
+					"path", c.Request.URL.Path,
+					"request_id", c.Writer.Header().Get("X-Request-ID"),
+				)
+				if !c.Writer.Written() {
+					writeError(c, http.StatusInternalServerError, "internal_error", "internal server error")
+				}
+				c.Abort()
 			}
+		}()
+		c.Next()
+	}
+}
 
-			next.ServeHTTP(recorder, r)
+// Timeout gives each request a bounded context lifetime.
+func Timeout(timeout time.Duration) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		ctx, cancel := context.WithTimeout(c.Request.Context(), timeout)
+		defer cancel()
+		c.Request = c.Request.WithContext(ctx)
+		c.Next()
+	}
+}
 
-			logger.Info(
-				"http request",
-				"method", r.Method,
-				"path", r.URL.Path,
-				"status", recorder.status,
-				"duration_ms", time.Since(start).Milliseconds(),
-			)
-		})
+// BodyLimit caps request body size before JSON binding reads it.
+func BodyLimit(limit int64) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, limit)
+		c.Next()
 	}
 }
 ```
 
-生产项目中请求日志通常还会记录 `request_id`、`remote_addr`、`user_agent`、`trace_id`。本篇先保留最小字段，避免一开始就把可观测体系讲得过重。
+创建 `api/internal/handler/gin/openapi.yaml`：
 
-### 6.9 编写路由
+```yaml title="api/internal/handler/gin/openapi.yaml"
+openapi: 3.1.0                  # -> OpenAPI 版本，3.1.0 支持 JSON Schema 2020-12
+info:
+  title: Cloud Native Todo API  # -> 文档标题，调用方会在文档页面看到
+  version: 2.0.0                # -> API 文档版本，不等同于 Go module 版本
+  description: Gin-based Todo API v2 used by the cloud-native course.
+servers:
+  - url: http://127.0.0.1:18080 # -> 本地实验默认地址
+paths:
+  /healthz:
+    get:
+      summary: Liveness check
+      responses:
+        "200":
+          description: Process is alive
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthEnvelope"
+  /readyz:
+    get:
+      summary: Readiness check
+      responses:
+        "200":
+          description: Service is ready
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthEnvelope"
+        "503":
+          $ref: "#/components/responses/ErrorResponse"
+  /openapi.yaml:
+    get:
+      summary: OpenAPI document
+      responses:
+        "200":
+          description: OpenAPI YAML document
+          content:
+            application/yaml:
+              schema:
+                type: string
+  /api/v2/todos:
+    get:
+      summary: List Todos
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [pending, done]
+      responses:
+        "200":
+          description: Todo list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TodoListEnvelope"
+        "400":
+          $ref: "#/components/responses/ErrorResponse"
+    post:
+      summary: Create a Todo
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TodoInput"
+      responses:
+        "201":
+          description: Todo created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TodoEnvelope"
+        "400":
+          $ref: "#/components/responses/ErrorResponse"
+        "415":
+          $ref: "#/components/responses/ErrorResponse"
+  /api/v2/todos/{id}:
+    get:
+      summary: Get one Todo
+      parameters:
+        - $ref: "#/components/parameters/TodoID"
+      responses:
+        "200":
+          description: Todo found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TodoEnvelope"
+        "400":
+          $ref: "#/components/responses/ErrorResponse"
+        "404":
+          $ref: "#/components/responses/ErrorResponse"
+    put:
+      summary: Update a Todo title
+      parameters:
+        - $ref: "#/components/parameters/TodoID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TodoInput"
+      responses:
+        "200":
+          description: Todo updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TodoEnvelope"
+        "400":
+          $ref: "#/components/responses/ErrorResponse"
+        "404":
+          $ref: "#/components/responses/ErrorResponse"
+        "415":
+          $ref: "#/components/responses/ErrorResponse"
+    delete:
+      summary: Delete a Todo
+      parameters:
+        - $ref: "#/components/parameters/TodoID"
+      responses:
+        "204":
+          description: Todo deleted
+        "404":
+          $ref: "#/components/responses/ErrorResponse"
+  /api/v2/todos/{id}/done:
+    patch:
+      summary: Mark a Todo as done
+      parameters:
+        - $ref: "#/components/parameters/TodoID"
+      responses:
+        "200":
+          description: Todo marked done
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TodoEnvelope"
+        "400":
+          $ref: "#/components/responses/ErrorResponse"
+        "404":
+          $ref: "#/components/responses/ErrorResponse"
+components:
+  responses:
+    ErrorResponse:
+      description: API error response
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+  parameters:
+    TodoID:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+        minimum: 1
+  schemas:
+    Todo:
+      type: object
+      required: [id, title, status, created_at, updated_at]
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        status:
+          type: string
+          enum: [pending, done]
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    TodoEnvelope:
+      type: object
+      required: [data]
+      properties:
+        data:
+          $ref: "#/components/schemas/Todo"
+    TodoListEnvelope:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items:
+                $ref: "#/components/schemas/Todo"
+    HealthEnvelope:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: object
+          required: [status]
+          properties:
+            status:
+              type: string
+    TodoInput:
+      type: object
+      required: [title]
+      additionalProperties: false
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 120
+    ErrorEnvelope:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+```
 
-创建 `internal/httpapi/router.go`：
+创建 `api/internal/handler/gin/openapi.go`：
 
-```go title="internal/httpapi/router.go"
-package httpapi
+```go title="api/internal/handler/gin/openapi.go"
+package ginapi
 
-import (
-	"log/slog"
-	"net/http"
-	"time"
+import _ "embed"
 
-	"github.com/go-chi/chi/v5"
-	"github.com/go-chi/chi/v5/middleware"
+//go:embed openapi.yaml
+var openAPISpec string
 
-	"cloud-native-todo-platform/internal/todo"
-)
-
-type Server struct {
-	todos  *todo.Service
-	logger *slog.Logger
-}
-
-func NewRouter(todos *todo.Service, logger *slog.Logger) http.Handler {
-	server := &Server{
-		todos:  todos,
-		logger: logger,
-	}
-
-	r := chi.NewRouter()
-	r.Use(middleware.Recoverer)
-	r.Use(middleware.Timeout(10 * time.Second))
-	r.Use(requestLogger(logger))
-
-	r.Get("/healthz", server.healthz)
-	r.Get("/readyz", server.readyz)
-
-	r.Route("/api/v1", func(r chi.Router) {
-		r.Get("/todos", server.listTodos)
-		r.Post("/todos", server.createTodo)
-		r.Get("/todos/{id}", server.getTodo)
-		r.Put("/todos/{id}", server.updateTodo)
-		r.Post("/todos/{id}/done", server.doneTodo)
-		r.Delete("/todos/{id}", server.deleteTodo)
-	})
-
-	r.NotFound(func(w http.ResponseWriter, r *http.Request) {
-		writeError(w, http.StatusNotFound, errorCodeNotFound, "route not found")
-	})
-
-	r.MethodNotAllowed(func(w http.ResponseWriter, r *http.Request) {
-		writeError(w, http.StatusMethodNotAllowed, errorCodeInvalidRequest, "method not allowed")
-	})
-
-	return r
+// OpenAPISpec returns the Todo API v2 OpenAPI document.
+func OpenAPISpec() string {
+	return openAPISpec
 }
 ```
 
-路由设计说明：
+这里有两个 OpenAPI 文件路径：`api/internal/handler/gin/openapi.yaml` 是嵌入到 Go 服务里的源文档，`api/openapi.yaml` 是通过命令导出的协作产物。源文档跟随代码一起编译，导出文件方便前端、测试和接口平台使用。
 
-- 健康检查放在根路径，方便 Kubernetes 探针和负载均衡访问。
-- 业务接口放在 `/api/v1` 下，为未来 v2 版本预留空间。
-- `middleware.Recoverer` 防止 panic 直接打崩进程。
-- `middleware.Timeout` 给单个请求设置上限。
-- 自定义 `requestLogger` 记录请求日志。
+创建 `api/internal/handler/gin/handler.go`：
 
-### 6.10 编写 Todo Handler
-
-创建 `internal/httpapi/handlers.go`：
-
-```go title="internal/httpapi/handlers.go"
-package httpapi
+```go title="api/internal/handler/gin/handler.go"
+package ginapi
 
 import (
-	"encoding/json"
+	"context"
 	"errors"
-	"io"
+	"log/slog"
 	"mime"
 	"net/http"
 	"strconv"
-	"strings"
 
-	"github.com/go-chi/chi/v5"
+	"cloud-native-todo-platform/api/internal/model"
+	"cloud-native-todo-platform/api/internal/repository"
+	"cloud-native-todo-platform/api/internal/service"
 
-	"cloud-native-todo-platform/internal/todo"
+	"github.com/gin-gonic/gin"
+	"github.com/gin-gonic/gin/binding"
 )
 
-const maxRequestBodyBytes = 1 << 20
+const maxBodyBytes = 1 << 20
 
-func (s *Server) healthz(w http.ResponseWriter, r *http.Request) {
-	writeData(w, http.StatusOK, healthResponse{Status: "ok"})
+type todoService interface {
+	List(ctx context.Context, status model.Status) ([]model.Todo, error)
+	Get(ctx context.Context, id int) (model.Todo, error)
+	Create(ctx context.Context, title string) (model.Todo, error)
+	Update(ctx context.Context, id int, title string) (model.Todo, error)
+	MarkDone(ctx context.Context, id int) (model.Todo, error)
+	Delete(ctx context.Context, id int) error
 }
 
-func (s *Server) readyz(w http.ResponseWriter, r *http.Request) {
-	stats, err := s.todos.Stats(r.Context())
-	if err != nil {
-		writeServiceError(w, err)
+// Handler wires Gin HTTP requests to the Todo service.
+type Handler struct {
+	service todoService
+}
+
+// NewRouter creates the Gin engine for Todo API v2.
+func NewRouter(service todoService, logger *slog.Logger) *gin.Engine {
+	gin.SetMode(gin.ReleaseMode)
+	binding.EnableDecoderDisallowUnknownFields = true
+	binding.EnableDecoderUseNumber = true
+
+	router := gin.New()
+	h := &Handler{service: service}
+
+	router.Use(RequestID(), AccessLog(logger), Recovery(logger), Timeout(defaultRequestTimeout), BodyLimit(maxBodyBytes))
+	router.GET("/healthz", h.healthz)
+	router.GET("/readyz", h.readyz)
+	router.GET("/openapi.yaml", h.openapi)
+
+	api := router.Group("/api/v2")
+	api.GET("/todos", h.listTodos)
+	api.POST("/todos", h.createTodo)
+	api.GET("/todos/:id", h.getTodo)
+	api.PUT("/todos/:id", h.updateTodo)
+	api.PATCH("/todos/:id/done", h.markDone)
+	api.DELETE("/todos/:id", h.deleteTodo)
+
+	return router
+}
+
+func (h *Handler) healthz(c *gin.Context) {
+	writeJSON(c, http.StatusOK, gin.H{"status": "ok"})
+}
+
+func (h *Handler) readyz(c *gin.Context) {
+	if _, err := h.service.List(c.Request.Context(), ""); err != nil {
+		writeError(c, http.StatusServiceUnavailable, "not_ready", "service is not ready")
 		return
 	}
-	writeData(w, http.StatusOK, readinessResponse{Status: "ready", Stats: stats})
+	writeJSON(c, http.StatusOK, gin.H{"status": "ready"})
 }
 
-func (s *Server) listTodos(w http.ResponseWriter, r *http.Request) {
-	status, ok := parseStatus(w, r)
+func (h *Handler) openapi(c *gin.Context) {
+	c.Data(http.StatusOK, "application/yaml; charset=utf-8", []byte(OpenAPISpec()))
+}
+
+func (h *Handler) listTodos(c *gin.Context) {
+	status := model.Status(c.Query("status"))
+	items, err := h.service.List(c.Request.Context(), status)
+	if err != nil {
+		h.handleError(c, err)
+		return
+	}
+	writeJSON(c, http.StatusOK, gin.H{"items": items})
+}
+
+func (h *Handler) createTodo(c *gin.Context) {
+	if !requireJSON(c) {
+		return
+	}
+
+	var req todoRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		writeError(c, http.StatusBadRequest, "invalid_request", "request body must contain a valid title")
+		return
+	}
+
+	item, err := h.service.Create(c.Request.Context(), req.Title)
+	if err != nil {
+		h.handleError(c, err)
+		return
+	}
+	writeJSON(c, http.StatusCreated, item)
+}
+
+func (h *Handler) getTodo(c *gin.Context) {
+	id, ok := parseID(c)
 	if !ok {
 		return
 	}
 
-	items, err := s.todos.List(r.Context(), todo.ListRequest{Status: status})
+	item, err := h.service.Get(c.Request.Context(), id)
 	if err != nil {
-		writeServiceError(w, err)
+		h.handleError(c, err)
 		return
 	}
-
-	result := make([]todoResponse, 0, len(items))
-	for _, item := range items {
-		result = append(result, newTodoResponse(item))
-	}
-
-	writeData(w, http.StatusOK, listTodosResponse{Items: result})
+	writeJSON(c, http.StatusOK, item)
 }
 
-func (s *Server) createTodo(w http.ResponseWriter, r *http.Request) {
-	var req createTodoRequest
-	if !decodeJSON(w, r, &req) {
+func (h *Handler) updateTodo(c *gin.Context) {
+	if !requireJSON(c) {
 		return
 	}
-
-	item, err := s.todos.Create(r.Context(), todo.CreateRequest{Title: req.Title})
-	if err != nil {
-		writeServiceError(w, err)
-		return
-	}
-
-	writeData(w, http.StatusCreated, newTodoResponse(item))
-}
-
-func (s *Server) getTodo(w http.ResponseWriter, r *http.Request) {
-	id, ok := parseID(w, r)
+	id, ok := parseID(c)
 	if !ok {
 		return
 	}
 
-	item, err := s.todos.Get(r.Context(), id)
-	if err != nil {
-		writeServiceError(w, err)
+	var req todoRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		writeError(c, http.StatusBadRequest, "invalid_request", "request body must contain a valid title")
 		return
 	}
 
-	writeData(w, http.StatusOK, newTodoResponse(item))
+	item, err := h.service.Update(c.Request.Context(), id, req.Title)
+	if err != nil {
+		h.handleError(c, err)
+		return
+	}
+	writeJSON(c, http.StatusOK, item)
 }
 
-func (s *Server) updateTodo(w http.ResponseWriter, r *http.Request) {
-	id, ok := parseID(w, r)
+func (h *Handler) markDone(c *gin.Context) {
+	id, ok := parseID(c)
 	if !ok {
 		return
 	}
 
-	var req updateTodoRequest
-	if !decodeJSON(w, r, &req) {
-		return
-	}
-
-	item, err := s.todos.Update(r.Context(), id, todo.UpdateRequest{Title: req.Title})
+	item, err := h.service.MarkDone(c.Request.Context(), id)
 	if err != nil {
-		writeServiceError(w, err)
+		h.handleError(c, err)
 		return
 	}
-
-	writeData(w, http.StatusOK, newTodoResponse(item))
+	writeJSON(c, http.StatusOK, item)
 }
 
-func (s *Server) doneTodo(w http.ResponseWriter, r *http.Request) {
-	id, ok := parseID(w, r)
+func (h *Handler) deleteTodo(c *gin.Context) {
+	id, ok := parseID(c)
 	if !ok {
 		return
 	}
 
-	item, err := s.todos.Done(r.Context(), id)
-	if err != nil {
-		writeServiceError(w, err)
+	if err := h.service.Delete(c.Request.Context(), id); err != nil {
+		h.handleError(c, err)
 		return
 	}
-
-	writeData(w, http.StatusOK, newTodoResponse(item))
+	noContent(c)
 }
 
-func (s *Server) deleteTodo(w http.ResponseWriter, r *http.Request) {
-	id, ok := parseID(w, r)
-	if !ok {
-		return
+func (h *Handler) handleError(c *gin.Context, err error) {
+	switch {
+	case errors.Is(err, service.ErrInvalidTitle):
+		writeError(c, http.StatusBadRequest, "invalid_title", "title must be between 1 and 120 characters")
+	case errors.Is(err, service.ErrInvalidStatus):
+		writeError(c, http.StatusBadRequest, "invalid_status", "status must be pending or done")
+	case errors.Is(err, repository.ErrNotFound):
+		writeError(c, http.StatusNotFound, "not_found", "todo was not found")
+	case errors.Is(err, context.Canceled):
+		writeError(c, http.StatusRequestTimeout, "request_canceled", "request was canceled")
+	case errors.Is(err, context.DeadlineExceeded):
+		writeError(c, http.StatusGatewayTimeout, "request_timeout", "request timed out")
+	default:
+		writeError(c, http.StatusInternalServerError, "internal_error", "internal server error")
 	}
-
-	if err := s.todos.Delete(r.Context(), id); err != nil {
-		writeServiceError(w, err)
-		return
-	}
-
-	writeJSON(w, http.StatusNoContent, nil)
 }
 
-func decodeJSON(w http.ResponseWriter, r *http.Request, dst any) bool {
-	defer r.Body.Close()
-
-	mediaType, _, err := mime.ParseMediaType(r.Header.Get("Content-Type"))
-	if err != nil || !strings.EqualFold(mediaType, "application/json") {
-		writeError(w, http.StatusUnsupportedMediaType, errorCodeUnsupportedMediaType, "content type must be application/json")
-		return false
-	}
-
-	r.Body = http.MaxBytesReader(w, r.Body, maxRequestBodyBytes)
-	decoder := json.NewDecoder(r.Body)
-	decoder.DisallowUnknownFields()
-
-	if err := decoder.Decode(dst); err != nil {
-		var maxBytesErr *http.MaxBytesError
-		if errors.As(err, &maxBytesErr) {
-			writeError(w, http.StatusRequestEntityTooLarge, errorCodeRequestTooLarge, "request body is too large")
-			return false
-		}
-		writeError(w, http.StatusBadRequest, errorCodeInvalidRequest, "request body is invalid")
-		return false
-	}
-
-	if err := decoder.Decode(&struct{}{}); err == nil {
-		writeError(w, http.StatusBadRequest, errorCodeInvalidRequest, "request body must contain only one JSON object")
-		return false
-	} else if !errors.Is(err, io.EOF) {
-		writeError(w, http.StatusBadRequest, errorCodeInvalidRequest, "request body is invalid")
-		return false
-	}
-
-	return true
+type todoRequest struct {
+	Title string `json:"title" binding:"required,min=1,max=120"`
 }
 
-func parseID(w http.ResponseWriter, r *http.Request) (int, bool) {
-	raw := chi.URLParam(r, "id")
-	id, err := strconv.Atoi(raw)
+func parseID(c *gin.Context) (int, bool) {
+	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil || id <= 0 {
-		writeError(w, http.StatusBadRequest, errorCodeInvalidRequest, "id must be a positive integer")
+		writeError(c, http.StatusBadRequest, "invalid_id", "id must be a positive integer")
 		return 0, false
 	}
 	return id, true
 }
 
-func parseStatus(w http.ResponseWriter, r *http.Request) (todo.Status, bool) {
-	raw := strings.TrimSpace(r.URL.Query().Get("status"))
-	if raw == "" {
-		return "", true
+func requireJSON(c *gin.Context) bool {
+	mediaType, _, err := mime.ParseMediaType(c.GetHeader("Content-Type"))
+	if err != nil || mediaType != "application/json" {
+		writeError(c, http.StatusUnsupportedMediaType, "unsupported_media_type", "Content-Type must be application/json")
+		return false
 	}
-
-	status := todo.Status(raw)
-	switch status {
-	case todo.StatusPending, todo.StatusDone:
-		return status, true
-	default:
-		writeError(w, http.StatusBadRequest, errorCodeInvalidRequest, "status must be pending or done")
-		return "", false
-	}
+	return true
 }
 ```
 
-### 6.11 编写 Handler 测试
+创建 `api/internal/handler/gin/handler_test.go`：
 
-创建 `internal/httpapi/router_test.go`：
-
-```go title="internal/httpapi/router_test.go"
-package httpapi
+```go title="api/internal/handler/gin/handler_test.go"
+package ginapi_test
 
 import (
 	"bytes"
 	"encoding/json"
+	"io"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
-	"time"
 
-	"cloud-native-todo-platform/internal/todo"
+	ginapi "cloud-native-todo-platform/api/internal/handler/gin"
+	"cloud-native-todo-platform/api/internal/repository"
+	"cloud-native-todo-platform/api/internal/service"
 )
 
-func newTestRouter(t *testing.T) http.Handler {
+func TestTodoLifecycle(t *testing.T) {
+	server := newTestServer()
+	defer server.Close()
+
+	createdStatus, createdBody := request(t, server, http.MethodPost, "/api/v2/todos", `{"title":"learn Gin"}`, "application/json")
+	if createdStatus != http.StatusCreated {
+		t.Fatalf("create status = %d, body = %s", createdStatus, createdBody)
+	}
+
+	var created struct {
+		Data struct {
+			ID     int    `json:"id"`
+			Title  string `json:"title"`
+			Status string `json:"status"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal([]byte(createdBody), &created); err != nil {
+		t.Fatalf("decode created response: %v", err)
+	}
+	if created.Data.ID != 1 || created.Data.Status != "pending" {
+		t.Fatalf("unexpected created todo: %+v", created.Data)
+	}
+
+	status, body := request(t, server, http.MethodPatch, "/api/v2/todos/1/done", "", "")
+	if status != http.StatusOK || !strings.Contains(body, `"status":"done"`) {
+		t.Fatalf("mark done status = %d, body = %s", status, body)
+	}
+
+	status, body = request(t, server, http.MethodGet, "/api/v2/todos?status=done", "", "")
+	if status != http.StatusOK || !strings.Contains(body, `"items"`) {
+		t.Fatalf("list status = %d, body = %s", status, body)
+	}
+
+	status, body = request(t, server, http.MethodDelete, "/api/v2/todos/1", "", "")
+	if status != http.StatusNoContent || body != "" {
+		t.Fatalf("delete status = %d, body = %s", status, body)
+	}
+}
+
+func TestRejectsUnsupportedMediaType(t *testing.T) {
+	server := newTestServer()
+	defer server.Close()
+
+	status, body := request(t, server, http.MethodPost, "/api/v2/todos", `{"title":"bad"}`, "text/plain")
+	if status != http.StatusUnsupportedMediaType {
+		t.Fatalf("status = %d, body = %s", status, body)
+	}
+	if !strings.Contains(body, "unsupported_media_type") {
+		t.Fatalf("body = %s", body)
+	}
+}
+
+func TestRejectsUnknownJSONFields(t *testing.T) {
+	server := newTestServer()
+	defer server.Close()
+
+	status, body := request(t, server, http.MethodPost, "/api/v2/todos", `{"title":"ok","extra":true}`, "application/json")
+	if status != http.StatusBadRequest {
+		t.Fatalf("status = %d, body = %s", status, body)
+	}
+}
+
+func TestOpenAPIAndRequestID(t *testing.T) {
+	server := newTestServer()
+	defer server.Close()
+
+	req, err := http.NewRequest(http.MethodGet, server.URL+"/openapi.yaml", nil)
+	if err != nil {
+		t.Fatalf("new request: %v", err)
+	}
+	resp, err := server.Client().Do(req)
+	if err != nil {
+		t.Fatalf("do request: %v", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatalf("read body: %v", err)
+	}
+	if resp.StatusCode != http.StatusOK || !bytes.Contains(body, []byte("openapi: 3.1.0")) {
+		t.Fatalf("status = %d, body = %s", resp.StatusCode, string(body))
+	}
+	if resp.Header.Get("X-Request-ID") == "" {
+		t.Fatal("missing X-Request-ID")
+	}
+}
+
+func TestInvalidIDReturnsBadRequest(t *testing.T) {
+	server := newTestServer()
+	defer server.Close()
+
+	status, body := request(t, server, http.MethodGet, "/api/v2/todos/not-a-number", "", "")
+	if status != http.StatusBadRequest {
+		t.Fatalf("status = %d, body = %s", status, body)
+	}
+}
+
+func newTestServer() *httptest.Server {
+	repo := repository.NewMemoryRepository()
+	svc := service.NewTodoService(repo)
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	return httptest.NewServer(ginapi.NewRouter(svc, logger))
+}
+
+func request(t *testing.T, server *httptest.Server, method, path, body, contentType string) (int, string) {
 	t.Helper()
 
-	store := todo.NewFileStore(t.TempDir() + "/todos.json")
-	store.Now = func() time.Time {
-		return time.Date(2026, 5, 26, 10, 0, 0, 0, time.UTC)
+	var reader io.Reader
+	if body != "" {
+		reader = strings.NewReader(body)
 	}
-	logger := slog.New(slog.NewTextHandler(&bytes.Buffer{}, nil))
-	service := todo.NewService(store, logger)
-	return NewRouter(service, logger)
-}
-
-func TestHealthz(t *testing.T) {
-	router := newTestRouter(t)
-
-	req := httptest.NewRequest(http.MethodGet, "/healthz", nil)
-	rec := httptest.NewRecorder()
-	router.ServeHTTP(rec, req)
-
-	if rec.Code != http.StatusOK {
-		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	req, err := http.NewRequest(method, server.URL+path, reader)
+	if err != nil {
+		t.Fatalf("new request: %v", err)
 	}
-	if !strings.Contains(rec.Body.String(), `"status":"ok"`) {
-		t.Fatalf("body = %s", rec.Body.String())
-	}
-}
-
-func TestTodoCRUD(t *testing.T) {
-	router := newTestRouter(t)
-
-	createBody := strings.NewReader(`{"title":"learn Go Web API"}`)
-	createReq := httptest.NewRequest(http.MethodPost, "/api/v1/todos", createBody)
-	createReq.Header.Set("Content-Type", "application/json")
-	createRec := httptest.NewRecorder()
-	router.ServeHTTP(createRec, createReq)
-
-	if createRec.Code != http.StatusCreated {
-		t.Fatalf("create status = %d, body = %s", createRec.Code, createRec.Body.String())
+	if contentType != "" {
+		req.Header.Set("Content-Type", contentType)
 	}
 
-	var created response
-	if err := json.Unmarshal(createRec.Body.Bytes(), &created); err != nil {
-		t.Fatalf("decode create response: %v", err)
+	resp, err := server.Client().Do(req)
+	if err != nil {
+		t.Fatalf("do request: %v", err)
 	}
+	defer resp.Body.Close()
 
-	listReq := httptest.NewRequest(http.MethodGet, "/api/v1/todos", nil)
-	listRec := httptest.NewRecorder()
-	router.ServeHTTP(listRec, listReq)
-	if listRec.Code != http.StatusOK {
-		t.Fatalf("list status = %d, body = %s", listRec.Code, listRec.Body.String())
+	data, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatalf("read body: %v", err)
 	}
-	if !strings.Contains(listRec.Body.String(), "learn Go Web API") {
-		t.Fatalf("list body = %s", listRec.Body.String())
-	}
-
-	updateReq := httptest.NewRequest(http.MethodPut, "/api/v1/todos/1", strings.NewReader(`{"title":"learn RESTful API"}`))
-	updateReq.Header.Set("Content-Type", "application/json")
-	updateRec := httptest.NewRecorder()
-	router.ServeHTTP(updateRec, updateReq)
-	if updateRec.Code != http.StatusOK {
-		t.Fatalf("update status = %d, body = %s", updateRec.Code, updateRec.Body.String())
-	}
-
-	doneReq := httptest.NewRequest(http.MethodPost, "/api/v1/todos/1/done", nil)
-	doneRec := httptest.NewRecorder()
-	router.ServeHTTP(doneRec, doneReq)
-	if doneRec.Code != http.StatusOK {
-		t.Fatalf("done status = %d, body = %s", doneRec.Code, doneRec.Body.String())
-	}
-
-	filterReq := httptest.NewRequest(http.MethodGet, "/api/v1/todos?status=done", nil)
-	filterRec := httptest.NewRecorder()
-	router.ServeHTTP(filterRec, filterReq)
-	if filterRec.Code != http.StatusOK {
-		t.Fatalf("filter status = %d, body = %s", filterRec.Code, filterRec.Body.String())
-	}
-	if !strings.Contains(filterRec.Body.String(), `"status":"done"`) {
-		t.Fatalf("filter body = %s", filterRec.Body.String())
-	}
-
-	deleteReq := httptest.NewRequest(http.MethodDelete, "/api/v1/todos/1", nil)
-	deleteRec := httptest.NewRecorder()
-	router.ServeHTTP(deleteRec, deleteReq)
-	if deleteRec.Code != http.StatusNoContent {
-		t.Fatalf("delete status = %d, body = %s", deleteRec.Code, deleteRec.Body.String())
-	}
-}
-
-func TestCreateTodoValidationError(t *testing.T) {
-	router := newTestRouter(t)
-
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/todos", strings.NewReader(`{"title":"   "}`))
-	req.Header.Set("Content-Type", "application/json")
-	rec := httptest.NewRecorder()
-	router.ServeHTTP(rec, req)
-
-	if rec.Code != http.StatusBadRequest {
-		t.Fatalf("status = %d, body = %s", rec.Code, rec.Body.String())
-	}
-	if !strings.Contains(rec.Body.String(), errorCodeInvalidRequest) {
-		t.Fatalf("body = %s", rec.Body.String())
-	}
-}
-
-func TestCreateTodoRejectsUnsupportedContentType(t *testing.T) {
-	router := newTestRouter(t)
-
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/todos", strings.NewReader(`{"title":"learn Go"}`))
-	req.Header.Set("Content-Type", "text/plain")
-	rec := httptest.NewRecorder()
-	router.ServeHTTP(rec, req)
-
-	if rec.Code != http.StatusUnsupportedMediaType {
-		t.Fatalf("status = %d, body = %s", rec.Code, rec.Body.String())
-	}
-	if !strings.Contains(rec.Body.String(), errorCodeUnsupportedMediaType) {
-		t.Fatalf("body = %s", rec.Body.String())
-	}
-}
-
-func TestCreateTodoRejectsUnknownField(t *testing.T) {
-	router := newTestRouter(t)
-
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/todos", strings.NewReader(`{"title":"learn Go","extra":true}`))
-	req.Header.Set("Content-Type", "application/json")
-	rec := httptest.NewRecorder()
-	router.ServeHTTP(rec, req)
-
-	if rec.Code != http.StatusBadRequest {
-		t.Fatalf("status = %d, body = %s", rec.Code, rec.Body.String())
-	}
-}
-
-func TestCreateTodoRejectsMultipleJSONObjects(t *testing.T) {
-	router := newTestRouter(t)
-
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/todos", strings.NewReader(`{"title":"one"}{"title":"two"}`))
-	req.Header.Set("Content-Type", "application/json")
-	rec := httptest.NewRecorder()
-	router.ServeHTTP(rec, req)
-
-	if rec.Code != http.StatusBadRequest {
-		t.Fatalf("status = %d, body = %s", rec.Code, rec.Body.String())
-	}
-}
-
-func TestCreateTodoRejectsTooLargeBody(t *testing.T) {
-	router := newTestRouter(t)
-
-	body := `{"title":"` + strings.Repeat("a", maxRequestBodyBytes) + `"}`
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/todos", strings.NewReader(body))
-	req.Header.Set("Content-Type", "application/json")
-	rec := httptest.NewRecorder()
-	router.ServeHTTP(rec, req)
-
-	if rec.Code != http.StatusRequestEntityTooLarge {
-		t.Fatalf("status = %d, body = %s", rec.Code, rec.Body.String())
-	}
-	if !strings.Contains(rec.Body.String(), errorCodeRequestTooLarge) {
-		t.Fatalf("body = %s", rec.Body.String())
-	}
-}
-
-func TestGetTodoNotFound(t *testing.T) {
-	router := newTestRouter(t)
-
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/todos/404", nil)
-	rec := httptest.NewRecorder()
-	router.ServeHTTP(rec, req)
-
-	if rec.Code != http.StatusNotFound {
-		t.Fatalf("status = %d, body = %s", rec.Code, rec.Body.String())
-	}
-}
-
-func TestInvalidTodoID(t *testing.T) {
-	router := newTestRouter(t)
-
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/todos/not-a-number", nil)
-	rec := httptest.NewRecorder()
-	router.ServeHTTP(rec, req)
-
-	if rec.Code != http.StatusBadRequest {
-		t.Fatalf("status = %d, body = %s", rec.Code, rec.Body.String())
-	}
-}
-
-func TestDeleteTodoNotFound(t *testing.T) {
-	router := newTestRouter(t)
-
-	req := httptest.NewRequest(http.MethodDelete, "/api/v1/todos/404", nil)
-	rec := httptest.NewRecorder()
-	router.ServeHTTP(rec, req)
-
-	if rec.Code != http.StatusNotFound {
-		t.Fatalf("status = %d, body = %s", rec.Code, rec.Body.String())
-	}
-}
-
-func TestInvalidStatusFilter(t *testing.T) {
-	router := newTestRouter(t)
-
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/todos?status=archived", nil)
-	rec := httptest.NewRecorder()
-	router.ServeHTTP(rec, req)
-
-	if rec.Code != http.StatusBadRequest {
-		t.Fatalf("status = %d, body = %s", rec.Code, rec.Body.String())
-	}
-}
-
-func TestRouteNotFound(t *testing.T) {
-	router := newTestRouter(t)
-
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/missing", nil)
-	rec := httptest.NewRecorder()
-	router.ServeHTTP(rec, req)
-
-	if rec.Code != http.StatusNotFound {
-		t.Fatalf("status = %d, body = %s", rec.Code, rec.Body.String())
-	}
-}
-
-func TestMethodNotAllowed(t *testing.T) {
-	router := newTestRouter(t)
-
-	req := httptest.NewRequest(http.MethodPatch, "/api/v1/todos/1", nil)
-	rec := httptest.NewRecorder()
-	router.ServeHTTP(rec, req)
-
-	if rec.Code != http.StatusMethodNotAllowed {
-		t.Fatalf("status = %d, body = %s", rec.Code, rec.Body.String())
-	}
+	return resp.StatusCode, string(data)
 }
 ```
 
-`httptest` 的价值是：不需要真的监听端口，也能完整验证路由、请求体、状态码和响应 JSON。本篇不仅测试成功路径，也测试错误路径，因为真实工作中的 API 质量往往取决于异常输入能否被稳定、可预期地处理。
+创建 `api/cmd/todo-api/main.go`：
 
-### 6.12 改造应用组装层
-
-修改 `internal/app/app.go`：
-
-```go title="internal/app/app.go"
-package app
+```go title="api/cmd/todo-api/main.go"
+package main
 
 import (
 	"context"
 	"errors"
 	"fmt"
 	"log/slog"
-	"net"
 	"net/http"
-	"time"
-
-	"cloud-native-todo-platform/internal/config"
-	"cloud-native-todo-platform/internal/httpapi"
-	"cloud-native-todo-platform/internal/todo"
-)
-
-type App struct {
-	Config config.Config
-	Logger *slog.Logger
-	Todos  *todo.Service
-}
-
-func New(cfg config.Config, logger *slog.Logger) *App {
-	store := todo.NewFileStore(cfg.DataPath)
-	return &App{
-		Config: cfg,
-		Logger: logger,
-		Todos:  todo.NewService(store, logger),
-	}
-}
-
-func (a *App) Run(ctx context.Context) error {
-	if a.Logger == nil {
-		a.Logger = slog.Default()
-	}
-
-	stats, err := a.Todos.Stats(ctx)
-	if err != nil {
-		return fmt.Errorf("load todo stats during app startup: %w", err)
-	}
-
-	handler := httpapi.NewRouter(a.Todos, a.Logger)
-	server := &http.Server{
-		Addr:              a.Config.HTTPAddr,
-		Handler:           handler,
-		ReadHeaderTimeout: 5 * time.Second,
-	}
-
-	listener, err := net.Listen("tcp", a.Config.HTTPAddr)
-	if err != nil {
-		return fmt.Errorf("listen http addr %s: %w", a.Config.HTTPAddr, err)
-	}
-
-	errCh := make(chan error, 1)
-	go func() {
-		a.Logger.Info(
-			"todo api server started",
-			"app", a.Config.AppName,
-			"env", a.Config.Env,
-			"http_addr", listener.Addr().String(),
-			"data_path", a.Config.DataPath,
-			"todo_total", stats.Total,
-			"todo_done", stats.Done,
-			"todo_pending", stats.Pending,
-		)
-
-		if err := server.Serve(listener); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			errCh <- err
-			return
-		}
-		errCh <- nil
-	}()
-
-	select {
-	case <-ctx.Done():
-		shutdownCtx, cancel := context.WithTimeout(context.Background(), a.Config.ShutdownTimeout)
-		defer cancel()
-
-		a.Logger.Info("todo api server shutting down", "timeout", a.Config.ShutdownTimeout.String())
-		if err := server.Shutdown(shutdownCtx); err != nil {
-			return fmt.Errorf("shutdown http server: %w", err)
-		}
-		return <-errCh
-	case err := <-errCh:
-		if err != nil {
-			return fmt.Errorf("run http server: %w", err)
-		}
-		return nil
-	}
-}
-```
-
-关键点：
-
-- `httpapi.NewRouter` 负责生成 HTTP 路由。
-- `http.Server` 负责监听端口。
-- `net.Listen` 先占用监听地址，避免端口被占用时误打印“启动成功”日志。
-- `ReadHeaderTimeout` 用于降低慢请求拖住连接的风险。
-- `server.Serve` 放在 goroutine 中运行，让主流程可以等待退出信号。
-- 收到 `ctx.Done()` 后执行 `server.Shutdown`，而不是直接退出进程。
-
-### 6.13 更新应用集成测试
-
-第 9 篇的 `App.Run` 只做启动自检并立即返回。第 10 篇引入 HTTP server 后，`App.Run` 会持续运行，直到 context 被取消。因此需要同步更新 `test/integration/app_test.go`：
-
-```go title="test/integration/app_test.go"
-package integration_test
-
-import (
-	"bytes"
-	"context"
-	"path/filepath"
-	"strings"
-	"sync"
-	"testing"
-	"time"
-
-	"cloud-native-todo-platform/internal/app"
-	"cloud-native-todo-platform/internal/config"
-	"cloud-native-todo-platform/internal/logger"
-	"cloud-native-todo-platform/internal/todo"
-)
-
-type safeBuffer struct {
-	mu  sync.Mutex
-	buf bytes.Buffer
-}
-
-func (b *safeBuffer) Write(p []byte) (int, error) {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-	return b.buf.Write(p)
-}
-
-func (b *safeBuffer) String() string {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-	return b.buf.String()
-}
-
-func TestAppRunStartsAndStopsHTTPServer(t *testing.T) {
-	var logs safeBuffer
-	cfg := config.Config{
-		AppName:         "todo-api",
-		Env:             "test",
-		HTTPAddr:        "127.0.0.1:0",
-		DataPath:        filepath.Join(t.TempDir(), "todos.json"),
-		LogLevel:        "debug",
-		ShutdownTimeout: time.Second,
-	}
-
-	todoApp := app.New(cfg, logger.New(&logs, cfg.LogLevel, cfg.Env))
-	if _, err := todoApp.Todos.Create(context.Background(), todo.CreateRequest{Title: "write integration test"}); err != nil {
-		t.Fatalf("create todo: %v", err)
-	}
-
-	ctx, cancel := context.WithCancel(context.Background())
-	errCh := make(chan error, 1)
-	go func() {
-		errCh <- todoApp.Run(ctx)
-	}()
-
-	deadline := time.After(time.Second)
-	for !strings.Contains(logs.String(), "todo api server started") {
-		select {
-		case <-deadline:
-			cancel()
-			t.Fatalf("server did not start, logs = %q", logs.String())
-		default:
-			time.Sleep(10 * time.Millisecond)
-		}
-	}
-
-	cancel()
-
-	select {
-	case err := <-errCh:
-		if err != nil {
-			t.Fatalf("run app: %v", err)
-		}
-	case <-time.After(2 * time.Second):
-		t.Fatal("server did not shut down")
-	}
-
-	out := logs.String()
-	if !strings.Contains(out, "todo_total=1") {
-		t.Fatalf("logs = %q", out)
-	}
-	if !strings.Contains(out, "todo api server shutting down") {
-		t.Fatalf("logs = %q", out)
-	}
-}
-```
-
-这里使用 `127.0.0.1:0`，表示由操作系统自动分配一个空闲端口。集成测试只验证应用能启动和关闭，不依赖固定端口，避免和本机已有进程冲突。
-
-### 6.14 保持启动入口清晰
-
-第 9 篇的 `cmd/todo-api/main.go` 已经监听了 `os.Interrupt` 和 `syscall.SIGTERM`。本篇可以继续使用同一个文件：
-
-```go title="cmd/todo-api/main.go"
-package main
-
-import (
-	"context"
-	"fmt"
-	"io"
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
-	"cloud-native-todo-platform/internal/app"
-	"cloud-native-todo-platform/internal/config"
-	"cloud-native-todo-platform/internal/logger"
+	ginapi "cloud-native-todo-platform/api/internal/handler/gin"
+	"cloud-native-todo-platform/api/internal/repository"
+	"cloud-native-todo-platform/api/internal/service"
 )
 
-func main() {
-	if err := run(context.Background(), os.Stdout); err != nil {
-		fmt.Fprintf(os.Stderr, "error: %v\n", err)
-		os.Exit(1)
-	}
+type config struct {
+	addr string
 }
 
-func run(parent context.Context, stdout io.Writer) error {
-	cfg, err := config.Load()
-	if err != nil {
-		return err
+func main() {
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+
+	if len(os.Args) > 1 && os.Args[1] == "openapi" {
+		fmt.Print(ginapi.OpenAPISpec())
+		return
 	}
 
-	log := logger.New(stdout, cfg.LogLevel, cfg.Env)
+	cfg := loadConfig()
+	repo := repository.NewMemoryRepository()
+	svc := service.NewTodoService(repo)
+	router := ginapi.NewRouter(svc, logger)
 
-	ctx, stop := signal.NotifyContext(parent, os.Interrupt, syscall.SIGTERM)
+	server := &http.Server{
+		Addr:              cfg.addr,
+		Handler:           router,
+		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       10 * time.Second,
+		WriteTimeout:      10 * time.Second,
+		IdleTimeout:       60 * time.Second,
+	}
+
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	return app.New(cfg, log).Run(ctx)
+	go func() {
+		logger.Info("todo api starting", "addr", cfg.addr)
+		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			logger.Error("todo api failed", "error", err)
+			os.Exit(1)
+		}
+	}()
+
+	<-ctx.Done()
+	logger.Info("shutdown signal received")
+
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if err := server.Shutdown(shutdownCtx); err != nil {
+		logger.Error("graceful shutdown failed", "error", err)
+		os.Exit(1)
+	}
+	logger.Info("todo api stopped")
+}
+
+func loadConfig() config {
+	addr := os.Getenv("TODO_API_ADDR")
+	if addr == "" {
+		addr = "127.0.0.1:18080"
+	}
+	return config{addr: addr}
 }
 ```
 
-`main.go` 没有因为加入 HTTP API 而膨胀，这说明第 9 篇的工程骨架起到了作用。
+### 5.5 执行命令
 
-### 6.15 更新验证脚本
+先拉取 Gin 依赖并整理 `go.sum`：
 
-修改 `Makefile`：
-
-```makefile title="Makefile"
-.PHONY: fmt test cover bench build verify
-
-fmt:
-	go fmt ./...
-
-test:
-	go test ./...
-
-cover:
-	go test ./... -cover
-
-bench:
-	go test ./internal/todo -bench BenchmarkServiceStats -benchmem
-
-build:
-	go build ./cmd/todo-cli
-	go build ./cmd/todo-stats
-	go build ./cmd/todo-api
-
-verify: fmt test cover build
+```bash
+go get github.com/gin-gonic/gin@v1.12.0
+go mod tidy
 ```
 
-修改 `scripts/verify.ps1`：
+格式化本篇代码：
 
-```powershell title="scripts/verify.ps1"
-$ErrorActionPreference = "Stop"
-
-go fmt ./...
-go test ./...
-go test ./... -cover
-go build ./cmd/todo-cli
-go build ./cmd/todo-stats
-go build ./cmd/todo-api
+```bash
+go fmt ./api/...
 ```
 
-### 6.16 编写 API 文档
+运行测试：
 
-创建 `docs/api/todo-api-v1.md`：
+```bash
+go test ./api/...
+```
 
-````markdown title="docs/api/todo-api-v1.md"
-# Todo Platform API v1
+这条命令会同时编译第 9 篇留下的 `api/internal/handler/http` 和本篇新增的 `api/internal/handler/gin`。本篇在 service 层保留了 `New` 和 `ParseStatus`，目的就是让两套 Handler 可以在同一个项目中共存并通过测试。
 
-Base URL:
+构建二进制：
+
+```bash
+go build -o bin/todo-api ./api/cmd/todo-api
+```
+
+生成 OpenAPI 文档文件：
+
+```bash
+go run ./api/cmd/todo-api openapi > api/openapi.yaml
+```
+
+`api/internal/handler/gin/openapi.yaml` 是服务内嵌使用的源文档；`api/openapi.yaml` 是导出的团队协作文档。两者内容来自同一份 OpenAPI 契约。
+
+启动服务。`TODO_API_ADDR` 控制监听地址，默认就是 `127.0.0.1:18080`：
+
+```bash
+TODO_API_ADDR=127.0.0.1:18080 ./bin/todo-api
+```
+
+另开一个终端，检查健康状态：
+
+```bash
+curl -s http://127.0.0.1:18080/healthz
+```
+
+创建 Todo：
+
+```bash
+curl -s -X POST http://127.0.0.1:18080/api/v2/todos -H 'Content-Type: application/json' -d '{"title":"学习 Gin 路由组"}'
+```
+
+查询 Todo 列表：
+
+```bash
+curl -s http://127.0.0.1:18080/api/v2/todos
+```
+
+标记完成：
+
+```bash
+curl -s -X PATCH http://127.0.0.1:18080/api/v2/todos/1/done
+```
+
+查看 OpenAPI 文档：
+
+```bash
+curl -s http://127.0.0.1:18080/openapi.yaml | head
+```
+
+停止服务时，在服务运行的终端按 `Ctrl+C`。程序会执行 `server.Shutdown`，日志中能看到：
 
 ```text
-http://127.0.0.1:8080
+{"time":"...","level":"INFO","msg":"shutdown signal received"}
+{"time":"...","level":"INFO","msg":"todo api stopped"}
 ```
 
-## Common Response
+### 5.6 预期输出
 
-Successful responses use `data`:
-
-```json
-{
-  "data": {}
-}
-```
-
-Error responses use `error`:
-
-```json
-{
-  "error": {
-    "code": "invalid_request",
-    "message": "request body is invalid"
-  }
-}
-```
-
-## Status Codes
-
-| Status | Meaning |
-|---|---|
-| `200 OK` | Request succeeded. |
-| `201 Created` | Todo was created. |
-| `204 No Content` | Todo was deleted. |
-| `400 Bad Request` | Query, path parameter, or JSON body is invalid. |
-| `404 Not Found` | Todo or route was not found. |
-| `405 Method Not Allowed` | Route exists, but HTTP method is not allowed. |
-| `413 Payload Too Large` | Request body is larger than 1 MiB. |
-| `415 Unsupported Media Type` | JSON request does not use `Content-Type: application/json`. |
-| `500 Internal Server Error` | Server failed unexpectedly. |
-
-## Health
-
-```http
-GET /healthz
-```
-
-Response:
-
-```json
-{
-  "data": {
-    "status": "ok"
-  }
-}
-```
-
-## Readiness
-
-```http
-GET /readyz
-```
-
-Response:
-
-```json
-{
-  "data": {
-    "status": "ready",
-    "stats": {
-      "total": 1,
-      "pending": 1,
-      "done": 0
-    }
-  }
-}
-```
-
-## List Todos
-
-```http
-GET /api/v1/todos?status=pending
-```
-
-`status` is optional. Allowed values are `pending` and `done`.
-
-Response:
-
-```json
-{
-  "data": {
-    "items": [
-      {
-        "id": 1,
-        "title": "learn Go Web API",
-        "status": "pending",
-        "created_at": "2026-05-26T10:00:00Z",
-        "updated_at": "2026-05-26T10:00:00Z"
-      }
-    ]
-  }
-}
-```
-
-## Create Todo
-
-```http
-POST /api/v1/todos
-Content-Type: application/json
-
-{"title":"learn Go Web API"}
-```
-
-Request fields:
-
-| Field | Type | Required | Description |
-|---|---|---|---|
-| `title` | string | yes | Todo title. It cannot be empty after trimming spaces. |
-
-Response:
-
-```json
-{
-  "data": {
-    "id": 1,
-    "title": "learn Go Web API",
-    "status": "pending",
-    "created_at": "2026-05-26T10:00:00Z",
-    "updated_at": "2026-05-26T10:00:00Z"
-  }
-}
-```
-
-## Get Todo
-
-```http
-GET /api/v1/todos/1
-```
-
-Response:
-
-```json
-{
-  "data": {
-    "id": 1,
-    "title": "learn Go Web API",
-    "status": "pending",
-    "created_at": "2026-05-26T10:00:00Z",
-    "updated_at": "2026-05-26T10:00:00Z"
-  }
-}
-```
-
-## Update Todo
-
-```http
-PUT /api/v1/todos/1
-Content-Type: application/json
-
-{"title":"learn RESTful API"}
-```
-
-Request fields are the same as `Create Todo`.
-
-Response:
-
-```json
-{
-  "data": {
-    "id": 1,
-    "title": "learn RESTful API",
-    "status": "pending",
-    "created_at": "2026-05-26T10:00:00Z",
-    "updated_at": "2026-05-26T10:05:00Z"
-  }
-}
-```
-
-## Mark Todo Done
-
-```http
-POST /api/v1/todos/1/done
-```
-
-Response:
-
-```json
-{
-  "data": {
-    "id": 1,
-    "title": "learn RESTful API",
-    "status": "done",
-    "created_at": "2026-05-26T10:00:00Z",
-    "updated_at": "2026-05-26T10:06:00Z"
-  }
-}
-```
-
-## Delete Todo
-
-```http
-DELETE /api/v1/todos/1
-```
-
-Successful deletion returns `204 No Content`.
-
-## Error Examples
-
-```json
-{
-  "error": {
-    "code": "invalid_request",
-    "message": "title is required"
-  }
-}
-```
-
-```json
-{
-  "error": {
-    "code": "unsupported_media_type",
-    "message": "content type must be application/json"
-  }
-}
-```
-
-```json
-{
-  "error": {
-    "code": "request_body_too_large",
-    "message": "request body is too large"
-  }
-}
-```
-````
-
-这个文档不是课程站点文档，而是 Todo 项目里的 API 契约文档。真实团队里，后端、前端、测试和产品经常围绕这类文档对齐接口。现在它不仅列出路径，也说明了请求字段、状态码、成功响应和错误响应，足够支撑第一轮联调。
-
-### 6.17 执行验证
-
-先运行自动化验证：
-
-=== "Linux / macOS / WSL2"
-
-    ```bash
-    export TODO_CONFIG_FILE=configs/local.json
-    export TODO_CLI_DATA="$(pwd)/.todo-cli/todos.json"
-    rm -rf .todo-cli
-
-    go mod tidy
-    go fmt ./...
-    go test ./...
-    go test ./... -cover
-    go build ./cmd/todo-api
-    ```
-
-=== "Windows PowerShell"
-
-    ```powershell
-    $env:TODO_CONFIG_FILE = "configs\local.json"
-    $env:TODO_CLI_DATA = "$PWD\.todo-cli\todos.json"
-    Remove-Item -Recurse -Force .todo-cli -ErrorAction SilentlyContinue
-
-    go mod tidy
-    go fmt ./...
-    go test ./...
-    go test ./... -cover
-    go build ./cmd/todo-api
-    ```
-
-再启动服务：
-
-=== "Linux / macOS / WSL2"
-
-    ```bash
-    TODO_CONFIG_FILE=configs/local.json TODO_CLI_DATA="$(pwd)/.todo-cli/todos.json" go run ./cmd/todo-api
-    ```
-
-=== "Windows PowerShell"
-
-    ```powershell
-    $env:TODO_CONFIG_FILE = "configs\local.json"
-    $env:TODO_CLI_DATA = "$PWD\.todo-cli\todos.json"
-    go run ./cmd/todo-api
-    ```
-
-另开一个终端验证 API：
-
-```bash
-curl -s http://127.0.0.1:8080/healthz
-curl -s http://127.0.0.1:8080/readyz
-curl -s -X POST http://127.0.0.1:8080/api/v1/todos -H 'Content-Type: application/json' -d '{"title":"learn Go Web API"}'
-curl -s http://127.0.0.1:8080/api/v1/todos
-curl -s http://127.0.0.1:8080/api/v1/todos/1
-curl -s -X PUT http://127.0.0.1:8080/api/v1/todos/1 -H 'Content-Type: application/json' -d '{"title":"learn RESTful API"}'
-curl -s -X POST http://127.0.0.1:8080/api/v1/todos/1/done
-curl -i -X DELETE http://127.0.0.1:8080/api/v1/todos/1
-```
-
-Windows PowerShell 如果使用 `curl` 别名遇到参数问题，可以改用 `curl.exe`。PowerShell 中可以用单引号包裹 JSON，避免手动转义双引号：
-
-```powershell
-curl.exe -s http://127.0.0.1:8080/healthz
-curl.exe -s -X POST http://127.0.0.1:8080/api/v1/todos -H "Content-Type: application/json" -d '{"title":"learn Go Web API"}'
-```
-
-预期输出示例：
-
-```json
-{"data":{"status":"ok"}}
-```
-
-创建 Todo 的响应示例：
-
-```json
-{"data":{"id":1,"title":"learn Go Web API","status":"pending","created_at":"2026-05-26T10:00:00Z","updated_at":"2026-05-26T10:00:00Z"}}
-```
-
-### 6.18 清理步骤
-
-=== "Linux / macOS / WSL2"
-
-    ```bash
-    rm -rf .todo-cli bin
-    unset TODO_CONFIG_FILE
-    unset TODO_CLI_DATA
-    ```
-
-=== "Windows PowerShell"
-
-    ```powershell
-    Remove-Item -Recurse -Force .todo-cli, bin -ErrorAction SilentlyContinue
-    Remove-Item Env:TODO_CONFIG_FILE -ErrorAction SilentlyContinue
-    Remove-Item Env:TODO_CLI_DATA -ErrorAction SilentlyContinue
-    ```
-
-不要删除本篇新增的源码文件，它们会在第 11 篇接入数据库时继续复用。
-
-## 7. 真实工作案例
-
-某团队要把内部 Todo 工具提供给 Web 前端使用。第一个版本上线前，团队不仅要实现 CRUD，还要约定接口规范。
-
-典型协作方式：
-
-- 后端开发定义 API 路径、状态码、错误码和响应格式。
-- 前端开发根据 API 文档联调页面。
-- 测试工程师根据 API 文档编写接口测试用例。
-- DevOps 工程师准备容器镜像、端口暴露和部署配置。
-- SRE 关注请求日志、健康检查、优雅关闭和错误率指标。
-- 架构师关注 API 版本策略、服务边界和后续鉴权方案。
-
-本篇实现的 `/api/v1/todos` 就是一个可演进的最小后端 API。它还没有数据库、认证、限流和 OpenAPI，但已经具备一个生产服务的基本轮廓：路由、输入校验、统一响应、测试、健康检查、优雅关闭。
-
-## 8. 常见错误
-
-| 错误现象 | 常见原因 | 修复方向 |
-|---|---|---|
-| `go: no required module provides package github.com/go-chi/chi/v5` | 没有执行 `go get` 或 `go mod tidy` | 执行 `go get github.com/go-chi/chi/v5@v5.3.0` |
-| `listen tcp :8080: bind: address already in use` | 8080 端口被占用 | 换 `TODO_HTTP_ADDR=:8081` 或关闭占用进程 |
-| `404 page not found` | 路径写错，少了 `/api/v1` 或多了尾部路径 | 对照 API 文档检查路径 |
-| `405 method not allowed` | 路径正确但 HTTP 方法错误 | 检查是 `GET`、`POST`、`PUT` 还是 `DELETE` |
-| `unsupported_media_type` | 创建或更新 Todo 时没有声明 JSON 请求类型 | 添加 `Content-Type: application/json` |
-| `request body is invalid` | JSON 格式错误、字段名错误或多传未知字段 | 检查引号、逗号和字段名 |
-| `request_body_too_large` | 请求体超过 1 MiB | 缩小请求体，或在生产配置中评估合理上限 |
-| `title is required` | 标题为空字符串或全是空格 | 传入非空 `title` |
-| `todo not found` | ID 不存在或已经删除 | 先调用列表接口确认 ID |
-| PowerShell 中 `curl` 参数异常 | PowerShell 的 `curl` 可能是 `Invoke-WebRequest` 别名 | 使用 `curl.exe` |
-| 服务启动后命令行卡住 | HTTP server 正在前台运行，这是正常现象 | 另开终端发请求，或按 `Ctrl+C` 停止 |
-| 测试读写了真实数据文件 | Handler 测试没有使用 `t.TempDir()` | 测试中使用临时文件路径 |
-| 删除接口返回空 body 被误认为失败 | `204 No Content` 按规范不返回响应体 | 用 `curl -i` 查看状态码 |
-
-## 9. 排障方法
-
-### 9.1 检查端口监听
-
-=== "Linux / macOS / WSL2"
-
-    ```bash
-    ss -lntp | grep 8080
-    ```
-
-=== "Windows PowerShell"
-
-    ```powershell
-    netstat -ano | findstr :8080
-    ```
-
-判断依据：
-
-- 如果看到 `LISTEN`，说明服务已经监听端口。
-- 如果没有输出，说明服务没有启动成功或监听了其他端口。
-- 如果端口被其他进程占用，启动会失败并提示 `address already in use`。
-
-### 9.2 检查健康检查
-
-```bash
-curl -i http://127.0.0.1:8080/healthz
-```
-
-判断依据：
-
-- `HTTP/1.1 200 OK` 表示进程可访问。
-- 响应 body 应包含 `{"data":{"status":"ok"}}`。
-- 如果连接失败，先检查服务是否启动、端口是否正确、防火墙是否阻断。
-
-### 9.3 检查请求方法和路径
-
-```bash
-curl -i http://127.0.0.1:8080/api/v1/todos
-curl -i -X POST http://127.0.0.1:8080/api/v1/todos
-curl -i -X POST http://127.0.0.1:8080/api/v1/todos -H 'Content-Type: application/json'
-```
-
-判断依据：
-
-- `GET /api/v1/todos` 应该返回 `200`。
-- 没有 `Content-Type` 的 `POST /api/v1/todos` 应该返回 `415`。
-- 有 `Content-Type` 但没有 body 的 `POST /api/v1/todos` 应该返回 `400`。
-- 如果返回 `404`，路径没匹配。
-- 如果返回 `405`，路径匹配了但方法不对。
-
-### 9.4 检查 JSON 请求体
-
-```bash
-curl -i -X POST http://127.0.0.1:8080/api/v1/todos \
-  -H 'Content-Type: application/json' \
-  -d '{"title":"debug json"}'
-```
-
-判断依据：
-
-- `201 Created` 表示创建成功。
-- `400 Bad Request` 且错误码是 `invalid_request`，说明请求体格式或字段不符合要求。
-- `415 Unsupported Media Type` 说明缺少或写错了 `Content-Type: application/json`。
-- `413 Payload Too Large` 说明请求体超过了本篇设置的 1 MiB 上限。
-- 如果在 Windows PowerShell 中执行失败，优先改用 `curl.exe` 并注意引号转义。
-
-### 9.5 检查服务端日志
-
-服务启动终端会输出类似日志：
+测试通过时，你会看到类似输出：
 
 ```text
-level=INFO msg="http request" method=POST path=/api/v1/todos status=201 duration_ms=1
+?   	cloud-native-todo-platform/api/cmd/todo-api	[no test files]
+ok  	cloud-native-todo-platform/api/internal/handler/gin	0.18s
+?   	cloud-native-todo-platform/api/internal/model	[no test files]
+?   	cloud-native-todo-platform/api/internal/repository	[no test files]
+?   	cloud-native-todo-platform/api/internal/service	[no test files]
 ```
 
-判断依据：
+创建 Todo 的响应类似：
 
-- `method` 和 `path` 能确认请求是否到达服务。
-- `status` 能快速区分成功、客户端错误和服务端错误。
-- `duration_ms` 能帮助发现慢请求。
-
-### 9.6 定位 Handler 测试
-
-```bash
-go test ./internal/httpapi -run TestTodoCRUD -v
+```json
+{"data":{"id":1,"title":"学习 Gin 路由组","status":"pending","created_at":"2026-05-27T10:00:00Z","updated_at":"2026-05-27T10:00:00Z"}}
 ```
 
-判断依据：
-
-- 如果 Handler 测试通过，而真实 `curl` 失败，多半是启动配置、端口、数据路径或请求命令问题。
-- 如果 Handler 测试失败，优先看状态码和响应 body。
-- `httptest` 不经过真实网络，适合快速定位路由和 Handler 逻辑。
-
-### 9.7 检查优雅关闭
-
-启动服务后按 `Ctrl+C`：
+OpenAPI 文档开头类似：
 
 ```text
-level=INFO msg="todo api server shutting down" timeout=5s
+openapi: 3.1.0
+info:
+  title: Cloud Native Todo API
+  version: 2.0.0
 ```
 
-判断依据：
+### 5.7 验证方法
 
-- 看到 shutting down 日志，说明信号被捕获。
-- 如果直接退出且没有日志，检查 `signal.NotifyContext` 是否仍在 `cmd/todo-api/main.go`。
-- 如果退出很慢，检查是否有长请求、后台 goroutine 或 shutdown timeout 设置过大。
-
-## 10. 生产环境注意事项
-
-### 10.1 不要把框架当成架构
-
-Gin、Chi、Echo 都只是 HTTP 层工具。真正决定项目可维护性的，是清晰边界：
-
-- Handler 只做协议转换。
-- Service 承载业务规则。
-- Repository 负责数据访问。
-- Config 负责配置加载。
-- Logger 负责可观测输出。
-
-框架可以替换，但这些边界应该稳定。
-
-### 10.2 输入必须校验
-
-生产环境不要相信客户端输入。至少要校验：
-
-- JSON 是否合法。
-- 字段是否允许。
-- 必填字段是否存在。
-- ID 是否为正整数。
-- 枚举值是否合法。
-- 请求体大小是否有限制。
-
-本篇已经用 `http.MaxBytesReader` 把 JSON 请求体限制在 1 MiB 以内，并用 `415` 明确拒绝非 JSON 请求。真实生产环境中，这个上限应该结合业务场景、网关限制、客户端 SDK 和监控告警一起设计，不能随意放大。
-
-### 10.3 错误响应不要泄漏内部细节
-
-服务端日志可以记录底层错误，但 API 响应不要把文件路径、数据库错误、堆栈、密钥等暴露给客户端。
-
-推荐做法：
-
-- 客户端看到稳定错误码和简洁消息。
-- 服务端日志保留详细上下文。
-- 请求链路使用 `request_id` 或 `trace_id` 关联。
-
-### 10.4 健康检查要区分存活和就绪
-
-不要把所有检查都塞进 `/healthz`。
-
-- `/healthz` 用于判断进程是否活着，通常轻量。
-- `/readyz` 用于判断是否可以接流量，可以检查数据路径、数据库、缓存等依赖。
-
-在 Kubernetes 中，liveness probe 失败可能导致容器重启，readiness probe 失败通常只是从 Service Endpoints 摘流。两者语义不同，配置错误会造成生产事故。
-
-本篇的 `/readyz` 会读取 Todo 统计。如果文件路径不可读，它会返回 `500`，含义是服务暂时不应该接收流量。后续接入数据库后，`/readyz` 会继续扩展为数据库连接、缓存连接和外部依赖检查。
-
-### 10.5 优雅关闭要和网关、Kubernetes 配合
-
-优雅关闭不是只写 `server.Shutdown` 就结束。生产环境还要考虑：
-
-- 网关是否停止转发新流量。
-- Kubernetes readiness 是否先摘流。
-- `terminationGracePeriodSeconds` 是否大于服务关闭时间。
-- 长请求是否支持 context 取消。
-- 后台任务是否能退出。
-
-本篇先完成 Go 进程内的优雅关闭，第 13 篇和 Kubernetes 阶段会继续补齐部署侧配置。
-
-### 10.6 API 版本要提前规划
-
-路径中的 `/api/v1` 是版本边界。不要轻易破坏已有版本的字段语义。
-
-常见策略：
-
-- 向后兼容地新增字段。
-- 避免随意删除字段。
-- 重大不兼容变更使用 `/api/v2`。
-- 为废弃字段提供迁移期。
-
-### 10.7 文件存储不是生产 API 的最终方案
-
-本篇仍然使用 JSON 文件存储，是为了复用前面课程成果并聚焦 Web API。生产 API 通常应该使用数据库：
-
-- 并发写入需要事务。
-- 查询需要索引。
-- 数据需要备份和恢复。
-- 多实例部署不能共享本地文件。
-
-第 11 篇会把 Todo 数据接入数据库，解决这些生产化问题。
-
-### 10.8 当前 API 还不能直接暴露公网
-
-本篇重点是 Web API 基础能力，所以暂不实现认证、鉴权、CORS、限流、审计日志和 OpenAPI 自动化文档。真实公网 API 至少还要补齐：
-
-- 认证机制，例如 Session、JWT 或企业身份平台。
-- 权限模型，例如不同用户只能访问自己的 Todo。
-- 限流和防刷，避免恶意请求打满服务。
-- CORS 白名单，而不是允许任意来源。
-- OpenAPI 契约和自动化兼容性检查。
-- 网关、WAF、TLS 和访问日志。
-
-## 11. 本章小项目
-
-本章小项目是：**Todo Platform API v1**。
-
-项目成果：
-
-- `internal/httpapi/router.go`：HTTP 路由和中间件注册。
-- `internal/httpapi/handlers.go`：Todo CRUD、健康检查和就绪检查。
-- `internal/httpapi/respond.go`：统一 JSON 响应和错误响应。
-- `internal/httpapi/types.go`：API 请求和响应模型。
-- `internal/httpapi/middleware.go`：请求日志中间件。
-- `internal/httpapi/router_test.go`：Handler 测试。
-- `internal/todo/service.go`：补齐 `Get`、`Update`、`Done`、`Delete` 服务方法。
-- `internal/app/app.go`：启动 HTTP server 并支持优雅关闭。
-- `docs/api/todo-api-v1.md`：API 契约文档。
-
-### 验收命令
-
-=== "Linux / macOS / WSL2"
-
-    ```bash
-    export TODO_CONFIG_FILE=configs/local.json
-    export TODO_CLI_DATA="$(pwd)/.todo-cli/todos.json"
-    rm -rf .todo-cli
-
-    go mod tidy
-    go fmt ./...
-    go test ./...
-    go test ./... -cover
-    go build ./cmd/todo-api
-    ```
-
-=== "Windows PowerShell"
-
-    ```powershell
-    $env:TODO_CONFIG_FILE = "configs\local.json"
-    $env:TODO_CLI_DATA = "$PWD\.todo-cli\todos.json"
-    Remove-Item -Recurse -Force .todo-cli -ErrorAction SilentlyContinue
-
-    go mod tidy
-    go fmt ./...
-    go test ./...
-    go test ./... -cover
-    go build ./cmd/todo-api
-    ```
-
-API 验收：
+验证格式、测试、构建和文档生成：
 
 ```bash
-curl -s http://127.0.0.1:8080/healthz
-curl -s -X POST http://127.0.0.1:8080/api/v1/todos -H 'Content-Type: application/json' -d '{"title":"accept Todo API"}'
-curl -s http://127.0.0.1:8080/api/v1/todos
-curl -s -X POST http://127.0.0.1:8080/api/v1/todos/1/done
-curl -i -X DELETE http://127.0.0.1:8080/api/v1/todos/1
+go fmt ./api/...
+go test ./api/...
+go build -o bin/todo-api ./api/cmd/todo-api
+go run ./api/cmd/todo-api openapi > /tmp/todo-openapi.yaml
+test -s /tmp/todo-openapi.yaml
 ```
+
+验证服务端口监听。先启动服务，再执行：
+
+```bash
+ss -ltnp | grep 18080
+```
+
+预期能看到 `127.0.0.1:18080` 处于 `LISTEN` 状态。
+
+验证错误响应：
+
+```bash
+curl -i -s -X POST http://127.0.0.1:18080/api/v2/todos -H 'Content-Type: text/plain' -d '{"title":"bad"}'
+```
+
+预期状态码是 `415 Unsupported Media Type`，响应体包含：
+
+```json
+{"error":{"code":"unsupported_media_type","message":"Content-Type must be application/json"}}
+```
+
+### 5.8 清理步骤
+
+如果服务还在运行，先按 `Ctrl+C` 停止。
+
+删除构建产物和临时文档：
+
+```bash
+rm -f bin/todo-api /tmp/todo-openapi.yaml
+```
+
+如果你已经生成了 `api/openapi.yaml`，可以保留它作为接口契约，也可以在最终提交前根据团队约定决定是否纳入版本控制。
+
+预计耗时：15 分钟阅读，45 分钟动手实验。
+
+## 6. 常见错误与排障
+
+### 错误 1：`go mod tidy` 拉不到 Gin
+
+- **现象**：
+
+  ```text
+  go: github.com/gin-gonic/gin@v1.12.0: Get "https://proxy.golang.org/...": i/o timeout
+  ```
+
+- **原因**：Go module 代理访问不稳定，或者环境没有配置国内可访问的代理。
+- **排查**：查看当前代理设置：
+
+  ```bash
+  go env GOPROXY
+  ```
+
+  如果输出不是 `https://goproxy.cn,direct`，国内网络下可能会拉取失败。
+
+- **修复**：设置 Go module 代理后重试：
+
+  ```bash
+  go env -w GOPROXY=https://goproxy.cn,direct
+  go mod tidy
+  ```
+
+- **预防**：阶段一第 1 篇已经统一配置 GOPROXY；每次换新机器时先执行环境检查脚本。
+
+### 错误 2：POST 返回 415
+
+- **现象**：
+
+  ```text
+  HTTP/1.1 415 Unsupported Media Type
+  {"error":{"code":"unsupported_media_type","message":"Content-Type must be application/json"}}
+  ```
+
+- **原因**：创建或更新 Todo 时没有设置 `Content-Type: application/json`。
+- **排查**：用 `curl -v` 查看请求头：
+
+  ```bash
+  curl -v -X POST http://127.0.0.1:18080/api/v2/todos -d '{"title":"demo"}'
+  ```
+
+  如果请求头没有 `Content-Type: application/json`，服务会拒绝请求。
+
+- **修复**：补上 Header：
+
+  ```bash
+  curl -s -X POST http://127.0.0.1:18080/api/v2/todos -H 'Content-Type: application/json' -d '{"title":"demo"}'
+  ```
+
+- **预防**：所有有 JSON 请求体的示例都显式写 `-H 'Content-Type: application/json'`。
+
+### 错误 3：路径仍然请求 `/api/v1`
+
+- **现象**：
+
+  ```text
+  404 page not found
+  ```
+
+- **原因**：第 9 篇标准库版本使用 `/api/v1`，本篇 Gin 版本使用 `/api/v2`。如果沿用旧 curl 命令，就会请求不到路由。
+- **排查**：检查请求路径：
+
+  ```bash
+  curl -i -s http://127.0.0.1:18080/api/v1/todos
+  ```
+
+  如果返回 `404`，再请求 `/api/v2/todos` 对比。
+
+- **修复**：把路径前缀改为 `/api/v2`。
+- **预防**：API 版本升级后，文档、测试和前端配置要一起修改。
+
+### 错误 4：`go test ./api/...` 编译第 9 篇 HTTP Handler 失败
+
+- **现象**：
+
+  ```text
+  api/internal/handler/http/handler.go:75:25: undefined: service.ParseStatus
+  api/internal/handler/http/handler_test.go:18:25: undefined: service.New
+  ```
+
+- **原因**：第 9 篇的标准库 Handler 仍然保留在 `api/internal/handler/http`，它依赖 `service.New` 和 `service.ParseStatus`。如果第 10 篇重写 service 层时只保留 `NewTodoService`，旧 Handler 就会编译失败。
+- **排查**：确认 service 文件中是否保留兼容函数：
+
+  ```bash
+  grep -n "func New(" api/internal/service/todo_service.go
+  grep -n "func ParseStatus" api/internal/service/todo_service.go
+  ```
+
+  两条命令都应该能输出对应函数所在行。
+
+- **修复**：补回 `New` 和 `ParseStatus`，然后重新测试：
+
+  ```bash
+  go test ./api/...
+  ```
+
+- **预防**：框架重构时不要只验证新包。保留旧实现用于对比时，必须执行 `go test ./api/...`，确保新旧 Handler 能在同一项目中共存。
+
+### 错误 5：端口已经被占用
+
+- **现象**：
+
+  ```text
+  listen tcp 127.0.0.1:18080: bind: address already in use
+  ```
+
+- **原因**：上一次服务还在运行，或者另一个程序占用了 18080。
+- **排查**：
+
+  ```bash
+  ss -ltnp | grep 18080
+  ```
+
+  输出中的 `pid` 或进程名可以帮助你定位是谁占用端口。
+
+- **修复**：停止旧服务，或者换一个端口启动：
+
+  ```bash
+  TODO_API_ADDR=127.0.0.1:18081 ./bin/todo-api
+  ```
+
+- **预防**：实验结束后用 `Ctrl+C` 正常停止服务，避免后台残留。
+
+## 7. 生产环境注意事项
+
+1. **不要把 Gin 当成生产能力的全部**。Gin 帮你组织路由、绑定请求和编排中间件，但它不会自动完成认证、授权、限流、审计、指标、链路追踪、配置分层和安全 Header。生产环境必须把这些能力作为明确需求设计，而不是等上线后再补。
+
+2. **请求体大小、超时和错误响应要统一治理**。本篇用 `http.MaxBytesReader` 限制请求体，用 `http.Server` 设置读写超时，用统一错误信封返回错误码。真实服务还应结合网关、Ingress 和应用层配置一起设定边界，避免慢请求、大请求或异常客户端拖垮服务。
+
+3. **OpenAPI 文档要跟代码一起维护**。文档过期比没有文档更危险，因为调用方会相信错误契约。本篇把 OpenAPI 文档嵌进代码包，并通过测试验证可以读取。生产项目可以进一步接入文档生成、契约测试或 CI 校验，确保路由和文档一致。
+
+4. **内存存储只适合教学和本地实验**。本篇 `MemoryRepository` 已经用 `sync.RWMutex` 保护并发访问，但进程重启后数据仍然丢失，也无法多副本共享。第 12 篇会引入 PostgreSQL，让 Todo 数据具备持久化和跨实例访问能力。
+
+5. **优雅关闭要和部署平台配合**。应用调用 `server.Shutdown` 只解决进程内停止接收新请求的问题。进入 Kubernetes 后，还要配合 readiness probe、terminationGracePeriodSeconds、preStop hook 和负载均衡摘流，才能降低滚动更新期间的请求失败率。
+
+## 8. 本章小项目
+
+### 项目名称
+
+Todo API v2（Gin 框架版）
+
+### 项目目标
+
+用 Gin 重构第 9 篇标准库 API，保留业务分层，新增 OpenAPI 文档入口，并通过测试验证核心行为。
+
+### 交付物
+
+- `api/internal/handler/gin/`：Gin Handler、中间件、响应封装、OpenAPI 文档和测试。
+- `api/cmd/todo-api/main.go`：基于 Gin router 的启动入口。
+- `api/openapi.yaml`：通过 `go run ./api/cmd/todo-api openapi` 生成的 API 文档。
+- 可执行二进制 `bin/todo-api`。
 
 ### 能力验收标准
 
-你可以用下面清单自检：
+- 能执行 `go test ./api/...` 且全部通过。
+- 能执行 `go build -o bin/todo-api ./api/cmd/todo-api` 成功构建。
+- 能启动服务并通过 `curl` 创建、查询、完成和删除 Todo。
+- 能访问 `GET /openapi.yaml` 获取 OpenAPI 文档。
+- 能解释 `gin.Context` 与 `context.Context` 的区别。
+- 能说清楚为什么 Handler 层依赖 `todoService` 接口，而不是直接依赖具体存储。
 
-- 能解释 HTTP Method、Path、Query、Header、Body 的作用。
-- 能解释 Gin 和 Chi 的差异，并说明本篇为什么选择 Chi。
-- 能设计 Todo RESTful API 路径。
-- 能实现 JSON 请求绑定和响应编码。
-- 能处理非法 JSON、非法 `Content-Type`、超大请求体、非法 ID、非法 status、空标题和不存在资源。
-- 能区分 `400`、`404`、`413`、`415`、`500` 的使用场景。
-- 能用 `httptest` 编写 Handler 测试。
-- 能实现 `/healthz` 和 `/readyz`。
-- 能解释 `server.Shutdown` 的作用。
-- 能使用 `curl` 完成 Todo CRUD 验收。
-- 能写出 API 契约文档。
+## 9. 本章练习题
 
-### 作品集说明
+### 9.1 基础题
 
-完成本篇后，你的作品集可以新增一条：
+1. Gin 为什么仍然需要 `http.Server`？请用一句话说明两者关系。
+2. `c.Param("id")` 和 `c.Query("status")` 分别读取请求的哪一部分？
+3. `ShouldBindJSON` 和 service 层校验分别适合处理哪类问题？
+4. 为什么错误响应里要有稳定的 `error.code`？
+5. `/healthz` 和 `/readyz` 在语义上有什么区别？
 
-```text
-使用 Go + Chi 开发 Todo Platform RESTful API v1，支持 Todo CRUD、统一 JSON 响应、错误码、健康检查、Handler 测试和 HTTP server 优雅关闭。
-```
+### 9.2 实操题
 
-这比“会写 Go Web 框架”更有说服力，因为它展示了完整 API 服务闭环。
+1. 给 `GET /api/v2/todos` 增加 `limit` 查询参数，限制最多返回多少条 Todo。验收标准：`curl -s 'http://127.0.0.1:18080/api/v2/todos?limit=1'` 只返回 1 条数据；非法 `limit` 返回 `400`。
+2. 给响应 Header 增加 `X-API-Version: v2`。验收标准：`curl -i -s http://127.0.0.1:18080/healthz` 能看到该 Header。
+3. 在 OpenAPI 文档中补充 `Error` schema 的引用。验收标准：`go run ./api/cmd/todo-api openapi > /tmp/todo-openapi.yaml` 后，文档中每个 `400` 或 `404` 响应都能找到错误结构说明。
 
-## 12. 本章练习题
+### 9.3 思考题
 
-### 基础题
+1. 如果团队已经有第 9 篇的标准库 API，什么时候值得迁移到 Gin？迁移收益和风险分别是什么？
+2. 如果线上出现大量 `invalid_request`，你会从前端、测试、网关、后端日志和 OpenAPI 文档哪些角度排查？
 
-1. `GET`、`POST`、`PUT`、`DELETE` 分别适合什么场景？
-2. 为什么创建资源成功通常返回 `201 Created`？
-3. `400`、`404`、`500` 的区别是什么？
-4. 为什么 Handler 不应该直接写大量业务逻辑？
-5. 中间件解决什么问题？
-6. `/healthz` 和 `/readyz` 有什么区别？
-7. 为什么 API 响应需要统一格式？
-8. 为什么要使用 `/api/v1` 这样的版本路径？
+## 10. 本章面试题
 
-### 实操题
+### 面试题 1：Gin 和 net/http 是什么关系？
 
-1. 给 `GET /api/v1/todos` 增加 `keyword` 查询参数，支持按标题模糊过滤。
-2. 给创建 Todo 接口增加标题最大长度限制，例如 100 个字符。
-3. 给请求日志增加 `remote_addr` 字段。
-4. 给错误响应增加 `request_id` 字段。
-5. 使用 `httptest` 增加一个测试，验证未知字段会返回 `400`。
-6. 给 `docs/api/todo-api-v1.md` 增加所有接口的完整响应示例。
+**一句话结论**：Gin 是构建在 `net/http` 之上的 Web 框架，最终仍然通过 `http.Server` 接收请求和返回响应。
 
-### 思考题
+**展开解释**：`gin.Engine` 实现了标准库 Handler 所需的 `ServeHTTP` 能力，所以可以作为 `http.Server.Handler`。Gin 主要封装了路由匹配、路径参数、JSON 绑定、中间件链和响应写法，但连接监听、超时、优雅关闭这些底层能力仍然来自 `net/http`。
 
-1. `PATCH /api/v1/todos/{id}` 和 `POST /api/v1/todos/{id}/done` 哪种设计更适合标记完成？为什么？
-2. 如果前端希望删除后返回被删除对象，你还会使用 `204 No Content` 吗？
-3. 健康检查是否应该访问数据库？访问失败时应该重启进程还是摘除流量？
-4. 什么时候应该选择 Gin，什么时候应该选择 Chi？
-5. 如果 API 已经发布给外部客户，如何处理不兼容变更？
+**深入追问**：如果不用 `http.Server` 而直接 `router.Run()`，也能启动服务，但你会少一些显式控制。生产代码通常更建议自己创建 `http.Server`，明确设置 `ReadHeaderTimeout`、`ReadTimeout`、`WriteTimeout`、`IdleTimeout` 和 `Shutdown`。
 
-## 13. 本章面试题
+### 面试题 2：Gin 的中间件顺序为什么重要？
 
-### 1. RESTful API 是什么？
+**一句话结论**：中间件是按注册顺序进入、按相反方向返回的链式调用，顺序会影响日志、panic 恢复、超时和响应状态。
 
-参考答案：
+**展开解释**：request ID 应尽量放在最外层，让后续日志和错误响应都能带上同一个 ID；访问日志也应靠外，才能记录完整耗时和最终状态码；Recovery 要包住业务 Handler，避免 panic 逃逸；BodyLimit 要在 JSON 绑定前执行，才能限制请求体大小。
 
-RESTful API 用 URL 表达资源，用 HTTP 方法表达对资源的操作。例如 `GET /todos` 查询列表，`POST /todos` 创建资源，`PUT /todos/{id}` 更新资源，`DELETE /todos/{id}` 删除资源。它的价值是语义清晰、状态码标准、易于前后端和服务间协作。
+**深入追问**：如果 Handler 已经写出了响应头，再发生 panic，Recovery 也无法把状态码改成 `500`。这说明 Handler 最好先完成校验和业务调用，最后统一写响应。
 
-### 2. Gin 和 Chi 有什么区别？
+### 面试题 3：ShouldBindJSON 是否可以替代业务校验？
 
-参考答案：
+**一句话结论**：不能。`ShouldBindJSON` 适合协议层输入校验，业务规则仍然应放在 service 层。
 
-Gin 是功能更完整的 Web 框架，内置上下文、绑定、渲染和大量生态中间件，适合快速开发业务 API。Chi 更轻量，贴近标准库 `net/http`，Handler 和中间件都保持标准接口，适合希望保留标准库组合能力、重视测试和底层可理解性的项目。选择哪个取决于团队习惯、项目复杂度和长期维护方式。
+**展开解释**：binding tag 可以检查字段是否存在、字符串长度、数字范围等输入形态问题。但“标题是否允许重复”“用户是否有权限更新”“状态能否从 done 改回 pending”这类业务规则不属于 Web 框架职责。放在 service 层可以让 CLI、HTTP API、测试和未来的消息消费者复用同一套规则。
 
-### 3. Handler 层和 Service 层应该如何分工？
+**深入追问**：如果业务规则写在 Handler 里，后续换框架、加 gRPC 或加异步任务时就容易复制规则，导致不同入口行为不一致。
 
-参考答案：
+### 面试题 4：为什么要生成 OpenAPI 文档？
 
-Handler 层负责 HTTP 协议转换，包括解析路径参数、查询参数、请求体、写状态码和 JSON 响应。Service 层负责业务规则，例如 Todo 标题校验、状态变更、错误包装和调用存储接口。这样可以让业务逻辑脱离 HTTP，方便 CLI、后台任务、测试和未来其他入口复用。
+**一句话结论**：OpenAPI 把 HTTP API 的路径、参数、请求体、响应和错误结构变成可审查、可测试、可协作的契约。
 
-### 4. 如何设计统一错误响应？
+**展开解释**：没有 API 文档时，前端和测试只能看代码或问后端。OpenAPI 文档可以用于生成客户端、生成测试、接入接口平台，也能让评审者检查状态码、字段命名和版本策略是否一致。本篇通过 `openapi` 命令和 `/openapi.yaml` 同时支持离线和在线查看。
 
-参考答案：
+**深入追问**：文档必须跟代码同步。大型团队通常会在 CI 中校验 OpenAPI 格式，甚至做契约测试，避免接口行为变了但文档没变。
 
-统一错误响应通常包含稳定的错误码和可读消息，例如 `{"error":{"code":"invalid_request","message":"title is required"}}`。错误码给程序判断，消息给人阅读。服务端内部错误细节应该记录到日志，不应该直接暴露给客户端。常见错误要映射到合适状态码，例如参数错误返回 400，资源不存在返回 404，未预期错误返回 500。
+### 面试题 5：为什么 Handler 包里要定义 todoService 接口？
 
-### 5. 为什么需要健康检查？
+**一句话结论**：接口定义在使用方，可以让 Handler 只依赖自己需要的行为，而不是依赖完整具体类型。
 
-参考答案：
+**展开解释**：Gin Handler 只需要 `List`、`Get`、`Create`、`Update`、`MarkDone`、`Delete` 这些方法。把接口定义在 Handler 包里，能让测试替换假服务，也能避免 Handler 知道 Service 的内部字段或构造细节。这符合 Go 的小接口习惯。
 
-健康检查用于让负载均衡、网关或 Kubernetes 判断服务是否可用。`/healthz` 通常表示进程是否存活，`/readyz` 表示服务是否准备好接收流量。两者语义不同：liveness 失败可能触发重启，readiness 失败通常用于摘除流量。
+**深入追问**：接口也不能滥用。如果只有一个实现，且测试不需要替换，过早抽象会增加阅读成本。本篇保留接口，是因为它能帮助你理解 Handler 和 Service 的边界。
 
-### 6. HTTP server 优雅关闭的流程是什么？
+## 11. 本章总结
 
-参考答案：
+本篇你完成了 Todo API v2 的 Gin 重构。知识上，你理解了 Gin 与 `net/http` 的关系，掌握了 `gin.Context`、路由组、JSON 绑定、中间件、统一响应、错误码和 OpenAPI 文档。项目成果上，你新增了 `api/internal/handler/gin`，并让 `todo-api` 具备 Gin 路由、结构化日志、请求 ID、panic 恢复、请求超时、请求体限制和文档生成能力。
 
-进程收到 `SIGTERM` 或 `Ctrl+C` 后，调用 `server.Shutdown(ctx)`。HTTP server 会停止接收新连接，等待正在处理的请求完成，直到请求结束或 shutdown context 超时。这样可以减少滚动更新、发布和缩容时的请求中断。
+能力价值上，你现在不仅能“用框架写接口”，还能解释框架背后的 HTTP 模型，知道哪些能力属于 Gin，哪些能力仍然属于标准库和工程治理。这是从初级 API 开发走向可维护后端服务的关键一步。
 
-### 7. `httptest` 有什么价值？
+## 12. 下一章衔接
 
-参考答案：
-
-`httptest` 可以在不真实监听端口的情况下测试 HTTP Handler。它能构造请求、记录响应，并验证状态码、Header 和 Body。它比端到端测试更快、更稳定，适合覆盖路由、参数校验、错误响应和 Handler 逻辑。
-
-### 8. 为什么生产 API 不应该直接返回底层错误？
-
-参考答案：
-
-底层错误可能包含文件路径、数据库结构、SQL、内部服务地址甚至敏感信息。直接返回会带来安全风险，也会让 API 契约不稳定。更好的方式是对客户端返回稳定错误码和简洁消息，同时在服务端日志中记录详细上下文，必要时通过 request ID 关联。
-
-### 9. 如何处理 API 版本升级？
-
-参考答案：
-
-对已发布 API 应尽量保持向后兼容。新增字段通常是安全的，删除字段、改变字段含义或改变错误码可能破坏调用方。重大不兼容变更可以通过 `/api/v2`、灰度发布、废弃公告和迁移期处理。版本管理本质上是契约管理。
-
-### 10. Web API 服务上线前至少要检查哪些内容？
-
-参考答案：
-
-至少要检查接口功能、参数校验、错误码、状态码、日志、健康检查、优雅关闭、配置、超时、测试覆盖、端口监听、安全响应和 API 文档。进入 Kubernetes 后，还要检查 readiness/liveness probe、资源限制、滚动更新、Service/Ingress 和可观测指标。
-
-## 14. 本章总结
-
-本篇把 Todo 平台从 Go 后端工程骨架推进到了可访问的 RESTful API 服务。
-
-你已经完成：
-
-- HTTP 协议基础理解。
-- Gin / Chi 框架选型理解。
-- Chi 路由和中间件。
-- Todo API v1 路由设计。
-- JSON 请求绑定和响应编码。
-- 统一响应格式和错误响应。
-- Todo CRUD Handler。
-- 健康检查和就绪检查。
-- Handler 测试。
-- HTTP server 优雅关闭。
-- API 契约文档。
-
-本篇能力价值在于：你不再只是写 Go 函数，而是能把业务能力以稳定、可测试、可排障的 HTTP API 形式交付给其他系统使用。这是 Go 后端开发岗位的核心能力之一。
-
-## 15. 下一章衔接
-
-下一篇将进入数据库与持久化开发。
-
-本篇的 Todo API 仍然使用第 7 篇延续下来的 JSON 文件存储。它适合学习和本地实验，但不适合生产 API：
-
-- 多实例部署时，每个实例都有自己的本地文件。
-- 并发写入容易产生数据竞争和文件损坏。
-- 查询无法使用索引。
-- 数据备份、恢复、迁移都不方便。
-
-第 11 篇会把 Todo 数据从文件存储迁移到数据库，学习：
-
-- 数据库表设计。
-- Go 数据库访问。
-- Repository 实现替换。
-- 数据迁移。
-- 集成测试。
-- 事务和连接池基础。
-
-也就是说，第 10 篇解决“如何对外提供 HTTP API”，第 11 篇解决“API 背后的数据如何可靠持久化”。这两篇合起来，才是企业级 Go 后端服务的基本形态。
+第 11 篇会继续基于这个 Todo API 服务讲 Go 并发：请求并发、后台统计任务、`context` 取消、压测和竞态检测都会围绕本篇的 Gin API 展开。如果跳过本篇，后续看到并发请求进入 Handler、Service 和 Repository 时，会缺少清晰的 Web API 边界感。
