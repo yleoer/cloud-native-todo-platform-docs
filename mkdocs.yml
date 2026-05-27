@@ -1,5 +1,5 @@
 site_name: 从 Go、Docker、Kubernetes 到 Operator
-site_description: 一套面向中高级云原生工程能力的系统教程 - 40 大篇 200 个章节，围绕 Cloud Native Todo Platform 项目主线
+site_description: 一套面向中高级云原生工程能力的系统教程 - 42 大篇约 230 个章节，围绕 Cloud Native Todo Platform 项目主线
 site_author: yuanxuefeng
 site_url: https://docs.yxuefeng.com/
 
@@ -164,8 +164,8 @@ extra_javascript:
 nav:
   - 首页: index.md
 
-  - 阶段一 基础环境:
-      - 1. 课程导学与环境准备: chapters/stage-01-foundation/01-course-guide-env.md
+  - 阶段一 基础能力:
+      - 1. 课程导学、YAML 与环境准备: chapters/stage-01-foundation/01-course-guide-env.md
       - 2. Linux 文件系统与命令: chapters/stage-01-foundation/02-linux-filesystem.md
       - 3. Linux 进程与服务管理: chapters/stage-01-foundation/03-linux-process.md
       - 4. Linux 网络基础与排障: chapters/stage-01-foundation/04-linux-network.md
@@ -184,7 +184,7 @@ nav:
       - 13. Go 后端生产化: chapters/stage-02-go-backend/13-go-production.md
       - 附录 A. Go 后端项目综合验收: chapters/stage-02-go-backend/stage-02-acceptance.md
 
-  - 阶段三 Docker 容器:
+  - 阶段三 容器化能力:
       - 14. Docker 基础: chapters/stage-03-docker/14-docker-basics.md
       - 15. Dockerfile 与镜像构建: chapters/stage-03-docker/15-dockerfile.md
       - 16. Docker Compose 本地编排: chapters/stage-03-docker/16-docker-compose.md
@@ -193,32 +193,31 @@ nav:
       - 附录 A. Docker 容器技术综合验收: chapters/stage-03-docker/stage-03-acceptance.md
       - 附录 B. Docker 速查与排障手册: chapters/stage-03-docker/stage-03-cheatsheet-troubleshooting.md
 
-  # - 阶段四 Kubernetes:
-  #     - 19. K8s 架构与集群搭建: chapters/stage-04-kubernetes/19-k8s-architecture.md
-  #     - 20. K8s 核心工作负载: chapters/stage-04-kubernetes/20-k8s-workloads.md
-  #     - 21. K8s 服务发现与配置: chapters/stage-04-kubernetes/21-k8s-service-config.md
-  #     - 22. K8s 网络: chapters/stage-04-kubernetes/22-k8s-networking.md
-  #     - 23. K8s 存储: chapters/stage-04-kubernetes/23-k8s-storage.md
-  #     - 24. K8s 安全: chapters/stage-04-kubernetes/24-k8s-security.md
-  #     - 25. Helm 包管理: chapters/stage-04-kubernetes/25-helm.md
-  #     - 26. Kustomize 配置管理: chapters/stage-04-kubernetes/26-kustomize.md
+  # - 阶段四 Kubernetes 应用交付:
+  #     - 20. Kubernetes 架构与集群搭建: chapters/stage-04-kubernetes/20-k8s-architecture.md
+  #     - 21. Kubernetes 核心工作负载: chapters/stage-04-kubernetes/21-k8s-workloads.md
+  #     - 22. Service、Ingress 与流量入口: chapters/stage-04-kubernetes/22-k8s-service-ingress.md
+  #     - 23. ConfigMap、Secret 与配置管理: chapters/stage-04-kubernetes/23-k8s-config-secret.md
+  #     - 24. Kubernetes 存储: chapters/stage-04-kubernetes/24-k8s-storage.md
+  #     - 25. Kubernetes 网络原理: chapters/stage-04-kubernetes/25-k8s-networking.md
+  #     - 26. Kubernetes 安全: chapters/stage-04-kubernetes/26-k8s-security.md
+  #     - 27. Helm 4 包管理: chapters/stage-04-kubernetes/27-helm4.md
+  #     - 28. Kustomize 多环境配置管理: chapters/stage-04-kubernetes/28-kustomize.md
 
-  # - 阶段五 交付与可观测:
-  #     - 27. CI/CD 自动化交付: chapters/stage-05-delivery-observability/27-cicd.md
-  #     - 28. GitOps 与 Argo CD: chapters/stage-05-delivery-observability/28-gitops.md
-  #     - 29. Prometheus 与 Grafana: chapters/stage-05-delivery-observability/29-prometheus-grafana.md
-  #     - 30. 日志与链路追踪: chapters/stage-05-delivery-observability/30-logging-tracing.md
-  #     - 31. K8s 生产排障: chapters/stage-05-delivery-observability/31-k8s-troubleshooting.md
+  # - 阶段五 生产工程能力:
+  #     - 29. CI/CD 自动化交付: chapters/stage-05-production-engineering/29-cicd.md
+  #     - 30. GitOps 与 Argo CD: chapters/stage-05-production-engineering/30-gitops-argocd.md
+  #     - 31. Prometheus 与 Grafana 监控: chapters/stage-05-production-engineering/31-prometheus-grafana.md
+  #     - 32. 日志与 OpenTelemetry 链路追踪: chapters/stage-05-production-engineering/32-logging-opentelemetry.md
+  #     - 33. Kubernetes 生产排障: chapters/stage-05-production-engineering/33-k8s-troubleshooting.md
 
-  # - 阶段六 Operator 开发:
-  #     - 32. K8s API 扩展机制: chapters/stage-06-operator/32-k8s-api-extension.md
-  #     - 33. CRD 设计与实践: chapters/stage-06-operator/33-crd-design.md
-  #     - 34. Controller 与 Informer: chapters/stage-06-operator/34-controller-informer.md
-  #     - 35. Kubebuilder 框架: chapters/stage-06-operator/35-kubebuilder.md
-  #     - 36. Operator 高级机制: chapters/stage-06-operator/36-operator-advanced.md
-  #     - 37. Operator 测试与发布: chapters/stage-06-operator/37-operator-release.md
-  #     - 38. Operator 生产实践: chapters/stage-06-operator/38-operator-production.md
-
-  # - 阶段七 综合项目:
-  #     - 39. 综合项目集成实战: chapters/stage-07-project-career/39-project-integration.md
-  #     - 40. 职业能力与面试: chapters/stage-07-project-career/40-career-interview.md
+  # - 阶段六 平台工程与 Operator:
+  #     - 34. Kubernetes API 扩展机制: chapters/stage-06-platform-operator/34-k8s-api-extension.md
+  #     - 35. CRD 设计与实践: chapters/stage-06-platform-operator/35-crd-design.md
+  #     - 36. Controller 机制：Informer 与 Workqueue: chapters/stage-06-platform-operator/36-controller-informer-workqueue.md
+  #     - 37. 手写简化版 Controller: chapters/stage-06-platform-operator/37-handwritten-controller.md
+  #     - 38. Kubebuilder 入门: chapters/stage-06-platform-operator/38-kubebuilder.md
+  #     - 39. Operator 高级机制: chapters/stage-06-platform-operator/39-operator-advanced.md
+  #     - 40. Operator 测试、发布与升级: chapters/stage-06-platform-operator/40-operator-test-release.md
+  #     - 41. Operator 生产实践: chapters/stage-06-platform-operator/41-operator-production.md
+  #     - 42. 综合集成与职业能力验收: chapters/stage-06-platform-operator/42-final-integration-career.md

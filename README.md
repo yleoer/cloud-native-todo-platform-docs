@@ -1,22 +1,23 @@
 # 从 Go、Docker、Kubernetes 到 Operator
 
-一套面向中高级云原生工程能力的系统教程，共 **40 大篇，200 个章节**，围绕 **Cloud Native Todo Platform** 项目主线展开。
+一套面向中高级云原生工程能力的系统教程，共 **42 大篇，约 230 个章节**，围绕 **Cloud Native Todo Platform** 项目主线展开。
 
 ## 📚 课程特色
 
 - **系统性**：从 Linux 基础到 Operator 开发，完整覆盖云原生技术栈
 - **实战性**：每个阶段都有配套项目，最终完成完整的云原生平台
-- **渐进性**：7 个学习阶段，循序渐进，适合不同基础的学习者
-- **职业导向**：对标真实岗位能力，包含面试题库和职业规划
+- **渐进性**：6 个学习阶段，按照“先会用，再深入”的顺序逐步推进
+- **可复现性**：锁定 Go 1.26、Docker 29、Kubernetes 1.36、Helm 4 等课程基线
+- **职业导向**：对标真实岗位能力，包含实验、排障、面试和作品集验收
 
 ## 🎯 学习路径
 
-当前已完成 **阶段一：基础环境与工具链**、**阶段二：Go 语言与后端开发** 和 **阶段三：Docker 容器技术**。课程会继续围绕 **Cloud Native Todo Platform** 项目推进 Kubernetes 部署与云原生交付能力。
+新版课程设计为 **6 个学习阶段、42 大篇、约 230 章**。当前站点已发布阶段一至阶段三的现有课程内容；后续会按新版设计继续推进 Kubernetes、生产工程和 Operator 能力。
 
 <details open>
-<summary><strong>阶段一：基础环境与工具链（第 1-6 篇 + 出版附录，已完成）</strong></summary>
+<summary><strong>阶段一：基础能力（第 1-6 篇，已发布）</strong></summary>
 
-Linux 命令、Git 协作、Shell 脚本等云原生开发必备基础。
+环境准备、YAML、Linux 文件/进程/网络、Git 协作和 Shell 自动化。
 
 - [第 1 篇：课程导学与开发环境准备](docs/chapters/stage-01-foundation/01-course-guide-env.md)
 - [第 2 篇：Linux 文件系统与命令基础](docs/chapters/stage-01-foundation/02-linux-filesystem.md)
@@ -30,9 +31,9 @@ Linux 命令、Git 协作、Shell 脚本等云原生开发必备基础。
 </details>
 
 <details>
-<summary><strong>阶段二：Go 语言与后端开发（第 7-13 篇 + 出版附录，已完成）</strong></summary>
+<summary><strong>阶段二：Go 后端开发（新版规划第 7-14 篇，当前已发布后端章节）</strong></summary>
 
-从 Go 基础到生产级 Web API、数据库、Redis、并发编程。
+从 Go 基础到工程化、net/http、Gin、并发、PostgreSQL、Redis 和后端生产化。
 
 - [第 7 篇：Go 语言基础](docs/chapters/stage-02-go-backend/07-go-basics.md)
 - [第 8 篇：Go 进阶与并发编程](docs/chapters/stage-02-go-backend/08-go-concurrency.md)
@@ -46,9 +47,9 @@ Linux 命令、Git 协作、Shell 脚本等云原生开发必备基础。
 </details>
 
 <details>
-<summary><strong>阶段三：Docker 容器技术（第 14-18 篇 + 出版附录，已完成）</strong></summary>
+<summary><strong>阶段三：容器化能力（新版规划第 15-19 篇，当前已发布 Docker 章节）</strong></summary>
 
-Docker 使用、Dockerfile 编写、Docker Compose 本地编排、容器原理和运行时机制。
+Docker 基础、Dockerfile、Compose、容器原理、OCI、containerd、runc 和 CRI。
 
 - [第 14 篇：Docker 基础](docs/chapters/stage-03-docker/14-docker-basics.md)
 - [第 15 篇：Dockerfile 与镜像构建](docs/chapters/stage-03-docker/15-dockerfile.md)
@@ -61,56 +62,49 @@ Docker 使用、Dockerfile 编写、Docker Compose 本地编排、容器原理�
 </details>
 
 <details>
-<summary><strong>阶段四：Kubernetes 核心能力（第 19-26 篇，规划中）</strong></summary>
+<summary><strong>阶段四：Kubernetes 应用交付（第 20-28 篇，规划中）</strong></summary>
 
-K8s 架构、工作负载、网络、存储、安全、Helm、Kustomize。
+Kubernetes 架构、工作负载、Service / Ingress / Gateway API、配置、存储、网络、安全、Helm 4 和 Kustomize。
 
-- 第 19 篇：Kubernetes 架构与集群搭建
-- 第 20 篇：Kubernetes 核心工作负载
-- 第 21 篇：Kubernetes 服务发现与应用配置
-- 第 22 篇：Kubernetes 网络
-- 第 23 篇：Kubernetes 存储
-- 第 24 篇：Kubernetes 安全
-- 第 25 篇：Helm 包管理
-- 第 26 篇：Kustomize 多环境配置管理
-
-</details>
-
-<details>
-<summary><strong>阶段五：云原生交付与可观测（第 27-31 篇，规划中）</strong></summary>
-
-CI/CD、GitOps、Prometheus、Grafana、日志、链路追踪、生产排障。
-
-- 第 27 篇：CI/CD 自动化交付
-- 第 28 篇：GitOps 与 Argo CD
-- 第 29 篇：Prometheus 与 Grafana 监控
-- 第 30 篇：日志、ELK / Loki 与链路追踪
-- 第 31 篇：Kubernetes 生产排障
+- 第 20 篇：Kubernetes 架构与集群搭建
+- 第 21 篇：Kubernetes 核心工作负载
+- 第 22 篇：Service、Ingress 与流量入口
+- 第 23 篇：ConfigMap、Secret 与配置管理
+- 第 24 篇：Kubernetes 存储
+- 第 25 篇：Kubernetes 网络原理
+- 第 26 篇：Kubernetes 安全
+- 第 27 篇：Helm 4 包管理
+- 第 28 篇：Kustomize 多环境配置管理
 
 </details>
 
 <details>
-<summary><strong>阶段六：Operator 开发与平台工程（第 32-38 篇，规划中）</strong></summary>
+<summary><strong>阶段五：生产工程能力（第 29-33 篇，规划中）</strong></summary>
 
-CRD、Controller、Kubebuilder、Operator 开发与生产实践。
+CI/CD、GitOps、Prometheus / Grafana、Loki、OpenTelemetry 和 Kubernetes 生产排障。
 
-- 第 32 篇：Kubernetes API 扩展机制
-- 第 33 篇：CRD 设计与实践
-- 第 34 篇：Controller、Informer 与 Workqueue
-- 第 35 篇：Kubebuilder 与 controller-runtime
-- 第 36 篇：Operator 高级机制
-- 第 37 篇：Operator 测试、发布与升级
-- 第 38 篇：Operator 生产实践
+- 第 29 篇：CI/CD 自动化交付
+- 第 30 篇：GitOps 与 Argo CD
+- 第 31 篇：Prometheus 与 Grafana 监控
+- 第 32 篇：日志与 OpenTelemetry 链路追踪
+- 第 33 篇：Kubernetes 生产排障
 
 </details>
 
 <details>
-<summary><strong>阶段七：综合项目与职业能力（第 39-40 篇，规划中）</strong></summary>
+<summary><strong>阶段六：平台工程与 Operator 能力（第 34-42 篇，规划中）</strong></summary>
 
-全链路集成、简历准备、面试指导。
+Kubernetes API Machinery、CRD、手写 Controller、Kubebuilder、Webhook、Finalizer、Operator 测试发布、生产实践和最终集成。
 
-- 第 39 篇：综合项目集成实战
-- 第 40 篇：职业能力验收与面试准备
+- 第 34 篇：Kubernetes API 扩展机制
+- 第 35 篇：CRD 设计与实践
+- 第 36 篇：Controller 机制：Informer 与 Workqueue
+- 第 37 篇：手写简化版 Controller
+- 第 38 篇：Kubebuilder 入门
+- 第 39 篇：Operator 高级机制
+- 第 40 篇：Operator 测试、发布与升级
+- 第 41 篇：Operator 生产实践
+- 第 42 篇：综合集成与职业能力验收
 
 </details>
 
@@ -172,7 +166,7 @@ mkdocs serve
 docs/
 ├── index.md                    # 首页
 ├── chapters/                   # 课程章节
-│   ├── stage-01-foundation/   # 阶段一：基础环境与工具链
+│   ├── stage-01-foundation/   # 阶段一：基础能力
 │   │   ├── 01-course-guide-env.md   # 第 1 篇：课程导学与开发环境准备
 │   │   ├── 02-linux-filesystem.md   # 第 2 篇：Linux 文件系统与命令基础
 │   │   ├── 03-linux-process.md      # 第 3 篇：Linux 进程、服务与软件管理
@@ -190,7 +184,7 @@ docs/
 │   │   ├── 12-redis-cache.md        # 第 12 篇：Redis、缓存与异步任务
 │   │   ├── 13-go-production.md      # 第 13 篇：Go 后端生产化能力
 │   │   └── stage-02-acceptance.md   # 阶段二附录 A：Go 后端项目综合验收
-│   ├── stage-03-docker/        # 阶段三：Docker 容器技术
+│   ├── stage-03-docker/        # 阶段三：容器化能力
 │   │   ├── 14-docker-basics.md      # 第 14 篇：Docker 基础
 │   │   ├── 15-dockerfile.md         # 第 15 篇：Dockerfile 与镜像构建
 │   │   ├── 16-docker-compose.md     # 第 16 篇：Docker Compose 本地编排
@@ -229,11 +223,12 @@ docs/
 
 - **语言**：Go
 - **容器**：Docker、containerd、runc
-- **编排**：Kubernetes、Helm、Kustomize
-- **数据库**：PostgreSQL、Redis
+- **入口**：Traefik Ingress Controller、Gateway API
+- **编排**：Kubernetes 1.36、Helm 4、Kustomize
+- **数据库**：PostgreSQL 18、Redis 8.2
 - **CI/CD**：GitHub Actions、GitLab CI、Argo CD
-- **监控**：Prometheus、Grafana、Loki、Jaeger
-- **开发框架**：Gin、GORM、Kubebuilder
+- **监控**：Prometheus、Grafana、Loki、OpenTelemetry
+- **开发框架**：Gin 1.12、GORM、Kubebuilder
 
 ## 🔧 构建与部署
 

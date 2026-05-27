@@ -25,7 +25,7 @@ hide:
 
 欢迎来到这套面向真实岗位能力的云原生系统教程。
 
-本教程以 **Cloud Native Todo Platform** 为项目主线，带你从课程导学与开发环境准备开始，逐步完成 Linux / Git / Shell 基础、Go 后端开发、Docker 容器化、Kubernetes 部署、CI/CD、GitOps、监控日志、生产排障，最后进入 CRD、Controller、Kubebuilder 与 Operator 开发。
+本教程以 **Cloud Native Todo Platform** 为项目主线，带你从课程导学、YAML 与开发环境准备开始，逐步完成 Linux / Git / Shell 基础、Go 后端开发、Docker 容器化、Kubernetes 应用交付、CI/CD、GitOps、监控日志、链路追踪、生产排障，最后进入 CRD、Controller、Kubebuilder 与 Operator 开发。
 
 ## 教程定位
 
@@ -35,8 +35,8 @@ hide:
 
 - Go 后端服务如何设计、开发、测试和运行。
 - Docker 镜像如何构建、优化和发布。
-- Kubernetes 应用如何部署、暴露、扩缩容和排障。
-- 云原生系统如何接入 CI/CD、GitOps、监控、日志和安全治理。
+- Kubernetes 应用如何部署、暴露、配置、存储、扩缩容和排障。
+- 云原生系统如何接入 CI/CD、GitOps、监控、日志、链路追踪和安全治理。
 - Operator 如何通过 Kubernetes API 扩展机制自动化管理应用生命周期。
 
 ## 适合人群
@@ -54,7 +54,7 @@ hide:
 - 独立开发 Go RESTful API 服务。
 - 编写 Dockerfile 和 Docker Compose 本地开发环境。
 - 将服务部署到 Kubernetes，并配置 Service、Ingress、ConfigMap、Secret、PVC、HPA。
-- 使用 Helm 和多环境配置管理应用发布。
+- 使用 Helm 4 和 Kustomize 管理多环境应用发布。
 - 搭建 CI/CD 与 GitOps 发布链路。
 - 接入 Prometheus、Grafana、Loki / ELK 等可观测系统。
 - 排查 Kubernetes 常见生产故障。
@@ -62,14 +62,14 @@ hide:
 
 ## 完整学习路径
 
-本课程共 **40 大篇，200 个章节**，分为 7 个学习阶段。
+本课程共 **42 大篇，约 230 个章节**，分为 6 个学习阶段。
 
-当前已完成 **阶段一：基础环境与工具链**、**阶段二：Go 语言与后端开发** 和 **阶段三：Docker 容器技术**。课程会继续围绕 **Cloud Native Todo Platform** 项目推进 Kubernetes 部署与云原生交付能力。
+新版设计路线已更新为 **6 个阶段**。当前站点已发布阶段一至阶段三的现有课程内容；后续会按新版设计继续推进 Kubernetes、生产工程和 Operator 能力。
 
 <details open markdown="1">
-<summary><strong>阶段一：基础环境与工具链（第 1-6 篇 + 出版附录，已完成）</strong></summary>
+<summary><strong>阶段一：基础能力（第 1-6 篇，已发布）</strong></summary>
 
-掌握 Linux 命令、Git 协作、Shell 脚本等云原生开发必备基础。
+掌握环境准备、YAML、Linux 文件/进程/网络、Git 协作和 Shell 自动化。
 
 - [第 1 篇：课程导学与开发环境准备](chapters/stage-01-foundation/01-course-guide-env.md)
 - [第 2 篇：Linux 文件系统与命令基础](chapters/stage-01-foundation/02-linux-filesystem.md)
@@ -83,9 +83,9 @@ hide:
 </details>
 
 <details markdown="1">
-<summary><strong>阶段二：Go 语言与后端开发（第 7-13 篇 + 出版附录，已完成）</strong></summary>
+<summary><strong>阶段二：Go 后端开发（新版规划第 7-14 篇，当前已发布后端章节）</strong></summary>
 
-从 Go 基础语法到 Web API、数据库、Redis、并发编程，完成生产级后端服务开发。
+从 Go 基础到工程化、net/http、Gin、并发、PostgreSQL、Redis 和后端生产化。
 
 - [第 7 篇：Go 语言基础](chapters/stage-02-go-backend/07-go-basics.md)
 - [第 8 篇：Go 进阶与并发编程](chapters/stage-02-go-backend/08-go-concurrency.md)
@@ -99,9 +99,9 @@ hide:
 </details>
 
 <details markdown="1">
-<summary><strong>阶段三：Docker 容器技术（第 14-18 篇 + 出版附录，已完成）</strong></summary>
+<summary><strong>阶段三：容器化能力（新版规划第 15-19 篇，当前已发布 Docker 章节）</strong></summary>
 
-掌握 Docker 使用、Dockerfile 编写、Docker Compose 本地编排、容器原理和运行时机制。
+掌握 Docker 基础、Dockerfile、Compose、容器原理、OCI、containerd、runc 和 CRI。
 
 - [第 14 篇：Docker 基础](chapters/stage-03-docker/14-docker-basics.md)
 - [第 15 篇：Dockerfile 与镜像构建](chapters/stage-03-docker/15-dockerfile.md)
@@ -114,56 +114,49 @@ hide:
 </details>
 
 <details markdown="1">
-<summary><strong>阶段四：Kubernetes 核心能力（第 19-26 篇，规划中）</strong></summary>
+<summary><strong>阶段四：Kubernetes 应用交付（第 20-28 篇，规划中）</strong></summary>
 
-系统学习 Kubernetes 架构、工作负载、网络、存储、安全、Helm 和 Kustomize。
+系统学习 Kubernetes 架构、工作负载、Service / Ingress / Gateway API、配置、存储、网络、安全、Helm 4 和 Kustomize。
 
-- 第 19 篇：Kubernetes 架构与集群搭建
-- 第 20 篇：Kubernetes 核心工作负载
-- 第 21 篇：Kubernetes 服务发现与应用配置
-- 第 22 篇：Kubernetes 网络
-- 第 23 篇：Kubernetes 存储
-- 第 24 篇：Kubernetes 安全
-- 第 25 篇：Helm 包管理
-- 第 26 篇：Kustomize 多环境配置管理
-
-</details>
-
-<details markdown="1">
-<summary><strong>阶段五：云原生交付与可观测（第 27-31 篇，规划中）</strong></summary>
-
-建立 CI/CD、GitOps、监控、日志、链路追踪和生产排障能力。
-
-- 第 27 篇：CI/CD 自动化交付
-- 第 28 篇：GitOps 与 Argo CD
-- 第 29 篇：Prometheus 与 Grafana 监控
-- 第 30 篇：日志、ELK / Loki 与链路追踪
-- 第 31 篇：Kubernetes 生产排障
+- 第 20 篇：Kubernetes 架构与集群搭建
+- 第 21 篇：Kubernetes 核心工作负载
+- 第 22 篇：Service、Ingress 与流量入口
+- 第 23 篇：ConfigMap、Secret 与配置管理
+- 第 24 篇：Kubernetes 存储
+- 第 25 篇：Kubernetes 网络原理
+- 第 26 篇：Kubernetes 安全
+- 第 27 篇：Helm 4 包管理
+- 第 28 篇：Kustomize 多环境配置管理
 
 </details>
 
 <details markdown="1">
-<summary><strong>阶段六：Operator 开发与平台工程（第 32-38 篇，规划中）</strong></summary>
+<summary><strong>阶段五：生产工程能力（第 29-33 篇，规划中）</strong></summary>
 
-深入 Kubernetes API 扩展机制，掌握 CRD、Controller、Kubebuilder 和 Operator 开发。
+建立 CI/CD、GitOps、Prometheus / Grafana、Loki、OpenTelemetry 和 Kubernetes 生产排障能力。
 
-- 第 32 篇：Kubernetes API 扩展机制
-- 第 33 篇：CRD 设计与实践
-- 第 34 篇：Controller、Informer 与 Workqueue
-- 第 35 篇：Kubebuilder 与 controller-runtime
-- 第 36 篇：Operator 高级机制
-- 第 37 篇：Operator 测试、发布与升级
-- 第 38 篇：Operator 生产实践
+- 第 29 篇：CI/CD 自动化交付
+- 第 30 篇：GitOps 与 Argo CD
+- 第 31 篇：Prometheus 与 Grafana 监控
+- 第 32 篇：日志与 OpenTelemetry 链路追踪
+- 第 33 篇：Kubernetes 生产排障
 
 </details>
 
 <details markdown="1">
-<summary><strong>阶段七：综合项目与职业能力（第 39-40 篇，规划中）</strong></summary>
+<summary><strong>阶段六：平台工程与 Operator 能力（第 34-42 篇，规划中）</strong></summary>
 
-完成 Cloud Native Todo Platform 全链路集成，准备简历和面试。
+深入 Kubernetes API Machinery、CRD、手写 Controller、Kubebuilder、Webhook、Finalizer、Operator 测试发布、生产实践和最终集成。
 
-- 第 39 篇：综合项目集成实战
-- 第 40 篇：职业能力验收与面试准备
+- 第 34 篇：Kubernetes API 扩展机制
+- 第 35 篇：CRD 设计与实践
+- 第 36 篇：Controller 机制：Informer 与 Workqueue
+- 第 37 篇：手写简化版 Controller
+- 第 38 篇：Kubebuilder 入门
+- 第 39 篇：Operator 高级机制
+- 第 40 篇：Operator 测试、发布与升级
+- 第 41 篇：Operator 生产实践
+- 第 42 篇：综合集成与职业能力验收
 
 </details>
 
@@ -195,6 +188,6 @@ http://127.0.0.1:8000
 
 ## 下一步计划
 
-- 开始编写 Kubernetes 架构与集群搭建，承接容器运行时和 CRI 知识。
-- 继续推进 Kubernetes 工作负载、网络、存储、安全、Helm 与 Kustomize 实践内容。
+- 按新版设计推进第 20 篇 Kubernetes 架构与集群搭建，承接容器运行时和 CRI 知识。
+- 继续推进 Kubernetes 工作负载、Service / Ingress / Gateway API、配置、存储、网络、安全、Helm 4 与 Kustomize 实践内容。
 - 使用阶段三综合验收和排障手册整理 Todo 平台容器化作品集。
