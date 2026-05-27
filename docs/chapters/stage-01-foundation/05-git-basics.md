@@ -462,6 +462,8 @@ Thumbs.db
 *.key
 ```
 
+`bin/` 规则会忽略前几篇以及后续章节生成的编译产物；二进制文件不应进入版本管理，从本章起正式纳入忽略规则。`.gitignore` 中忽略 `.vscode/` 是为了避免个人编辑器设置污染团队仓库。如果团队希望共享推荐插件，可以改成忽略 `.vscode/*`，再通过 `!.vscode/extensions.json` 放开特定文件。
+
 `.gitmessage`：
 
 ```text title=".gitmessage"
@@ -574,8 +576,6 @@ test(api): cover todo validation
 
 占位符说明：`.gitmessage` 和 PR/MR 模板中的 `<type>`、`<summary>`、`Refs #`、`Closes #` 都需要在真实提交或 PR/MR 中替换成具体内容。模板的作用是提醒你补齐背景、变更、验证和风险，不是让占位符原样进入团队历史。
 
-`.gitignore` 中忽略 `.vscode/` 是为了避免个人编辑器设置污染团队仓库。如果团队希望共享推荐插件，可以改成忽略 `.vscode/*`，再通过 `!.vscode/extensions.json` 放开特定文件。
-
 ### 5.5 执行命令
 
 先在临时仓库中练习危险操作，避免破坏课程项目历史。
@@ -624,6 +624,8 @@ $ git commit -m "docs: resolve workflow conflict"
 
 练习 stash：
 
+真实场景中，stash 最常用于临时保存未完成修改，以便切换到其他分支处理紧急任务；本实验先演示最小闭环。
+
 ```bash
 $ printf "temporary=wip\n" >> workflow.txt
 $ git stash push -m "wip: temporary workflow note"
@@ -647,6 +649,8 @@ $ git switch docs/issue-5-rebase-demo
 $ git rebase main
 ```
 
+由于 `rebase.txt` 和 `main.txt` 是不同文件，本次 rebase 不会冲突。如果两个分支修改了同一文件的同一行，rebase 期间同样需要解决冲突，处理思路与 merge 冲突一致。
+
 把 rebase 后的功能分支合回 `main`，并创建 tag：
 
 ```bash
@@ -665,7 +669,7 @@ $ git push origin v0.1.0
 $ git ls-remote --heads --tags origin
 ```
 
-回到课程项目仓库，创建工作分支。下面路径按第 1 篇的建议写法展示，请按你的实际路径调整：
+回到课程项目仓库，创建工作分支。下面路径按第 1 篇的建议写法展示，请按你的实际路径调整。如果你还没有远程仓库，执行下面代码块时跳过 `git pull --ff-only origin main` 这一行，但仍然要确保当前工作区干净。
 
 ```bash
 $ cd ~/workspace/cloud-native-todo-platform
@@ -676,7 +680,7 @@ $ git pull --ff-only origin main
 $ git switch -c docs/issue-5-git-workflow
 ```
 
-`git config --local pull.ff only` 只影响当前课程项目；如果你还没有远程仓库，可以先跳过 `git pull --ff-only origin main`，但仍然要确保当前工作区干净。
+`git config --local pull.ff only` 只影响当前课程项目。
 
 创建目录并写入 5.4 中的文件：
 
@@ -979,11 +983,11 @@ $ git push origin --delete docs/issue-5-git-workflow
 
 - **排查**：
 
-```bash
-$ git status --short
-$ git diff --check
-$ git grep -n -E '<<<<<<<|=======|>>>>>>>' -- ':!docs/chapters/stage-01-foundation/05-git-basics.md' || true
-```
+  ```bash
+  $ git status --short
+  $ git diff --check
+  $ git grep -n -E '<<<<<<<|=======|>>>>>>>' -- ':!docs/chapters/stage-01-foundation/05-git-basics.md' || true
+  ```
 
   `git grep` 如果命中冲突标记，说明文件还不能提交。这里排除了本篇教程文件，是因为教程正文中包含用于讲解的冲突标记示例。
 
