@@ -25,7 +25,7 @@ hide:
 
 欢迎来到这套面向真实岗位能力的云原生系统教程。
 
-本教程以 **Cloud Native Todo Platform** 为项目主线，带你从课程导学、YAML 与开发环境准备开始，逐步完成 Linux / Git / Shell 基础、Go 后端开发、Docker 容器化、Kubernetes 应用交付、CI/CD、GitOps、监控日志、链路追踪、生产排障，最后进入 CRD、Controller、Kubebuilder 与 Operator 开发。
+本教程以 **Cloud Native Todo Platform** 为项目主线，带你从课程导学与开发环境准备开始，逐步完成 YAML、Linux / Git / Shell 基础、Go 后端开发、Docker 容器化、Kubernetes 应用交付、CI/CD、GitOps、监控日志、链路追踪、生产排障，最后进入 CRD、Controller、Kubebuilder 与 Operator 开发。
 
 ## 教程定位
 
@@ -71,7 +71,7 @@ hide:
 
 掌握环境准备、YAML、Linux 文件/进程/网络、Git 协作和 Shell 自动化。
 
-- [第 1 篇：课程导学与开发环境准备](chapters/stage-01-foundation/01-course-guide-env.md)
+- [第 1 篇：课程导学与开发环境准备 [A]](chapters/stage-01-foundation/01-course-guide-env.md)
 - [第 2 篇：Linux 文件系统与命令基础](chapters/stage-01-foundation/02-linux-filesystem.md)
 - [第 3 篇：Linux 进程、服务与软件管理](chapters/stage-01-foundation/03-linux-process.md)
 - [第 4 篇：Linux 网络基础与排障](chapters/stage-01-foundation/04-linux-network.md)
