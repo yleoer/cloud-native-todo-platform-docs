@@ -80,7 +80,7 @@ func main() {
 - `package main` 表示这个包可以编译成可执行程序。
 - `import "fmt"` 引入 Go 标准库中的格式化输出包。
 - `func main()` 是程序入口。
-- Go 使用 `gofmt` 统一格式，团队不需要争论缩进风格。
+- Go 使用 `go fmt` 统一格式；它底层调用 `gofmt`，团队不需要争论缩进风格。
 
 在课程项目中，我们采用更接近真实项目的拆分：
 
@@ -280,13 +280,14 @@ go 1.26
 
 require (
 	github.com/example/teamlib v1.2.3
-	golang.org/x/text v0.31.0 // indirect
+	github.com/example/dependency v0.0.0 // indirect
 )
 
 replace github.com/example/teamlib => ../teamlib
 ```
 
 - `require` 记录当前项目依赖的 module 版本。
+- 示例中的 `example` 路径和版本号仅用于说明语法，真实项目以 `go get` 或 `go mod tidy` 解析结果为准。
 - `// indirect` 表示这个依赖不是当前代码直接 import 的，而是被其他依赖间接拉入。
 - `replace` 常用于本地联调，例如后续你同时修改平台公共库和 Todo 服务。
 - `go mod vendor` 会把依赖复制到 `vendor/`，适合网络受限或强审计环境；普通项目默认不需要一开始就 vendor。
@@ -295,7 +296,7 @@ replace github.com/example/teamlib => ../teamlib
 
 ### 4.1 `todo-cli` 的调用链
 
-图 7-1 展示本篇 CLI 的运行流程。
+下图展示本篇 CLI 的运行流程。
 
 ```mermaid
 flowchart TD
@@ -313,6 +314,8 @@ flowchart TD
 
 本篇使用内存存储，所有 Todo 都保存在当前进程的 `map[int]Item` 中。进程退出后，数据会消失。这是有意设计，不是缺陷：第 7 篇的目标是 Go 语法和对象建模，不提前引入文件、数据库和并发控制。
 
+这版 `MemoryStore` 没有加锁，只适合本篇的单进程、顺序 CLI 实验，不适合直接放进并发 HTTP 服务。后续学习并发和生产化服务时，会再引入 `sync.Mutex`、数据库事务和请求级 `context`。
+
 因此，完整增删改查要在同一个进程中完成。本篇支持两种方式：
 
 - 在一条命令里串联多个子命令。
@@ -327,7 +330,7 @@ CLI 程序经常被 Shell 脚本或 CI 调用。它应该遵守一个基本约�
 本篇 `main` 函数会这样处理：
 
 ```go
-if err := run(os.Args[1:], os.Stdin, os.Stdout); err != nil {
+if err := run(os.Args[1:], os.Stdin, os.Stdout, os.Stderr); err != nil {
 	fmt.Fprintf(os.Stderr, "error: %v\n", err)
 	os.Exit(1)
 }
@@ -598,6 +601,11 @@ func (s *MemoryStore) Delete(id int) error {
 }
 ```
 
+这里有两个容易被忽略的工程细节：
+
+- `now func() time.Time` 默认指向 `time.Now`，以后写测试时可以替换成固定时间，避免测试结果依赖真实时钟。这是 Go 项目里常见的轻量依赖注入。
+- `var _ Repository = (*MemoryStore)(nil)` 是编译期接口断言。如果 `*MemoryStore` 不再满足 `Repository`，编译会立刻失败；它不产生运行时对象，是零成本的安全网。
+
 创建 `cmd/todo-cli/main.go`：
 
 ```go title="cmd/todo-cli/main.go"
@@ -827,9 +835,9 @@ go test ./...
 go run ./cmd/todo-cli add "学习 Go 程序结构" add "完成 todo-cli 实验" list done 1 update 2 "完成 Go module 实验" list delete 1 list
 ```
 
-这条链式命令是本篇为了演示“同一个进程内的内存状态”而设计的教学用法。真实 CLI 更常见的是一次执行一个子命令，并通过文件、SQLite、PostgreSQL 或远程 API 保存状态；本篇先不引入持久化，是为了把注意力放在 Go 基础语法和业务边界上。
+这条链式命令在 Shell 眼中只是一条普通命令加一串参数；带引号的标题会作为一个完整参数传给 Go 程序，不带引号的空格会触发 Shell 单词拆分。链式命令是本篇为了演示“同一个进程内的内存状态”而设计的教学用法。真实 CLI 更常见的是一次执行一个子命令，并通过文件、SQLite、PostgreSQL 或远程 API 保存状态；本篇先不引入持久化，是为了把注意力放在 Go 基础语法和业务边界上。
 
-也可以进入交互模式：
+也可以直接运行 `go run ./cmd/todo-cli` 进入交互模式，然后逐行输入命令，输入 `exit` 退出。下面用 `<<'EOF'` heredoc 把多行输入一次性传给交互模式，这个语法在阶段一第 3 篇已经介绍过：
 
 ```bash
 go run ./cmd/todo-cli <<'EOF'
@@ -897,10 +905,10 @@ todo-cli memory mode. Type help or exit.
 
 ### 5.7 验证方法
 
-验证代码格式：
+验证代码格式。执行前先确认文件已经保存；`go fmt` 会直接格式化目标 package：
 
 ```bash
-gofmt -w cmd/todo-cli/main.go internal/todo/item.go internal/todo/memory_store.go
+go fmt ./cmd/todo-cli ./internal/todo
 git diff --check
 ```
 
@@ -1075,7 +1083,7 @@ rm -rf cmd/todo-cli internal/todo bin/todo-cli
 
 - **预防**：外部输入永远要校验；不要相信用户传入的字符串一定能转换成业务 ID。
 
-### 错误 5：分开执行命令后数据消失
+### 错误 5：分开执行 `go run` 后数据消失
 
 - **现象**：
 
@@ -1213,7 +1221,7 @@ go build -o bin/todo-cli ./cmd/todo-cli
 
 **一句话结论**：内存存储最简单但进程退出即丢失；文件存储可持久化但并发和查询能力有限；数据库适合生产数据的一致性、查询和事务需求。
 
-**展开解释**：本篇选择内存存储，是为了聚焦 Go 语言基础。文件存储会引入路径、权限、JSON 编解码和文件锁；数据库会引入连接池、事务、迁移和 SQL。学习顺序上，先用内存理解对象和行为，再逐步引入持久化复杂度，学习曲线更平滑。
+**展开解释**：本篇选择内存存储，是为了聚焦 Go 语言基础。文件存储会引入路径、权限、JSON 编解码、并发写入、文件锁和原子替换；数据库会引入连接池、事务、迁移和 SQL。学习顺序上，先用内存理解对象和行为，再逐步引入持久化复杂度，学习曲线更平滑。
 
 **深入追问**：如果后续要把 `MemoryStore` 换成 PostgreSQL，只要新的实现满足 `Repository` 接口，上层 CLI 或服务层就可以尽量少改。这正是接口边界的价值。
 
