@@ -148,6 +148,8 @@ PORT="${TODO_PORT:-18080}"
 | `$#` | 参数个数 |
 | `"$@"` | 所有参数，推荐带双引号使用 |
 
+不加引号的 `$@` 会受单词拆分影响。如果参数里包含空格，例如 `--title "learn shell"`，`$@` 可能被拆成更多参数；`"$@"` 会保留每个原始参数的边界。
+
 处理多个参数时，`case` 比一串 `if` 更清晰：
 
 ```bash
@@ -357,7 +359,7 @@ Shell 不会替代 Docker、Kubernetes、Helm 或 Operator，但它会出现在�
 | 系统 | Linux、WSL2 Ubuntu 或 macOS |
 | Shell | Bash 5.x 优先，macOS Bash 3.2 也可运行本实验 |
 | Git | 已完成第 5 篇 Git 工作流 |
-| Go | 1.22+，用于构建最小 HTTP 服务 |
+| Go | 1.26.x，与课程环境锁定版本一致 |
 | curl | 用于 HTTP 健康检查 |
 | 可选 | ShellCheck，用于脚本静态检查 |
 
@@ -369,6 +371,21 @@ $ git --version
 $ go version
 $ curl --version | head -n 1
 ```
+
+如果要在本地启用 ShellCheck：
+
+=== "Ubuntu / WSL2"
+
+    ```bash
+    $ sudo apt update
+    $ sudo apt install -y shellcheck
+    ```
+
+=== "macOS"
+
+    ```bash
+    $ brew install shellcheck
+    ```
 
 如果使用 WSL2：
 
@@ -560,7 +577,13 @@ func main() {
 	})
 
 	log.Printf("todo dev server listening on %s", addr)
-	if err := http.ListenAndServe(addr, mux); err != nil {
+
+	server := &http.Server{
+		Addr:              addr,
+		Handler:           mux,
+		ReadHeaderTimeout: 5 * time.Second,
+	}
+	if err := server.ListenAndServe(); err != nil {
 		log.Fatal(err)
 	}
 }
@@ -654,6 +677,8 @@ main "$@"
 ```
 
 `dev.sh` 会把进程号写入 `todo-dev.pid`，把真实访问地址写入 `todo-dev.addr`。如果服务已经运行，再用不同端口启动，脚本会提示先清理旧进程，避免输出一个并不存在的“新端口已运行”。
+
+这里使用 `nohup ... &` 是为了本地开发便利，让服务能在后台保持运行。生产环境不应长期依赖这种方式管理服务，应使用第 3 篇介绍的 systemd，或在后续章节中交给容器和 Kubernetes 管理。
 
 `scripts/check.sh`：
 
@@ -833,6 +858,8 @@ main "$@"
 ```
 
 `check.sh` 会在发起 HTTP 请求前校验 `TODO_PORT`。如果 `.env` 中写成 `TODO_PORT=abc`，脚本会报告端口配置错误，而不是笼统地说健康检查失败。
+
+`check_syntax` 显式列出 3 个脚本，而不是直接使用 `scripts/*.sh`，是为了避免误检查临时脚本或非 Bash 文件。如果后续新增 `logs.sh`、`build.sh` 等脚本，记得把它们加入这个列表和 CI 检查。
 
 `scripts/clean.sh`：
 
@@ -1063,8 +1090,8 @@ $ mkdir -p scripts .github/workflows
 ```bash
 $ printf 'TODO_HOST=127.0.0.1\nTODO_PORT=18080\nTODO_REQUIRE_SHELLCHECK=false\n' > .env.example
 $ touch .gitignore
-$ grep -qxF '.todo-platform/' .gitignore || printf '\n.todo-platform/\n' >> .gitignore
-$ grep -qxF '.env' .gitignore || printf '.env\n' >> .gitignore
+$ grep -qxF '.todo-platform/' .gitignore || printf '%s\n' '.todo-platform/' >> .gitignore
+$ grep -qxF '.env' .gitignore || printf '%s\n' '.env' >> .gitignore
 ```
 
 把 5.4 中的 `dev.sh`、`check.sh`、`clean.sh` 保存到 `scripts/` 目录；如果使用 GitHub Actions，把 `scripts-check.yml` 保存到 `.github/workflows/`。
@@ -1101,7 +1128,6 @@ $ curl -fsS http://127.0.0.1:18080/todos
 测试 `.env` 和环境变量覆盖：
 
 ```bash
-$ cp .env.example .env
 $ printf 'TODO_HOST=127.0.0.1\nTODO_PORT=18081\nTODO_REQUIRE_SHELLCHECK=false\n' > .env
 $ ./scripts/clean.sh --all
 $ ./scripts/dev.sh
@@ -1274,7 +1300,6 @@ $ git restore --staged scripts .env.example .github/workflows/scripts-check.yml
 
   ```bash
   $ ls -l scripts/dev.sh
-  $ stat -c '%a %n' scripts/dev.sh
   ```
 
   如果权限里没有 `x`，例如 `-rw-r--r--`，说明当前用户不能直接执行脚本。
@@ -1388,7 +1413,7 @@ $ git restore --staged scripts .env.example .github/workflows/scripts-check.yml
 
 - **修复**：优先使用 POSIX 兼容写法；确实需要平台差异时，用 `case "$(uname -s)"` 分支处理。CI 中明确使用 Ubuntu Runner 时，也要在文档中写清本地兼容范围。
 
-- **预防**：关键脚本在 Linux/WSL2 中验证。跨平台脚本避免依赖 `sed -i`、`readlink -f`、GNU `stat -c` 等差异较大的参数。
+- **预防**：关键脚本在 Linux/WSL2 中验证。跨平台脚本避免依赖 `sed -i`、`readlink -f`、GNU `stat -c`、BSD `stat -f` 等差异较大的参数；教学排查优先使用 `ls -l` 这类两端都可用的命令。
 
 ### 错误 5：清理脚本误删或泄露敏感信息
 
