@@ -167,7 +167,7 @@ nav:
   - 阶段一 基础能力:
       - 1. 课程导学与开发环境准备 [A]: chapters/stage-01-foundation/01-course-guide-env.md
       - 2. Linux 文件系统与命令基础 [A]: chapters/stage-01-foundation/02-linux-filesystem.md
-      - 3. Linux 进程与服务管理: chapters/stage-01-foundation/03-linux-process.md
+      - 3. Linux 进程、服务与软件管理 [A]: chapters/stage-01-foundation/03-linux-process.md
       - 4. Linux 网络基础与排障: chapters/stage-01-foundation/04-linux-network.md
       - 5. Git 基础与团队协作: chapters/stage-01-foundation/05-git-basics.md
       - 6. Shell 脚本与自动化: chapters/stage-01-foundation/06-shell-scripting.md
