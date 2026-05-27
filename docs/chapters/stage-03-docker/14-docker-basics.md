@@ -106,7 +106,7 @@ Docker 主要解决三类问题。
 
 - `postgres:16`：包含 PostgreSQL 16。
 - `redis:7`：包含 Redis 7。
-- `golang:1.24`：包含 Go 1.24 工具链。
+- `golang:1.26`：包含 Go 1.26 工具链。
 
 镜像通常从镜像仓库拉取：
 
@@ -282,7 +282,7 @@ postgres://todo:todo_password@todo-postgres:5432/todo_platform?sslmode=disable
 - 创建 Docker 网络 `todo-net`。
 - 创建 PostgreSQL 和 Redis 数据卷。
 - 使用 Docker 运行 PostgreSQL、Redis。
-- 使用官方 `golang:1.24` 镜像运行 Todo API。
+- 使用官方 `golang:1.26` 镜像运行 Todo API。
 - 完成数据库迁移、密码哈希生成、登录和 Todo 接口访问。
 - 查看日志、进入容器、检查网络、停止和清理容器。
 
@@ -635,7 +635,7 @@ PONG
       -e TODO_CONFIG_DIR=configs \
       -e TODO_ENV=dev \
       -e TODO_DATABASE_DSN='postgres://todo:todo_password@todo-postgres:5432/todo_platform?sslmode=disable' \
-      golang:1.24 \
+      golang:1.26 \
       go run ./cmd/todo-api migrate
     ```
 
@@ -648,7 +648,7 @@ PONG
       -e TODO_CONFIG_DIR=configs `
       -e TODO_ENV=dev `
       -e TODO_DATABASE_DSN='postgres://todo:todo_password@todo-postgres:5432/todo_platform?sslmode=disable' `
-      golang:1.24 `
+      golang:1.26 `
       go run ./cmd/todo-api migrate
     ```
 
@@ -661,7 +661,7 @@ PONG
 | `-v "$PWD:/workspace"` | 把当前代码目录挂载进容器 |
 | `-w /workspace` | 设置容器工作目录 |
 | `TODO_DATABASE_DSN` | 使用 Docker 网络中的 PostgreSQL 地址 |
-| `golang:1.24` | 使用官方 Go 镜像执行项目命令 |
+| `golang:1.26` | 使用官方 Go 镜像执行项目命令 |
 
 第一次运行可能会下载 Go module，时间会稍长。
 
@@ -695,7 +695,7 @@ Todo API 第 13 篇已经要求不保存明文密码。先在 Go 容器中生成
       -w /workspace \
       -e TODO_CONFIG_DIR=configs \
       -e TODO_ENV=dev \
-      golang:1.24 \
+      golang:1.26 \
       go run ./cmd/todo-api hash-password "change-me-123")
 
     echo "$HASH"
@@ -709,7 +709,7 @@ Todo API 第 13 篇已经要求不保存明文密码。先在 Go 容器中生成
       -w /workspace `
       -e TODO_CONFIG_DIR=configs `
       -e TODO_ENV=dev `
-      golang:1.24 `
+      golang:1.26 `
       go run ./cmd/todo-api hash-password "change-me-123"
 
     $hash
@@ -741,7 +741,7 @@ argon2id$v=19$m=65536,t=3,p=2$...$...
       -e TODO_REDIS_PASSWORD='todo_redis_password' \
       -e TODO_JWT_SECRET='0123456789abcdef0123456789abcdef' \
       -e "TODO_AUTH_USERS=admin=$HASH" \
-      golang:1.24 \
+      golang:1.26 \
       go run ./cmd/todo-api config-check
     ```
 
@@ -759,7 +759,7 @@ argon2id$v=19$m=65536,t=3,p=2$...$...
       -e TODO_REDIS_PASSWORD='todo_redis_password' `
       -e TODO_JWT_SECRET='0123456789abcdef0123456789abcdef' `
       -e "TODO_AUTH_USERS=admin=$hash" `
-      golang:1.24 `
+      golang:1.26 `
       go run ./cmd/todo-api config-check
     ```
 
@@ -785,7 +785,7 @@ argon2id$v=19$m=65536,t=3,p=2$...$...
       -e TODO_REDIS_PASSWORD='todo_redis_password' \
       -e TODO_JWT_SECRET='0123456789abcdef0123456789abcdef' \
       -e "TODO_AUTH_USERS=admin=$HASH" \
-      golang:1.24 \
+      golang:1.26 \
       go run ./cmd/todo-api serve
     ```
 
@@ -805,7 +805,7 @@ argon2id$v=19$m=65536,t=3,p=2$...$...
       -e TODO_REDIS_PASSWORD='todo_redis_password' `
       -e TODO_JWT_SECRET='0123456789abcdef0123456789abcdef' `
       -e "TODO_AUTH_USERS=admin=$hash" `
-      golang:1.24 `
+      golang:1.26 `
       go run ./cmd/todo-api serve
     ```
 
@@ -1009,15 +1009,15 @@ SELECT id, title, completed FROM todos ORDER BY created_at DESC LIMIT 5;
 === "Linux / macOS / WSL2"
 
     ```bash
-    docker run --rm --network todo-net alpine:3.20 nslookup todo-postgres
-    docker run --rm --network todo-net alpine:3.20 nslookup todo-redis
+    docker run --rm --network todo-net alpine:3.23 nslookup todo-postgres
+    docker run --rm --network todo-net alpine:3.23 nslookup todo-redis
     ```
 
 === "Windows PowerShell"
 
     ```powershell
-    docker run --rm --network todo-net alpine:3.20 nslookup todo-postgres
-    docker run --rm --network todo-net alpine:3.20 nslookup todo-redis
+    docker run --rm --network todo-net alpine:3.23 nslookup todo-postgres
+    docker run --rm --network todo-net alpine:3.23 nslookup todo-redis
     ```
 
 如果能解析到 IP，说明 Docker 网络 DNS 正常。
@@ -1282,13 +1282,13 @@ docker exec todo-redis redis-cli -a todo_redis_password PING
 ### 9.9 检查代码目录挂载
 
 ```bash
-docker run --rm -v "$PWD:/workspace" -w /workspace golang:1.24 ls go.mod cmd/todo-api
+docker run --rm -v "$PWD:/workspace" -w /workspace golang:1.26 ls go.mod cmd/todo-api
 ```
 
 Windows PowerShell 使用：
 
 ```powershell
-docker run --rm -v "${PWD}:/workspace" -w /workspace golang:1.24 ls go.mod cmd/todo-api
+docker run --rm -v "${PWD}:/workspace" -w /workspace golang:1.26 ls go.mod cmd/todo-api
 ```
 
 如果容器内看不到 `go.mod`，说明当前目录不对，或 Docker Desktop 没有权限挂载该路径。Windows 场景优先检查 Docker Desktop 的 WSL integration 和文件共享设置。
@@ -1312,13 +1312,13 @@ docker run --rm -v "${PWD}:/workspace" -w /workspace golang:1.24 ls go.mod cmd/t
 查看镜像架构：
 
 ```bash
-docker image inspect golang:1.24 --format '{{.Architecture}}/{{.Os}}'
+docker image inspect golang:1.26 --format '{{.Architecture}}/{{.Os}}'
 ```
 
 如果 Apple Silicon、ARM 服务器或特殊开发机出现 `exec format error`，说明镜像平台可能不匹配。可以临时指定平台验证：
 
 ```bash
-docker run --rm --platform linux/amd64 golang:1.24 go version
+docker run --rm --platform linux/amd64 golang:1.26 go version
 ```
 
 这只是排障手段。长期方案应选择适合团队机器和部署环境的平台镜像。
@@ -1548,7 +1548,7 @@ Dockerfile 解决如何构建应用镜像；Docker Compose 解决本地多容器
 
 下一篇会进入 **Dockerfile 与镜像构建**。
 
-本篇使用 `golang:1.24` 镜像挂载代码运行 Todo API，这种方式适合学习和本地开发，但不适合生产交付。生产交付需要一个属于 Todo API 自己的镜像，把编译产物、运行命令、非 root 用户、健康检查和镜像标签管理起来。
+本篇使用 `golang:1.26` 镜像挂载代码运行 Todo API，这种方式适合学习和本地开发，但不适合生产交付。生产交付需要一个属于 Todo API 自己的镜像，把编译产物、运行命令、非 root 用户、健康检查和镜像标签管理起来。
 
 下一篇会完成：
 

@@ -116,7 +116,7 @@ Docker Compose 是本地多容器应用编排工具。它用一个 YAML 文件�
 ```yaml title="compose.yaml"
 services:
   hello:
-    image: alpine:3.20
+    image: alpine:3.23
     command: ["echo", "hello compose"]
 ```
 
