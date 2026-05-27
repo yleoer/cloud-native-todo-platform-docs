@@ -1,8 +1,8 @@
-# 第 7 篇：Go 语言基础
+# 第 7 篇：Go 语言基础 [C]
 
-阶段一已经完成了 Linux、Git、网络排障和 Shell 自动化。现在课程进入阶段二：Go 后端开发。
+阶段一已经完成 Ubuntu 24.04 环境、Linux 基础、Git 协作和 Shell 自动化。从本篇开始，课程进入 **阶段二：Go 后端开发**。
 
-在后续课程中，`Cloud Native Todo Platform` 会从一个本地实验项目逐步演进为 Go Web API、数据库服务、Docker 镜像、Kubernetes 应用和 Operator 管理对象。Go 是这条主线的核心语言。本篇不追求一次讲完所有 Go 细节，而是先建立后端开发最常用、最关键的一组基础能力。
+本篇属于 **C 类：实践/开发章**。你不会只看语法表，而是会把 Go 基础语法放进一个能运行的项目里：命令行版 Todo 管理器 `todo-cli`。它使用内存存储，支持新增、列表、完成、修改和删除 Todo，是后续 Todo API、工程化测试、数据库持久化和容器化的第一块 Go 代码资产。
 
 本篇对应 5 个章节主题：
 
@@ -10,151 +10,60 @@
 - 7.2 条件、循环、数组、切片与 map
 - 7.3 函数、指针、结构体与方法
 - 7.4 interface、error 与 defer
-- 7.5 Go module 与包管理基础
-
-本篇特色项目是：**开发命令行版 Todo 管理器 `todo-cli`**。
-
-你会在 `cloud-native-todo-platform` 仓库中创建一个 Go module，编写一个可运行、可测试、可持续演进的 CLI 程序，支持 Todo 的新增、列表、修改、完成和删除。这个 CLI 会在后续章节继续演进：第 8 篇会引入并发，第 9 篇会强化测试和工程化，第 10 篇会改造为 Web API。
+- 7.5 Go module 与包管理：`replace`、`vendor`、`indirect` 依赖
 
 ## 1. 本章学习目标
 
-学完本篇后，你应该能够用 Go 编写结构清晰的小型命令行程序，并理解这些语法为什么是后端服务开发的基础。
+学完本篇后，你应该能用 Go 编写结构清晰的小型命令行程序，并能解释这些基础语法如何支撑后续 Web API、数据库访问和 Kubernetes Controller 开发。
 
-具体目标如下：
+### 1.1 知识目标
 
-- 能解释一个 Go 程序由 `package`、`import`、函数和文件组成。
-- 能使用变量、常量、基础类型、零值和类型转换。
-- 能使用 `if`、`switch`、`for` 编写分支和循环逻辑。
-- 能使用数组、切片和 map 表达列表、集合和键值关系。
-- 能定义函数，理解参数、返回值、多返回值和命名返回值。
-- 能理解指针为什么用于修改原对象，什么时候应该避免过度使用指针。
-- 能定义结构体和方法，用它们表达业务对象和行为。
-- 能使用 `interface` 抽象能力边界，而不是为了抽象而抽象。
-- 能使用 `error`、`errors.Is`、`fmt.Errorf("%w")` 处理错误链路。
-- 能使用 `defer` 释放资源或收尾，但知道它不是万能清理工具。
-- 能创建 Go module，理解 module path、package path、`go.mod` 和 `go.sum`。
-- 能完成 `todo-cli` 的增删改查逻辑，并用 `go test ./...` 验证。
+- 能解释 Go 程序由 `package`、`import`、函数、文件和 module 组成。
+- 能描述变量、常量、零值、类型转换、数组、切片和 map 的使用边界。
+- 能解释函数、指针、结构体和方法如何表达业务对象与业务行为。
+- 能说明 `interface`、`error`、`defer` 在工程代码中的职责。
+- 能描述 `go.mod`、module path、package path、`replace`、`vendor` 和 `indirect` 依赖的作用。
 
-本篇结束时，你至少应该能独立完成以下命令组合：
+### 1.2 技能目标
+
+- 能在 `cloud-native-todo-platform` 中创建 `cmd/todo-cli` 和 `internal/todo` 两个 Go package。
+- 能实现一个内存版 `todo-cli`，支持 `add`、`list`、`done`、`update`、`delete`。
+- 能使用 `go fmt`、`go test`、`go run`、`go build` 完成基础开发闭环。
+- 能根据 Go 编译错误定位 package 名、导出标识符、参数数量和类型错误。
+
+本篇结束时，你至少应该能成功执行：
 
 ```bash
-go mod init cloud-native-todo-platform
-go fmt ./...
+cd ~/workspace/cloud-native-todo-platform
 go test ./...
-go run ./cmd/todo-cli add "学习 Go 基础语法"
-go run ./cmd/todo-cli list
-go run ./cmd/todo-cli done 1
-go run ./cmd/todo-cli update 1 "学习 Go module 与包管理"
-go run ./cmd/todo-cli delete 1
+go run ./cmd/todo-cli add "学习 Go 基础" add "完成 todo-cli" list done 1 update 2 "完成 Go module" list delete 1 list
+go build -o bin/todo-cli ./cmd/todo-cli
+./bin/todo-cli add "构建后的 CLI 可运行" list
 ```
 
-这些能力会直接支撑后续 Go 并发、Web API、数据库访问、Docker 镜像构建、Kubernetes 探针和 Operator Controller 开发。
+## 2. 本章工作场景与真实案例
 
-## 2. 本章工作场景
+### 2.1 技术痛点
 
-真实公司里，Go 不只是“写语法练习”的语言。它常用于后端 API、微服务、命令行工具、云原生控制器、基础设施自动化和平台工程系统。
+真实后端开发不会停留在“会写一个 hello world”。团队需要你能把业务对象、业务规则、错误处理和工程目录组织起来。比如 Todo 平台中，“新增任务”“完成任务”“删除任务”看似简单，但它们已经涉及输入校验、ID 分配、状态变化、错误返回和输出格式。
 
-典型工作场景包括：
+如果 Go 基础不扎实，后续会连续卡住：写 HTTP Handler 时不知道如何组织结构体，接数据库时不知道如何处理错误，写测试时不知道怎么替换依赖，开发 Controller 时不知道 interface 应该定义在哪里。本篇先用一个小 CLI 把这些能力串起来。
 
-- 后端开发需要实现 Todo API 的业务逻辑，例如创建任务、更新任务、标记完成、分页查询。
-- DevOps 需要写一个 CLI 工具批量检查服务配置、生成部署文件或触发发布流程。
-- SRE 需要编写巡检工具，读取文件、调用 HTTP 接口、输出诊断结果。
-- 平台工程师需要开发 Kubernetes Controller，用结构体表达 CRD 资源，用 interface 抽象客户端，用 error 处理重试。
-- 测试同学需要运行 `go test ./...`，确认业务逻辑没有在重构中被破坏。
-- 团队需要通过 Go module 管理依赖版本，确保本地、CI 和生产构建一致。
+### 2.2 团队协作场景
 
-本篇的学习路径如下：
+在真实团队中，CLI 工具常用于本地调试、数据修复、发布辅助和运维巡检。后端开发负责编写业务逻辑，DevOps 可能把 CLI 放进脚本或 CI，测试同学用它准备数据，SRE 用它快速验证服务行为。一个 CLI 如果参数、退出码和错误输出不稳定，就很难被脚本可靠调用。
 
-```mermaid
-flowchart LR
-    Syntax["Go 基础语法<br/>变量 / 类型 / 控制流"]
-    Data["数据结构<br/>切片 / map / 结构体"]
-    Behavior["业务行为<br/>函数 / 方法 / 指针"]
-    Boundary["能力边界<br/>interface / error / defer"]
-    Module["工程入口<br/>Go module / package"]
-    CLI["todo-cli<br/>可运行小项目"]
-    Next["后续演进<br/>并发 / 测试 / Web API"]
+本篇的 `todo-cli` 不追求功能复杂，而是训练最基本的协作边界：入口程序放在 `cmd/todo-cli`，业务对象和内存仓库放在 `internal/todo`，命令行解析只负责把用户输入转换为业务调用，业务包不依赖终端输出。
 
-    Syntax --> Data --> Behavior --> Boundary --> Module --> CLI --> Next
-```
+### 2.3 课程项目关联
 
-本篇不会把 Go 学成零散语法表，而是围绕一个真实的 `todo-cli` 小项目，把语法放回工程场景中理解。
+`todo-cli` 是 `Cloud Native Todo Platform` 的第一个 Go 业务程序。它的内存存储只适合本篇学习；后续第 8 篇会在此基础上补工程化结构和测试，第 9 篇开始把 Todo 能力迁移到 HTTP API，第 12 篇会引入 PostgreSQL 持久化。你在本篇写下的 `Item`、`Repository`、错误处理和 package 边界，会反复出现在后续章节中。
 
-## 3. 前置知识
+## 3. 核心概念
 
-### 必须掌握
+### 3.1 Go 程序结构
 
-学习本篇前，你需要具备以下基础：
-
-- 已经完成第 1 篇开发环境准备，并能在终端执行命令。
-- 已经安装 Go，并能执行 `go version`。
-- 已经完成 Git 基础，能在仓库中创建分支、提交代码和查看变更。
-- 已经完成 Shell 基础，能理解环境变量、退出码和命令执行上下文。
-- 能使用 `cd` 进入 `cloud-native-todo-platform` 项目目录。
-
-### 建议了解
-
-以下内容不要求熟练，但建议有基本概念：
-
-- JSON 是常见的数据交换格式。
-- CLI 程序通过命令行参数接收用户输入。
-- 后端服务常把“业务对象”和“存储逻辑”拆开。
-- 单元测试用于验证函数和业务逻辑是否符合预期。
-
-### 环境差异说明
-
-Go 语言本身跨平台一致，但路径、环境变量和命令行语法在不同系统中有差异。
-
-=== "Linux / WSL2"
-
-    推荐环境。后续 Docker、Kubernetes、Operator 实验也更接近生产环境。
-
-    ```bash
-    go version
-    git --version
-    pwd
-    ```
-
-    如果使用 WSL2，建议把项目放在 Linux 文件系统中，例如：
-
-    ```bash
-    mkdir -p ~/workspace
-    cd ~/workspace
-    ```
-
-=== "macOS"
-
-    macOS 可以直接完成本篇实验。
-
-    ```bash
-    go version
-    git --version
-    pwd
-    ```
-
-    如果通过 Homebrew 安装 Go，确认当前终端能找到 Go：
-
-    ```bash
-    which go
-    ```
-
-=== "Windows PowerShell"
-
-    Windows 可以完成本篇实验。后续涉及 Linux、Docker 和 Kubernetes 时，更推荐使用 WSL2。
-
-    ```powershell
-    go version
-    git --version
-    Get-Location
-    ```
-
-    PowerShell 中环境变量写法和 Bash 不同，本篇实验会用标签页分别给出。
-
-## 4. 核心概念
-
-### 4.1 Go 程序结构
-
-一个可执行 Go 程序通常从 `package main` 开始，并包含 `main` 函数。
+一个可执行 Go 程序通常从 `package main` 和 `main` 函数开始：
 
 ```go
 package main
@@ -168,23 +77,23 @@ func main() {
 
 几个关键点：
 
-- `package main` 表示当前包会编译成可执行程序。
-- `import "fmt"` 表示引入标准库 `fmt`。
+- `package main` 表示这个包可以编译成可执行程序。
+- `import "fmt"` 引入 Go 标准库中的格式化输出包。
 - `func main()` 是程序入口。
-- Go 代码格式由 `gofmt` 或 `go fmt` 统一，不依赖团队手工约定。
+- Go 使用 `gofmt` 统一格式，团队不需要争论缩进风格。
 
-在项目中，我们不会把所有代码都塞进 `main.go`。常见做法是：
+在课程项目中，我们采用更接近真实项目的拆分：
 
 ```text
-cmd/todo-cli/        # 可执行程序入口
-internal/todo/       # 业务逻辑包
+cmd/todo-cli/        # 命令行入口，负责解析参数和输出
+internal/todo/       # Todo 业务包，负责对象、规则和存储
 ```
 
-`cmd/` 用来放入口程序，`internal/` 用来放只允许本 module 内部使用的业务包。这种结构在企业 Go 项目中非常常见，也适合后续演进为 Web API 和 Kubernetes Controller。
+`cmd/` 放可执行程序入口，`internal/` 放本 module 内部使用的业务包。后续 Web API、后台任务和测试都会复用这种组织方式。
 
-### 4.2 变量、常量与类型
+### 3.2 变量、常量与类型
 
-Go 是静态类型语言。变量在编译期就有明确类型。
+Go 是静态类型语言，变量在编译期就有明确类型：
 
 ```go
 var title string = "学习 Go"
@@ -192,41 +101,40 @@ var done bool
 count := 3
 ```
 
-说明：
-
 - `var title string = "学习 Go"` 显式声明类型。
 - `var done bool` 没有赋值时使用零值，`bool` 的零值是 `false`。
 - `count := 3` 是短变量声明，只能在函数内部使用。
 
-常量用 `const`：
+常量用 `const`，适合表达不会变化的命令名、默认值和状态：
 
 ```go
-const defaultDataFile = "todos.json"
+const commandAdd = "add"
 ```
 
-Go 常见基础类型如下：
+本篇常用类型如下：
 
-| 类型 | 典型用途 | 零值 |
+| 类型 | 用途 | 零值 |
 |---|---|---|
-| `string` | 标题、名称、路径 | `""` |
-| `bool` | 是否完成、是否启用 | `false` |
-| `int` | ID、数量、索引 | `0` |
-| `float64` | 金额、比例、指标值 | `0` |
-| `time.Time` | 创建时间、更新时间 | 零时间 |
+| `string` | Todo 标题、命令名 | `""` |
+| `bool` | 是否完成 | `false` |
+| `int` | Todo ID、索引 | `0` |
+| `[]Item` | Todo 列表 | `nil` |
+| `map[int]Item` | 按 ID 保存 Todo | `nil` |
+| `time.Time` | 创建和更新时间 | 零时间 |
 
-零值是 Go 的重要设计。它让结构体在未显式初始化时仍然处于可预测状态。比如 `Todo` 的 `ID` 默认是 `0`，可以用来判断它是否还没有被持久化。
+零值是 Go 的重要设计。一个 `Item` 即使没有手动填充所有字段，也处于可预测状态；但业务代码仍应主动校验标题不能为空、ID 必须存在。
 
-### 4.3 条件、循环、数组、切片与 map
+### 3.3 条件、循环、数组、切片与 map
 
-Go 的条件判断不需要小括号：
+Go 的条件语句不需要小括号：
 
 ```go
 if title == "" {
-	return errors.New("title is empty")
+	return errors.New("title is required")
 }
 ```
 
-`switch` 适合命令分发：
+`switch` 很适合处理 CLI 子命令：
 
 ```go
 switch command {
@@ -239,45 +147,35 @@ default:
 }
 ```
 
-Go 只有一种循环关键字：`for`。
+数组长度固定，切片长度可变。业务列表更常用切片：
 
 ```go
-for _, item := range items {
-	fmt.Println(item.Title)
+items := []string{"学习 Go", "编写 CLI"}
+items = append(items, "运行 go build")
+```
+
+map 适合按 key 快速查找。本篇的内存仓库用 `map[int]Item` 按 ID 保存 Todo：
+
+```go
+items := map[int]string{
+	1: "学习 Go",
+	2: "完成 CLI",
 }
 ```
 
-数组长度固定，切片长度可变。日常后端开发中更常用切片。
+遍历 map 时顺序不稳定，所以本篇会在 `List` 方法中把 Todo 拷贝到切片里，再按 ID 排序。这个细节很重要：命令行输出如果每次顺序不同，脚本和测试都会变得不稳定。
+
+### 3.4 函数、指针、结构体与方法
+
+函数用于表达动作：
 
 ```go
-items := []string{"learn go", "write cli"}
-items = append(items, "run tests")
-```
-
-map 用于键值关系：
-
-```go
-labels := map[string]string{
-	"app": "todo-cli",
-	"env": "dev",
-}
-```
-
-在 Todo 项目中，切片适合表示 Todo 列表，map 适合后续表示标签、索引、配置项或 HTTP 请求参数。
-
-### 4.4 函数、指针、结构体与方法
-
-函数用于封装一段可复用逻辑：
-
-```go
-func nextID(items []Item) int {
-	maxID := 0
-	for _, item := range items {
-		if item.ID > maxID {
-			maxID = item.ID
-		}
+func normalizeTitle(title string) (string, error) {
+	title = strings.TrimSpace(title)
+	if title == "" {
+		return "", errors.New("title is required")
 	}
-	return maxID + 1
+	return title, nil
 }
 ```
 
@@ -285,80 +183,76 @@ func nextID(items []Item) int {
 
 ```go
 type Item struct {
-	ID    int
-	Title string
-	Done  bool
+	ID        int
+	Title     string
+	Done      bool
+	CreatedAt time.Time
+	UpdatedAt time.Time
 }
 ```
 
-方法把行为绑定到类型：
+方法把行为绑定到类型上：
 
 ```go
-func (i *Item) MarkDone() {
-	i.Done = true
+func (i Item) Status() string {
+	if i.Done {
+		return "done"
+	}
+	return "pending"
 }
 ```
 
-这里使用 `*Item` 指针接收者，是因为 `MarkDone` 需要修改原对象。如果使用值接收者，方法拿到的是副本，修改不会影响原来的 `Item`。
+指针用于修改原对象，或避免复制较大的对象。本篇的 `MemoryStore` 方法使用指针接收者，因为新增、修改和删除 Todo 都会改变仓库内部的 `map` 和 `nextID`。
 
-一个简单判断原则：
+```go
+func (s *MemoryStore) Add(title string) (Item, error) {
+	// 修改 s.items 和 s.nextID
+}
+```
 
-- 只读取对象状态，可以优先用值接收者。
-- 需要修改对象状态，使用指针接收者。
-- 对象较大或包含锁、连接等资源时，通常使用指针接收者。
+指针不是越多越好。像 `Item.Status()` 只读取字段，不修改对象，用值接收者更简单。
 
-### 4.5 interface、error 与 defer
+### 3.5 interface、error 与 defer
 
-`interface` 表达的是“一个类型具备什么能力”。例如：
+`interface` 描述“调用方需要什么能力”。本篇定义一个最小 `Repository`：
 
 ```go
 type Repository interface {
-	List() ([]Item, error)
 	Add(title string) (Item, error)
+	List() []Item
+	Done(id int) (Item, error)
+	Update(id int, title string) (Item, error)
+	Delete(id int) error
 }
 ```
 
-任何类型只要实现了这些方法，就自动满足这个 interface。Go 不需要显式写 `implements`。
+现在它的实现是 `MemoryStore`。未来可以替换成文件、PostgreSQL 或 Redis，而 CLI 入口不需要关心底层怎么存。
 
-`error` 是 Go 中最重要的错误处理方式。Go 不鼓励把错误藏起来，而是要求调用者显式处理：
+这里的 `List() []Item` 是本篇为了新手学习刻意保留的简化接口：内存读取不会失败，所以暂时不返回 `error`。后续进入文件存储、数据库和 HTTP 请求链路后，Repository 会继续演进为带 `error`、`context.Context` 和过滤条件的形式。先把“能力边界”学清楚，再逐步增加生产复杂度，学习曲线会更稳。
+
+Go 用 `error` 表达可预期失败，例如标题为空、ID 不存在、ID 不是数字。错误要带上下文，方便排障：
 
 ```go
-item, err := store.Add("学习 Go")
-if err != nil {
-	return err
-}
-fmt.Println(item.ID)
+return Item{}, fmt.Errorf("%w: id=%d", ErrNotFound, id)
 ```
 
-为了保留错误上下文，推荐使用错误包装：
+`%w` 会保留错误链，后续可以用 `errors.Is(err, ErrNotFound)` 判断根因。
+
+`defer` 用于函数返回前执行收尾动作，常见于关闭文件、释放锁、恢复临时状态。本篇内存 CLI 不需要打开文件，但你应该理解它的典型用法：
 
 ```go
-return fmt.Errorf("read todo file: %w", err)
-```
-
-调用方可以用 `errors.Is` 判断底层错误：
-
-```go
-if errors.Is(err, ErrNotFound) {
-	fmt.Println("todo not found")
-}
-```
-
-`defer` 用于延迟执行，常见于关闭文件、释放锁、恢复临时状态：
-
-```go
-file, err := os.Open("todos.json")
+file, err := os.Open("todos.txt")
 if err != nil {
 	return err
 }
 defer file.Close()
 ```
 
-注意：`defer` 会在当前函数返回前执行，不是“后台任务”，也不能替代错误处理。生产代码里，关闭文件、提交事务、释放锁等 `defer` 操作仍然需要考虑错误和顺序。
+`defer` 不是“出了错自动修复”。它只是保证当前函数结束前执行某个动作，具体动作是否成功仍然要按场景处理。
 
-### 4.6 Go module 与包管理
+### 3.6 Go module 与包管理
 
-Go module 是 Go 的依赖和版本管理机制。一个 module 由 `go.mod` 描述：
+`go.mod` 是 Go 项目的依赖和 module 声明文件：
 
 ```go
 module cloud-native-todo-platform
@@ -366,247 +260,183 @@ module cloud-native-todo-platform
 go 1.26
 ```
 
-这里的 `go 1.26` 是课程当前验证环境示例，不是语法本身的硬性要求。你在本机执行 `go mod init` 时，Go 工具链会按本机版本写入对应的 `go` 行。团队项目中应在课程文档、CI 镜像和开发环境中统一 Go 主版本，避免“本机能编译，CI 不能编译”的问题。
+几个概念要分清：
 
-关键概念：
+- module path：`cloud-native-todo-platform`，表示当前项目的根路径。
+- package path：`cloud-native-todo-platform/internal/todo`，表示某个包的导入路径。
+- `go.sum`：记录依赖校验信息，有第三方依赖时出现。
+- `indirect`：当前 module 没直接 import，但被其他依赖间接需要。
+- `replace`：把某个 module 临时替换到本地路径或另一个版本，常用于本地联调。
+- `vendor`：把依赖复制到项目 `vendor/` 目录，常用于网络受限或强审计环境。
 
-- `module` 是当前项目的模块路径。
-- `go` 表示这个 module 使用的 Go 语言版本线。
-- `require` 用于记录外部依赖。
-- `go.sum` 用于记录依赖校验信息，保证构建可复现。
+本篇只使用标准库，不会产生第三方依赖；但你会先建立 module 结构，为后续 Gin、PostgreSQL、Redis 等依赖管理打基础。
 
-本篇示例只使用 Go 标准库，所以暂时不会产生外部依赖。后续引入 Web 框架、数据库驱动和 Kubernetes SDK 时，Go module 会变得非常关键。
+为了先建立概念，下面给出一个只读示例，不需要在本篇实验中执行：
 
-## 5. 原理深入
+```go
+module cloud-native-todo-platform
 
-### 5.1 从源码到可执行程序
+go 1.26
 
-运行：
+require (
+	github.com/example/teamlib v1.2.3
+	golang.org/x/text v0.31.0 // indirect
+)
 
-```bash
-go run ./cmd/todo-cli
+replace github.com/example/teamlib => ../teamlib
 ```
 
-背后发生了几件事：
+- `require` 记录当前项目依赖的 module 版本。
+- `// indirect` 表示这个依赖不是当前代码直接 import 的，而是被其他依赖间接拉入。
+- `replace` 常用于本地联调，例如后续你同时修改平台公共库和 Todo 服务。
+- `go mod vendor` 会把依赖复制到 `vendor/`，适合网络受限或强审计环境；普通项目默认不需要一开始就 vendor。
+
+## 4. 原理深入
+
+### 4.1 `todo-cli` 的调用链
+
+图 7-1 展示本篇 CLI 的运行流程。
 
 ```mermaid
-flowchart LR
-    Source["Go 源码<br/>.go 文件"]
-    Parse["解析与类型检查<br/>语法 / 类型 / import"]
-    Compile["编译<br/>生成机器码"]
-    Link["链接<br/>组合依赖包"]
-    Run["运行<br/>执行 main 函数"]
-
-    Source --> Parse --> Compile --> Link --> Run
+flowchart TD
+    User["用户输入命令"] --> Main["cmd/todo-cli main"]
+    Main --> Parse["解析子命令和参数"]
+    Parse --> Repo["todo.Repository 接口"]
+    Repo --> Store["MemoryStore 内存实现"]
+    Store --> Result["返回 Item 或 error"]
+    Result --> Output["打印结果并设置退出码"]
 ```
 
-如果执行：
+命令行入口只做三件事：解析输入、调用业务包、打印结果。业务包不读取 `os.Args`，也不直接打印终端输出。这样的拆分让代码更容易测试，也让后续从 CLI 迁移到 HTTP API 更自然。
 
-```bash
-go build ./cmd/todo-cli
-```
+### 4.2 内存存储的生命周期
 
-Go 会生成一个可执行文件。`go run` 更适合开发调试，`go build` 更接近构建发布。
+本篇使用内存存储，所有 Todo 都保存在当前进程的 `map[int]Item` 中。进程退出后，数据会消失。这是有意设计，不是缺陷：第 7 篇的目标是 Go 语法和对象建模，不提前引入文件、数据库和并发控制。
 
-### 5.2 package 如何组织代码
+因此，完整增删改查要在同一个进程中完成。本篇支持两种方式：
 
-Go 以目录作为 package 的组织单位。一般来说，一个目录中的 `.go` 文件应该属于同一个 package。
+- 在一条命令里串联多个子命令。
+- 不带参数启动交互模式，逐行输入命令。
 
-本篇项目中：
+第 8 篇以后会继续演进工程结构和测试，第 12 篇会把数据持久化到 PostgreSQL。你现在需要记住的是：存储方式会变，但 `Repository` 表达的业务能力边界可以延续。
 
-```text
-cmd/todo-cli/main.go       -> package main
-internal/todo/*.go         -> package todo
-```
+### 4.3 错误与退出码
 
-`main.go` 负责解析命令行参数和输出结果，`internal/todo` 负责业务逻辑和文件存储。这样拆分有几个好处：
+CLI 程序经常被 Shell 脚本或 CI 调用。它应该遵守一个基本约定：成功时退出码为 `0`，失败时退出码非 `0`，错误写到标准错误。
 
-- CLI 入口变薄，后续更容易新增 Web API 入口。
-- 业务逻辑可以被测试，不依赖终端交互。
-- 后续可以把文件存储替换成数据库存储。
-- `internal` 能防止其他 module 直接导入内部包，保护边界。
-
-### 5.3 值、指针和内存语义
-
-Go 默认按值传递。把结构体传给函数时，函数拿到的是副本。
+本篇 `main` 函数会这样处理：
 
 ```go
-func rename(item Item) {
-	item.Title = "new title"
+if err := run(os.Args[1:], os.Stdin, os.Stdout); err != nil {
+	fmt.Fprintf(os.Stderr, "error: %v\n", err)
+	os.Exit(1)
 }
 ```
 
-这段代码不会修改外部的 `item`。如果要修改原对象，需要传指针：
+这段代码背后有三个工程习惯：
 
-```go
-func rename(item *Item) {
-	item.Title = "new title"
-}
-```
+- 业务函数返回 `error`，入口统一决定怎么展示。
+- 普通结果写到 `stdout`，错误写到 `stderr`。
+- 失败时显式 `os.Exit(1)`，方便脚本判断。
 
-这也是为什么 `MarkDone` 使用 `*Item` 方法接收者。对新手来说，指针最重要的不是“地址”这个词，而是理解：**我修改的是副本，还是原来的对象**。
+## 5. 手把手实验
 
-### 5.4 interface 是行为契约
+### 5.1 实验目标
 
-在 Go 中，interface 不应该一开始就设计得很大。一个常见原则是：在使用方定义小 interface。
+本实验会在 `cloud-native-todo-platform` 中实现内存版 `todo-cli`，完成 Go module 初始化、业务包编写、命令行入口编写、运行验证和构建。
 
-例如后续 Web API 处理器只需要新增和查询 Todo，就可以定义：
-
-```go
-type TodoService interface {
-	Add(title string) (Item, error)
-	List() ([]Item, error)
-}
-```
-
-这样测试时可以用假的实现替代真实存储，生产中可以用数据库实现替代文件实现。interface 的价值不是“看起来高级”，而是降低调用方和具体实现的耦合。
-
-也要注意，不是所有地方都应该提前定义 interface。如果一个类型只有一个实现，而且调用方暂时不需要替换它，过早抽象会增加阅读成本。本篇保留 `Repository`，是为了让你提前看到“文件存储将来可以替换成数据库存储”的边界；但在真实项目中，interface 应该随着测试、替换实现或跨层依赖的需要自然出现。
-
-### 5.5 error 链路决定可排障性
-
-生产问题里，最怕的错误信息是：
-
-```text
-open failed
-```
-
-它没有告诉你打开什么失败、在哪个业务动作失败、底层原因是什么。
-
-更好的错误信息应该携带上下文：
-
-```go
-return fmt.Errorf("read todo file %s: %w", s.Path, err)
-```
-
-这样排障时能看到：
-
-```text
-read todo file /home/user/.todo-cli/todos.json: permission denied
-```
-
-Go 的错误处理虽然看起来啰嗦，但它把故障上下文留在了代码路径上。这对后端服务、Kubernetes Controller 和 Operator 重试逻辑都非常重要。
-
-## 6. 手把手实验
-
-### 6.1 实验目标
-
-本实验会开发一个命令行版 Todo 管理器 `todo-cli`，支持：
+最终功能：
 
 - `add <title>`：新增 Todo。
 - `list`：列出 Todo。
-- `done <id>`：标记 Todo 为完成。
-- `update <id> <title>`：修改 Todo 标题。
+- `done <id>`：标记 Todo 完成。
+- `update <id> <title>`：修改标题。
 - `delete <id>`：删除 Todo。
-- `path`：显示数据文件路径。
+- `help`：查看帮助。
 
-数据会保存到 JSON 文件中。默认路径是用户家目录下的 `.todo-cli/todos.json`，也可以通过环境变量 `TODO_CLI_DATA` 指定。
+### 5.2 实验环境
 
-本篇聚焦 Go 语言基础和命令行程序，不涉及 Kubernetes YAML。YAML 会在 Docker、Kubernetes、Helm 和 Operator 阶段系统展开，本篇只需要把 Go 业务逻辑写清楚、跑起来、测起来。
+| 项目 | 要求 |
+|---|---|
+| 操作系统 | Ubuntu 24.04 LTS |
+| Go | 1.26.x |
+| Git | 已完成阶段一 Git 工作流 |
+| Shell | Bash 5.x |
+| 项目目录 | `~/workspace/cloud-native-todo-platform` |
 
-### 6.2 实验环境
-
-确认已经进入课程项目仓库：
-
-=== "Linux / macOS / WSL2"
-
-    ```bash
-    cd ~/workspace/cloud-native-todo-platform
-    go version
-    git status --short --branch
-    ```
-
-=== "Windows PowerShell"
-
-    ```powershell
-    cd D:\workspace\cloud-native-todo-platform
-    go version
-    git status --short --branch
-    ```
-
-如果你还没有项目仓库，可以先创建一个练习目录：
-
-=== "Linux / macOS / WSL2"
-
-    ```bash
-    mkdir -p ~/workspace/cloud-native-todo-platform
-    cd ~/workspace/cloud-native-todo-platform
-    git init
-    ```
-
-=== "Windows PowerShell"
-
-    ```powershell
-    New-Item -ItemType Directory -Force D:\workspace\cloud-native-todo-platform
-    cd D:\workspace\cloud-native-todo-platform
-    git init
-    ```
-
-### 6.3 创建目录结构
-
-创建本篇项目目录：
-
-=== "Linux / macOS / WSL2"
-
-    ```bash
-    mkdir -p cmd/todo-cli internal/todo
-    ```
-
-=== "Windows PowerShell"
-
-    ```powershell
-    New-Item -ItemType Directory -Force cmd\todo-cli, internal\todo
-    ```
-
-最终目录结构如下：
-
-```text
-cloud-native-todo-platform/
-├── go.mod
-├── cmd/
-│   └── todo-cli/
-│       └── main.go
-└── internal/
-    └── todo/
-        ├── defer_demo_test.go
-        ├── item.go
-        ├── store.go
-        └── store_test.go
-```
-
-### 6.4 初始化 Go module
-
-如果仓库还没有 `go.mod`，执行：
+确认 Go 版本：
 
 ```bash
-go mod init cloud-native-todo-platform
+go version
+go env GOPROXY
 ```
 
 预期输出类似：
 
 ```text
-go: creating new go.mod: module cloud-native-todo-platform
+go version go1.26.2 linux/amd64
+https://goproxy.cn,direct
 ```
 
-`go.mod` 内容如下：
+进入项目仓库：
+
+```bash
+cd ~/workspace/cloud-native-todo-platform
+```
+
+### 5.3 文件目录结构
+
+创建本篇需要的目录：
+
+```bash
+mkdir -p cmd/todo-cli internal/todo bin
+```
+
+查看结构：
+
+```bash
+tree -L 3 cmd internal
+```
+
+预期输出：
+
+```text
+cmd
+└── todo-cli
+internal
+└── todo
+```
+
+本篇完成后会形成：
+
+```text
+cloud-native-todo-platform/
+├── cmd/
+│   └── todo-cli/
+│       └── main.go
+├── internal/
+│   └── todo/
+│       ├── item.go
+│       └── memory_store.go
+├── bin/
+└── go.mod
+```
+
+### 5.4 完整代码
+
+如果仓库还没有 `go.mod`，先初始化 module：
+
+```bash
+test -f go.mod || go mod init cloud-native-todo-platform
+```
+
+`go.mod` 内容应类似：
 
 ```go title="go.mod"
 module cloud-native-todo-platform
 
 go 1.26
 ```
-
-`go` 后面的版本会由你本机安装的 Go 工具链写入。上面用 `go 1.26` 作为课程环境示例；如果你的输出是其他已安装版本，以本机生成结果为准。
-
-这里使用 `cloud-native-todo-platform` 作为本地 module path，便于学习者直接复制运行。真实公司项目中通常会使用完整仓库路径，例如：
-
-```text
-github.com/example-org/cloud-native-todo-platform
-```
-
-如果你改成完整仓库路径，代码里的 import 路径也要同步修改。
-
-### 6.5 编写业务对象
 
 创建 `internal/todo/item.go`：
 
@@ -615,267 +445,158 @@ package todo
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 )
 
-type Status string
+// ErrNotFound marks a missing Todo item.
+var ErrNotFound = errors.New("todo not found")
 
-const (
-	StatusPending Status = "pending"
-	StatusDone    Status = "done"
-)
-
-var (
-	ErrEmptyTitle = errors.New("todo title is empty")
-	ErrNotFound   = errors.New("todo item not found")
-)
-
+// Item is the domain object managed by todo-cli.
 type Item struct {
-	ID        int       `json:"id"`
-	Title     string    `json:"title"`
-	Status    Status    `json:"status"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	ID        int
+	Title     string
+	Done      bool
+	CreatedAt time.Time
+	UpdatedAt time.Time
 }
 
-func NewItem(id int, title string, now time.Time) (Item, error) {
+// Status returns the human-readable state of the item.
+func (i Item) Status() string {
+	if i.Done {
+		return "done"
+	}
+	return "pending"
+}
+
+// NormalizeTitle trims and validates a Todo title.
+func NormalizeTitle(title string) (string, error) {
 	title = strings.TrimSpace(title)
 	if title == "" {
-		return Item{}, ErrEmptyTitle
+		return "", errors.New("title is required")
 	}
-
-	return Item{
-		ID:        id,
-		Title:     title,
-		Status:    StatusPending,
-		CreatedAt: now,
-		UpdatedAt: now,
-	}, nil
+	return title, nil
 }
 
-func (i Item) Done() bool {
-	return i.Status == StatusDone
-}
-
-func (i *Item) MarkDone(now time.Time) {
-	i.Status = StatusDone
-	i.UpdatedAt = now
-}
-
-func (i *Item) Rename(title string, now time.Time) error {
-	title = strings.TrimSpace(title)
-	if title == "" {
-		return ErrEmptyTitle
+// FormatItem converts an Item to one stable CLI output line.
+func FormatItem(item Item) string {
+	mark := " "
+	if item.Done {
+		mark = "x"
 	}
-
-	i.Title = title
-	i.UpdatedAt = now
-	return nil
+	return fmt.Sprintf("%d. [%s] %s (%s)", item.ID, mark, item.Title, item.Status())
 }
 ```
 
-这段代码覆盖了本篇多个核心语法：
+创建 `internal/todo/memory_store.go`：
 
-- `type Status string` 定义业务类型，让状态不只是普通字符串。
-- `const` 定义允许的状态值。
-- `var` 定义可复用错误，方便后续用 `errors.Is` 判断。
-- `Item` 结构体表达 Todo 业务对象。
-- `json` tag 决定保存为 JSON 时的字段名。
-- `NewItem` 返回 `(Item, error)`，体现 Go 常见多返回值。
-- `MarkDone` 和 `Rename` 使用指针接收者，因为它们会修改原对象。
-
-### 6.6 编写文件存储
-
-创建 `internal/todo/store.go`：
-
-```go title="internal/todo/store.go"
+```go title="internal/todo/memory_store.go"
 package todo
 
 import (
-	"encoding/json"
-	"errors"
 	"fmt"
-	"os"
-	"path/filepath"
+	"sort"
 	"time"
 )
 
+// Repository describes the storage behavior needed by the CLI.
 type Repository interface {
-	List() ([]Item, error)
 	Add(title string) (Item, error)
+	List() []Item
 	Done(id int) (Item, error)
 	Update(id int, title string) (Item, error)
 	Delete(id int) error
 }
 
-type FileStore struct {
-	Path string
-	Now  func() time.Time
+// MemoryStore stores Todo items in the current process memory.
+type MemoryStore struct {
+	nextID int
+	items  map[int]Item
+	now    func() time.Time
 }
 
-var _ Repository = (*FileStore)(nil)
+var _ Repository = (*MemoryStore)(nil)
 
-func NewFileStore(path string) *FileStore {
-	return &FileStore{
-		Path: path,
-		Now:  time.Now,
+// NewMemoryStore creates an empty in-memory Todo repository.
+func NewMemoryStore() *MemoryStore {
+	return &MemoryStore{
+		nextID: 1,
+		items:  make(map[int]Item),
+		now:    time.Now,
 	}
 }
 
-func (s *FileStore) List() ([]Item, error) {
-	return s.load()
-}
-
-func (s *FileStore) Add(title string) (Item, error) {
-	items, err := s.load()
+// Add validates and stores a new Todo item.
+func (s *MemoryStore) Add(title string) (Item, error) {
+	title, err := NormalizeTitle(title)
 	if err != nil {
 		return Item{}, err
 	}
 
-	item, err := NewItem(nextID(items), title, s.now())
-	if err != nil {
-		return Item{}, err
+	now := s.now()
+	item := Item{
+		ID:        s.nextID,
+		Title:     title,
+		CreatedAt: now,
+		UpdatedAt: now,
 	}
 
-	items = append(items, item)
-	if err := s.save(items); err != nil {
-		return Item{}, err
-	}
-
+	s.items[item.ID] = item
+	s.nextID++
 	return item, nil
 }
 
-func (s *FileStore) Done(id int) (Item, error) {
-	items, err := s.load()
+// List returns all Todo items sorted by ID.
+func (s *MemoryStore) List() []Item {
+	items := make([]Item, 0, len(s.items))
+	for _, item := range s.items {
+		items = append(items, item)
+	}
+	sort.Slice(items, func(i, j int) bool {
+		return items[i].ID < items[j].ID
+	})
+	return items
+}
+
+// Done marks an item as completed.
+func (s *MemoryStore) Done(id int) (Item, error) {
+	item, ok := s.items[id]
+	if !ok {
+		return Item{}, fmt.Errorf("%w: id=%d", ErrNotFound, id)
+	}
+	item.Done = true
+	item.UpdatedAt = s.now()
+	s.items[id] = item
+	return item, nil
+}
+
+// Update changes the title of an existing item.
+func (s *MemoryStore) Update(id int, title string) (Item, error) {
+	title, err := NormalizeTitle(title)
 	if err != nil {
 		return Item{}, err
 	}
 
-	for i := range items {
-		if items[i].ID == id {
-			items[i].MarkDone(s.now())
-			if err := s.save(items); err != nil {
-				return Item{}, err
-			}
-			return items[i], nil
-		}
+	item, ok := s.items[id]
+	if !ok {
+		return Item{}, fmt.Errorf("%w: id=%d", ErrNotFound, id)
 	}
-
-	return Item{}, fmt.Errorf("%w: id=%d", ErrNotFound, id)
+	item.Title = title
+	item.UpdatedAt = s.now()
+	s.items[id] = item
+	return item, nil
 }
 
-func (s *FileStore) Update(id int, title string) (Item, error) {
-	items, err := s.load()
-	if err != nil {
-		return Item{}, err
-	}
-
-	for i := range items {
-		if items[i].ID == id {
-			if err := items[i].Rename(title, s.now()); err != nil {
-				return Item{}, err
-			}
-			if err := s.save(items); err != nil {
-				return Item{}, err
-			}
-			return items[i], nil
-		}
-	}
-
-	return Item{}, fmt.Errorf("%w: id=%d", ErrNotFound, id)
-}
-
-func (s *FileStore) Delete(id int) error {
-	items, err := s.load()
-	if err != nil {
-		return err
-	}
-
-	next := items[:0]
-	deleted := false
-	for _, item := range items {
-		if item.ID == id {
-			deleted = true
-			continue
-		}
-		next = append(next, item)
-	}
-
-	if !deleted {
+// Delete removes an item by ID.
+func (s *MemoryStore) Delete(id int) error {
+	if _, ok := s.items[id]; !ok {
 		return fmt.Errorf("%w: id=%d", ErrNotFound, id)
 	}
-
-	return s.save(next)
-}
-
-func (s *FileStore) load() ([]Item, error) {
-	data, err := os.ReadFile(s.Path)
-	if errors.Is(err, os.ErrNotExist) {
-		return []Item{}, nil
-	}
-	if err != nil {
-		return nil, fmt.Errorf("read todo file %s: %w", s.Path, err)
-	}
-	if len(data) == 0 {
-		return []Item{}, nil
-	}
-
-	var items []Item
-	if err := json.Unmarshal(data, &items); err != nil {
-		return nil, fmt.Errorf("parse todo file %s: %w", s.Path, err)
-	}
-
-	return items, nil
-}
-
-func (s *FileStore) save(items []Item) error {
-	if err := os.MkdirAll(filepath.Dir(s.Path), 0755); err != nil {
-		return fmt.Errorf("create todo data directory: %w", err)
-	}
-
-	data, err := json.MarshalIndent(items, "", "  ")
-	if err != nil {
-		return fmt.Errorf("encode todo items: %w", err)
-	}
-	data = append(data, '\n')
-
-	if err := os.WriteFile(s.Path, data, 0600); err != nil {
-		return fmt.Errorf("write todo file %s: %w", s.Path, err)
-	}
-
+	delete(s.items, id)
 	return nil
 }
-
-func (s *FileStore) now() time.Time {
-	if s.Now != nil {
-		return s.Now()
-	}
-	return time.Now()
-}
-
-func nextID(items []Item) int {
-	maxID := 0
-	for _, item := range items {
-		if item.ID > maxID {
-			maxID = item.ID
-		}
-	}
-	return maxID + 1
-}
 ```
-
-这段代码的设计重点：
-
-- `Repository` 是一个小 interface，描述 Todo 存储需要提供的能力。
-- `FileStore` 是文件存储实现，后续可以替换成数据库实现。
-- `var _ Repository = (*FileStore)(nil)` 用于在编译期确认 `FileStore` 实现了 `Repository`。
-- `load` 中把文件不存在当作空列表处理，符合第一次运行的用户预期。
-- `save` 使用 `json.MarshalIndent`，让数据文件更容易阅读和排查。
-- `fmt.Errorf("%w")` 保留底层错误，便于调用方用 `errors.Is` 判断。
-- `Now func() time.Time` 让测试可以固定时间，避免测试结果不稳定。
-
-### 6.7 编写 CLI 入口
 
 创建 `cmd/todo-cli/main.go`：
 
@@ -883,10 +604,11 @@ func nextID(items []Item) int {
 package main
 
 import (
+	"bufio"
 	"errors"
 	"fmt"
+	"io"
 	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -895,88 +617,148 @@ import (
 
 const appName = "todo-cli"
 
+type runner struct {
+	repo   todo.Repository
+	out    io.Writer
+	errOut io.Writer
+}
+
 func main() {
-	if err := run(os.Args[1:]); err != nil {
+	if err := run(os.Args[1:], os.Stdin, os.Stdout, os.Stderr); err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		os.Exit(1)
 	}
 }
 
-func run(args []string) error {
-	if len(args) == 0 {
-		printUsage()
+func run(args []string, in io.Reader, out, errOut io.Writer) error {
+	r := runner{
+		repo:   todo.NewMemoryStore(),
+		out:    out,
+		errOut: errOut,
+	}
+
+	if len(args) > 0 {
+		return r.runArgs(args)
+	}
+	return r.runInteractive(in)
+}
+
+func (r runner) runInteractive(in io.Reader) error {
+	fmt.Fprintf(r.out, "%s memory mode. Type help or exit.\n", appName)
+
+	scanner := bufio.NewScanner(in)
+	for {
+		fmt.Fprint(r.out, "> ")
+		if !scanner.Scan() {
+			break
+		}
+
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" {
+			continue
+		}
+		if line == "exit" || line == "quit" {
+			return nil
+		}
+
+		args := parseInteractiveLine(line)
+		if err := r.runArgs(args); err != nil {
+			fmt.Fprintf(r.errOut, "error: %v\n", err)
+		}
+	}
+
+	if err := scanner.Err(); err != nil {
+		return fmt.Errorf("read stdin: %w", err)
+	}
+	return nil
+}
+
+func parseInteractiveLine(line string) []string {
+	fields := strings.Fields(line)
+	if len(fields) == 0 {
 		return nil
 	}
 
-	store := todo.NewFileStore(dataPath())
-
-	switch args[0] {
+	switch fields[0] {
 	case "add":
-		if len(args) < 2 {
-			return errors.New("usage: todo-cli add <title>")
-		}
-		item, err := store.Add(strings.Join(args[1:], " "))
-		if err != nil {
-			return err
-		}
-		fmt.Printf("added #%d: %s\n", item.ID, item.Title)
-
-	case "list":
-		items, err := store.List()
-		if err != nil {
-			return err
-		}
-		printItems(items)
-
-	case "done":
-		if len(args) != 2 {
-			return errors.New("usage: todo-cli done <id>")
-		}
-		id, err := parseID(args[1])
-		if err != nil {
-			return err
-		}
-		item, err := store.Done(id)
-		if err != nil {
-			return err
-		}
-		fmt.Printf("done #%d: %s\n", item.ID, item.Title)
-
+		title := strings.TrimSpace(strings.TrimPrefix(line, "add"))
+		return []string{"add", title}
 	case "update":
-		if len(args) < 3 {
-			return errors.New("usage: todo-cli update <id> <title>")
+		if len(fields) < 3 {
+			return fields
 		}
-		id, err := parseID(args[1])
-		if err != nil {
-			return err
-		}
-		item, err := store.Update(id, strings.Join(args[2:], " "))
-		if err != nil {
-			return err
-		}
-		fmt.Printf("updated #%d: %s\n", item.ID, item.Title)
-
-	case "delete":
-		if len(args) != 2 {
-			return errors.New("usage: todo-cli delete <id>")
-		}
-		id, err := parseID(args[1])
-		if err != nil {
-			return err
-		}
-		if err := store.Delete(id); err != nil {
-			return err
-		}
-		fmt.Printf("deleted #%d\n", id)
-
-	case "path":
-		fmt.Println(dataPath())
-
-	case "help", "-h", "--help":
-		printUsage()
-
+		prefix := fields[0] + " " + fields[1]
+		title := strings.TrimSpace(strings.TrimPrefix(line, prefix))
+		return []string{"update", fields[1], title}
 	default:
-		return fmt.Errorf("unknown command %q", args[0])
+		return fields
+	}
+}
+
+func (r runner) runArgs(args []string) error {
+	for len(args) > 0 {
+		command := args[0]
+		args = args[1:]
+
+		switch command {
+		case "help", "-h", "--help":
+			r.printHelp()
+		case "add":
+			if len(args) < 1 {
+				return errors.New("usage: todo-cli add <title>")
+			}
+			item, err := r.repo.Add(args[0])
+			if err != nil {
+				return err
+			}
+			fmt.Fprintf(r.out, "added #%d: %s\n", item.ID, item.Title)
+			args = args[1:]
+		case "list":
+			r.printList()
+		case "done":
+			if len(args) < 1 {
+				return errors.New("usage: todo-cli done <id>")
+			}
+			id, err := parseID(args[0])
+			if err != nil {
+				return err
+			}
+			item, err := r.repo.Done(id)
+			if err != nil {
+				return fmt.Errorf("mark done: %w", err)
+			}
+			fmt.Fprintf(r.out, "done #%d: %s\n", item.ID, item.Title)
+			args = args[1:]
+		case "update":
+			if len(args) < 2 {
+				return errors.New("usage: todo-cli update <id> <title>")
+			}
+			id, err := parseID(args[0])
+			if err != nil {
+				return err
+			}
+			item, err := r.repo.Update(id, args[1])
+			if err != nil {
+				return fmt.Errorf("update: %w", err)
+			}
+			fmt.Fprintf(r.out, "updated #%d: %s\n", item.ID, item.Title)
+			args = args[2:]
+		case "delete":
+			if len(args) < 1 {
+				return errors.New("usage: todo-cli delete <id>")
+			}
+			id, err := parseID(args[0])
+			if err != nil {
+				return err
+			}
+			if err := r.repo.Delete(id); err != nil {
+				return fmt.Errorf("delete: %w", err)
+			}
+			fmt.Fprintf(r.out, "deleted #%d\n", id)
+			args = args[1:]
+		default:
+			return fmt.Errorf("unknown command %q", command)
+		}
 	}
 
 	return nil
@@ -984,277 +766,114 @@ func run(args []string) error {
 
 func parseID(raw string) (int, error) {
 	id, err := strconv.Atoi(raw)
-	if err != nil {
-		return 0, fmt.Errorf("invalid id %q: %w", raw, err)
-	}
-	if id <= 0 {
-		return 0, fmt.Errorf("invalid id %d: must be greater than 0", id)
+	if err != nil || id <= 0 {
+		return 0, fmt.Errorf("invalid id %q", raw)
 	}
 	return id, nil
 }
 
-func dataPath() string {
-	if path := strings.TrimSpace(os.Getenv("TODO_CLI_DATA")); path != "" {
-		return path
-	}
-
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return filepath.Join(".todo-cli", "todos.json")
-	}
-
-	return filepath.Join(home, ".todo-cli", "todos.json")
-}
-
-func printItems(items []todo.Item) {
+func (r runner) printList() {
+	items := r.repo.List()
 	if len(items) == 0 {
-		fmt.Println("No todo items.")
+		fmt.Fprintln(r.out, "no todos")
 		return
 	}
 
 	for _, item := range items {
-		mark := " "
-		if item.Done() {
-			mark = "x"
-		}
-		fmt.Printf("%d. [%s] %s (%s)\n", item.ID, mark, item.Title, item.Status)
+		fmt.Fprintln(r.out, todo.FormatItem(item))
 	}
 }
 
-func printUsage() {
-	fmt.Printf(`%s manages local todo items.
+func (r runner) printHelp() {
+	fmt.Fprint(r.out, `todo-cli commands:
+  add <title>          add a Todo
+  list                 list Todos
+  done <id>            mark a Todo as done
+  update <id> <title>  update a Todo title
+  delete <id>          delete a Todo
+  help                 show help
+  exit                 leave interactive mode
 
-Usage:
-  %s add <title>
-  %s list
-  %s done <id>
-  %s update <id> <title>
-  %s delete <id>
-  %s path
-
-Environment:
-  TODO_CLI_DATA  custom JSON data file path
-`, appName, appName, appName, appName, appName, appName, appName)
+Examples:
+  todo-cli add "learn Go" list
+  todo-cli
+`)
 }
 ```
 
-这段入口代码体现了 CLI 程序的常见结构：
+### 5.5 执行命令
 
-- `main` 只负责调用 `run` 和设置退出码。
-- `run` 接收 `args []string`，便于后续测试命令分发。
-- `switch` 根据子命令分发业务逻辑。
-- `parseID` 把字符串参数转换为 `int`，并做输入校验。
-- `dataPath` 通过环境变量支持自定义数据文件位置。
-- `printItems` 只负责输出展示，不参与存储逻辑。
-
-本篇手写 `os.Args` 解析命令，是为了让你看清楚 CLI 程序最基本的参数处理过程。真实团队开发复杂 CLI 时，可以考虑标准库 `flag`，或 Cobra、urfave/cli 等成熟框架。框架能提供子命令、帮助信息、参数校验和自动补全，但在 Go 基础阶段过早引入框架，反而会遮住函数、切片、错误处理和 package 组织这些核心能力。
-
-### 6.8 编写单元测试
-
-创建 `internal/todo/store_test.go`：
-
-```go title="internal/todo/store_test.go"
-package todo
-
-import (
-	"errors"
-	"path/filepath"
-	"testing"
-	"time"
-)
-
-func TestFileStoreLifecycle(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "todos.json")
-	store := NewFileStore(path)
-	store.Now = fixedNow
-
-	item, err := store.Add("  learn Go basics  ")
-	if err != nil {
-		t.Fatalf("add item: %v", err)
-	}
-	if item.ID != 1 {
-		t.Fatalf("item id = %d, want 1", item.ID)
-	}
-	if item.Title != "learn Go basics" {
-		t.Fatalf("item title = %q", item.Title)
-	}
-	if item.Status != StatusPending {
-		t.Fatalf("item status = %q, want %q", item.Status, StatusPending)
-	}
-
-	items, err := store.List()
-	if err != nil {
-		t.Fatalf("list items: %v", err)
-	}
-	if len(items) != 1 {
-		t.Fatalf("len(items) = %d, want 1", len(items))
-	}
-
-	updated, err := store.Update(1, "learn Go module")
-	if err != nil {
-		t.Fatalf("update item: %v", err)
-	}
-	if updated.Title != "learn Go module" {
-		t.Fatalf("updated title = %q", updated.Title)
-	}
-
-	done, err := store.Done(1)
-	if err != nil {
-		t.Fatalf("done item: %v", err)
-	}
-	if !done.Done() {
-		t.Fatalf("done item status = %q", done.Status)
-	}
-
-	if err := store.Delete(1); err != nil {
-		t.Fatalf("delete item: %v", err)
-	}
-
-	items, err = store.List()
-	if err != nil {
-		t.Fatalf("list after delete: %v", err)
-	}
-	if len(items) != 0 {
-		t.Fatalf("len(items) after delete = %d, want 0", len(items))
-	}
-}
-
-func TestNewItemRejectsEmptyTitle(t *testing.T) {
-	_, err := NewItem(1, "   ", fixedNow())
-	if !errors.Is(err, ErrEmptyTitle) {
-		t.Fatalf("error = %v, want ErrEmptyTitle", err)
-	}
-}
-
-func TestFileStoreReturnsNotFound(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "todos.json")
-	store := NewFileStore(path)
-
-	_, err := store.Done(42)
-	if !errors.Is(err, ErrNotFound) {
-		t.Fatalf("error = %v, want ErrNotFound", err)
-	}
-}
-
-func fixedNow() time.Time {
-	return time.Date(2026, 5, 26, 10, 0, 0, 0, time.UTC)
-}
-```
-
-测试代码的意义：
-
-- `t.TempDir()` 为每次测试创建临时目录，测试结束自动清理。
-- `fixedNow` 固定时间，避免测试因为当前时间变化而不稳定。
-- `errors.Is` 验证错误链路，而不是比较错误字符串。
-- 生命周期测试覆盖新增、查询、更新、完成和删除。
-
-### 6.9 增加 defer 实战测试
-
-前面已经讲过 `defer`，这里再补一个最小可执行测试，让它不只停留在概念层面。
-
-创建 `internal/todo/defer_demo_test.go`：
-
-```go title="internal/todo/defer_demo_test.go"
-package todo
-
-import (
-	"io"
-	"os"
-	"path/filepath"
-	"testing"
-)
-
-func TestReadFileWithDefer(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "defer-demo.txt")
-	if err := os.WriteFile(path, []byte("learn defer\n"), 0600); err != nil {
-		t.Fatalf("write demo file: %v", err)
-	}
-
-	data, err := readFileWithDefer(path)
-	if err != nil {
-		t.Fatalf("read file with defer: %v", err)
-	}
-	if string(data) != "learn defer\n" {
-		t.Fatalf("data = %q", string(data))
-	}
-}
-
-func readFileWithDefer(path string) ([]byte, error) {
-	file, err := os.Open(path)
-	if err != nil {
-		return nil, err
-	}
-	defer file.Close()
-
-	return io.ReadAll(file)
-}
-```
-
-这个测试故意很小，只验证一件事：打开文件后，用 `defer file.Close()` 保证函数返回前释放文件句柄。
-
-生产代码中要注意两点：
-
-- 读文件时，关闭失败通常不是主要错误；写文件、刷盘、提交事务时，关闭或提交失败也可能影响数据完整性。
-- `defer` 只保证当前函数返回前执行，不会让慢操作变成异步，也不会自动处理错误。
-
-### 6.10 格式化、测试与运行
-
-先格式化代码：
+格式化 Go 代码：
 
 ```bash
-go fmt ./...
+go fmt ./cmd/todo-cli ./internal/todo
 ```
 
-为什么要执行：Go 项目不靠团队争论缩进风格，统一交给 `go fmt`。
+列出 package，确认 module 和 import 路径正确：
 
-运行测试：
+```bash
+go list ./...
+```
+
+运行编译级检查：
 
 ```bash
 go test ./...
 ```
 
-预期输出类似：
+使用一条命令完成完整内存生命周期：
+
+```bash
+go run ./cmd/todo-cli add "学习 Go 程序结构" add "完成 todo-cli 实验" list done 1 update 2 "完成 Go module 实验" list delete 1 list
+```
+
+这条链式命令是本篇为了演示“同一个进程内的内存状态”而设计的教学用法。真实 CLI 更常见的是一次执行一个子命令，并通过文件、SQLite、PostgreSQL 或远程 API 保存状态；本篇先不引入持久化，是为了把注意力放在 Go 基础语法和业务边界上。
+
+也可以进入交互模式：
+
+```bash
+go run ./cmd/todo-cli <<'EOF'
+add 学习结构体和方法
+add 练习 interface 和 error
+list
+done 1
+update 2 练习 Go module
+list
+delete 1
+list
+exit
+EOF
+```
+
+构建可执行文件：
+
+```bash
+go build -o bin/todo-cli ./cmd/todo-cli
+```
+
+运行构建产物：
+
+```bash
+./bin/todo-cli add "构建后的 CLI 可运行" list
+```
+
+### 5.6 预期输出
+
+`go list ./...` 应包含：
+
+```text
+cloud-native-todo-platform/cmd/todo-cli
+cloud-native-todo-platform/internal/todo
+```
+
+`go test ./...` 在本篇可能显示没有测试文件，这是正常的。本篇把 `go test` 作为编译级验证使用；第 8 篇会系统补充单元测试、表驱动测试和覆盖率：
 
 ```text
 ?   	cloud-native-todo-platform/cmd/todo-cli	[no test files]
-ok  	cloud-native-todo-platform/internal/todo	0.003s
+?   	cloud-native-todo-platform/internal/todo	[no test files]
 ```
 
-运行 CLI。为了不污染真实用户目录，并避免历史数据影响 `id=1`、`id=2` 的示例结果，本实验建议先把数据文件放在项目目录下，并清理旧实验数据：
-
-=== "Linux / macOS / WSL2"
-
-    ```bash
-    export TODO_CLI_DATA="$(pwd)/.todo-cli/todos.json"
-    rm -rf .todo-cli
-
-    go run ./cmd/todo-cli add "学习 Go 程序结构"
-    go run ./cmd/todo-cli add "完成 todo-cli 实验"
-    go run ./cmd/todo-cli list
-    go run ./cmd/todo-cli done 1
-    go run ./cmd/todo-cli update 2 "完成 Go module 实验"
-    go run ./cmd/todo-cli list
-    go run ./cmd/todo-cli delete 1
-    go run ./cmd/todo-cli list
-    ```
-
-=== "Windows PowerShell"
-
-    ```powershell
-    $env:TODO_CLI_DATA = "$PWD\.todo-cli\todos.json"
-    Remove-Item -Recurse -Force .todo-cli -ErrorAction SilentlyContinue
-
-    go run ./cmd/todo-cli add "学习 Go 程序结构"
-    go run ./cmd/todo-cli add "完成 todo-cli 实验"
-    go run ./cmd/todo-cli list
-    go run ./cmd/todo-cli done 1
-    go run ./cmd/todo-cli update 2 "完成 Go module 实验"
-    go run ./cmd/todo-cli list
-    go run ./cmd/todo-cli delete 1
-    go run ./cmd/todo-cli list
-    ```
-
-预期输出类似：
+完整生命周期命令的输出应类似：
 
 ```text
 added #1: 学习 Go 程序结构
@@ -1269,580 +888,339 @@ deleted #1
 2. [ ] 完成 Go module 实验 (pending)
 ```
 
-查看数据文件：
+交互模式会先输出提示：
 
-=== "Linux / macOS / WSL2"
-
-    ```bash
-    cat .todo-cli/todos.json
-    ```
-
-=== "Windows PowerShell"
-
-    ```powershell
-    Get-Content .todo-cli\todos.json
-    ```
-
-预期可以看到 JSON 数据：
-
-```json
-[
-  {
-    "id": 2,
-    "title": "完成 Go module 实验",
-    "status": "pending",
-    "created_at": "2026-05-26T10:00:00Z",
-    "updated_at": "2026-05-26T10:00:00Z"
-  }
-]
+```text
+todo-cli memory mode. Type help or exit.
+>
 ```
 
-实际时间会是你运行命令时的当前时间。测试中的时间是固定的，运行程序时使用真实时间。
+### 5.7 验证方法
 
-### 6.11 构建可执行文件
-
-`go run` 适合开发调试。如果要得到可执行文件，使用 `go build`：
-
-=== "Linux / macOS / WSL2"
-
-    ```bash
-    mkdir -p bin
-    go build -o bin/todo-cli ./cmd/todo-cli
-    ./bin/todo-cli list
-    ```
-
-=== "Windows PowerShell"
-
-    ```powershell
-    New-Item -ItemType Directory -Force bin
-    go build -o bin\todo-cli.exe .\cmd\todo-cli
-    .\bin\todo-cli.exe list
-    ```
-
-构建成功说明：
-
-- `main` 包可以正常编译。
-- import 路径正确。
-- `internal/todo` 包没有语法或类型错误。
-- 这个 CLI 已经可以作为后续阶段的项目资产。
-
-### 6.12 清理步骤
-
-清理实验数据和构建产物：
-
-=== "Linux / macOS / WSL2"
-
-    ```bash
-    rm -rf .todo-cli bin
-    unset TODO_CLI_DATA
-    ```
-
-=== "Windows PowerShell"
-
-    ```powershell
-    Remove-Item -Recurse -Force .todo-cli, bin
-    Remove-Item Env:TODO_CLI_DATA -ErrorAction SilentlyContinue
-    ```
-
-如果你已经把代码提交到 Git，不要删除源码目录。清理步骤只删除临时数据和构建产物。
-
-## 7. 真实工作案例
-
-一家团队准备把 Todo 平台从脚本 Demo 演进为后端服务。团队通常会按以下职责协作：
-
-- 后端开发负责用 Go 实现业务模型、存储接口、HTTP API 和测试。
-- 测试工程师负责根据需求编写用例，验证新增、修改、完成、删除等业务路径。
-- DevOps 负责把 Go 程序纳入 CI，执行 `go test ./...` 和 `go build ./...`。
-- SRE 关注程序日志、错误信息、配置路径和运行时可观测性。
-- 平台工程师后续会把业务对象映射为 Kubernetes 资源，开发 Controller 自动化管理。
-
-本篇的 `todo-cli` 虽然很小，但它已经具备真实工程的影子：
-
-```mermaid
-flowchart TD
-    CLI["cmd/todo-cli<br/>命令行入口"]
-    Service["internal/todo<br/>业务逻辑"]
-    Store["FileStore<br/>文件存储"]
-    Test["go test<br/>自动化验证"]
-    FutureAPI["后续 Web API<br/>复用业务逻辑"]
-    FutureDB["后续数据库<br/>替换存储实现"]
-
-    CLI --> Service
-    Service --> Store
-    Test --> Service
-    Service --> FutureAPI
-    Store --> FutureDB
-```
-
-后续第 10 篇开发 Web API 时，不需要重写 Todo 业务规则，只需要在 HTTP Handler 中调用同一组业务能力。这个思路就是企业开发中常说的“把业务逻辑从入口层拆出来”。
-
-## 8. 常见错误
-
-| 错误现象 | 常见原因 | 修复方向 |
-|---|---|---|
-| `go: go.mod file not found` | 没有在 module 根目录执行命令 | 回到项目根目录，执行 `go mod init cloud-native-todo-platform` |
-| `package cloud-native-todo-platform/internal/todo is not in std` | module path 和 import path 不一致，或不在 module 根目录 | 检查 `go.mod` 的 `module` 值和 `main.go` 的 import 路径 |
-| `undefined: todo.NewFileStore` | 文件没有保存、包名不一致、函数名大小写错误 | 检查 `internal/todo/store.go` 是否为 `package todo`，函数名是否导出 |
-| `imported and not used` | 引入了包但没有使用 | 删除未使用 import，或补齐使用逻辑 |
-| `declared and not used` | 声明变量但没有使用 | 删除变量，或真正使用它 |
-| `invalid id "abc"` | `done`、`update`、`delete` 需要数字 ID | 使用 `go run ./cmd/todo-cli list` 查看 ID |
-| `permission denied` | 数据文件所在目录不可写 | 调整 `TODO_CLI_DATA` 到可写目录，或修复目录权限 |
-| JSON 文件解析失败 | 手工修改 JSON 后格式错误 | 用编辑器修复 JSON，或备份后删除数据文件重新生成 |
-| Windows 下环境变量不生效 | 使用了 Bash 的 `export` 写法 | PowerShell 使用 `$env:TODO_CLI_DATA = "..."` |
-| 测试偶发失败 | 测试依赖当前时间、当前目录或共享文件 | 使用 `t.TempDir()` 和固定时间函数 |
-
-Go 新手经常会被“未使用变量”和“未使用 import”卡住。它们不是编译器挑剔，而是 Go 强制保持代码干净，避免无效依赖和隐藏问题。
-
-## 9. 排障方法
-
-### 9.1 确认当前位置
+验证代码格式：
 
 ```bash
-pwd
-ls
+gofmt -w cmd/todo-cli/main.go internal/todo/item.go internal/todo/memory_store.go
+git diff --check
 ```
 
-Windows PowerShell：
-
-```powershell
-Get-Location
-Get-ChildItem
-```
-
-判断依据：
-
-- 当前目录应该能看到 `go.mod`。
-- 应该存在 `cmd/` 和 `internal/` 目录。
-
-如果不在项目根目录，先 `cd` 到 `cloud-native-todo-platform`。
-
-### 9.2 检查 module path
+验证包路径和编译：
 
 ```bash
-go env GOMOD
-cat go.mod
-```
-
-Windows PowerShell：
-
-```powershell
-go env GOMOD
-Get-Content go.mod
-```
-
-判断依据：
-
-- `go env GOMOD` 应该输出当前项目的 `go.mod` 路径。
-- `go.mod` 中应包含 `module cloud-native-todo-platform`。
-- `cmd/todo-cli/main.go` 中 import 应该是 `cloud-native-todo-platform/internal/todo`。
-
-如果 module path 改成了 GitHub 地址，import 路径也必须同步。
-
-### 9.3 检查 Go 代码格式和编译
-
-```bash
-go fmt ./...
 go list ./...
 go test ./...
-go build ./cmd/todo-cli
+go build -o bin/todo-cli ./cmd/todo-cli
 ```
 
-判断依据：
-
-- `go fmt` 通常没有输出，表示格式化完成。
-- `go list` 能列出 `cloud-native-todo-platform/cmd/todo-cli` 和 `cloud-native-todo-platform/internal/todo`，说明 package 路径和 import 关系正确。
-- `go test` 输出 `ok` 表示测试通过。
-- `go build` 没有输出且退出码为 `0` 表示构建成功。
-
-查看退出码：
-
-=== "Linux / macOS / WSL2"
-
-    ```bash
-    echo $?
-    ```
-
-=== "Windows PowerShell"
-
-    ```powershell
-    $LASTEXITCODE
-    ```
-
-如果只想排查某一个测试，可以使用 `-run` 和 `-v`：
+验证业务行为：
 
 ```bash
-go test ./internal/todo -run TestFileStoreLifecycle -v
+./bin/todo-cli add "验收 todo-cli" list done 1 list delete 1 list
 ```
 
-判断依据：
+判断标准：
 
-- `-run TestFileStoreLifecycle` 只运行名称匹配的测试，适合定位某个失败用例。
-- `-v` 会输出每个测试名称和执行结果，适合学习阶段观察测试流程。
-- 如果指定测试能通过，但 `go test ./...` 失败，说明问题可能在其他 package 或其他测试用例中。
+- `go list ./...` 能列出 `cmd/todo-cli` 和 `internal/todo`。
+- `go test ./...` 能成功退出。
+- `go build` 能生成 `bin/todo-cli`。
+- `add` 后能看到 `added #1`。
+- `done 1` 后列表中能看到 `[x]`。
+- `delete 1` 后列表显示 `no todos`。
 
-### 9.4 检查数据文件路径
+### 5.8 清理步骤
+
+如果只是删除构建产物：
 
 ```bash
-go run ./cmd/todo-cli path
+rm -f bin/todo-cli
 ```
 
-如果输出路径不可写，可以临时改到项目目录：
-
-=== "Linux / macOS / WSL2"
-
-    ```bash
-    export TODO_CLI_DATA="$(pwd)/.todo-cli/todos.json"
-    go run ./cmd/todo-cli add "验证数据路径"
-    ```
-
-=== "Windows PowerShell"
-
-    ```powershell
-    $env:TODO_CLI_DATA = "$PWD\.todo-cli\todos.json"
-    go run ./cmd/todo-cli add "验证数据路径"
-    ```
-
-判断依据：
-
-- 如果命令成功，说明之前的问题大概率是默认家目录权限或路径问题。
-- 如果仍然失败，继续检查错误信息中的具体路径和底层原因。
-
-### 9.5 检查 JSON 数据是否损坏
-
-=== "Linux / macOS / WSL2"
-
-    ```bash
-    cat .todo-cli/todos.json
-    go run ./cmd/todo-cli list
-    ```
-
-=== "Windows PowerShell"
-
-    ```powershell
-    Get-Content .todo-cli\todos.json
-    go run ./cmd/todo-cli list
-    ```
-
-如果看到类似错误：
-
-```text
-parse todo file ...: invalid character
-```
-
-说明 JSON 文件格式不合法。修复方式：
-
-- 如果数据重要，先复制备份，再修复 JSON 格式。
-- 如果只是实验数据，可以删除 `.todo-cli/todos.json` 后重新运行。
-
-## 10. 生产环境注意事项
-
-本篇项目是学习用 CLI，但它已经触及生产 Go 工程的基本原则。
-
-### 10.1 错误信息必须可排障
-
-生产环境不要只返回 `failed`、`error`、`invalid` 这类无上下文错误。至少要说明：
-
-- 当前执行什么动作。
-- 操作的资源是什么。
-- 底层错误是什么。
-
-推荐：
-
-```go
-return fmt.Errorf("write todo file %s: %w", s.Path, err)
-```
-
-### 10.2 不要把敏感数据写入普通文件
-
-本篇 Todo 数据不是敏感信息。真实生产中，如果文件里包含 token、密码、密钥或个人信息，需要考虑：
-
-- 文件权限是否限制为当前用户可读写。
-- 是否需要加密。
-- 是否应该交给 Secret 管理系统。
-- 日志里是否泄露敏感字段。
-
-后续 Kubernetes 章节会进一步学习 Secret、RBAC 和配置管理。
-
-### 10.3 文件存储有并发写入和非原子写入风险
-
-本篇 `FileStore` 没有实现文件锁。如果多个 `todo-cli` 进程同时写同一个 JSON 文件，可能出现覆盖或数据损坏。
-
-另外，当前 `save` 使用 `os.WriteFile` 直接覆盖目标文件。对学习项目来说足够简单，但生产环境要考虑进程崩溃、磁盘写满、系统断电等情况。如果写入过程中断，目标文件可能只写入了一部分，最终导致 JSON 损坏。
-
-更稳妥的生产思路是：
-
-- 先写入同目录临时文件。
-- 写入成功后执行必要的 flush 或 close 检查。
-- 再用原子 rename 替换旧文件。
-- 多进程写入时增加文件锁或改用数据库。
-
-生产系统通常会使用数据库或带事务能力的存储来解决：
-
-- PostgreSQL 负责事务和并发控制。
-- Redis 可用于缓存和轻量状态。
-- Kubernetes API Server 通过资源版本控制对象更新。
-
-本篇选择文件存储，是为了聚焦 Go 基础语法和最小可运行项目。
-
-### 10.4 module path 要稳定
-
-真实团队中，Go module path 一旦发布给其他服务依赖，就不要随意改变。常见做法是使用仓库地址：
-
-```text
-github.com/company/cloud-native-todo-platform
-```
-
-如果 module path 变更，所有 import 路径、CI、构建脚本和依赖方都可能受影响。
-
-### 10.5 测试要进入 CI
-
-不要只在本机运行测试。后续仓库应在 Pull Request 中自动执行：
+如果要重做本篇实验，先确认当前分支中的代码已经提交或不再需要，再删除本篇新增文件：
 
 ```bash
+rm -rf cmd/todo-cli internal/todo bin/todo-cli
+```
+
+本篇使用内存存储，不会产生 `.todo-cli` 数据目录或 JSON 文件。
+
+预计耗时：70 分钟（动手操作约 45 分钟）。
+
+## 6. 常见错误与排障
+
+### 错误 1：`go: cannot find main module`
+
+- **现象**：
+
+  ```text
+  go: cannot find main module, but found .git/config in /home/user/workspace/cloud-native-todo-platform
+  ```
+
+- **原因**：当前仓库没有 `go.mod`，或者你不在 module 根目录中执行命令。
+
+- **排查**：
+
+  ```bash
+  pwd
+  ls -l go.mod
+  go env GOMOD
+  ```
+
+  如果 `go.mod` 不存在，或者 `go env GOMOD` 输出 `/dev/null`，说明 Go 没有识别到当前 module。
+
+- **修复**：
+
+  ```bash
+  cd ~/workspace/cloud-native-todo-platform
+  test -f go.mod || go mod init cloud-native-todo-platform
+  ```
+
+- **预防**：所有 Go 命令都在项目根目录执行；新增 module 后把 `go.mod` 提交到 Git。
+
+### 错误 2：`package cloud-native-todo-platform/internal/todo is not in std`
+
+- **现象**：
+
+  ```text
+  package cloud-native-todo-platform/internal/todo is not in std
+  ```
+
+- **原因**：`go.mod` 中的 `module` 值和 `main.go` 里的 import 路径不一致，或者你在 module 外部执行了 `go run`。
+
+- **排查**：
+
+  ```bash
+  sed -n '1,20p' go.mod
+  grep -n 'cloud-native-todo-platform/internal/todo' cmd/todo-cli/main.go
+  go list ./...
+  ```
+
+  `go.mod` 第一行应为 `module cloud-native-todo-platform`。
+
+- **修复**：统一 module path 和 import path。课程中使用：
+
+  ```go
+  module cloud-native-todo-platform
+  ```
+
+  ```go
+  import "cloud-native-todo-platform/internal/todo"
+  ```
+
+- **预防**：初始化 module 后不要随意改名；如果团队使用 GitHub module path，应一次性统一所有 import。
+
+### 错误 3：`usage: todo-cli add <title>`
+
+- **现象**：
+
+  ```text
+  error: usage: todo-cli add <title>
+  exit status 1
+  ```
+
+- **原因**：`add` 命令缺少标题，或者标题中有空格但没有用引号包起来。
+
+- **排查**：
+
+  ```bash
+  go run ./cmd/todo-cli add
+  go run ./cmd/todo-cli add 学习 Go
+  ```
+
+  第二条命令会把 `学习` 和 `Go` 当成两个参数；本篇的链式命令模式要求带空格的标题使用引号。
+
+- **修复**：
+
+  ```bash
+  go run ./cmd/todo-cli add "学习 Go"
+  ```
+
+  或使用交互模式，交互模式中的标题可以直接包含空格：
+
+  ```bash
+  go run ./cmd/todo-cli
+  ```
+
+- **预防**：写 CLI 文档时明确参数格式；脚本中给带空格的参数加引号。
+
+### 错误 4：`invalid id "abc"` 或 `todo not found`
+
+- **现象**：
+
+  ```text
+  error: invalid id "abc"
+  ```
+
+  或者：
+
+  ```text
+  error: mark done: todo not found: id=9
+  ```
+
+- **原因**：`done`、`update`、`delete` 的 ID 必须是正整数，而且该 ID 必须存在于当前进程的内存仓库中。
+
+- **排查**：
+
+  ```bash
+  go run ./cmd/todo-cli add "学习 Go" list done abc
+  go run ./cmd/todo-cli add "学习 Go" list done 9
+  ```
+
+  第一条会暴露 ID 格式错误；第二条会暴露 ID 不存在。
+
+- **修复**：先执行 `list` 查看当前进程里的 ID，再操作存在的 ID。
+
+  ```bash
+  go run ./cmd/todo-cli add "学习 Go" list done 1 list
+  ```
+
+- **预防**：外部输入永远要校验；不要相信用户传入的字符串一定能转换成业务 ID。
+
+### 错误 5：分开执行命令后数据消失
+
+- **现象**：
+
+  ```bash
+  go run ./cmd/todo-cli add "学习 Go"
+  go run ./cmd/todo-cli list
+  ```
+
+  第二条输出：
+
+  ```text
+  no todos
+  ```
+
+- **原因**：本篇使用内存存储。每次 `go run` 都会启动一个新进程，新进程里的 `MemoryStore` 是空的。
+
+- **排查**：
+
+  ```bash
+  go run ./cmd/todo-cli add "学习 Go" list
+  ```
+
+  如果同一条命令里可以看到 Todo，说明程序正常，数据只是没有跨进程持久化。
+
+- **修复**：本篇使用链式命令或交互模式完成完整生命周期。链式命令只是内存版教学手段，不代表生产 CLI 的推荐交互方式。持久化会在后续章节引入，不要在第 7 篇提前把文件或数据库逻辑塞进 CLI。
+
+- **预防**：明确区分内存状态和持久化状态。内存适合学习对象建模和算法流程，持久化适合跨进程、跨重启保存数据。
+
+## 7. 生产环境注意事项
+
+1. **CLI 的参数、输出和退出码必须稳定。**
+   真实团队的 CLI 往往会被 Shell、CI 或发布系统调用。输出格式随意变化，会让脚本解析失败；失败时仍返回退出码 `0`，会让流水线误判成功。本篇虽然只是教学 CLI，但已经按 `stdout` 输出结果、`stderr` 输出错误、失败时 `os.Exit(1)` 的习惯设计。
+
+2. **内存存储不能承载生产数据。**
+   内存存储简单、快、适合学习，但进程退出后数据会丢失，也无法处理多进程并发写入。生产环境需要文件锁、数据库事务、备份恢复和权限控制。本篇刻意不做持久化，是为了让你先掌握 Go 语言基础；不要把内存版 CLI 当成可上线工具。
+
+3. **业务包不要依赖终端和操作系统细节。**
+   `internal/todo` 不读取 `os.Args`，不打印终端输出，也不调用 `os.Exit`。这样它将来可以被 HTTP Handler、后台任务、测试或 Controller 复用。生产项目中，业务逻辑和传输层混在一起会增加重构成本，也会让测试变得困难。
+
+4. **依赖管理要可追踪。**
+   本篇只用标准库，所以没有 `go.sum`。后续引入第三方库时，应把 `go.mod` 和 `go.sum` 一起提交。企业环境中还要关注依赖许可证、漏洞扫描、私有 module 认证和 `GOPROXY` 来源，不能在生产构建中临时拉取不可追踪依赖。
+
+5. **错误信息要帮助定位，但不要泄露敏感信息。**
+   本篇的错误会告诉你 `id=9` 不存在，这有助于调试。生产系统中，错误信息同样要有上下文，但不能输出密钥、Token、数据库连接串或用户隐私数据。CLI 工具尤其容易被放进 CI 日志，输出内容要经过安全审查。
+
+## 8. 本章小项目
+
+本章小项目：**内存版 Todo CLI v0.1**。
+
+交付物：
+
+- `go.mod`
+- `cmd/todo-cli/main.go`
+- `internal/todo/item.go`
+- `internal/todo/memory_store.go`
+- `bin/todo-cli` 构建产物（可本地生成，不提交）
+
+验收命令：
+
+```bash
+cd ~/workspace/cloud-native-todo-platform
+go fmt ./cmd/todo-cli ./internal/todo
 go test ./...
-go build ./...
+go build -o bin/todo-cli ./cmd/todo-cli
+./bin/todo-cli add "验收 todo-cli" add "检查内存存储" list done 1 update 2 "检查 Go module" list delete 1 list
 ```
 
-这样可以在合并前发现语法错误、测试失败、依赖问题和跨平台问题。
+能力验收标准：
 
-### 10.6 CLI 退出码要明确
+| 能力项 | 验收方式 |
+|---|---|
+| Go module | `go list ./...` 能列出本篇两个 package |
+| 结构体与方法 | 能解释 `Item` 和 `Status()` 的职责 |
+| 切片与 map | 能解释为什么 `MemoryStore` 用 map 保存、用切片排序输出 |
+| interface | 能解释 `Repository` 为什么能隔离存储实现 |
+| error | 能解释 `ErrNotFound` 和 `%w` 的作用 |
+| CLI | 能用一条命令完成 add/list/done/update/delete |
 
-命令行工具在 CI/CD 中经常被脚本调用。约定是：
-
-- 成功返回退出码 `0`。
-- 失败返回非 `0`。
-- 错误信息输出到 `stderr`。
-
-本篇 `main` 中使用：
-
-```go
-fmt.Fprintf(os.Stderr, "error: %v\n", err)
-os.Exit(1)
-```
-
-这使得脚本、流水线和调用方可以可靠判断命令是否成功。
-
-## 11. 本章小项目
-
-本章小项目是：**开发命令行版 Todo 管理器 `todo-cli`**。
-
-### 项目目标
-
-完成一个标准库实现的小型 CLI 工具，具备以下能力：
-
-- 使用 Go module 管理项目。
-- 使用 `cmd/` 和 `internal/` 组织代码。
-- 使用结构体表达 Todo 对象。
-- 使用方法封装 Todo 行为。
-- 使用 interface 描述存储能力。
-- 使用 error 处理输入、文件和业务错误。
-- 使用 JSON 文件持久化 Todo 数据。
-- 使用单元测试覆盖核心业务逻辑。
-
-### 验收命令
-
-=== "Linux / macOS / WSL2"
-
-    ```bash
-    export TODO_CLI_DATA="$(pwd)/.todo-cli/acceptance.json"
-    rm -f "$TODO_CLI_DATA"
-
-    go fmt ./...
-    go list ./...
-    go test ./...
-    go build ./cmd/todo-cli
-    go run ./cmd/todo-cli add "验收 todo-cli"
-    go run ./cmd/todo-cli list
-    go run ./cmd/todo-cli done 1
-    go run ./cmd/todo-cli update 1 "验收 Go CLI 项目"
-    go run ./cmd/todo-cli delete 1
-    ```
-
-=== "Windows PowerShell"
-
-    ```powershell
-    $env:TODO_CLI_DATA = "$PWD\.todo-cli\acceptance.json"
-    Remove-Item $env:TODO_CLI_DATA -ErrorAction SilentlyContinue
-
-    go fmt ./...
-    go list ./...
-    go test ./...
-    go build ./cmd/todo-cli
-    go run ./cmd/todo-cli add "验收 todo-cli"
-    go run ./cmd/todo-cli list
-    go run ./cmd/todo-cli done 1
-    go run ./cmd/todo-cli update 1 "验收 Go CLI 项目"
-    go run ./cmd/todo-cli delete 1
-    ```
-
-这里单独使用 `.todo-cli/acceptance.json`，是为了让验收不依赖你平时练习产生的 Todo 数据。只要从空文件开始，`id=1` 的示例就稳定可复现。
-
-### 能力验收标准
-
-你可以用下面清单自检：
-
-- 能解释 `package main` 和普通业务 package 的区别。
-- 能解释 `cmd/todo-cli` 和 `internal/todo` 为什么要拆开。
-- 能解释 `Item` 结构体中每个字段的作用。
-- 能解释为什么 `MarkDone` 使用指针接收者。
-- 能解释 `Repository` interface 的作用。
-- 能解释 `ErrNotFound` 为什么要作为变量复用。
-- 能解释 `go test ./...` 为什么比只运行程序更可靠。
-- 能在空数据文件、错误 ID、无效 JSON、权限不足时定位问题。
-- 能完成 Todo 的新增、查询、更新、完成和删除。
-
-### 作品集说明
-
-完成本篇后，你的作品集可以新增一条：
-
-```text
-使用 Go 标准库开发 todo-cli 命令行工具，具备 JSON 持久化、错误处理、单元测试和基础工程目录结构。
-```
-
-也可以在项目 README 中记录更完整的作品说明：
-
-````markdown
-## todo-cli
-
-本项目使用 Go 标准库实现命令行版 Todo 管理器，支持新增、列表、完成、修改和删除 Todo。
-
-### 技术点
-
-- Go module 管理项目
-- `cmd/` + `internal/` 工程目录
-- 结构体、方法、指针接收者
-- interface 抽象存储边界
-- error 包装与 `errors.Is`
-- JSON 文件持久化
-- `go test ./...` 单元测试
-
-### 验证
-
-```bash
-go fmt ./...
-go test ./...
-go build ./cmd/todo-cli
-```
-````
-
-这比“学过 Go 语法”更有说服力，因为它能展示你已经把语法落到了一个可运行项目里。
-
-## 12. 本章练习题
+## 9. 本章练习题
 
 ### 基础题
 
-1. `package main` 和 `package todo` 有什么区别？
-2. Go 变量的零值是什么意思？`string`、`bool`、`int` 的零值分别是什么？
-3. 切片和数组有什么区别？为什么本篇 Todo 列表使用切片？
-4. `map[string]string` 适合表达什么数据？
-5. 为什么 Go 函数经常返回 `(value, error)`？
-6. `errors.Is` 和直接比较错误字符串有什么区别？
-7. `defer` 在什么时候执行？
-8. `go.mod` 的 `module` 行有什么作用？
+1. `package main` 和普通业务包有什么区别？
+2. 为什么 `MemoryStore.Add` 使用指针接收者，而 `Item.Status` 可以使用值接收者？
+3. 切片和 map 分别适合表达什么数据？本篇为什么两个都用到了？
+4. `Repository` interface 的作用是什么？如果只有一个实现，为什么仍然可以保留这个边界？
+5. 为什么本篇分开执行两次 `go run` 后数据不会保留？
 
 ### 实操题
 
-1. 给 `todo-cli` 增加 `clear` 命令，删除所有 Todo。
-2. 给 `todo-cli list` 增加 `--done` 和 `--pending` 过滤能力。
-3. 给 `Item` 增加 `Priority string` 字段，支持 `low`、`medium`、`high`。
-4. 新增测试用例，验证空标题、非法 ID、删除不存在 ID 都会返回错误。
-5. 执行 `go build -o bin/todo-cli ./cmd/todo-cli`，并用构建后的可执行文件完成一次完整增删改查。
+1. 给 `todo-cli` 增加 `count` 命令，输出当前 Todo 总数。当 `go run ./cmd/todo-cli add "a" add "b" count` 输出 `2` 时，说明操作成功。
+2. 给 `list` 输出增加完成数量统计，例如最后一行输出 `summary: 1 done, 2 pending`。当完成一个 Todo 后统计数字变化正确，说明操作成功。
+3. 修改 `parseID`，让 ID 为 `0` 或负数时报错信息包含 `id must be positive`。当 `go run ./cmd/todo-cli done 0` 返回该错误时，说明操作成功。
 
 ### 思考题
 
-1. 如果未来把 JSON 文件换成 PostgreSQL，哪些代码应该变化，哪些代码不应该变化？
-2. `Repository` interface 是应该定义在业务包里，还是定义在调用方？为什么？
-3. 如果两个进程同时修改同一个 JSON 文件，可能发生什么问题？
-4. CLI 工具为什么要把错误输出到 `stderr`，而不是普通 `stdout`？
-5. 什么时候应该使用指针接收者？什么时候值接收者更合适？
+1. 如果团队准备让 `todo-cli` 的数据跨进程保留，你会选择 JSON 文件、SQLite 还是 PostgreSQL？请说明你会如何权衡复杂度和可靠性。
+2. 如果后续 HTTP API 和 CLI 都要复用 Todo 业务逻辑，你会把输入校验放在 `cmd/todo-cli`、HTTP Handler，还是 `internal/todo`？为什么？
 
-## 13. 本章面试题
+## 10. 本章面试题
 
-### 1. Go 程序的入口是什么？
+### 1. Go 的 package、module 和 import path 是什么关系？
 
-参考答案：
+**一句话结论**：module 是项目级依赖边界，package 是代码组织单元，import path 是其他代码引用某个 package 的路径。
 
-Go 可执行程序的入口是 `package main` 中的 `func main()`。普通 package 没有 `main` 入口，主要用于被其他包导入复用。在工程中，通常把入口放在 `cmd/<app>/main.go`，把业务逻辑放在 `internal/` 或其他业务包中。
+**展开解释**：`go.mod` 中的 `module cloud-native-todo-platform` 定义了当前项目根路径；`internal/todo` 是一个 package；在 `cmd/todo-cli/main.go` 中通过 `import "cloud-native-todo-platform/internal/todo"` 引入它。module path 和目录路径拼起来，形成包的 import path。理解这层关系后，遇到 `package ... is not in std` 这类错误时，就能回到 `go.mod` 和 import 路径检查。
 
-### 2. Go 的零值有什么意义？
+**深入追问**：如果是公开 GitHub module，module path 通常会写成 `github.com/<org>/<repo>`。如果改 module path，所有内部 import 都要同步更新。企业私有仓库还要配合 `GOPRIVATE` 和私有代理。
 
-参考答案：
+### 2. Go 中什么时候使用指针接收者？
 
-零值是变量未显式初始化时的默认值，例如 `int` 是 `0`，`bool` 是 `false`，`string` 是空字符串。零值让很多类型在创建后就处于可用或可预测状态。生产代码中要理解零值含义，避免把“没有设置”和“设置为零”混淆，例如超时时间、数量限制、业务 ID 等。
+**一句话结论**：当方法需要修改原对象，或对象较大不希望复制时，使用指针接收者。
 
-### 3. 切片和数组有什么区别？
+**展开解释**：本篇 `MemoryStore.Add`、`Done`、`Update`、`Delete` 都要修改 `items` 或 `nextID`，所以使用 `*MemoryStore`。而 `Item.Status()` 只读取字段，不修改对象，用值接收者更简单。指针接收者不是高级写法，也不是默认选择，它应该服务于语义。
 
-参考答案：
+**深入追问**：如果同一个类型既有指针接收者又有值接收者，要注意方法集。接口匹配时，`T` 和 `*T` 的方法集不同。真实项目里通常会保持同一类型的方法接收者风格一致，减少误解。
 
-数组长度固定，长度是类型的一部分。切片是对底层数组的动态视图，包含指针、长度和容量，支持 `append`。业务开发中列表大小通常不固定，所以更常用切片。使用切片时要注意共享底层数组可能带来的副作用。
+### 3. interface 应该定义在哪里？
 
-### 4. Go 为什么显式返回 error，而不是默认使用异常？
+**一句话结论**：interface 通常定义在调用方需要的能力边界上，而不是机械地为每个实现都提前定义接口。
 
-参考答案：
+**展开解释**：本篇 `Repository` 描述 CLI 和后续服务层需要的 Todo 存储能力：新增、列表、完成、修改、删除。现在实现是 `MemoryStore`，未来可以替换成文件或数据库。如果调用方只依赖 `Repository`，替换实现时改动就更小。但如果一个接口只有一个实现、也没有测试或替换需求，过早抽象会增加阅读成本。
 
-Go 鼓励调用方显式处理错误，让错误路径清晰可见。这样代码虽然更直接，但也更利于生产排障。错误处理时应保留上下文，用 `fmt.Errorf("%w")` 包装底层错误，并用 `errors.Is` 或 `errors.As` 做可靠判断，而不是依赖字符串比较。
+**深入追问**：Go 的接口是隐式实现，不需要 `implements` 关键字。本篇的 `var _ Repository = (*MemoryStore)(nil)` 是编译期断言，用来确认 `MemoryStore` 满足接口，常见于重要边界。
 
-### 5. 什么情况下使用指针接收者？
+### 4. Go 为什么显式返回 `error`，而不是默认使用异常？
 
-参考答案：
+**一句话结论**：Go 倾向把可预期失败作为普通返回值处理，让调用方明确决定如何恢复、包装或终止。
 
-当方法需要修改原对象、对象较大、对象包含锁或资源句柄时，通常使用指针接收者。例如 `MarkDone` 要修改 Todo 状态，所以使用 `*Item`。如果方法只读取对象且对象较小，值接收者也可以。团队内应保持同一类型方法接收者风格尽量一致，避免语义混乱。
+**展开解释**：CLI 中标题为空、ID 不存在、ID 不是数字，都是可预期失败。函数返回 `error` 后，入口层可以统一打印错误并返回非零退出码。`fmt.Errorf("%w")` 可以包装上下文，同时保留原始错误，便于 `errors.Is` 判断根因。
 
-### 6. interface 在 Go 中如何实现？
+**深入追问**：Go 也有 `panic`，但它更适合不可恢复的程序错误，例如违反内部不变量。业务输入错误、网络失败、数据库超时都应该优先用 `error` 返回。
 
-参考答案：
+### 5. 内存存储、文件存储和数据库存储有什么差异？
 
-Go 的 interface 是隐式实现的。一个类型只要拥有 interface 要求的方法集合，就自动实现该 interface，不需要写 `implements`。推荐定义小 interface，用于表达调用方真正需要的能力，避免一开始设计过大的抽象。
+**一句话结论**：内存存储最简单但进程退出即丢失；文件存储可持久化但并发和查询能力有限；数据库适合生产数据的一致性、查询和事务需求。
 
-### 7. `defer` 常见用途和注意事项是什么？
+**展开解释**：本篇选择内存存储，是为了聚焦 Go 语言基础。文件存储会引入路径、权限、JSON 编解码和文件锁；数据库会引入连接池、事务、迁移和 SQL。学习顺序上，先用内存理解对象和行为，再逐步引入持久化复杂度，学习曲线更平滑。
 
-参考答案：
+**深入追问**：如果后续要把 `MemoryStore` 换成 PostgreSQL，只要新的实现满足 `Repository` 接口，上层 CLI 或服务层就可以尽量少改。这正是接口边界的价值。
 
-`defer` 常用于关闭文件、释放锁、回滚临时状态等收尾动作。它会在当前函数返回前执行，多个 defer 按后进先出的顺序执行。注意不要滥用 defer 掩盖错误，生产中关闭文件、提交事务、释放锁等动作仍要考虑错误处理和执行顺序。
+## 11. 本章总结
 
-### 8. `go run`、`go build`、`go test` 有什么区别？
+本篇完成了阶段二的第一步：用 Go 写出一个能运行的业务小程序。你学习了 Go 程序结构、变量和类型、控制流、切片与 map、函数、指针、结构体、方法、interface、error、defer 和 Go module。项目成果上，你创建了 `cmd/todo-cli` 和 `internal/todo`，实现了内存版 Todo CLI v0.1，能在一个进程内完成增删改查。能力价值上，你已经不只是能写零散语法，而是能把业务对象、业务行为、错误边界和工程目录组织成可继续演进的 Go 代码。
 
-参考答案：
+## 12. 下一章衔接
 
-`go run` 会临时编译并运行程序，适合开发调试。`go build` 编译生成可执行文件，适合构建发布。`go test` 编译并运行测试文件，适合验证业务逻辑和回归问题。企业 CI 中通常至少执行 `go test ./...` 和 `go build ./...`。
-
-### 9. Go module 解决什么问题？
-
-参考答案：
-
-Go module 用于管理项目模块路径、Go 版本线和依赖版本。`go.mod` 描述直接依赖，`go.sum` 记录依赖校验信息，保证构建可复现。真实项目中 module path 应尽量稳定，通常使用仓库路径，避免后续 import 路径大规模变更。
-
-### 10. 如何让 CLI 程序适合 CI/CD 调用？
-
-参考答案：
-
-CLI 程序应该有清晰的参数、稳定的输出、明确的退出码和可排障的错误信息。成功返回 `0`，失败返回非 `0`，错误输出到 `stderr`。配置应支持环境变量或参数注入，避免把本机路径、密钥、临时状态写死在代码中。
-
-## 14. 本章总结
-
-本篇完成了阶段二 Go 后端开发的第一步。
-
-你已经学习并实践了：
-
-- Go 程序结构、变量、常量、类型和零值。
-- 条件、循环、切片和 map。
-- 函数、指针、结构体和方法。
-- interface、error 和 defer。
-- Go module、package 和基础工程目录。
-- 一个完整可运行的 `todo-cli` 项目。
-
-本篇的关键不是“背下语法”，而是理解 Go 如何表达业务对象、业务行为、错误边界和工程结构。`todo-cli` 是后续 Todo 平台的第一块 Go 代码资产，它会继续演进为并发任务、可测试服务、Web API、数据库服务和云原生应用。
-
-## 15. 下一章衔接
-
-下一篇将进入 Go 并发编程。
-
-本篇的 `todo-cli` 目前是单进程、顺序执行、文件存储的程序。真实后端服务会面对更多并发场景：
-
-- 多个请求同时创建 Todo。
-- 后台任务异步处理 Todo 事件。
-- 服务需要设置超时和取消。
-- 数据同步、日志处理、批量导入需要 worker。
-- Kubernetes Controller 会通过队列和 worker 并发处理资源事件。
-
-因此，下一篇会在本篇 Go 基础之上学习 goroutine、channel、context、sync、并发安全和常见并发错误，为后续 Web API 和 Operator Controller 打基础。
+下一篇进入 **Go 工程化与测试**。本篇的 `Item`、`Repository`、`MemoryStore` 和 `cmd/todo-cli` 会成为后续工程化改造的起点：你会学习如何给业务逻辑补测试、如何整理配置和日志、如何让小程序逐步具备生产级后端项目的骨架。
