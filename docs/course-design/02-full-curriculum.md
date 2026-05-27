@@ -80,8 +80,8 @@ Todo Operator（篇 34-42）
 
 - 1.1 课程目标、岗位路线与综合项目介绍
 - 1.2 YAML 语法基础（缩进、多文档、锚点与别名）
-- 1.3 Windows / macOS / Linux 学习环境选择
-- 1.4 WSL2、Ubuntu、终端与 VS Code 配置
+- 1.3 Ubuntu 24.04 统一学习环境
+- 1.4 终端、PATH、Docker Engine 与 kubeconfig
 - 1.5 安装 Go、Git、Docker、kubectl、kind、Helm
 - 1.6 版本环境锁定与 `check-env.sh` 检查脚本
 

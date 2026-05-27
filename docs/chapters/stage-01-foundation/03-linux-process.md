@@ -39,13 +39,13 @@ Go 服务运行在 Linux 之上，无论它将来是在虚拟机、Docker 容器
 本篇结束时，你至少应该能独立完成下面这组任务：
 
 ```bash
-$ systemctl status todo-process-demo --no-pager
-$ journalctl -u todo-process-demo -n 30 --no-pager
-$ PID="$(systemctl show -p MainPID --value todo-process-demo)"
-$ ps -p "$PID" -o pid,ppid,user,stat,%cpu,%mem,etime,cmd
-$ sudo ss -lntp | grep 18080
-$ curl -fsS http://127.0.0.1:18080/healthz
-$ sudo systemctl restart todo-process-demo
+systemctl status todo-process-demo --no-pager
+journalctl -u todo-process-demo -n 30 --no-pager
+PID="$(systemctl show -p MainPID --value todo-process-demo)"
+ps -p "$PID" -o pid,ppid,user,stat,%cpu,%mem,etime,cmd
+sudo ss -lntp | grep 18080
+curl -fsS http://127.0.0.1:18080/healthz
+sudo systemctl restart todo-process-demo
 ```
 
 这些命令是 Linux 服务器、容器宿主机、CI Runner 和 Kubernetes Node 排障时经常会用到的基础工具箱。
@@ -112,8 +112,8 @@ flowchart LR
 查看当前 Shell 的 PID：
 
 ```bash
-$ echo $$
-$ ps -p $$ -o pid,ppid,user,stat,cmd
+echo $$
+ps -p $$ -o pid,ppid,user,stat,cmd
 ```
 
 `PID` 是 Process ID，表示当前进程编号；`PPID` 是 Parent Process ID，表示父进程编号。在 systemd 管理的 Linux 系统中，PID 1 通常是 `systemd`，它负责启动和管理系统服务。
@@ -123,8 +123,8 @@ $ ps -p $$ -o pid,ppid,user,stat,cmd
 前台任务会占用当前终端；后台任务不会阻塞当前终端。临时实验时可以把命令放到后台运行：
 
 ```bash
-$ sleep 300 &
-$ jobs
+sleep 300 &
+jobs
 ```
 
 预期输出类似：
@@ -160,20 +160,20 @@ $ jobs
 `ps` 用于查看某一刻的进程快照：
 
 ```bash
-$ ps -ef | grep todo-process-demo
-$ ps -p "$PID" -o pid,ppid,user,stat,%cpu,%mem,rss,etime,cmd
+ps -ef | grep todo-process-demo
+ps -p "$PID" -o pid,ppid,user,stat,%cpu,%mem,rss,etime,cmd
 ```
 
 `pgrep` 用于按进程名查找 PID：
 
 ```bash
-$ pgrep -af todo-process-demo
+pgrep -af todo-process-demo
 ```
 
 `top` 用于动态观察 CPU 和内存：
 
 ```bash
-$ top -p "$PID"
+top -p "$PID"
 ```
 
 `htop` 是更友好的交互式工具，适合人工排查，但很多最小化服务器默认不安装。脚本中优先使用 `ps`、`top`、`pgrep` 这类更基础的命令。
@@ -219,20 +219,20 @@ Linux 发行版通常通过软件包管理器安装工具和依赖：
 === "Ubuntu / Debian：apt"
 
     ```bash
-    $ sudo apt update
-    $ sudo apt install -y procps curl htop lsof psmisc
+    sudo apt update
+    sudo apt install -y procps curl htop lsof psmisc
     ```
 
 === "Rocky / Alma / Fedora：dnf"
 
     ```bash
-    $ sudo dnf install -y procps-ng curl htop lsof psmisc
+    sudo dnf install -y procps-ng curl htop lsof psmisc
     ```
 
 === "遗留 CentOS 7：yum"
 
     ```bash
-    $ sudo yum install -y procps-ng curl htop lsof psmisc
+    sudo yum install -y procps-ng curl htop lsof psmisc
     ```
 
 `procps` 或 `procps-ng` 提供 `ps`、`top`、`free` 等命令；`curl` 用于访问 HTTP 服务；`lsof` 和 `ss` 常用于端口排查；`psmisc` 提供 `pstree`、`killall` 等工具。
@@ -253,7 +253,7 @@ CentOS Linux 7 已经停止维护，不建议作为新学习环境和新生产�
 例如查看监听端口：
 
 ```bash
-$ sudo ss -lntp | grep 18080
+sudo ss -lntp | grep 18080
 ```
 
 `ss -lnt` 只看监听端口，通常普通用户也能执行；`ss -lntp` 会额外显示进程名和 PID，在很多系统上需要 `sudo` 才能看全。因此脚本里只做端口存在性检查，人工排障时再用 `sudo ss -lntp` 确认进程归属。
@@ -261,8 +261,8 @@ $ sudo ss -lntp | grep 18080
 查看磁盘空间：
 
 ```bash
-$ df -h
-$ sudo du -sh /var/log/* 2>/dev/null | sort -h | tail
+df -h
+sudo du -sh /var/log/* 2>/dev/null | sort -h | tail
 ```
 
 这些命令会在后续 Kubernetes 排障中继续出现，只是对象会从 Linux 进程扩展为容器、Pod 和 Node。
@@ -274,7 +274,7 @@ $ sudo du -sh /var/log/* 2>/dev/null | sort -h | tail
 当你执行：
 
 ```bash
-$ sudo systemctl start todo-process-demo
+sudo systemctl start todo-process-demo
 ```
 
 系统大致经历下面的过程：
@@ -312,7 +312,7 @@ sequenceDiagram
 临时后台运行可以这样做：
 
 ```bash
-$ nohup ./todo-api > todo-api.log 2>&1 &
+nohup ./todo-api > todo-api.log 2>&1 &
 ```
 
 这适合临时验证，不适合长期生产服务。
@@ -357,15 +357,15 @@ systemd 管理单机服务，Kubernetes 管理集群应用。它们不是同一�
 建议在第 1 篇创建的仓库中执行：
 
 ```bash
-$ cd ~/workspace/cloud-native-todo-platform
+cd ~/workspace/cloud-native-todo-platform
 ```
 
 推荐环境：
 
 | 项目 | 要求 |
 |---|---|
-| 操作系统 | WSL2 Ubuntu 24.04 或带 systemd 的 Linux |
-| Go | Go 1.26.x，能在执行实验的 WSL/Linux 终端中执行 `go version` |
+| 操作系统 | Ubuntu 24.04 LTS |
+| Go | Go 1.26.x，能在当前 Ubuntu 终端中执行 `go version` |
 | systemd | PID 1 为 `systemd` |
 | 权限 | 当前用户可以使用 `sudo` |
 | 必需命令 | `go`、`systemctl`、`journalctl`、`ps`、`top`、`ss`、`curl`、`free`、`df` |
@@ -374,8 +374,8 @@ $ cd ~/workspace/cloud-native-todo-platform
 确认 systemd 可用：
 
 ```bash
-$ ps -p 1 -o pid,comm,args
-$ systemctl --version
+ps -p 1 -o pid,comm,args
+systemctl --version
 ```
 
 预期输出类似：
@@ -386,10 +386,10 @@ $ systemctl --version
 systemd 255 (255.4-1ubuntu8.12)
 ```
 
-确认 Go 在同一个 WSL/Linux 环境中可用：
+确认 Go 在当前 Ubuntu 环境中可用：
 
 ```bash
-$ go version
+go version
 ```
 
 预期输出类似：
@@ -398,58 +398,27 @@ $ go version
 go version go1.26.2 linux/amd64
 ```
 
-注意：如果 Windows PowerShell 中能执行 `go version`，但 WSL2 Ubuntu 中不能执行，仍然无法完成本篇实验。systemd 启动的是 Linux 环境里的二进制文件，Go 编译也应在同一个 WSL/Linux 环境中完成。
-
-平台说明：
-
-=== "Windows + WSL2"
-
-    在 WSL2 Ubuntu 终端中执行本篇实验。课程仓库建议放在 WSL2 Linux 文件系统中，例如 `~/workspace/cloud-native-todo-platform`。不要放在 `/mnt/c/...`、`/mnt/d/...` 这类 Windows 挂载盘下做 systemd、权限和脚本实验。
-
-    如果 `ps -p 1 -o comm=` 不是 `systemd`，可以在 WSL2 Ubuntu 中编辑 `/etc/wsl.conf`：
-
-    ```bash
-    $ sudo tee /etc/wsl.conf >/dev/null <<'EOF'
-    [boot]
-    systemd=true
-    EOF
-    ```
-
-    然后在 Windows PowerShell 中执行：
-
-    ```powershell
-    wsl --shutdown
-    ```
-
-    重新打开 Ubuntu 后再验证。
-
-=== "Linux"
-
-    Ubuntu、Debian、Rocky Linux、AlmaLinux、Fedora、CentOS Stream 等带 systemd 的发行版都可以完成实验。课程示例以 Ubuntu 24.04 为基准。
-
-=== "macOS"
-
-    macOS 可以阅读本篇、理解概念、编译 Go 程序，但不能原生运行 systemd。要完整完成实验，请使用 WSL2、Linux 虚拟机或云服务器。
+注意：systemd 启动的是 Ubuntu 环境里的二进制文件，Go 编译和服务安装都应在同一台 Ubuntu 24.04 机器上完成。不要在容器、精简环境或没有 systemd 的临时 shell 中做本篇实验。
 
 安装排障工具：
 
 === "Ubuntu / Debian"
 
     ```bash
-    $ sudo apt update
-    $ sudo apt install -y procps curl htop lsof psmisc
+    sudo apt update
+    sudo apt install -y procps curl htop lsof psmisc
     ```
 
 === "Rocky / Alma / Fedora"
 
     ```bash
-    $ sudo dnf install -y procps-ng curl htop lsof psmisc
+    sudo dnf install -y procps-ng curl htop lsof psmisc
     ```
 
 === "遗留 CentOS 7"
 
     ```bash
-    $ sudo yum install -y procps-ng curl htop lsof psmisc
+    sudo yum install -y procps-ng curl htop lsof psmisc
     ```
 
 ### 5.3 文件目录结构
@@ -877,8 +846,8 @@ main "$@"
 先确认你在课程仓库根目录：
 
 ```bash
-$ pwd
-$ ls
+pwd
+ls
 ```
 
 预期能看到 `README.md`、`docs/` 等文件或目录。
@@ -886,7 +855,7 @@ $ ls
 如果仓库还没有 Go module，先初始化：
 
 ```bash
-$ test -f go.mod || go mod init github.com/your-name/cloud-native-todo-platform
+test -f go.mod || go mod init github.com/your-name/cloud-native-todo-platform
 ```
 
 请把 `your-name` 替换为你的 GitHub 用户名或组织名；如果只是本地实验，保留这个示例模块名也不影响本篇编译。
@@ -894,27 +863,27 @@ $ test -f go.mod || go mod init github.com/your-name/cloud-native-todo-platform
 创建实验目录：
 
 ```bash
-$ mkdir -p api/cmd/todo-process-demo bin deployments/systemd scripts
+mkdir -p api/cmd/todo-process-demo bin deployments/systemd scripts
 ```
 
 将 5.4 中的 Go 代码保存为 `api/cmd/todo-process-demo/main.go`，再格式化并编译：
 
 ```bash
-$ gofmt -w api/cmd/todo-process-demo/main.go
-$ go mod tidy
-$ go build -o bin/todo-process-demo ./api/cmd/todo-process-demo
+gofmt -w api/cmd/todo-process-demo/main.go
+go mod tidy
+go build -o bin/todo-process-demo ./api/cmd/todo-process-demo
 ```
 
 先以前台方式运行一次，确认程序本身没问题：
 
 ```bash
-$ TODO_HTTP_ADDR=127.0.0.1:18080 TODO_ENV=dev ./bin/todo-process-demo
+TODO_HTTP_ADDR=127.0.0.1:18080 TODO_ENV=dev ./bin/todo-process-demo
 ```
 
 另开一个终端访问健康检查：
 
 ```bash
-$ curl -fsS http://127.0.0.1:18080/healthz
+curl -fsS http://127.0.0.1:18080/healthz
 ```
 
 确认前台服务能访问后，在运行服务的终端按 `Ctrl+C` 停止。这样做是为了先排除 Go 程序本身的问题，再进入 systemd 安装步骤。
@@ -922,29 +891,29 @@ $ curl -fsS http://127.0.0.1:18080/healthz
 创建低权限用户和系统目录：
 
 ```bash
-$ sudo groupadd --system todo 2>/dev/null || true
-$ sudo useradd --system --gid todo --home /var/lib/todo-platform --shell /usr/sbin/nologin todo 2>/dev/null || true
-$ sudo mkdir -p /opt/todo-platform/bin /etc/todo-platform /var/lib/todo-platform /var/log/todo-platform
-$ sudo chown -R todo:todo /var/lib/todo-platform /var/log/todo-platform
-$ sudo chmod 750 /var/lib/todo-platform /var/log/todo-platform
+sudo groupadd --system todo 2>/dev/null || true
+sudo useradd --system --gid todo --home /var/lib/todo-platform --shell /usr/sbin/nologin todo 2>/dev/null || true
+sudo mkdir -p /opt/todo-platform/bin /etc/todo-platform /var/lib/todo-platform /var/log/todo-platform
+sudo chown -R todo:todo /var/lib/todo-platform /var/log/todo-platform
+sudo chmod 750 /var/lib/todo-platform /var/log/todo-platform
 ```
 
 安装二进制文件：
 
 ```bash
-$ sudo install -o root -g root -m 0755 bin/todo-process-demo /opt/todo-platform/bin/todo-process-demo
+sudo install -o root -g root -m 0755 bin/todo-process-demo /opt/todo-platform/bin/todo-process-demo
 ```
 
 写入配置文件：
 
 ```bash
-$ sudo tee /etc/todo-platform/process-demo.env >/dev/null <<'EOF'
+sudo tee /etc/todo-platform/process-demo.env >/dev/null <<'EOF'
 TODO_ENV=dev
 TODO_HTTP_ADDR=127.0.0.1:18080
 TODO_PID_FILE=/run/todo-platform/todo-process-demo.pid
 EOF
-$ sudo chown root:todo /etc/todo-platform/process-demo.env
-$ sudo chmod 640 /etc/todo-platform/process-demo.env
+sudo chown root:todo /etc/todo-platform/process-demo.env
+sudo chmod 640 /etc/todo-platform/process-demo.env
 ```
 
 这里使用 `<<'EOF'` 是为了让 Shell 原样写入内容，不展开文件里的 `$VARIABLE`。写配置文件时推荐使用这种写法，避免环境变量被当前终端提前替换。
@@ -952,10 +921,10 @@ $ sudo chmod 640 /etc/todo-platform/process-demo.env
 将 5.4 中的 unit 内容保存为 `deployments/systemd/todo-process-demo.service`，再安装到 systemd：
 
 ```bash
-$ sudo cp deployments/systemd/todo-process-demo.service /etc/systemd/system/todo-process-demo.service
-$ systemd-analyze verify /etc/systemd/system/todo-process-demo.service
-$ echo $?
-$ sudo systemctl daemon-reload
+sudo cp deployments/systemd/todo-process-demo.service /etc/systemd/system/todo-process-demo.service
+systemd-analyze verify /etc/systemd/system/todo-process-demo.service
+echo $?
+sudo systemctl daemon-reload
 ```
 
 `systemd-analyze verify` 用来提前检查 unit 语法。判断标准以退出码为准：`echo $?` 输出 `0` 表示语法检查通过；如果有错误，它会打印具体配置问题。如果提示 `Command ... is not executable`，优先检查二进制文件是否已经安装到 `/opt/todo-platform/bin/todo-process-demo`。
@@ -963,39 +932,39 @@ $ sudo systemctl daemon-reload
 启动服务并设置开机自启：
 
 ```bash
-$ sudo systemctl enable --now todo-process-demo
+sudo systemctl enable --now todo-process-demo
 ```
 
 查看服务状态：
 
 ```bash
-$ systemctl status todo-process-demo --no-pager
+systemctl status todo-process-demo --no-pager
 ```
 
 查看服务日志：
 
 ```bash
-$ journalctl -u todo-process-demo -n 30 --no-pager
+journalctl -u todo-process-demo -n 30 --no-pager
 ```
 
 查看主进程和端口：
 
 ```bash
-$ PID="$(systemctl show -p MainPID --value todo-process-demo)"
-$ ps -p "$PID" -o pid,ppid,user,stat,%cpu,%mem,rss,etime,cmd
-$ sudo ss -lntp | grep 18080
+PID="$(systemctl show -p MainPID --value todo-process-demo)"
+ps -p "$PID" -o pid,ppid,user,stat,%cpu,%mem,rss,etime,cmd
+sudo ss -lntp | grep 18080
 ```
 
 访问接口并制造一点 CPU 和内存观察数据：
 
 ```bash
-$ curl -fsS http://127.0.0.1:18080/healthz
-$ curl -fsS "http://127.0.0.1:18080/work?ms=1000"
-$ curl -fsS "http://127.0.0.1:18080/memory?mb=16&hold=true"
-$ curl -fsS "http://127.0.0.1:18080/memory?clear=true"
-$ ps -p "$PID" -o pid,%cpu,%mem,rss,vsz,cmd
-$ free -h
-$ df -h
+curl -fsS http://127.0.0.1:18080/healthz
+curl -fsS "http://127.0.0.1:18080/work?ms=1000"
+curl -fsS "http://127.0.0.1:18080/memory?mb=16&hold=true"
+curl -fsS "http://127.0.0.1:18080/memory?clear=true"
+ps -p "$PID" -o pid,%cpu,%mem,rss,vsz,cmd
+free -h
+df -h
 ```
 
 `/memory?mb=16&hold=true` 会让进程短暂持有一块内存，便于观察 RSS 变化；随后访问 `/memory?clear=true` 是为了释放这块实验内存，避免影响后续观察。
@@ -1005,24 +974,24 @@ $ df -h
 将 5.4 中的检查脚本保存为 `scripts/check-process-service.sh`，再赋予执行权限：
 
 ```bash
-$ chmod +x scripts/check-process-service.sh
-$ ./scripts/check-process-service.sh
+chmod +x scripts/check-process-service.sh
+./scripts/check-process-service.sh
 ```
 
 如果你临时把端口改成了 `18081`，可以这样检查：
 
 ```bash
-$ TODO_DEMO_PORT=18081 TODO_DEMO_URL=http://127.0.0.1:18081 ./scripts/check-process-service.sh
+TODO_DEMO_PORT=18081 TODO_DEMO_URL=http://127.0.0.1:18081 ./scripts/check-process-service.sh
 ```
 
 测试重启和停止：
 
 ```bash
-$ sudo systemctl restart todo-process-demo
-$ systemctl status todo-process-demo --no-pager
-$ sudo systemctl stop todo-process-demo
-$ systemctl status todo-process-demo --no-pager
-$ sudo systemctl start todo-process-demo
+sudo systemctl restart todo-process-demo
+systemctl status todo-process-demo --no-pager
+sudo systemctl stop todo-process-demo
+systemctl status todo-process-demo --no-pager
+sudo systemctl start todo-process-demo
 ```
 
 ### 5.6 预期输出
@@ -1072,16 +1041,16 @@ Process service check completed.
 集中执行下面命令：
 
 ```bash
-$ go build -o bin/todo-process-demo ./api/cmd/todo-process-demo
-$ systemctl is-active todo-process-demo
-$ systemctl status todo-process-demo --no-pager
-$ journalctl -u todo-process-demo -n 20 --no-pager
-$ curl -fsS http://127.0.0.1:18080/healthz
-$ PID="$(systemctl show -p MainPID --value todo-process-demo)"
-$ ps -p "$PID" -o pid,ppid,user,stat,%cpu,%mem,rss,etime,cmd
-$ test "$(cat /run/todo-platform/todo-process-demo.pid)" = "$PID"
-$ sudo ss -lntp | grep 18080
-$ ./scripts/check-process-service.sh
+go build -o bin/todo-process-demo ./api/cmd/todo-process-demo
+systemctl is-active todo-process-demo
+systemctl status todo-process-demo --no-pager
+journalctl -u todo-process-demo -n 20 --no-pager
+curl -fsS http://127.0.0.1:18080/healthz
+PID="$(systemctl show -p MainPID --value todo-process-demo)"
+ps -p "$PID" -o pid,ppid,user,stat,%cpu,%mem,rss,etime,cmd
+test "$(cat /run/todo-platform/todo-process-demo.pid)" = "$PID"
+sudo ss -lntp | grep 18080
+./scripts/check-process-service.sh
 ```
 
 这里的 `go build` 只验证源码还能编译，并不会自动更新 systemd 正在运行的 `/opt/todo-platform/bin/todo-process-demo`。如果你修改代码后希望服务运行新版本，需要重新执行 `sudo install -o root -g root -m 0755 bin/todo-process-demo /opt/todo-platform/bin/todo-process-demo`，再执行 `sudo systemctl restart todo-process-demo`。
@@ -1101,24 +1070,24 @@ $ ./scripts/check-process-service.sh
 如果你只是临时停止服务：
 
 ```bash
-$ sudo systemctl stop todo-process-demo
+sudo systemctl stop todo-process-demo
 ```
 
 如果要完全清理本篇实验安装到系统中的内容：
 
 ```bash
-$ sudo systemctl disable --now todo-process-demo || true
-$ sudo rm -f /etc/systemd/system/todo-process-demo.service
-$ sudo systemctl daemon-reload
-$ sudo systemctl reset-failed todo-process-demo || true
-$ sudo rm -f /opt/todo-platform/bin/todo-process-demo
-$ sudo rm -f /etc/todo-platform/process-demo.env
+sudo systemctl disable --now todo-process-demo || true
+sudo rm -f /etc/systemd/system/todo-process-demo.service
+sudo systemctl daemon-reload
+sudo systemctl reset-failed todo-process-demo || true
+sudo rm -f /opt/todo-platform/bin/todo-process-demo
+sudo rm -f /etc/todo-platform/process-demo.env
 ```
 
 如果这些目录只用于本课程实验，也可以清理空目录：
 
 ```bash
-$ sudo rmdir /var/lib/todo-platform /var/log/todo-platform 2>/dev/null || true
+sudo rmdir /var/lib/todo-platform /var/log/todo-platform 2>/dev/null || true
 ```
 
 `/run/todo-platform` 由 systemd 的 `RuntimeDirectory` 管理，服务停止后会自动清理。不建议自动删除 `todo` 用户和 `/opt/todo-platform`、`/etc/todo-platform` 目录，因为它们可能被后续章节复用。
@@ -1136,18 +1105,18 @@ $ sudo rmdir /var/lib/todo-platform /var/log/todo-platform 2>/dev/null || true
   Failed to connect to bus: Host is down
   ```
 
-- **原因**：当前环境不是以 systemd 作为 PID 1 启动，例如旧版 WSL、普通容器或精简环境。
+- **原因**：当前环境不是以 systemd 作为 PID 1 启动，例如普通容器、精简环境或错误的实验机器。
 
 - **排查**：
 
   ```bash
-  $ ps -p 1 -o pid,comm,args
-  $ systemctl --version
+  ps -p 1 -o pid,comm,args
+  systemctl --version
   ```
 
   如果 PID 1 不是 `systemd`，本篇 systemd 实验无法完整执行。
 
-- **修复**：WSL2 中按 §5.2 启用 systemd；其他环境换成 Linux 虚拟机、云服务器或带 systemd 的实验机。
+- **修复**：切换到课程指定的 Ubuntu 24.04 环境，并确认 `ps -p 1 -o comm=` 输出 `systemd`。
 
 - **预防**：开始实验前先检查 PID 1，不要等到安装 unit 后才发现环境不支持。
 
@@ -1164,8 +1133,8 @@ $ sudo rmdir /var/lib/todo-platform /var/log/todo-platform 2>/dev/null || true
 - **排查**：
 
   ```bash
-  $ ls -l /etc/systemd/system/todo-process-demo.service
-  $ systemctl cat todo-process-demo
+  ls -l /etc/systemd/system/todo-process-demo.service
+  systemctl cat todo-process-demo
   ```
 
   `systemctl cat` 可以确认 systemd 实际读到的 unit 内容。
@@ -1173,9 +1142,9 @@ $ sudo rmdir /var/lib/todo-platform /var/log/todo-platform 2>/dev/null || true
 - **修复**：
 
   ```bash
-  $ sudo cp deployments/systemd/todo-process-demo.service /etc/systemd/system/todo-process-demo.service
-  $ sudo systemctl daemon-reload
-  $ sudo systemctl start todo-process-demo
+  sudo cp deployments/systemd/todo-process-demo.service /etc/systemd/system/todo-process-demo.service
+  sudo systemctl daemon-reload
+  sudo systemctl start todo-process-demo
   ```
 
 - **预防**：每次新增或修改 unit 文件后，都执行 `daemon-reload` 再启动或重启服务。
@@ -1194,9 +1163,9 @@ $ sudo rmdir /var/lib/todo-platform /var/log/todo-platform 2>/dev/null || true
 - **排查**：
 
   ```bash
-  $ systemctl status todo-process-demo --no-pager
-  $ journalctl -u todo-process-demo -n 50 --no-pager
-  $ ls -l /opt/todo-platform/bin/todo-process-demo
+  systemctl status todo-process-demo --no-pager
+  journalctl -u todo-process-demo -n 50 --no-pager
+  ls -l /opt/todo-platform/bin/todo-process-demo
   ```
 
   如果文件不存在或权限中没有 `x`，systemd 无法执行它。
@@ -1204,8 +1173,8 @@ $ sudo rmdir /var/lib/todo-platform /var/log/todo-platform 2>/dev/null || true
 - **修复**：
 
   ```bash
-  $ sudo install -o root -g root -m 0755 bin/todo-process-demo /opt/todo-platform/bin/todo-process-demo
-  $ sudo systemctl restart todo-process-demo
+  sudo install -o root -g root -m 0755 bin/todo-process-demo /opt/todo-platform/bin/todo-process-demo
+  sudo systemctl restart todo-process-demo
   ```
 
 - **预防**：unit 中的 `ExecStart` 使用绝对路径，并在启动前检查目标文件存在且可执行。
@@ -1229,19 +1198,19 @@ $ sudo rmdir /var/lib/todo-platform /var/log/todo-platform 2>/dev/null || true
 - **排查**：
 
   ```bash
-  $ id todo
-  $ ls -l /etc/todo-platform/process-demo.env
-  $ ls -ld /run/todo-platform /var/lib/todo-platform /var/log/todo-platform
-  $ journalctl -u todo-process-demo -n 50 --no-pager
+  id todo
+  ls -l /etc/todo-platform/process-demo.env
+  ls -ld /run/todo-platform /var/lib/todo-platform /var/log/todo-platform
+  journalctl -u todo-process-demo -n 50 --no-pager
   ```
 
 - **修复**：
 
   ```bash
-  $ sudo chown root:todo /etc/todo-platform/process-demo.env
-  $ sudo chmod 640 /etc/todo-platform/process-demo.env
-  $ sudo chown -R todo:todo /var/lib/todo-platform /var/log/todo-platform
-  $ sudo systemctl restart todo-process-demo
+  sudo chown root:todo /etc/todo-platform/process-demo.env
+  sudo chmod 640 /etc/todo-platform/process-demo.env
+  sudo chown -R todo:todo /var/lib/todo-platform /var/log/todo-platform
+  sudo systemctl restart todo-process-demo
   ```
 
 - **预防**：服务使用低权限用户时，要同时设计配置文件读取权限、数据目录写入权限和运行时目录权限。
@@ -1259,8 +1228,8 @@ $ sudo rmdir /var/lib/todo-platform /var/log/todo-platform 2>/dev/null || true
 - **排查**：
 
   ```bash
-  $ sudo ss -lntp | grep 18080 || true
-  $ sudo lsof -iTCP:18080 -sTCP:LISTEN
+  sudo ss -lntp | grep 18080 || true
+  sudo lsof -iTCP:18080 -sTCP:LISTEN
   ```
 
   找到 PID 后，再用 `ps -p <PID> -o pid,user,cmd` 判断它属于哪个服务。
@@ -1268,8 +1237,8 @@ $ sudo rmdir /var/lib/todo-platform /var/log/todo-platform 2>/dev/null || true
 - **修复**：停止冲突服务，或者修改 `/etc/todo-platform/process-demo.env` 中的端口。
 
   ```bash
-  $ sudo sed -i 's/TODO_HTTP_ADDR=.*/TODO_HTTP_ADDR=127.0.0.1:18081/' /etc/todo-platform/process-demo.env
-  $ sudo systemctl restart todo-process-demo
+  sudo sed -i 's/TODO_HTTP_ADDR=.*/TODO_HTTP_ADDR=127.0.0.1:18081/' /etc/todo-platform/process-demo.env
+  sudo systemctl restart todo-process-demo
   ```
 
 - **预防**：部署前检查端口规划；同一台机器上多个服务不要随意复用端口。
@@ -1309,13 +1278,13 @@ $ sudo rmdir /var/lib/todo-platform /var/log/todo-platform 2>/dev/null || true
 验收命令：
 
 ```bash
-$ systemctl status todo-process-demo --no-pager
-$ journalctl -u todo-process-demo -n 20 --no-pager
-$ curl -fsS http://127.0.0.1:18080/healthz
-$ PID="$(systemctl show -p MainPID --value todo-process-demo)"
-$ ps -p "$PID" -o pid,ppid,user,stat,%cpu,%mem,etime,cmd
-$ sudo ss -lntp | grep 18080
-$ ./scripts/check-process-service.sh
+systemctl status todo-process-demo --no-pager
+journalctl -u todo-process-demo -n 20 --no-pager
+curl -fsS http://127.0.0.1:18080/healthz
+PID="$(systemctl show -p MainPID --value todo-process-demo)"
+ps -p "$PID" -o pid,ppid,user,stat,%cpu,%mem,etime,cmd
+sudo ss -lntp | grep 18080
+./scripts/check-process-service.sh
 ```
 
 能力验收标准：

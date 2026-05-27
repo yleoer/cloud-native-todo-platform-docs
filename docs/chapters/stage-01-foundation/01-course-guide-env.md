@@ -10,8 +10,8 @@
 
 - 1.1 课程目标、岗位路线与综合项目介绍
 - 1.2 YAML 语法基础：缩进、多文档、锚点与别名
-- 1.3 Windows / macOS / Linux 学习环境选择
-- 1.4 WSL2、Ubuntu、终端与 VS Code 配置
+- 1.3 Ubuntu 24.04 统一学习环境
+- 1.4 终端、PATH、Docker Engine 与 kubeconfig
 - 1.5 安装 Go、Git、Docker、kubectl、kind、Helm
 - 1.6 版本环境锁定与 `check-env.sh` 检查脚本
 
@@ -23,7 +23,7 @@
 
 - 能说清本课程 6 个阶段、42 篇内容与 `Cloud Native Todo Platform` 项目主线的关系。
 - 能解释 YAML 缩进、列表、字典、多文档、锚点和别名的语法规则。
-- 能对比 Windows + WSL2、macOS、Linux 三类学习环境的差异及适用场景。
+- 能说明为什么本课程统一基于 Ubuntu 24.04 LTS，并能验证当前系统版本。
 - 能说明 `go`、`git`、`docker`、`kubectl`、`kind`、`helm` 在后续课程中的作用。
 
 ### 1.2 技能目标
@@ -36,12 +36,12 @@
 本篇结束时，你至少应该能在自己的主力学习终端中成功执行：
 
 ```bash
-$ go version
-$ git --version
-$ docker --version
-$ kubectl version --client
-$ kind version
-$ helm version
+go version
+git --version
+docker --version
+kubectl version --client
+kind version
+helm version
 ```
 
 预期结果不是每个人输出完全相同，而是这些命令都能返回版本信息，且版本符合团队或课程约定。
@@ -169,19 +169,15 @@ tools:
 
 本篇先掌握这些基础即可。后续 Kubernetes、Helm、GitHub Actions、Argo CD 都会继续使用 YAML。
 
-### 3.4 为什么推荐 Linux 用户态环境
+### 3.4 为什么统一使用 Ubuntu 24.04
 
-云原生技术大量运行在 Linux 之上。即使你使用 Windows 或 macOS，Docker 容器、Kubernetes 节点、CI runner 和生产服务器最终也大多是 Linux。
+云原生技术大量运行在 Linux 之上。为了减少新手在系统差异、包管理器、路径、权限、Shell 行为和 Docker 运行方式上的额外负担，本课程统一使用 **Ubuntu 24.04 LTS** 作为学习和实验环境。
 
-因此推荐环境如下：
+统一环境带来三个好处：
 
-| 本机系统 | 推荐学习环境 | 原因 |
-|---|---|---|
-| Windows | Windows 11 + WSL2 Ubuntu + Docker Desktop | 最接近 Linux 开发体验，同时保留 Windows 桌面工具 |
-| macOS | macOS + Homebrew + Docker Desktop | 命令行友好，但容器实际运行在 Linux 虚拟机中 |
-| Linux | Ubuntu 24.04 LTS 或同类发行版 | 最接近服务器和容器运行环境 |
-
-这不是说 Windows 或 macOS 不能学，而是要清楚：后续涉及 Shell、文件权限、Docker、Kubernetes 的内容时，Linux 用户态能减少很多额外差异。
+- 命令可复制：课程中的 Bash、apt、systemd、Docker Engine 命令都按 Ubuntu 24.04 编写。
+- 问题可复现：同一条命令在不同学员机器上的行为更接近，便于排障和答疑。
+- 更贴近生产：后续容器、Kubernetes 节点、CI runner 和服务器环境都以 Linux 为主。
 
 ### 3.5 版本环境锁定
 
@@ -211,9 +207,9 @@ tools:
 检查命令位置：
 
 ```bash
-$ command -v go
-$ command -v docker
-$ echo "$PATH"
+command -v go
+command -v docker
+echo "$PATH"
 ```
 
 预期输出类似：
@@ -226,21 +222,21 @@ $ echo "$PATH"
 
 如果工具已经安装但命令找不到，通常不是工具坏了，而是没有加入 `PATH`，或者当前终端没有重新加载环境变量。
 
-### 4.2 Docker Desktop、Docker Engine 与 WSL2
+### 4.2 Docker CLI 与 Docker Engine
 
 Docker CLI 是你输入的命令，Docker daemon 才是真正管理镜像和容器的后台服务。
 
-在 Windows + WSL2 中，推荐关系是：
+在本课程的 Ubuntu 24.04 环境中，推荐关系是：
 
 ```text
-Windows Terminal
-  -> WSL2 Ubuntu
-    -> docker CLI
-      -> Docker Desktop WSL Integration
-        -> Linux VM / Docker daemon
+Ubuntu 24.04 shell
+  -> docker CLI
+    -> Docker Engine daemon
+      -> containerd
+        -> runc
 ```
 
-这解释了一个常见现象：你在 PowerShell 能执行 `docker --version`，但在 WSL2 Ubuntu 中失败。原因通常是 Docker Desktop 没有启用对应 Ubuntu 发行版的 WSL Integration。
+这解释了一个常见现象：`docker --version` 能成功，但 `docker info` 失败。前者只说明 Docker CLI 已安装，后者才说明 Docker daemon 正在运行且当前用户有权限访问。
 
 ### 4.3 kubectl、kind 与 kubeconfig
 
@@ -269,8 +265,8 @@ Pod 创建链路
 查看当前集群上下文：
 
 ```bash
-$ kubectl config current-context
-$ kubectl config get-contexts
+kubectl config current-context
+kubectl config get-contexts
 ```
 
 生产环境中，执行删除命令前必须确认当前 context。很多事故不是命令不会用，而是对错集群执行了正确命令。
@@ -301,157 +297,151 @@ $ kubectl config get-contexts
 | 内存 | 16GB 及以上 |
 | 磁盘 | 至少预留 50GB |
 | 编辑器 | VS Code |
-| 终端 | Windows Terminal、iTerm2、GNOME Terminal 或同类工具 |
+| 终端 | Ubuntu 24.04 自带 Terminal、GNOME Terminal 或同类 Linux 终端 |
 
 建议软件及版本：
 
 | 软件 | 课程基线 | 检查命令 |
 |---|---|---|
 | Go | 1.26.x | `go version` |
-| Git | 2.x | `git --version` |
+| Git | 2.x，Ubuntu 24.04 apt 仓库版本即可 | `git --version` |
 | Docker | 29.x | `docker --version` |
 | kubectl | 1.36.x | `kubectl version --client` |
 | kind | 0.31+ | `kind version` |
 | Helm | 4.2.x | `helm version --template '{{.Version}}'` |
 
-选择你的系统路径：
+确认当前系统为 Ubuntu 24.04：
 
-=== "Windows + WSL2"
+```bash
+cat /etc/os-release
+uname -m
+```
 
-    推荐使用 Windows 11 + WSL2 Ubuntu 24.04 + Docker Desktop。
-
-    先确认 WSL 状态：
-
-    ```powershell
-    PS> wsl --status
-    PS> wsl -l -v
-    ```
-
-    预期输出中 Ubuntu 的 `VERSION` 应为 `2`。
-
-    如果还没有 Ubuntu，可以安装：
-
-    ```powershell
-    PS> wsl --install -d Ubuntu-24.04
-    ```
-
-    安装完成后，进入 Ubuntu，后续 Linux 命令都在 WSL2 Ubuntu 中执行。
-
-    WSL2 新手可以记住三个入口：在开始菜单打开 Ubuntu，会进入 Linux 终端；在 Ubuntu 中访问 Windows 文件通常从 `/mnt/c/Users/<你的用户名>` 开始；在 Windows 资源管理器地址栏输入 `\\wsl$` 可以访问 WSL2 文件系统。课程后续建议把仓库放在 Ubuntu 的 `~/workspace`，不要放在 `/mnt/c` 下，这样文件权限和磁盘性能更接近真实 Linux。
-
-=== "macOS"
-
-    推荐使用 Homebrew 安装命令行工具，使用 Docker Desktop 提供 Docker daemon。
-
-    检查芯片架构：
-
-    ```bash
-    $ uname -m
-    ```
-
-    Apple Silicon 通常输出 `arm64`，Intel Mac 通常输出 `x86_64`。后续构建镜像时要留意平台架构。
-
-=== "Linux"
-
-    推荐 Ubuntu 24.04 LTS 或同类发行版。
-
-    查看系统版本：
-
-    ```bash
-    $ cat /etc/os-release
-    $ uname -m
-    ```
-
-    Linux 环境最接近后续服务器和容器环境，但 Docker 权限、系统包源和内核配置需要自己维护。
+`/etc/os-release` 中应包含 `VERSION_ID="24.04"`。如果不是 Ubuntu 24.04，请先切换到课程指定环境后再继续，避免后续包源、systemd、Docker 和 Kubernetes 命令出现不必要差异。
 
 ### 5.3 安装核心工具
 
-本课程给出默认推荐路径，同时保留企业内网、镜像源和安全策略的替代空间。工具安装不要追求“命令越短越好”，而要追求来源可信、版本可查、结果可验证。
+本课程默认在 Ubuntu 24.04 上安装工具。安装不要追求“命令越短越好”，而要追求来源可信、版本可查、结果可验证。国内网络环境下，优先使用可信镜像源、公司制品库或公司代理；不要从不明网盘下载二进制文件。
 
-默认参考这些官方入口：
+默认参考这些入口：
 
-| 工具 | 官方入口 | 本篇验证方式 |
+| 工具 | 安装来源 | 本篇验证方式 |
 |---|---|---|
-| Go | [go.dev/doc/install](https://go.dev/doc/install) | `go version` |
-| Git | [git-scm.com/downloads](https://git-scm.com/downloads) | `git --version` |
-| Docker | [docs.docker.com/get-docker](https://docs.docker.com/get-docker/) | `docker --version` 和 `docker info` |
-| kubectl | [kubernetes.io/docs/tasks/tools](https://kubernetes.io/docs/tasks/tools/) | `kubectl version --client` |
-| kind | [kind.sigs.k8s.io/docs/user/quick-start](https://kind.sigs.k8s.io/docs/user/quick-start/) | `kind version` |
-| Helm | [helm.sh/docs/intro/install](https://helm.sh/docs/intro/install/) | `helm version` |
+| Go | 官方 tar 包；国内可使用 `golang.google.cn/dl` 下载页 | `go version` |
+| Git | Ubuntu apt 仓库 | `git --version` |
+| Docker | Docker Engine apt 仓库；国内可使用可信 Docker CE 镜像源 | `docker --version` 和 `docker info` |
+| kubectl | Kubernetes apt 仓库或官方二进制 | `kubectl version --client` |
+| kind | GitHub Release 或公司制品库缓存的二进制 | `kind version` |
+| Helm | `get.helm.sh` 官方 tar 包或公司制品库缓存的二进制 | `helm version` |
 
 安装完成后的最低要求是：命令能在你的主力学习终端里返回版本信息。
 
-=== "Linux / WSL2 Ubuntu"
+先安装基础包：
 
-    先更新系统包索引并安装基础工具：
+```bash
+sudo apt update
+sudo apt install -y curl ca-certificates gnupg lsb-release make tar gzip
+sudo apt install -y git
+```
 
-    ```bash
-    $ sudo apt update
-    $ sudo apt install -y git curl ca-certificates gnupg lsb-release make
-    ```
+如果国内访问 Ubuntu 官方源较慢，可以把 Ubuntu 24.04 的 apt 源切换到可信镜像源。以下示例使用清华源，执行前会备份原文件：
 
-    `lsb-release` 在 Ubuntu 24.04 LTS 中仍可用。如果你的发行版不提供这个包，可以先跳过它，后续用 `cat /etc/os-release` 查看发行版信息。
+```bash
+sudo cp /etc/apt/sources.list.d/ubuntu.sources /etc/apt/sources.list.d/ubuntu.sources.bak
+sudo sed -i \
+  -e 's|http://archive.ubuntu.com/ubuntu/|https://mirrors.tuna.tsinghua.edu.cn/ubuntu/|g' \
+  -e 's|http://security.ubuntu.com/ubuntu/|https://mirrors.tuna.tsinghua.edu.cn/ubuntu/|g' \
+  /etc/apt/sources.list.d/ubuntu.sources
+sudo apt update
+```
 
-    Go 推荐使用官方安装包或公司内部制品源。手动安装时要核对 checksum，不要从不明网盘或二进制镜像站下载。
+安装 Go：
 
-    Docker 可以使用 Docker Engine，也可以在 Windows + WSL2 场景使用 Docker Desktop 的 WSL Integration。WSL2 学员应先在 Docker Desktop 设置中启用当前 Ubuntu 发行版。
+```bash
+GO_VERSION=1.26.0
+GO_ARCH=amd64
+curl -fLO "https://golang.google.cn/dl/go${GO_VERSION}.linux-${GO_ARCH}.tar.gz"
+sudo rm -rf /usr/local/go
+sudo tar -C /usr/local -xzf "go${GO_VERSION}.linux-${GO_ARCH}.tar.gz"
+grep -qxF 'export PATH=/usr/local/go/bin:$PATH' ~/.bashrc || printf '\nexport PATH=/usr/local/go/bin:$PATH\n' >> ~/.bashrc
+export PATH=/usr/local/go/bin:$PATH
+go env -w GOPROXY=https://goproxy.cn,direct
+go version
+go env GOPROXY
+```
 
-    kubectl、kind、Helm 建议按官方文档安装，或使用公司统一脚本安装。安装完成后执行：
+安装 Docker Engine：
 
-    ```bash
-    $ go version
-    $ git --version
-    $ docker --version
-    $ kubectl version --client
-    $ kind version
-    $ helm version
-    ```
+```bash
+sudo install -m 0755 -d /etc/apt/keyrings
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg \
+  | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+sudo chmod a+r /etc/apt/keyrings/docker.gpg
+. /etc/os-release
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu ${VERSION_CODENAME} stable" \
+  | sudo tee /etc/apt/sources.list.d/docker.list >/dev/null
+sudo apt update
+sudo apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+sudo usermod -aG docker "$USER"
+```
 
-    再单独确认 Docker daemon 是否可访问：
+`usermod -aG docker "$USER"` 后需要重新登录终端，或者临时执行 `newgrp docker`。确认 Docker daemon：
 
-    ```bash
-    $ docker info
-    ```
+```bash
+docker --version
+docker compose version
+docker info
+```
 
-    如果 `docker --version` 成功但 `docker info` 失败，说明 CLI 已安装，但后台 daemon 未启动或 WSL Integration 未配置。
+如果国内访问 Docker 官方 apt 仓库较慢，可以把上面 `docker.list` 中的 `https://download.docker.com/linux/ubuntu` 替换为可信镜像源，例如 `https://mirrors.tuna.tsinghua.edu.cn/docker-ce/linux/ubuntu`。如果拉取容器镜像较慢，应优先使用公司内部 registry 或课程提供的预拉取镜像，避免依赖不明公共加速器。
 
-=== "macOS"
+安装 kubectl：
 
-    安装 Homebrew 后，可以安装命令行工具：
+```bash
+sudo install -m 0755 -d /etc/apt/keyrings
+curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.36/deb/Release.key \
+  | sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+echo 'deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.36/deb/ /' \
+  | sudo tee /etc/apt/sources.list.d/kubernetes.list >/dev/null
+sudo apt update
+sudo apt install -y kubectl
+kubectl version --client
+```
 
-    ```bash
-    $ brew install go git kubectl kind helm
-    ```
+安装 kind：
 
-    Docker 建议安装 Docker Desktop。安装后先启动 Docker Desktop，再执行：
+```bash
+KIND_VERSION=v0.31.0
+curl -fLo kind "https://github.com/kubernetes-sigs/kind/releases/download/${KIND_VERSION}/kind-linux-amd64"
+chmod +x kind
+sudo mv kind /usr/local/bin/kind
+kind version
+```
 
-    ```bash
-    $ go version
-    $ git --version
-    $ docker --version
-    $ kubectl version --client
-    $ kind version
-    $ helm version
-    $ docker info
-    ```
+安装 Helm：
 
-    Apple Silicon 用户要特别留意镜像架构。后续构建镜像时，如果遇到 `no matching manifest` 或运行时架构不一致，需要检查 `linux/arm64` 与 `linux/amd64` 的差异。
+```bash
+HELM_VERSION=v4.2.0
+curl -fLO "https://get.helm.sh/helm-${HELM_VERSION}-linux-amd64.tar.gz"
+tar -zxf "helm-${HELM_VERSION}-linux-amd64.tar.gz"
+sudo install linux-amd64/helm /usr/local/bin/helm
+rm -rf linux-amd64 "helm-${HELM_VERSION}-linux-amd64.tar.gz"
+helm version
+```
 
-=== "Windows PowerShell"
+如果国内网络访问 GitHub Release、`pkgs.k8s.io` 或 `get.helm.sh` 不稳定，推荐做法是：由课程、团队或公司提前把 kubectl、kind、Helm 二进制缓存到可信制品库，学员仍按相同版本号安装和验证。不要把来源不明的安装脚本直接 pipe 给 Shell 执行。
 
-    Windows 推荐用 PowerShell 安装桌面工具，用 WSL2 Ubuntu 执行主要课程命令。
+最后统一验证：
 
-    可以使用 winget 安装 Git、VS Code、Docker Desktop：
-
-    ```powershell
-    PS> winget install Git.Git
-    PS> winget install Microsoft.VisualStudioCode
-    PS> winget install Docker.DockerDesktop
-    ```
-
-    Go、kubectl、kind、Helm 可以安装在 Windows，也可以安装在 WSL2 Ubuntu。为了减少差异，课程后续命令默认以 WSL2 Ubuntu 为主。
-
-    进入 WSL2 Ubuntu 后，再按 Linux / WSL2 Ubuntu 的方式安装和验证工具。
+```bash
+go version
+git --version
+docker --version
+docker info
+kubectl version --client
+kind version
+helm version
+```
 
 ### 5.4 企业网络与镜像源准备
 
@@ -470,41 +460,41 @@ $ kubectl config get-contexts
 Go 代理示例：
 
 ```bash
-$ go env -w GOPROXY=https://proxy.golang.org,direct
+go env -w GOPROXY=https://goproxy.cn,direct
 ```
 
-Go 默认通常已经使用 `https://proxy.golang.org,direct`。如果你的机器已经是这个值，可以跳过这条命令；如果公司要求使用内部代理，应以公司地址替换上面的公共地址。
+本课程统一使用 `https://goproxy.cn,direct`。如果公司要求使用内部 Go module proxy，应以公司地址替换上面的公共地址，并记录到 `docs/environment.md`。
 
 ### 5.5 初始化项目仓库
 
 创建工作目录：
 
 ```bash
-$ mkdir -p ~/workspace
-$ cd ~/workspace
-$ mkdir -p cloud-native-todo-platform
-$ cd cloud-native-todo-platform
+mkdir -p ~/workspace
+cd ~/workspace
+mkdir -p cloud-native-todo-platform
+cd cloud-native-todo-platform
 ```
 
 初始化 Git：
 
 ```bash
-$ git init
+git init
 ```
 
 创建新版项目主线目录：
 
-下面的命令使用了 Bash / zsh 的花括号展开。Windows 学员请在 WSL2 Ubuntu 的 Bash 中执行，不要在 `sh` 或 `cmd.exe` 中执行。
+下面的命令使用了 Bash 的花括号展开，请在 Ubuntu 24.04 的 Bash 中执行，不要切换到 `sh`。
 
 ```bash
-$ mkdir -p api/cmd/todo-api
-$ mkdir -p api/internal/{config,handler/{http,gin},service,repository,middleware,model}
-$ mkdir -p api/migrations api/tests
-$ mkdir -p cli scripts docs/examples
-$ mkdir -p deployments/{docker-compose,k8s-base,k8s-network,k8s-security,helm/todo-platform,kustomize/base}
-$ mkdir -p deployments/kustomize/overlays/{dev,test,prod}
-$ mkdir -p observability/{prometheus,grafana/dashboards,loki,otel}
-$ mkdir -p operator/{crd,handwritten,kubebuilder,helm}
+mkdir -p api/cmd/todo-api
+mkdir -p api/internal/{config,handler/{http,gin},service,repository,middleware,model}
+mkdir -p api/migrations api/tests
+mkdir -p cli scripts docs/examples
+mkdir -p deployments/{docker-compose,k8s-base,k8s-network,k8s-security,helm/todo-platform,kustomize/base}
+mkdir -p deployments/kustomize/overlays/{dev,test,prod}
+mkdir -p observability/{prometheus,grafana/dashboards,loki,otel}
+mkdir -p operator/{crd,handwritten,kubebuilder,helm}
 ```
 
 目录用途：
@@ -526,10 +516,14 @@ $ mkdir -p operator/{crd,handwritten,kubebuilder,helm}
 执行 `tree` 查看当前仓库骨架：
 
 ```bash
-$ tree -L 3 .
+tree -L 4 .
 ```
 
-如果你的系统还没有 `tree`，Ubuntu/WSL2 可以执行 `sudo apt install -y tree`，macOS 可以执行 `brew install tree`。
+如果系统还没有 `tree`，先安装：
+
+```bash
+sudo apt install -y tree
+```
 
 预期输出类似：
 
@@ -539,6 +533,14 @@ $ tree -L 3 .
 │   ├── cmd
 │   │   └── todo-api
 │   ├── internal
+│   │   ├── config
+│   │   ├── handler
+│   │   │   ├── gin
+│   │   │   └── http
+│   │   ├── middleware
+│   │   ├── model
+│   │   ├── repository
+│   │   └── service
 │   ├── migrations
 │   └── tests
 ├── cli
@@ -549,10 +551,13 @@ $ tree -L 3 .
 │   ├── k8s-network
 │   ├── k8s-security
 │   └── kustomize
+│       ├── base
+│       └── overlays
 ├── docs
 │   └── examples
 ├── observability
 │   ├── grafana
+│   │   └── dashboards
 │   ├── loki
 │   ├── otel
 │   └── prometheus
@@ -583,7 +588,7 @@ tools:
 写入文件：
 
 ```bash
-$ cat > docs/examples/basic.yaml <<'EOF'
+cat > docs/examples/basic.yaml <<'EOF'
 project:
   name: cloud-native-todo-platform
   stage: foundation
@@ -614,7 +619,7 @@ data:
 写入文件：
 
 ```bash
-$ cat > docs/examples/multi-doc.yaml <<'EOF'
+cat > docs/examples/multi-doc.yaml <<'EOF'
 apiVersion: v1
 kind: Namespace
 metadata:
@@ -633,7 +638,7 @@ EOF
 创建锚点示例：
 
 ```bash
-$ cat > docs/examples/anchors.yaml <<'EOF'
+cat > docs/examples/anchors.yaml <<'EOF'
 versions:
   go: &go_version "1.26.x"
   docker: "29.x"
@@ -648,7 +653,7 @@ EOF
 用 kubectl 客户端检查 Kubernetes YAML 语法：
 
 ```bash
-$ kubectl apply --dry-run=client --validate=false -f docs/examples/multi-doc.yaml
+kubectl apply --dry-run=client --validate=false -f docs/examples/multi-doc.yaml
 ```
 
 预期输出：
@@ -665,7 +670,7 @@ configmap/todo-env created (dry run)
 创建环境记录：
 
 ```bash
-$ cat > docs/environment.md <<'EOF'
+cat > docs/environment.md <<'EOF'
 # 开发环境记录
 
 ## 基础信息
@@ -686,16 +691,14 @@ $ cat > docs/environment.md <<'EOF'
 
 ## 备注
 
-- Windows 用户记录 WSL2 发行版和 Docker Desktop WSL Integration 状态。
-- macOS 用户记录芯片架构和 Docker Desktop 资源配置。
-- Linux 用户记录发行版版本和 Docker Engine 安装方式。
+- 记录 Ubuntu 版本、CPU 架构、Docker Engine 安装方式和是否使用国内镜像源。
 EOF
 ```
 
 创建 README：
 
 ```bash
-$ cat > README.md <<'EOF'
+cat > README.md <<'EOF'
 # Cloud Native Todo Platform
 
 这是《从 Go 后端开发、Docker 容器化、Kubernetes 到 Operator 开发与生产实践》课程的综合项目仓库。
@@ -715,7 +718,7 @@ EOF
 创建 `.gitignore`：
 
 ```bash
-$ cat > .gitignore <<'EOF'
+cat > .gitignore <<'EOF'
 .DS_Store
 .idea/
 .vscode/
@@ -740,6 +743,7 @@ EOF
 
 ```bash title="scripts/versions.conf"
 GO_REQUIRED_PREFIX=go1.26
+GO_PROXY_REQUIRED=https://goproxy.cn,direct
 DOCKER_REQUIRED_PREFIX="Docker version 29."
 KUBECTL_REQUIRED_PREFIX=v1.36
 KIND_REQUIRED_PREFIX=kind
@@ -750,8 +754,9 @@ KIND_NODE_IMAGE=kindest/node:v1.35.0@sha256:452d707d4862f52530247495d180205e0290
 写入文件：
 
 ```bash
-$ cat > scripts/versions.conf <<'EOF'
+cat > scripts/versions.conf <<'EOF'
 GO_REQUIRED_PREFIX=go1.26
+GO_PROXY_REQUIRED=https://goproxy.cn,direct
 DOCKER_REQUIRED_PREFIX="Docker version 29."
 KUBECTL_REQUIRED_PREFIX=v1.36
 KIND_REQUIRED_PREFIX=kind
@@ -767,8 +772,8 @@ EOF
 校验这个 digest 的方法如下：
 
 ```bash
-$ docker pull kindest/node:v1.35.0
-$ docker inspect kindest/node:v1.35.0 --format '{{.RepoDigests}}'
+docker pull kindest/node:v1.35.0
+docker inspect kindest/node:v1.35.0 --format '{{.RepoDigests}}'
 ```
 
 预期输出应包含：
@@ -851,6 +856,8 @@ main() {
 
   show_and_capture_version "Go" go version
   go_version="$version_output"
+  show_and_capture_version "Go proxy" go env GOPROXY
+  go_proxy="$version_output"
   show_and_capture_version "Git" git --version
   show_and_capture_version "Docker CLI" docker --version
   docker_version="$version_output"
@@ -862,6 +869,7 @@ main() {
   helm_version="$version_output"
 
   warn_if_missing_prefix "Go" "$go_version" "${GO_REQUIRED_PREFIX:-}"
+  warn_if_missing_prefix "Go proxy" "$go_proxy" "${GO_PROXY_REQUIRED:-}"
   warn_if_missing_prefix "Docker CLI" "$docker_version" "${DOCKER_REQUIRED_PREFIX:-}"
   warn_if_missing_prefix "kubectl" "$kubectl_version" "${KUBECTL_REQUIRED_PREFIX:-}"
   warn_if_missing_prefix "kind" "$kind_version" "${KIND_REQUIRED_PREFIX:-}"
@@ -873,7 +881,7 @@ main() {
     ok "Docker daemon is reachable"
   else
     warn "Docker CLI exists, but Docker daemon is not reachable"
-    warn "Start Docker Desktop or Docker Engine, then run this script again"
+    warn "Start Docker Engine, then run this script again"
   fi
 
   printf '\nEnvironment check completed.\n'
@@ -886,28 +894,29 @@ main "$@"
 
 Helm 版本检查使用 `helm version --template '{{.Version}}'`，是为了只取 `v4.2.x` 这样的语义版本，避免默认输出中的 Git commit、GoVersion 等字段影响脚本判断。
 
-WSL2 换行符提醒：如果你在 Windows 编辑器里创建脚本，要确认文件使用 LF 换行。若执行脚本时出现 `$'\r': command not found`，可以在 WSL2 中运行：
+如果复制脚本后执行异常，先确认文件使用 LF 换行。若执行脚本时出现 `$'\r': command not found`，可以运行：
 
 ```bash
-$ sed -i 's/\r$//' scripts/check-env.sh
+sed -i 's/\r$//' scripts/check-env.sh
 ```
 
 赋予执行权限：
 
 ```bash
-$ chmod +x scripts/check-env.sh
+chmod +x scripts/check-env.sh
 ```
 
 运行检查：
 
 ```bash
-$ ./scripts/check-env.sh
+./scripts/check-env.sh
 ```
 
 预期输出会包含：
 
 ```text
 [OK] go found: ...
+[OK] Go proxy matches expected prefix: https://goproxy.cn,direct
 [OK] git found: ...
 [OK] docker found: ...
 [OK] kubectl found: ...
@@ -917,15 +926,15 @@ $ ./scripts/check-env.sh
 Environment check completed.
 ```
 
-如果 Docker Desktop 没启动，脚本应该给出 WARN，而不是直接中断。这样的设计能让新手先看完所有工具状态，再集中处理问题。
+如果 Docker Engine 没启动，脚本应该给出 WARN，而不是直接中断。这样的设计能让新手先看完所有工具状态，再集中处理问题。
 
 ### 5.10 可选：创建 kind 集群做烟测
 
 如果 Docker daemon 可以访问，可以创建一个本地 Kubernetes 集群。创建前先读取版本锁文件，让 kind 使用固定节点镜像：
 
 ```bash
-$ source scripts/versions.conf
-$ kind create cluster --name todo-dev --image "$KIND_NODE_IMAGE"
+source scripts/versions.conf
+kind create cluster --name todo-dev --image "$KIND_NODE_IMAGE"
 ```
 
 这里显式指定 `--image`，是为了避免 kind 默认节点镜像随着 kind 版本变化而漂移。真实团队做本地集成测试时，也应该把节点镜像写进脚本或 CI 配置，而不是依赖默认值。
@@ -933,7 +942,7 @@ $ kind create cluster --name todo-dev --image "$KIND_NODE_IMAGE"
 查看节点：
 
 ```bash
-$ kubectl get nodes
+kubectl get nodes
 ```
 
 预期输出：
@@ -950,14 +959,14 @@ todo-dev-control-plane   Ready    control-plane   ...   v1.35.0
 应用前面写的 YAML：
 
 ```bash
-$ kubectl apply -f docs/examples/multi-doc.yaml
+kubectl apply -f docs/examples/multi-doc.yaml
 ```
 
 验证资源：
 
 ```bash
-$ kubectl get namespace todo-dev
-$ kubectl -n todo-dev get configmap todo-env
+kubectl get namespace todo-dev
+kubectl -n todo-dev get configmap todo-env
 ```
 
 ### 5.11 完成首次提交
@@ -965,25 +974,25 @@ $ kubectl -n todo-dev get configmap todo-env
 查看 Git 状态：
 
 ```bash
-$ git status --short
+git status --short
 ```
 
 暂存文件：
 
 ```bash
-$ git add .
+git add .
 ```
 
 提交：
 
 ```bash
-$ git commit -m "初始化课程项目环境"
+git commit -m "初始化课程项目环境"
 ```
 
 查看提交记录：
 
 ```bash
-$ git log --oneline -1
+git log --oneline -1
 ```
 
 ### 5.12 验证方法
@@ -991,13 +1000,13 @@ $ git log --oneline -1
 本篇实验完成后，集中执行下面的验证命令：
 
 ```bash
-$ cd ~/workspace/cloud-native-todo-platform
-$ ./scripts/check-env.sh
-$ kubectl apply --dry-run=client --validate=false -f docs/examples/multi-doc.yaml
-$ test -f docs/environment.md
-$ test -f scripts/versions.conf
-$ test -x scripts/check-env.sh
-$ git log --oneline -1
+cd ~/workspace/cloud-native-todo-platform
+./scripts/check-env.sh
+kubectl apply --dry-run=client --validate=false -f docs/examples/multi-doc.yaml
+test -f docs/environment.md
+test -f scripts/versions.conf
+test -x scripts/check-env.sh
+git log --oneline -1
 ```
 
 预期结果：
@@ -1027,20 +1036,20 @@ configmap/todo-env created (dry run)
 如果你在 5.10 创建了 kind 集群，实验结束后可以删除它：
 
 ```bash
-$ kind delete cluster --name todo-dev
+kind delete cluster --name todo-dev
 ```
 
 确认上下文已经清理：
 
 ```bash
-$ kubectl config get-contexts
+kubectl config get-contexts
 ```
 
 如果只是想重新做一遍仓库初始化实验，可以删除本地练习仓库：
 
 ```bash
-$ cd ~/workspace
-$ rm -rf cloud-native-todo-platform
+cd ~/workspace
+rm -rf cloud-native-todo-platform
 ```
 
 删除仓库前请确认里面没有你想保留的笔记或提交记录。课程后续章节会继续使用这个仓库；如果你准备接着学习下一篇，不需要删除仓库，只需要保留当前成果即可。
@@ -1054,7 +1063,7 @@ $ rm -rf cloud-native-todo-platform
 | 错误 | 典型现象 | 优先排查方向 |
 |---|---|---|
 | 错误 1 | `go: command not found` | PATH 与安装目录 |
-| 错误 2 | `docker --version` 成功但 `docker info` 失败 | Docker daemon 与 WSL Integration |
+| 错误 2 | `docker --version` 成功但 `docker info` 失败 | Docker daemon 与用户权限 |
 | 错误 3 | `mapping values are not allowed` | YAML 缩进、冒号、Tab |
 | 错误 4 | `localhost:8080 was refused` | kubeconfig 与 kind 集群 |
 | 错误 5 | `Permission denied` | 脚本执行权限 |
@@ -1072,16 +1081,16 @@ bash: go: command not found
 **排查：**
 
 ```bash
-$ command -v go
-$ echo "$PATH"
-$ ls /usr/local/go/bin/go
+command -v go
+echo "$PATH"
+ls /usr/local/go/bin/go
 ```
 
 **修复：** 如果 `command -v go` 没有输出，先按官方方式安装 Go；如果 `/usr/local/go/bin/go` 存在但找不到命令，把 `/usr/local/go/bin` 加入 Shell 配置文件，然后重新打开终端。
 
 **预防：** 安装工具后立即运行 `go version`，并把版本写入 `docs/environment.md`。团队环境文档中要写清安装路径和验证命令。
 
-### 错误 2：Docker daemon 未启动或 WSL Integration 未开启
+### 错误 2：Docker daemon 未启动或当前用户无权限
 
 **现象：**
 
@@ -1089,18 +1098,23 @@ $ ls /usr/local/go/bin/go
 Cannot connect to the Docker daemon at unix:///var/run/docker.sock. Is the docker daemon running?
 ```
 
-**原因：** Docker CLI 已安装，但后台 Docker daemon 没启动；Windows + WSL2 场景中，也可能是 Docker Desktop 没有给当前 Ubuntu 发行版开启 WSL Integration。
+**原因：** Docker CLI 已安装，但后台 Docker daemon 没启动；或者当前用户不在 `docker` 组中，无法访问 `/var/run/docker.sock`。
 
 **排查：**
 
 ```bash
-$ docker --version
-$ docker info
+docker --version
+docker info
 ```
 
-Windows 学员还要在 Docker Desktop 中检查 **Settings -> Resources -> WSL Integration**。
+**修复：** 启动 Docker Engine，并确认当前用户有权限访问 Docker daemon：
 
-**修复：** 启动 Docker Desktop 或 Docker Engine；WSL2 用户开启当前 Ubuntu 发行版的 WSL Integration 后，重启 Ubuntu 终端，再运行 `docker info`。
+```bash
+sudo systemctl enable --now docker
+sudo usermod -aG docker "$USER"
+newgrp docker
+docker info
+```
 
 **预防：** 每次进入实验前先运行 `./scripts/check-env.sh`。脚本会把 Docker CLI 和 Docker daemon 分开检查，避免把“命令存在”和“服务可用”混为一谈。
 
@@ -1117,8 +1131,8 @@ error: error parsing docs/examples/basic.yaml: error converting YAML to JSON: ya
 **排查：**
 
 ```bash
-$ sed -n '1,80p' docs/examples/basic.yaml
-$ kubectl apply --dry-run=client --validate=false -f docs/examples/multi-doc.yaml
+sed -n '1,80p' docs/examples/basic.yaml
+kubectl apply --dry-run=client --validate=false -f docs/examples/multi-doc.yaml
 ```
 
 **修复：** 统一使用 2 个空格缩进；列表项前使用 `- `；键值对写成 `key: value`。如果编辑器能显示不可见字符，打开 Tab 和空格显示功能。
@@ -1138,17 +1152,17 @@ The connection to the server localhost:8080 was refused - did you specify the ri
 **排查：**
 
 ```bash
-$ kubectl config current-context
-$ kubectl config get-contexts
-$ kind get clusters
+kubectl config current-context
+kubectl config get-contexts
+kind get clusters
 ```
 
 **修复：** 如果只是做客户端 YAML 检查，使用 `--dry-run=client --validate=false`；如果要真实验证资源，先创建 kind 集群：
 
 ```bash
-$ source scripts/versions.conf
-$ kind create cluster --name todo-dev --image "$KIND_NODE_IMAGE"
-$ kubectl get nodes
+source scripts/versions.conf
+kind create cluster --name todo-dev --image "$KIND_NODE_IMAGE"
+kubectl get nodes
 ```
 
 **预防：** 操作集群前先执行 `kubectl config current-context`。生产环境中尤其不要把生产 kubeconfig 和本地 kind context 混用。
@@ -1166,14 +1180,14 @@ bash: ./scripts/check-env.sh: Permission denied
 **排查：**
 
 ```bash
-$ ls -l scripts/check-env.sh
+ls -l scripts/check-env.sh
 ```
 
 **修复：**
 
 ```bash
-$ chmod +x scripts/check-env.sh
-$ ./scripts/check-env.sh
+chmod +x scripts/check-env.sh
+./scripts/check-env.sh
 ```
 
 **预防：** 创建脚本后立即执行 `chmod +x`，并在 Git 提交前运行一次脚本。后续章节会逐步把脚本执行纳入 Makefile 或 CI。
@@ -1183,7 +1197,7 @@ $ ./scripts/check-env.sh
 1. 先确认命令是否存在：`command -v <tool>`。
 2. 再确认版本是否能输出：`<tool> version`。
 3. 再确认后台服务是否运行：`docker info`、`kubectl get nodes`。
-4. 最后检查配置文件：PATH、kubeconfig、Docker Desktop WSL Integration。
+4. 最后检查配置文件和后台服务：PATH、kubeconfig、Docker Engine、用户组权限。
 
 不要一上来重装所有工具。重装之前，先保存错误输出和你的环境记录。
 
@@ -1191,7 +1205,7 @@ $ ./scripts/check-env.sh
 
 本篇是开发环境准备，但很多习惯会直接影响生产安全和稳定性。
 
-- 工具安装来源要可信。Go、Docker、kubectl、kind、Helm 应优先来自官方文档、系统包管理器、Homebrew 或公司内部镜像源。
+- 工具安装来源要可信。Go、Docker、kubectl、kind、Helm 应优先来自官方文档、Ubuntu apt 仓库、官方二进制或公司内部镜像源。
 - 能校验 checksum 时要校验，尤其是 kubectl、Helm、kind 这类会接触集群权限或发布流程的工具。
 - 企业环境应优先使用公司内部制品库、Go module proxy、容器镜像仓库和受控代理，避免每台开发机直接从公网下载不可追踪的二进制。
 - 如果公司使用 HTTPS 代理或私有 CA，应按安全团队要求安装证书，不要用关闭 TLS 校验的方式“临时解决”下载问题。
@@ -1220,18 +1234,18 @@ $ ./scripts/check-env.sh
 验收命令：
 
 ```bash
-$ cd ~/workspace/cloud-native-todo-platform
-$ ./scripts/check-env.sh
-$ kubectl apply --dry-run=client --validate=false -f docs/examples/multi-doc.yaml
-$ test -f scripts/versions.conf
-$ git log --oneline -1
+cd ~/workspace/cloud-native-todo-platform
+./scripts/check-env.sh
+kubectl apply --dry-run=client --validate=false -f docs/examples/multi-doc.yaml
+test -f scripts/versions.conf
+git log --oneline -1
 ```
 
 能力验收标准：
 
 | 能力项 | 验收方式 |
 |---|---|
-| 环境选择 | 能说明自己为什么选择 WSL2、macOS 或 Linux |
+| 环境基线 | 能确认并说明课程统一使用 Ubuntu 24.04 的原因 |
 | YAML 基础 | 能解释缩进、列表、多文档、锚点和别名 |
 | 工具安装 | 6 个核心工具都能输出版本 |
 | Docker | `docker info` 能成功或能解释为什么 daemon 暂不可用 |
@@ -1245,15 +1259,16 @@ $ git log --oneline -1
 
 ### 基础题
 
-1. 找出下面 YAML 片段的问题，并说明如何修复。
+1. 找出下面这段故意写错的 YAML 片段的问题，并写出修复后的片段。
 
     ```yaml
     tools:
     - go
       - docker
     ```
+    提示：本题重点是 YAML 列表缩进；如果想提前观察 Kubernetes 多文档格式，可以参考 `docs/examples/multi-doc.yaml`。
 2. `kubectl` 和 `kind` 分别解决什么问题？
-3. 为什么 Windows 学员推荐使用 WSL2 Ubuntu 作为主力学习终端？
+3. 为什么本课程统一要求使用 Ubuntu 24.04？
 4. 为什么 `.env` 和 kubeconfig 不应该提交到 Git？
 
 ### 实操题
@@ -1276,7 +1291,7 @@ $ git log --oneline -1
 
 一句话结论：先统一主力终端和工具版本，再初始化仓库结构，最后用脚本自动验证环境。
 
-展开解释：Windows 推荐 WSL2 Ubuntu，macOS 和 Linux 使用本机终端。安装 Go、Git、Docker、kubectl、kind、Helm 后，先确认每个工具能输出版本，再规划 `api/`、`cli/`、`deployments/`、`scripts/`、`operator/` 等目录。最后编写 `check-env.sh` 做自动化环境检查，并把版本记录到 `docs/environment.md` 或 README 中。
+展开解释：本课程统一使用 Ubuntu 24.04，先确认 `/etc/os-release` 和 CPU 架构，再安装 Go、Git、Docker Engine、kubectl、kind、Helm。国内环境下还要配置可信 apt 源、Go proxy 和必要的制品库缓存。安装完成后，先确认每个工具能输出版本，再规划 `api/`、`cli/`、`deployments/`、`scripts/`、`operator/` 等目录。最后编写 `check-env.sh` 做自动化环境检查，并把版本记录到 `docs/environment.md` 或 README 中。
 
 深入追问：如果团队成员环境不一致，你会怎么治理？可以回答：把版本基线写进 `scripts/versions.conf`、README、CI 和构建镜像中，并定期升级验证。
 
@@ -1312,7 +1327,7 @@ $ git log --oneline -1
 
 ## 11. 本章总结
 
-本篇完成了整套课程的第一块地基。你看到了 6 个阶段、42 篇内容如何围绕 `Cloud Native Todo Platform` 逐步展开；掌握了 YAML 的最小可用语法；理解了 Windows + WSL2、macOS、Linux 三类学习环境的差异；知道了 PATH、Docker daemon、kubeconfig 这些基础机制为什么会影响后续实验。
+本篇完成了整套课程的第一块地基。你看到了 6 个阶段、42 篇内容如何围绕 `Cloud Native Todo Platform` 逐步展开；掌握了 YAML 的最小可用语法；明确了课程统一基于 Ubuntu 24.04；知道了 PATH、Docker daemon、kubeconfig 这些基础机制为什么会影响后续实验。
 
 项目成果上，你已经初始化了 `cloud-native-todo-platform` 仓库，创建了后续阶段会持续复用的目录结构，写入了基础 YAML 示例、环境记录、版本锁文件和 `scripts/check-env.sh`。这些文件不是一次性练习材料，而是后续 Go CLI、Go API、Docker、Kubernetes、Helm 和 Operator 章节的共同起点。
 

@@ -39,12 +39,12 @@
 本篇结束时，你至少应该能独立完成下面这组任务：
 
 ```bash
-$ git status --short --branch
-$ git switch -c docs/issue-5-git-workflow
-$ git add .gitattributes .gitignore .gitmessage .github/pull_request_template.md docs/contributing/git-workflow.md
-$ git commit -m "docs: define git collaboration workflow"
-$ git push -u origin docs/issue-5-git-workflow
-$ git tag -a v0.1.0 -m "release: v0.1.0"
+git status --short --branch
+git switch -c docs/issue-5-git-workflow
+git add .gitattributes .gitignore .gitmessage .github/pull_request_template.md docs/contributing/git-workflow.md
+git commit -m "docs: define git collaboration workflow"
+git push -u origin docs/issue-5-git-workflow
+git tag -a v0.1.0 -m "release: v0.1.0"
 ```
 
 这些能力会贯穿后续每一篇：Go 代码、Dockerfile、Kubernetes YAML、Helm Chart 和 Operator Controller 都必须通过 Git 进入团队协作链路。
@@ -113,10 +113,10 @@ flowchart LR
 最小工作流如下：
 
 ```bash
-$ git status --short
-$ git add docs/contributing/git-workflow.md
-$ git diff --staged
-$ git commit -m "docs: define git workflow"
+git status --short
+git add docs/contributing/git-workflow.md
+git diff --staged
+git commit -m "docs: define git workflow"
 ```
 
 在课程项目中，每一次新增 Go 文件、Dockerfile、Kubernetes YAML 或 Operator 代码，都应该先进入暂存区，再形成清晰提交。
@@ -153,7 +153,7 @@ tag 不只是“好看的版本号”。后续镜像 tag、Helm Chart 版本和 
 分支是指向 commit 的名字。创建分支并不会复制整个项目，它只是创建一个新的指针。
 
 ```bash
-$ git switch -c docs/issue-5-git-workflow
+git switch -c docs/issue-5-git-workflow
 ```
 
 推荐分支命名：
@@ -196,9 +196,9 @@ $ git switch -c docs/issue-5-git-workflow
 `stash` 用于临时保存未完成的工作区修改：
 
 ```bash
-$ git stash push -m "wip: update git workflow"
-$ git stash list
-$ git stash pop
+git stash push -m "wip: update git workflow"
+git stash list
+git stash pop
 ```
 
 远程仓库用于团队共享和审查。Pull Request / Merge Request 是把分支变更合并到目标分支的请求，也是团队质量门禁。
@@ -247,8 +247,8 @@ flowchart TD
 建议先看清历史关系：
 
 ```bash
-$ git fetch origin
-$ git log --oneline --graph --decorate --all -n 20
+git fetch origin
+git log --oneline --graph --decorate --all -n 20
 ```
 
 如果 `git pull --ff-only` 失败，说明本地和远程已经分叉。此时不要盲目 `git pull`，应该先判断是 merge、rebase，还是需要重新开分支。
@@ -329,12 +329,12 @@ sequenceDiagram
 
 ### 5.2 实验环境
 
-建议在 Linux / WSL2 Ubuntu 或 macOS 终端中执行。Windows 学员建议使用 WSL2 Ubuntu 或 Git Bash。
+建议在课程指定的 Ubuntu 24.04 终端中执行。
 
 | 项目 | 要求 |
 |---|---|
 | Git | 2.30+ |
-| Shell | Bash 5.x 或 zsh |
+| Shell | Bash 5.x |
 | 课程仓库 | 已完成前 4 篇的 `cloud-native-todo-platform` |
 | 远程平台 | GitHub 或 GitLab 账号 |
 | 可选工具 | `tree`、`gh`、`glab` |
@@ -342,15 +342,15 @@ sequenceDiagram
 确认 Git 版本：
 
 ```bash
-$ git --version
+git --version
 ```
 
 配置作者信息。请替换成你自己的名字和邮箱：
 
 ```bash
-$ git config --global user.name "Your Name"
-$ git config --global user.email "you@example.com"
-$ git config --global init.defaultBranch main
+git config --global user.name "Your Name"
+git config --global user.email "you@example.com"
+git config --global init.defaultBranch main
 ```
 
 为什么要配置：每个 commit 都会记录作者信息。`init.defaultBranch main` 避免不同机器默认分支名不一致。
@@ -398,7 +398,7 @@ cloud-native-todo-platform/
 如果没有安装 `tree`，可以用下面的命令查看类似结构：
 
 ```bash
-$ find . -maxdepth 3 -print
+find . -maxdepth 3 -print
 ```
 
 ### 5.4 完整代码和配置
@@ -583,43 +583,43 @@ test(api): cover todo validation
 创建临时仓库：
 
 ```bash
-$ rm -rf /tmp/git-collaboration-lab /tmp/git-collaboration-remote.git
-$ mkdir -p /tmp/git-collaboration-lab
-$ cd /tmp/git-collaboration-lab
-$ git init -b main
-$ git config user.name "Course Learner"
-$ git config user.email "learner@example.com"
+rm -rf /tmp/git-collaboration-lab /tmp/git-collaboration-remote.git
+mkdir -p /tmp/git-collaboration-lab
+cd /tmp/git-collaboration-lab
+git init -b main
+git config user.name "Course Learner"
+git config user.email "learner@example.com"
 ```
 
 创建初始提交：
 
 ```bash
-$ printf "workflow=main\nreview=required\n" > workflow.txt
-$ git add workflow.txt
-$ git commit -m "docs: initialize workflow note"
+printf "workflow=main\nreview=required\n" > workflow.txt
+git add workflow.txt
+git commit -m "docs: initialize workflow note"
 ```
 
 制造并解决一次冲突：
 
 ```bash
-$ git switch -c docs/issue-5-pr-workflow
-$ printf "workflow=feature\nreview=required\n" > workflow.txt
-$ git commit -am "docs: update workflow from feature branch"
-$ git switch main
-$ printf "workflow=main-hotfix\nreview=required\n" > workflow.txt
-$ git commit -am "docs: update workflow from main branch"
-$ git merge docs/issue-5-pr-workflow
+git switch -c docs/issue-5-pr-workflow
+printf "workflow=feature\nreview=required\n" > workflow.txt
+git commit -am "docs: update workflow from feature branch"
+git switch main
+printf "workflow=main-hotfix\nreview=required\n" > workflow.txt
+git commit -am "docs: update workflow from main branch"
+git merge docs/issue-5-pr-workflow
 ```
 
 预期 `git merge` 会提示冲突。解决冲突：
 
 ```bash
-$ cat > workflow.txt <<'EOF'
+cat > workflow.txt <<'EOF'
 workflow=main-and-feature
 review=required
 EOF
-$ git add workflow.txt
-$ git commit -m "docs: resolve workflow conflict"
+git add workflow.txt
+git commit -m "docs: resolve workflow conflict"
 ```
 
 练习 stash：
@@ -627,26 +627,26 @@ $ git commit -m "docs: resolve workflow conflict"
 真实场景中，stash 最常用于临时保存未完成修改，以便切换到其他分支处理紧急任务；本实验先演示最小闭环。
 
 ```bash
-$ printf "temporary=wip\n" >> workflow.txt
-$ git stash push -m "wip: temporary workflow note"
-$ git stash list
-$ git stash pop
-$ git restore workflow.txt
+printf "temporary=wip\n" >> workflow.txt
+git stash push -m "wip: temporary workflow note"
+git stash list
+git stash pop
+git restore workflow.txt
 ```
 
 练习 rebase：
 
 ```bash
-$ git switch -c docs/issue-5-rebase-demo
-$ printf "rebase=feature\n" > rebase.txt
-$ git add rebase.txt
-$ git commit -m "docs: add rebase demo file"
-$ git switch main
-$ printf "main=advanced\n" > main.txt
-$ git add main.txt
-$ git commit -m "docs: advance main branch"
-$ git switch docs/issue-5-rebase-demo
-$ git rebase main
+git switch -c docs/issue-5-rebase-demo
+printf "rebase=feature\n" > rebase.txt
+git add rebase.txt
+git commit -m "docs: add rebase demo file"
+git switch main
+printf "main=advanced\n" > main.txt
+git add main.txt
+git commit -m "docs: advance main branch"
+git switch docs/issue-5-rebase-demo
+git rebase main
 ```
 
 由于 `rebase.txt` 和 `main.txt` 是不同文件，本次 rebase 不会冲突。如果两个分支修改了同一文件的同一行，rebase 期间同样需要解决冲突，处理思路与 merge 冲突一致。
@@ -654,30 +654,30 @@ $ git rebase main
 把 rebase 后的功能分支合回 `main`，并创建 tag：
 
 ```bash
-$ git switch main
-$ git merge --ff-only docs/issue-5-rebase-demo
-$ git tag -a v0.1.0 -m "release: v0.1.0"
+git switch main
+git merge --ff-only docs/issue-5-rebase-demo
+git tag -a v0.1.0 -m "release: v0.1.0"
 ```
 
 创建本地裸仓库模拟远程，并推送分支和 tag：
 
 ```bash
-$ git init --bare -b main /tmp/git-collaboration-remote.git
-$ git remote add origin /tmp/git-collaboration-remote.git
-$ git push -u origin main
-$ git push origin v0.1.0
-$ git ls-remote --heads --tags origin
+git init --bare -b main /tmp/git-collaboration-remote.git
+git remote add origin /tmp/git-collaboration-remote.git
+git push -u origin main
+git push origin v0.1.0
+git ls-remote --heads --tags origin
 ```
 
 回到课程项目仓库，创建工作分支。下面路径按第 1 篇的建议写法展示，请按你的实际路径调整。如果你还没有远程仓库，执行下面代码块时跳过 `git pull --ff-only origin main` 这一行，但仍然要确保当前工作区干净。
 
 ```bash
-$ cd ~/workspace/cloud-native-todo-platform
-$ git config --local pull.ff only
-$ git status --short --branch
-$ git switch main
-$ git pull --ff-only origin main
-$ git switch -c docs/issue-5-git-workflow
+cd ~/workspace/cloud-native-todo-platform
+git config --local pull.ff only
+git status --short --branch
+git switch main
+git pull --ff-only origin main
+git switch -c docs/issue-5-git-workflow
 ```
 
 `git config --local pull.ff only` 只影响当前课程项目。
@@ -685,7 +685,7 @@ $ git switch -c docs/issue-5-git-workflow
 创建目录并写入 5.4 中的文件：
 
 ```bash
-$ mkdir -p .github docs/contributing
+mkdir -p .github docs/contributing
 ```
 
 把 5.4 中的 `.gitattributes`、`.gitignore`、`.gitmessage`、`.github/pull_request_template.md` 和 `docs/contributing/git-workflow.md` 保存到对应路径。
@@ -693,7 +693,7 @@ $ mkdir -p .github docs/contributing
 让 Git 使用提交模板：
 
 ```bash
-$ git config commit.template .gitmessage
+git config commit.template .gitmessage
 ```
 
 执行不带 `-m` 的 `git commit` 时，Git 会打开编辑器并载入 `.gitmessage` 模板。下面为了让实验命令可复制、输出更稳定，仍然使用 `git commit -m` 直接提交。
@@ -701,29 +701,29 @@ $ git config commit.template .gitmessage
 检查差异并提交：
 
 ```bash
-$ git status --short --branch
-$ git diff -- .gitattributes .gitignore .gitmessage .github/pull_request_template.md docs/contributing/git-workflow.md
-$ git add .gitattributes .gitignore .gitmessage .github/pull_request_template.md docs/contributing/git-workflow.md
-$ git diff --staged
-$ git commit -m "docs: define git collaboration workflow"
+git status --short --branch
+git diff -- .gitattributes .gitignore .gitmessage .github/pull_request_template.md docs/contributing/git-workflow.md
+git add .gitattributes .gitignore .gitmessage .github/pull_request_template.md docs/contributing/git-workflow.md
+git diff --staged
+git commit -m "docs: define git collaboration workflow"
 ```
 
 推送分支：
 
 ```bash
-$ git push -u origin docs/issue-5-git-workflow
+git push -u origin docs/issue-5-git-workflow
 ```
 
 如果你的远程分支已经存在，并且你只是追加提交，使用：
 
 ```bash
-$ git push
+git push
 ```
 
 如果你在个人分支上 rebase 过，并确认远程分支没有被别人更新，才可以使用：
 
 ```bash
-$ git push --force-with-lease
+git push --force-with-lease
 ```
 
 不要对 `main`、`release/*`、`hotfix/*` 使用普通开发者强推。
@@ -771,9 +771,9 @@ Closes #5
 合并后删除远程分支，并同步本地 `main`：
 
 ```bash
-$ git switch main
-$ git pull --ff-only origin main
-$ git branch -d docs/issue-5-git-workflow
+git switch main
+git pull --ff-only origin main
+git branch -d docs/issue-5-git-workflow
 ```
 
 ### 5.6 预期输出
@@ -834,10 +834,10 @@ stash@{0}: On main: wip: temporary workflow note
 在临时仓库中验证：
 
 ```bash
-$ cd /tmp/git-collaboration-lab
-$ git log --oneline --graph --decorate --all -n 20
-$ git tag --list
-$ git ls-remote --heads --tags origin
+cd /tmp/git-collaboration-lab
+git log --oneline --graph --decorate --all -n 20
+git tag --list
+git ls-remote --heads --tags origin
 ```
 
 判断标准：
@@ -849,15 +849,15 @@ $ git ls-remote --heads --tags origin
 在课程项目中验证：
 
 ```bash
-$ cd ~/workspace/cloud-native-todo-platform
-$ test -f .gitattributes
-$ test -f .gitignore
-$ test -f .gitmessage
-$ test -f .github/pull_request_template.md
-$ test -f docs/contributing/git-workflow.md
-$ git status --short --branch
-$ git show --check --stat --oneline HEAD
-$ git config --show-origin --get pull.ff
+cd ~/workspace/cloud-native-todo-platform
+test -f .gitattributes
+test -f .gitignore
+test -f .gitmessage
+test -f .github/pull_request_template.md
+test -f docs/contributing/git-workflow.md
+git status --short --branch
+git show --check --stat --oneline HEAD
+git config --show-origin --get pull.ff
 ```
 
 判断标准：
@@ -874,7 +874,7 @@ $ git config --show-origin --get pull.ff
 临时练习仓库可以删除：
 
 ```bash
-$ rm -rf /tmp/git-collaboration-lab /tmp/git-collaboration-remote.git
+rm -rf /tmp/git-collaboration-lab /tmp/git-collaboration-remote.git
 ```
 
 课程项目中的协作规范文件建议保留，后续章节会继续复用：
@@ -890,14 +890,14 @@ docs/contributing/git-workflow.md
 如果你只是本地演练，不想保留未合并分支，可以在确认没有未提交修改后删除：
 
 ```bash
-$ git switch main
-$ git branch -D docs/issue-5-git-workflow
+git switch main
+git branch -D docs/issue-5-git-workflow
 ```
 
 如果远程分支也只是练习分支，可以删除：
 
 ```bash
-$ git push origin --delete docs/issue-5-git-workflow
+git push origin --delete docs/issue-5-git-workflow
 ```
 
 预计耗时：90 分钟（动手操作约 60 分钟）。
@@ -918,8 +918,8 @@ $ git push origin --delete docs/issue-5-git-workflow
 - **排查**：
 
   ```bash
-  $ git config --global user.name
-  $ git config --global user.email
+  git config --global user.name
+  git config --global user.email
   ```
 
   如果没有输出，说明全局作者信息未配置。
@@ -927,8 +927,8 @@ $ git push origin --delete docs/issue-5-git-workflow
 - **修复**：
 
   ```bash
-  $ git config --global user.name "Your Name"
-  $ git config --global user.email "you@example.com"
+  git config --global user.name "Your Name"
+  git config --global user.email "you@example.com"
   ```
 
 - **预防**：新开发环境初始化时，把 Git 用户信息加入环境检查清单。
@@ -947,8 +947,8 @@ $ git push origin --delete docs/issue-5-git-workflow
 - **排查**：
 
   ```bash
-  $ git status --short --branch
-  $ git branch --show-current
+  git status --short --branch
+  git branch --show-current
   ```
 
   如果当前分支是 `main` 且已有修改，就需要先转移到新分支。
@@ -956,7 +956,7 @@ $ git push origin --delete docs/issue-5-git-workflow
 - **修复**：
 
   ```bash
-  $ git switch -c docs/issue-5-git-workflow
+  git switch -c docs/issue-5-git-workflow
   ```
 
   未提交修改会跟随工作区进入新分支。
@@ -984,9 +984,9 @@ $ git push origin --delete docs/issue-5-git-workflow
 - **排查**：
 
   ```bash
-  $ git status --short
-  $ git diff --check
-  $ git grep -n -E '<<<<<<<|=======|>>>>>>>' -- ':!docs/chapters/stage-01-foundation/05-git-basics.md' || true
+  git status --short
+  git diff --check
+  git grep -n -E '<<<<<<<|=======|>>>>>>>' -- ':!docs/chapters/stage-01-foundation/05-git-basics.md' || true
   ```
 
   `git grep` 如果命中冲突标记，说明文件还不能提交。这里排除了本篇教程文件，是因为教程正文中包含用于讲解的冲突标记示例。
@@ -994,8 +994,8 @@ $ git push origin --delete docs/issue-5-git-workflow
 - **修复**：打开冲突文件，理解两边改动意图，删除冲突标记，保存正确结果，然后执行：
 
   ```bash
-  $ git add <file>
-  $ git commit
+  git add <file>
+  git commit
   ```
 
 - **预防**：解决冲突后必须运行 `git diff --check` 和 `git status`。
@@ -1014,8 +1014,8 @@ $ git push origin --delete docs/issue-5-git-workflow
 - **排查**：
 
   ```bash
-  $ git fetch origin
-  $ git log --oneline --graph --decorate --all -n 20
+  git fetch origin
+  git log --oneline --graph --decorate --all -n 20
   ```
 
   看清楚本地分支和远程分支各自多了哪些提交。
@@ -1023,13 +1023,13 @@ $ git push origin --delete docs/issue-5-git-workflow
 - **修复**：
 
   ```bash
-  $ git pull --ff-only origin main
+  git pull --ff-only origin main
   ```
 
   如果不能快进，需要先理解分叉原因，再选择 merge 或 rebase。个人分支 rebase 后更新远程时使用：
 
   ```bash
-  $ git push --force-with-lease
+  git push --force-with-lease
   ```
 
 - **预防**：推送前先 `git fetch`，公共分支禁止强推。
@@ -1050,8 +1050,8 @@ $ git push origin --delete docs/issue-5-git-workflow
 - **排查**：
 
 ```bash
-$ git grep -n -E 'PASSWORD|TOKEN|SECRET|BEGIN .*PRIVATE KEY' || true
-$ git log --all -- .env
+git grep -n -E 'PASSWORD|TOKEN|SECRET|BEGIN .*PRIVATE KEY' || true
+git log --all -- .env
 ```
 
 - **修复**：不要只删除文件再提交。应立即视为密钥泄露：撤销或轮换密钥，通知负责人，必要时清理 Git 历史，并检查访问日志。
@@ -1093,11 +1093,11 @@ $ git log --all -- .env
 验收命令：
 
 ```bash
-$ git status --short --branch
-$ ls .gitattributes .gitignore .gitmessage .github/pull_request_template.md docs/contributing/git-workflow.md
-$ git log --oneline -n 5
-$ git show --check --stat --oneline HEAD
-$ git branch -vv
+git status --short --branch
+ls .gitattributes .gitignore .gitmessage .github/pull_request_template.md docs/contributing/git-workflow.md
+git log --oneline -n 5
+git show --check --stat --oneline HEAD
+git branch -vv
 ```
 
 能力验收标准：

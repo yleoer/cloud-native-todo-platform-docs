@@ -23,34 +23,35 @@
 ```text
 cloud-native-todo-platform/
 ├── README.md
-├── Makefile
+├── Makefile                       # 建议：统一验收入口
 ├── go.mod
 ├── .gitignore
 ├── .gitattributes
 ├── .gitmessage
+├── .env.example
 ├── .github/
-│   └── pull_request_template.md
+│   ├── pull_request_template.md
+│   └── workflows/
+│       └── scripts-check.yml        # 可选：如果已启用脚本 CI
 ├── api/
-├── cli/
-│   └── env-check/
-│       └── main.go
+│   └── cmd/
+│       ├── todo-network-demo/
+│       │   └── main.go
+│       └── todo-process-demo/
+│           └── main.go
 ├── cmd/
-│   ├── todo-dev-server/
-│   │   └── main.go
-│   ├── todo-network-demo/
-│   │   └── main.go
-│   └── todo-process-demo/
+│   └── todo-dev-server/
 │       └── main.go
 ├── deployments/
-│   ├── kind/
-│   │   └── cluster.yaml
-│   ├── k8s-yaml/
-│   │   └── smoke-test.yaml
 │   └── systemd/
 │       └── todo-process-demo.service
 ├── docs/
 │   ├── contributing/
 │   │   └── git-workflow.md
+│   ├── examples/
+│   │   ├── basic.yaml
+│   │   ├── multi-doc.yaml
+│   │   └── anchors.yaml
 │   ├── environment.md
 │   └── stage-01-acceptance.md
 ├── labs/
@@ -58,6 +59,7 @@ cloud-native-todo-platform/
 └── scripts/
     ├── check-env.sh
     ├── check-process-service.sh
+    ├── versions.conf
     ├── dev.sh
     ├── check.sh
     └── clean.sh
@@ -96,7 +98,7 @@ bash --version:
 
 ## 实验成果
 
-- [ ] 第 1 篇：完成开发环境安装，并能运行 Kubernetes smoke test。
+- [ ] 第 1 篇：完成开发环境安装，能运行 YAML 客户端 dry-run；如果 Docker daemon 可用，再完成可选 kind smoke test。
 - [ ] 第 2 篇：完成 Todo 平台 Linux 服务器目录结构。
 - [ ] 第 3 篇：完成 Go HTTP 服务 systemd 托管实验。
 - [ ] 第 4 篇：完成 Todo HTTP 服务网络访问链路排障。
@@ -105,14 +107,20 @@ bash --version:
 
 ## 关键验证输出
 
-粘贴以下命令的关键输出：
+粘贴以下基础必过命令的关键输出：
 
 - `git status --short --branch`
-- `go test ./...`
+- `go build ./...`
 - `bash -n scripts/*.sh`
 - `./scripts/check.sh`
+- `kubectl apply --dry-run=client --validate=false -f docs/examples/multi-doc.yaml`
+
+如果你完成了第 1 篇的可选 kind smoke test，再补充以下增强输出：
+
+- `kind get clusters`
 - `kubectl get nodes`
-- `kubectl get pod,svc`
+- `kubectl get namespace todo-dev`
+- `kubectl -n todo-dev get configmap todo-env`
 
 ## 排障复盘
 
@@ -202,14 +210,16 @@ main() {
   echo '==> project files'
   check_file README.md
   check_file .gitignore
-  check_optional_file .github/pull_request_template.md
-  check_optional_file docs/environment.md
+  check_file .github/pull_request_template.md
+  check_file docs/environment.md
+  check_file docs/examples/multi-doc.yaml
   check_optional_file docs/stage-01-acceptance.md
 
   echo '==> scripts'
-  check_optional_file scripts/dev.sh
-  check_optional_file scripts/check.sh
-  check_optional_file scripts/clean.sh
+  check_file scripts/check-env.sh
+  check_file scripts/dev.sh
+  check_file scripts/check.sh
+  check_file scripts/clean.sh
 
   if compgen -G "scripts/*.sh" >/dev/null; then
     bash -n scripts/*.sh || fail "bash syntax check failed"
@@ -222,9 +232,17 @@ main() {
 
   echo '==> go packages'
   if [[ -f go.mod ]]; then
-    go test ./... || fail "go test failed"
+    go build ./... || fail "go build failed"
   else
-    printf '[warn] go.mod not found, skip go test\n'
+    printf '[warn] go.mod not found, skip go build\n'
+  fi
+
+  echo '==> yaml manifests'
+  if [[ -f docs/examples/multi-doc.yaml ]]; then
+    kubectl apply --dry-run=client --validate=false -f docs/examples/multi-doc.yaml \
+      || fail "kubectl yaml dry-run failed"
+  else
+    fail "file missing: docs/examples/multi-doc.yaml"
   fi
 
   if [[ "$STATUS" -eq 0 ]]; then
@@ -294,7 +312,42 @@ make check-foundation
 
 这段说明可以直接帮助别人理解你的阶段一成果。面试时，它也是一个很好的开场材料。
 
-## 7. 出版级能力验收
+## 7. 三个 Go 服务的差异
+
+阶段一里出现了 3 个 Go HTTP 服务，它们不是重复造轮子，而是在训练 3 种不同工作场景：
+
+| 服务 | 所在章节 | 运行方式 | 配置变量 | 主要训练目标 |
+|---|---|---|---|---|
+| `todo-process-demo` | 第 3 篇 | 安装到 `/opt/todo-platform/bin`，由 systemd 托管 | `TODO_HTTP_ADDR`、`TODO_PID_FILE` | 理解进程、PID、信号、日志、systemd unit 和服务重启 |
+| `todo-network-demo` | 第 4 篇 | 前台运行，方便多终端观察 | `TODO_ADDR` | 理解监听地址、HTTP 请求、DNS、端口和 `tcpdump` 抓包 |
+| `todo-dev-server` | 第 6 篇 | 由 `dev.sh` 生成并用 `nohup &` 后台运行 | `.env` 中的 `TODO_HOST`、`TODO_PORT`，脚本内部合成为 `TODO_ADDR` | 理解本地开发入口、PID 文件、健康检查、清理脚本和 CI 脚本检查 |
+
+第 3 篇用 systemd，是为了接近长期运行服务的生产管理方式；第 4 篇前台运行，是为了让日志、端口和抓包现象都直接可见；第 6 篇使用 `nohup &`，是为了本地开发的一键启动体验。环境变量命名也随场景变化：`TODO_HTTP_ADDR` 强调 HTTP 服务地址，`TODO_ADDR` 强调网络监听地址，`TODO_HOST`/`TODO_PORT` 则更适合 `.env` 中拆开配置。
+
+代码层面也有取舍：第 3 篇更接近长期服务，强调信号处理和 systemd 配合；第 4 篇强调监听地址、访问日志和抓包观察；第 6 篇的服务由脚本自动生成，只保留开发自检需要的最小接口，但仍保留 `ReadHeaderTimeout` 这类基础 HTTP 安全设置。
+
+## 8. 阶段综合练习：从零复现
+
+在进入阶段二前，建议做一次可选但很有价值的综合练习：打开一个新终端，或者重新克隆一份仓库，只依赖 `README.md`、`docs/stage-01-acceptance.md` 和 `scripts/` 目录，从零复现阶段一成果。
+
+验收路径建议如下：
+
+```bash
+git status --short --branch
+go env GOPROXY
+grep -n '^GO_PROXY_REQUIRED=https://goproxy.cn,direct$' scripts/versions.conf
+./scripts/check-env.sh
+go build ./...
+bash -n scripts/*.sh
+./scripts/check.sh
+./scripts/check-foundation.sh
+```
+
+如果是在全新的 Ubuntu 24.04 环境中复现，先按第 1 篇 §5.3 完成 apt 源、Docker Engine 源、Go proxy 和核心工具安装；国内网络环境下，建议把 `apt update`、`go env GOPROXY`、`docker info` 的关键输出也写入验收记录。如果使用公司内部源或制品库，记录公司源地址即可，不必强行改成公共镜像。
+
+如果 Docker daemon 可用，再补做第 1 篇的 kind smoke test。这个练习的目的不是多跑几条命令，而是验证你的文档和脚本是否足够自包含：换一个终端、换一台机器、换一个同学，也能把阶段一成果跑起来。
+
+## 9. 出版级能力验收
 
 完成阶段一后，你应该能够独立通过以下验收：
 
@@ -309,22 +362,23 @@ make check-foundation
 | 安全意识 | 能解释为什么不能提交密钥、不能乱用 `chmod 777`、不能无确认执行 `rm -rf` |
 | 作品集表达 | 能用 README 和验收文档说明自己做了什么、如何验证、遇到什么问题 |
 
-## 8. 常见验收失败
+## 10. 常见验收失败
 
 | 现象 | 常见原因 | 处理方式 |
 |---|---|---|
-| `docker version` 失败 | Docker Desktop 未启动或 WSL Integration 未开启 | 启动 Docker Desktop，检查 WSL 集成 |
-| `kubectl get nodes` 失败 | 没有集群或 kubeconfig 上下文错误 | 执行 `kind get clusters`、`kubectl config get-contexts` |
+| `docker version` 失败 | Docker Engine 未安装、未启动，或当前用户无权限访问 Docker daemon | 执行 `sudo systemctl status docker`，必要时启动 Docker 并检查 `docker` 用户组 |
+| `kubectl apply --dry-run=client` 失败 | YAML 格式错误或文件路径不对 | 检查缩进、冒号、文件位置 |
+| `kubectl get nodes` 失败 | 这是增强验收；可能没有集群或 kubeconfig 上下文错误 | 执行 `kind get clusters`、`kubectl config get-contexts`，或仅保留基础 dry-run 验收 |
 | `bash -n scripts/*.sh` 失败 | Shell 脚本语法错误 | 根据行号修复，再运行 ShellCheck |
-| `go test ./...` 失败 | Go 模块未初始化或代码未完成 | 执行 `go mod tidy`，检查包路径 |
+| `go build ./...` 失败 | Go 模块未初始化或代码未完成 | 执行 `go mod tidy`，检查包路径 |
 | PR 模板仍有占位符 | 创建 PR 前没有替换模板内容 | 补充 Summary、Changes、Verification、Risk |
 | 清理脚本误删风险高 | 没有限制删除路径 | 使用 `safe_rm_dir`，并在删除前打印目标路径 |
 
-## 9. 下一阶段衔接
+## 11. 下一阶段衔接
 
 阶段一完成后，项目已经具备后续开发所需的基本地基。进入 Go 阶段前，建议确认：
 
-- `go test ./...` 至少能执行。
+- `go build ./...` 至少能执行；单元测试会在阶段二逐步补充。
 - `scripts/check-foundation.sh` 能运行。
 - `README.md` 能说明项目目标和阶段一成果。
 - `.gitignore` 已排除日志、构建产物、密钥和本地缓存。

@@ -162,23 +162,12 @@ hide:
 
 ## 如何本地运行
 
-=== "Linux / macOS"
-
-    ```bash
-    python3 -m venv .venv
-    source .venv/bin/activate
-    pip install -r requirements.txt
-    mkdocs serve
-    ```
-
-=== "Windows PowerShell"
-
-    ```powershell
-    py -m venv .venv
-    .\.venv\Scripts\Activate.ps1
-    pip install -r requirements.txt
-    mkdocs serve
-    ```
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+mkdocs serve
+```
 
 启动后访问：
 
