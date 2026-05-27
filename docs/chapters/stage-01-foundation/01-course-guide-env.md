@@ -1266,6 +1266,7 @@ git log --oneline -1
     - go
       - docker
     ```
+    提示：本题重点是 YAML 列表缩进；如果想提前观察 Kubernetes 多文档格式，可以参考 `docs/examples/multi-doc.yaml`。
 2. `kubectl` 和 `kind` 分别解决什么问题？
 3. 为什么本课程统一要求使用 Ubuntu 24.04？
 4. 为什么 `.env` 和 kubeconfig 不应该提交到 Git？

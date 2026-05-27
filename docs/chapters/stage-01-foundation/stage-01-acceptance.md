@@ -334,12 +334,16 @@ make check-foundation
 
 ```bash
 git status --short --branch
+go env GOPROXY
+grep -n '^GO_PROXY_REQUIRED=https://goproxy.cn,direct$' scripts/versions.conf
 ./scripts/check-env.sh
 go build ./...
 bash -n scripts/*.sh
 ./scripts/check.sh
 ./scripts/check-foundation.sh
 ```
+
+如果是在全新的 Ubuntu 24.04 环境中复现，先按第 1 篇 §5.3 完成 apt 源、Docker Engine 源、Go proxy 和核心工具安装；国内网络环境下，建议把 `apt update`、`go env GOPROXY`、`docker info` 的关键输出也写入验收记录。如果使用公司内部源或制品库，记录公司源地址即可，不必强行改成公共镜像。
 
 如果 Docker daemon 可用，再补做第 1 篇的 kind smoke test。这个练习的目的不是多跑几条命令，而是验证你的文档和脚本是否足够自包含：换一个终端、换一台机器、换一个同学，也能把阶段一成果跑起来。
 
