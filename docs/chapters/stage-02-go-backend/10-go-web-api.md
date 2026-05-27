@@ -270,7 +270,7 @@ type todoService interface {
 
 这是 Go 中常见的“接口定义在使用方”模式。Handler 不依赖整个 `service.TodoService` 具体类型，只声明自己真正需要的方法。测试时也可以替换成假服务。
 
-同时，错误映射仍然直接引用 `service.ErrInvalidTitle` 和 `repository.ErrNotFound`。这是教学项目里的务实折中：我们保留清晰的错误来源，不额外引入复杂的错误翻译层。大型项目可以把错误码收敛到单独的 API error 包。
+同时，错误映射仍然直接引用 `service.ErrInvalidTitle` 和 `repository.ErrNotFound`。这是教学项目里的务实折中：我们保留清晰的错误来源，不额外引入复杂的错误翻译层。大型项目可以把错误码收敛到单独的 API error 包。本篇还比第 9 篇多处理了 `context.DeadlineExceeded`，当请求超时时会返回 `504 Gateway Timeout`，这和 Gin 版新增的请求超时中间件配套。
 
 ### 4.4 API 版本
 
@@ -409,6 +409,7 @@ package repository
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sort"
 	"sync"
 	"time"
@@ -468,7 +469,7 @@ func (r *MemoryRepository) Get(ctx context.Context, id int) (model.Todo, error) 
 
 	item, ok := r.items[id]
 	if !ok {
-		return model.Todo{}, ErrNotFound
+		return model.Todo{}, fmt.Errorf("%w: id=%d", ErrNotFound, id)
 	}
 	return item, nil
 }
@@ -506,7 +507,7 @@ func (r *MemoryRepository) Update(ctx context.Context, id int, title string) (mo
 
 	item, ok := r.items[id]
 	if !ok {
-		return model.Todo{}, ErrNotFound
+		return model.Todo{}, fmt.Errorf("%w: id=%d", ErrNotFound, id)
 	}
 	item.Title = title
 	item.UpdatedAt = r.now().UTC()
@@ -525,7 +526,7 @@ func (r *MemoryRepository) MarkDone(ctx context.Context, id int) (model.Todo, er
 
 	item, ok := r.items[id]
 	if !ok {
-		return model.Todo{}, ErrNotFound
+		return model.Todo{}, fmt.Errorf("%w: id=%d", ErrNotFound, id)
 	}
 	item.Status = model.StatusDone
 	item.UpdatedAt = r.now().UTC()
@@ -543,7 +544,7 @@ func (r *MemoryRepository) Delete(ctx context.Context, id int) error {
 	defer r.mu.Unlock()
 
 	if _, ok := r.items[id]; !ok {
-		return ErrNotFound
+		return fmt.Errorf("%w: id=%d", ErrNotFound, id)
 	}
 	delete(r.items, id)
 	return nil
@@ -792,13 +793,13 @@ func BodyLimit(limit int64) gin.HandlerFunc {
 创建 `api/internal/handler/gin/openapi.yaml`：
 
 ```yaml title="api/internal/handler/gin/openapi.yaml"
-openapi: 3.1.0                  # -> OpenAPI 版本，3.1.0 支持 JSON Schema 2020-12
+openapi: 3.1.0
 info:
-  title: Cloud Native Todo API  # -> 文档标题，调用方会在文档页面看到
-  version: 2.0.0                # -> API 文档版本，不等同于 Go module 版本
+  title: Cloud Native Todo API
+  version: 2.0.0
   description: Gin-based Todo API v2 used by the cloud-native course.
 servers:
-  - url: http://127.0.0.1:18080 # -> 本地实验默认地址
+  - url: http://127.0.0.1:18080
 paths:
   /healthz:
     get:
@@ -1036,6 +1037,8 @@ func OpenAPISpec() string {
 ```
 
 这里有两个 OpenAPI 文件路径：`api/internal/handler/gin/openapi.yaml` 是嵌入到 Go 服务里的源文档，`api/openapi.yaml` 是通过命令导出的协作产物。源文档跟随代码一起编译，导出文件方便前端、测试和接口平台使用。
+
+因为这份 YAML 会通过 `//go:embed` 嵌入二进制，并通过 `GET /openapi.yaml` 对外暴露，所以文件内部不写中文教学注释。字段含义在正文中解释，交付给调用方的 API 文档保持干净。
 
 创建 `api/internal/handler/gin/handler.go`：
 
@@ -1402,7 +1405,7 @@ func request(t *testing.T, server *httptest.Server, method, path, body, contentT
 }
 ```
 
-创建 `api/cmd/todo-api/main.go`：
+创建 `api/cmd/todo-api/main.go`。本篇会覆盖第 9 篇的同名入口文件：原来的 `config-check` 和 `routes` 子命令会被简化为 `openapi` 子命令，重点转向 Gin API v2 和 OpenAPI 文档。如果你想保留第 9 篇入口用于对比，可以先用 Git 提交或分支保存。
 
 ```go title="api/cmd/todo-api/main.go"
 package main
@@ -1428,7 +1431,7 @@ type config struct {
 }
 
 func main() {
-	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
 
 	if len(os.Args) > 1 && os.Args[1] == "openapi" {
 		fmt.Print(ginapi.OpenAPISpec())
@@ -1579,6 +1582,12 @@ ok  	cloud-native-todo-platform/api/internal/handler/gin	0.18s
 {"data":{"id":1,"title":"学习 Gin 路由组","status":"pending","created_at":"2026-05-27T10:00:00Z","updated_at":"2026-05-27T10:00:00Z"}}
 ```
 
+查询 Todo 列表的响应会多一层 `items` 字段，因为 `writeJSON` 会先包一层 `data`，而 `listTodos` 传入的是 `gin.H{"items": items}`：
+
+```json
+{"data":{"items":[{"id":1,"title":"学习 Gin 路由组","status":"pending","created_at":"2026-05-27T10:00:00Z","updated_at":"2026-05-27T10:00:00Z"}]}}
+```
+
 OpenAPI 文档开头类似：
 
 ```text
@@ -1717,6 +1726,8 @@ rm -f bin/todo-api /tmp/todo-openapi.yaml
   api/internal/handler/http/handler_test.go:18:25: undefined: service.New
   ```
 
+  具体行号可能因你本地代码版本不同而变化，关键是 `undefined: service.ParseStatus` 和 `undefined: service.New`。
+
 - **原因**：第 9 篇的标准库 Handler 仍然保留在 `api/internal/handler/http`，它依赖 `service.New` 和 `service.ParseStatus`。如果第 10 篇重写 service 层时只保留 `NewTodoService`，旧 Handler 就会编译失败。
 - **排查**：确认 service 文件中是否保留兼容函数：
 
@@ -1774,22 +1785,16 @@ rm -f bin/todo-api /tmp/todo-openapi.yaml
 
 ## 8. 本章小项目
 
-### 项目名称
+本章小项目是 **Todo API v2（Gin 框架版）**。项目目标是用 Gin 重构第 9 篇标准库 API，保留业务分层，新增 OpenAPI 文档入口，并通过测试验证核心行为。
 
-Todo API v2（Gin 框架版）
-
-### 项目目标
-
-用 Gin 重构第 9 篇标准库 API，保留业务分层，新增 OpenAPI 文档入口，并通过测试验证核心行为。
-
-### 交付物
+交付物包括：
 
 - `api/internal/handler/gin/`：Gin Handler、中间件、响应封装、OpenAPI 文档和测试。
 - `api/cmd/todo-api/main.go`：基于 Gin router 的启动入口。
 - `api/openapi.yaml`：通过 `go run ./api/cmd/todo-api openapi` 生成的 API 文档。
 - 可执行二进制 `bin/todo-api`。
 
-### 能力验收标准
+能力验收标准：
 
 - 能执行 `go test ./api/...` 且全部通过。
 - 能执行 `go build -o bin/todo-api ./api/cmd/todo-api` 成功构建。
@@ -1831,7 +1836,7 @@ Todo API v2（Gin 框架版）
 
 ### 面试题 2：Gin 的中间件顺序为什么重要？
 
-**一句话结论**：中间件是按注册顺序进入、按相反方向返回的链式调用，顺序会影响日志、panic 恢复、超时和响应状态。
+**一句话结论**：中间件像洋葱一样层层包裹请求链，按注册顺序进入、按相反方向返回，顺序会影响日志、panic 恢复、超时和响应状态。
 
 **展开解释**：request ID 应尽量放在最外层，让后续日志和错误响应都能带上同一个 ID；访问日志也应靠外，才能记录完整耗时和最终状态码；Recovery 要包住业务 Handler，避免 panic 逃逸；BodyLimit 要在 JSON 绑定前执行，才能限制请求体大小。
 
