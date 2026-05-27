@@ -88,8 +88,8 @@ flowchart LR
 学习本篇前，建议已经完成：
 
 - 第 7 篇：Go 语言基础，理解结构体、方法、interface、error 和 Go module。
-- 第 8 篇：Go 并发编程，理解 `context`、超时取消和 goroutine 生命周期。
-- 第 9 篇：Go 工程化与测试，已经具备 `cmd/todo-api`、`internal/config`、`internal/logger`、`internal/app` 和 `internal/todo.Service`。
+- 第 8 篇：Go 工程化与测试，已经具备 `cmd/todo-api`、`internal/config`、`internal/logger`、`internal/app` 和 `internal/todo.Service`。
+- 第 9 篇：Go net/http 标准库与 HTTP 服务，已经理解 HTTP Server、Handler、路由和基础请求处理模型。
 - 阶段一 Linux 网络基础，理解端口、监听地址、`curl`、`ss` 或 `netstat`。
 
 必须掌握：

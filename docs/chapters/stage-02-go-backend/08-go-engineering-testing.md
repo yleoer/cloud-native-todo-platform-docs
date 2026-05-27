@@ -19,6 +19,10 @@
 - 能执行 `go test ./...`、`go test ./... -cover` 和 Benchmark，判断工程健康状态。
 - 能把本章产出的工程骨架作为第 9 篇 `net/http` 标准库 HTTP 服务的基础。
 
+### 前置条件
+
+开始本篇前，请确认你已经完成第 7 篇的 `todo-cli`，项目根目录中已有 `go.mod`，并且能在 `go.mod` 所在目录执行 `go run`、`go test`、`go list -m` 等 Go 命令。工具版本建议为 Go 1.21 或更高版本（课程统一使用 Go 1.26.x）和 Git 2.40 或更高版本。
+
 ## 2. 本章工作场景与真实案例
 
 ### 2.1 技术痛点
@@ -49,6 +53,8 @@ Go 工程化的目标不是把目录拆得很复杂，而是让“入口、配�
 
 ```text
 cloud-native-todo-platform/
+├── go.mod
+├── go.sum
 ├── cmd/
 │   └── todo-api/
 │       └── main.go
@@ -70,6 +76,8 @@ cloud-native-todo-platform/
 ```
 
 `cmd/todo-api` 只负责进程启动；`internal/config` 负责读取配置；`internal/logger` 负责创建日志实例；`internal/todo` 负责 Todo 领域逻辑；`test/integration` 放跨包协作测试。`internal/` 是 Go 的特殊目录，外部 module 不能直接 import 它，适合放不希望暴露给外部项目的业务实现。
+
+`go.mod` 是 module 定义文件，记录 module path 和 Go 版本；`go.sum` 会在引入第三方依赖后出现，用来记录依赖校验信息。本章只使用标准库，`go.sum` 可能暂时不存在，这是正常现象。
 
 ### 3.2 配置管理
 
@@ -150,22 +158,22 @@ flowchart LR
     Main --> Config
     Main --> Logger
     Main --> App
-    App --> Repo
     App --> Service
+    Service --> Repo
 ```
 
 启动入口先读取配置，再创建日志，然后组装应用依赖。业务逻辑不会直接读取环境变量，也不会自己创建全局日志实例。这样做的好处是：测试可以绕过真实环境变量，直接构造配置和 fake 仓储；后续 HTTP Handler 也可以复用同一个 `todo.Service`。
 
 ### 4.2 依赖倒置让测试更稳定
 
-Todo 服务不直接依赖某个具体数据库，而是依赖一个 `Repository` 接口。内存仓储、fake 仓储、PostgreSQL 仓储都可以实现这个接口。
+Todo 服务不直接依赖某个具体数据库，而是依赖一个仓储（`Repository`）接口。内存仓储、fake 仓储、PostgreSQL 仓储都可以实现这个接口。
 
 ```mermaid
 flowchart TB
     Service["todo.Service"]
     Interface["todo.Repository 接口"]
-    Memory["MemoryRepository"]
-    Fake["测试 fakeRepository"]
+    Memory["MemoryRepository<br/>内存实现"]
+    Fake["fakeRepository<br/>测试实现"]
     Postgres["后续 PostgreSQLRepository"]
 
     Service --> Interface
@@ -201,7 +209,7 @@ flowchart TB
 ### 5.2 实验环境
 
 | 工具 | 建议版本 | 用途 |
-|---|---:|---|
+|---|---|---|
 | Go | 1.26.x | 编译、测试和运行 Todo API 骨架 |
 | Git | 2.40+ | 管理课程项目代码 |
 | 终端 | Bash / Zsh / PowerShell | 执行实验命令 |
@@ -212,7 +220,7 @@ flowchart TB
 go version
 ```
 
-预期输出类似：
+预期输出类似。最后的 `linux/amd64`、`darwin/arm64` 或 `windows/amd64` 会随你的操作系统和 CPU 架构变化：
 
 ```text
 go version go1.26.0 linux/amd64
@@ -242,10 +250,12 @@ import "cloud-native-todo-platform/internal/todo"
 
 如果你的 `go list -m` 输出不是 `cloud-native-todo-platform`，不要直接复制 import path。你需要把本章所有 `cloud-native-todo-platform/...` 替换为你的实际 module path。
 
-从第 7 篇迁移时，注意两点：
+从第 7 篇迁移时，按下面步骤处理已有代码：
 
-- 保留 `cmd/todo-cli`，它仍然是 Todo 项目的命令行入口。
-- 如果第 7 篇已经有 `internal/todo`，不要直接删除。先对比已有类型和函数，再把本章的领域模型、仓储接口、服务层和测试合并进去。
+1. 保留 `cmd/todo-cli`，它仍然是 Todo 项目的命令行入口。
+2. 如果第 7 篇已经有 `internal/todo`，先提交或备份当前代码，再按本章代码替换 `internal/todo` 中的模型、仓储接口和服务层。
+3. 如果第 7 篇的 `todo-cli` 依赖旧的 `internal/todo` API，先让 `todo-cli` 保持原状；本章重点验证新工程骨架，不要求同步重构 CLI。
+4. 完成本章后运行 `go test ./...`。如果 `todo-cli` 因旧 API 变化编译失败，可以临时把 CLI 迁移到新的 `todo.Service`，也可以在后续章节统一重构。
 
 本章暂时不会改造 `todo-cli` 调用新的 `todo.Service`。这样做是为了让新手先把后端工程骨架搭起来，避免在同一章同时处理 CLI 重构、服务层抽象和测试迁移。后续章节会继续收敛代码复用边界。
 
@@ -265,7 +275,7 @@ import "cloud-native-todo-platform/internal/todo"
     New-Item -ItemType Directory -Force cmd\todo-api, internal\app, internal\config, internal\logger, internal\todo, test\integration
     ```
 
-如果你还没有 `go.mod`，初始化 module。课程推荐沿用第 7 篇的 module path：
+如果目录已经存在，上面的命令不会破坏已有目录。若你从第 7 篇继续且 `go.mod` 已存在，请跳过 `go mod init`；如果你是单独练习本篇，才需要初始化 module。课程推荐沿用第 7 篇的 module path：
 
 ```bash
 go mod init cloud-native-todo-platform
@@ -275,6 +285,8 @@ go mod init cloud-native-todo-platform
 
 ```text
 cloud-native-todo-platform/
+├── go.mod
+├── go.sum
 ├── cmd/
 │   └── todo-api/
 │       └── main.go
@@ -295,7 +307,7 @@ cloud-native-todo-platform/
         └── app_test.go
 ```
 
-下面代码中的 import path 使用 `cloud-native-todo-platform`。如果你的 `go.mod` module 名称不同，请用 `go list -m` 查看当前 module，并把代码中的 import path 替换为你的实际 module 名。
+`go.sum` 只有在引入第三方依赖后才会出现。本章代码全部来自标准库，因此没有 `go.sum` 也不影响实验。下面代码中的 import path 使用 `cloud-native-todo-platform`。如果你的 `go.mod` module 名称不同，请用 `go list -m` 查看当前 module，并把代码中的 import path 替换为你的实际 module 名。
 
 ### 5.5 完整代码
 
@@ -346,6 +358,8 @@ func getInt(key string, fallback int) int {
 }
 ```
 
+这里为了让实验流程保持简单，非法整数会回退到默认值。生产项目通常应该记录配置解析警告，或者对关键配置直接启动失败，避免拼写错误被静默吞掉。
+
 创建 `internal/logger/logger.go`：
 
 ```go
@@ -377,6 +391,8 @@ func parseLevel(level string) slog.Level {
 	}
 }
 ```
+
+日志级别同样采用教学阶段的宽松策略：未知值回退到 `info`。真实生产服务更适合在启动阶段显式提示非法配置。
 
 创建 `internal/todo/model.go`：
 
@@ -564,6 +580,7 @@ func (s *Service) Stats(ctx context.Context) (Stats, error) {
 		case StatusDone:
 			stats.Done++
 		default:
+			// Treat every non-done status as pending until new statuses are introduced.
 			stats.Pending++
 		}
 	}
@@ -640,7 +657,7 @@ func main() {
 		"env", cfg.Env,
 		"port", cfg.Port,
 	)
-	fmt.Printf("todo api skeleton ready on :%d\n", cfg.Port)
+	fmt.Printf("todo api skeleton checked; future listener addr :%d\n", cfg.Port)
 }
 ```
 
@@ -821,6 +838,8 @@ func TestAppCreatesTodo(t *testing.T) {
 
 ### 5.6 执行命令
 
+以下命令均在项目根目录执行，也就是 `go.mod` 所在目录。
+
 先格式化全部 Go 代码，避免格式问题进入提交：
 
 ```bash
@@ -876,7 +895,7 @@ go test ./... -coverprofile coverage.out
 go tool cover -func coverage.out
 ```
 
-预期输出会列出每个函数的覆盖率，最后一行是 `total:`。如果某个核心函数覆盖率为 `0.0%`，说明测试没有执行到该路径。这里使用空格形式而不是 `-coverprofile=coverage.out`，是为了在 Windows PowerShell、Bash 和 CI 中保持一致的参数解析行为。
+预期输出会列出每个函数的覆盖率，最后一行是 `total:`。如果某个核心函数覆盖率为 `0.0%`，说明测试没有执行到该路径。本书统一使用空格分隔参数，便于保持命令风格一致。
 
 运行 Benchmark：
 
@@ -902,8 +921,10 @@ go run ./cmd/todo-api
 
 ```text
 {"time":"2026-05-27T10:00:00.000000000Z","level":"INFO","msg":"todo api skeleton started","env":"dev","port":8080}
-todo api skeleton ready on :8080
+todo api skeleton checked; future listener addr :8080
 ```
+
+当前阶段还没有启动 HTTP Server，所以程序完成健康检查和日志输出后会立即退出。第 9 篇加入 `net/http` 后，进程才会持续监听端口。
 
 ### 5.7 验证方法
 
@@ -911,11 +932,12 @@ todo api skeleton ready on :8080
 
 - `go fmt ./...` 执行完成，没有格式错误。
 - `go vet ./...` 执行完成，没有静态检查报错。
+- `go list -m` 输出和代码中的 import path 前缀一致。
 - `go test ./...` 中 `internal/todo` 和 `test/integration` 都显示 `ok`。
 - `go test ./... -cover` 能看到 `internal/todo` 的覆盖率，且核心业务函数不是 `0.0%`。
 - `go tool cover -func coverage.out` 能输出函数级覆盖率。
 - Benchmark 输出包含 `ns/op`、`B/op` 和 `allocs/op`。
-- `go run ./cmd/todo-api` 输出 JSON 结构化日志和 `todo api skeleton ready`。
+- `go run ./cmd/todo-api` 输出 JSON 格式结构化日志和 `todo api skeleton checked`。
 
 ### 5.8 清理步骤
 
@@ -939,9 +961,11 @@ todo api skeleton ready on :8080
     Remove-Item coverage.out -ErrorAction SilentlyContinue
     ```
 
-不要删除本章新增的 `cmd/todo-api`、`internal/config`、`internal/logger`、`internal/app` 和 `internal/todo`，它们会被后续章节继续使用。
+这些命令只清理当前终端会话中的环境变量；关闭终端后，本来在当前会话里设置的环境变量也会失效。
 
-预计耗时：60 分钟（动手操作约 40 分钟）。
+不要删除本章新增的 `cmd/todo-api`、`internal/config`、`internal/logger` 和 `internal/app`。`internal/todo` 如果来自第 7 篇，请保留并按本章内容更新，它会被后续章节继续使用。
+
+预计耗时：90-120 分钟（动手操作约 60 分钟）。
 
 ## 6. 常见错误与排障
 
@@ -1074,7 +1098,7 @@ todo api skeleton ready on :8080
 
 - `cmd/todo-api/main.go`：Todo API 进程启动入口。
 - `internal/config`：配置加载包，支持环境变量和默认值。
-- `internal/logger`：基于 `log/slog` 的 JSON 结构化日志。
+- `internal/logger`：基于 `log/slog` 的 JSON 格式结构化日志。
 - `internal/app`：应用依赖组装层。
 - `internal/todo`：Todo 领域模型、仓储接口、内存仓储和服务层。
 - `internal/todo/service_test.go`：表驱动单元测试、fake 仓储和 Benchmark。

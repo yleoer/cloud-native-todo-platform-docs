@@ -1,6 +1,8 @@
-# 第 9 篇：Go 工程化与测试
+# 第 9 篇：Go net/http 标准库与 HTTP 服务
 
-第 7 篇完成了命令行版 `todo-cli`，第 8 篇完成了并发统计工具 `todo-stats`。到这里，项目已经有了可运行的业务代码，但还没有形成生产级后端项目常见的工程骨架。
+> 本篇正在按新版课程计划从旧稿迁移为 `net/http` 标准库 HTTP 服务章节。第 8 篇已经完成 Go 工程化与测试，提供了 `cmd/todo-api`、配置、日志、应用组装和 `internal/todo.Service`，本篇将以这些产物为基础，把 Todo 能力暴露为 HTTP API。
+
+第 8 篇已经把 Todo 平台整理成了可测试的 Go 后端工程骨架。到这里，项目已经有了启动入口、配置加载、结构化日志、服务层和基础测试，但还没有通过 HTTP 对外提供能力。
 
 真实公司里的 Go 项目不会只有几个 `.go` 文件。它通常需要清晰的目录边界、配置加载、结构化日志、错误处理规范、单元测试、集成测试、覆盖率、Benchmark 和统一验证命令。本篇要做的事情，就是把前两篇的代码组织成更接近企业项目的样子，为第 10 篇 Web API 开发打地基。
 
@@ -83,7 +85,7 @@ flowchart LR
 学习本篇前，建议已经完成：
 
 - 第 7 篇：Go 语言基础，尤其是 `go.mod`、`cmd/todo-cli`、`internal/todo`、interface 和 error。
-- 第 8 篇：Go 并发编程，尤其是 `context`、测试命令和 `go test -race` 的意义。
+- 第 8 篇：Go 工程化与测试，已经具备 `cmd/todo-api`、`internal/config`、`internal/logger`、`internal/app` 和 `internal/todo.Service`。
 - 阶段一 Git 与 Shell 基础，能够在项目根目录执行命令、查看文件结构和提交变更。
 
 必须掌握：
