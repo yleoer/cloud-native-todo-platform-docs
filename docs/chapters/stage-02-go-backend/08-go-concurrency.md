@@ -1,1601 +1,1164 @@
-# 第 8 篇：Go 进阶与并发编程
+# 第 8 篇：Go 工程化与测试
 
-第 7 篇已经完成了 Go 基础语法和命令行版 `todo-cli`。到这里，你已经能用结构体、方法、interface、error 和 Go module 写出一个可运行的小程序。
+第 7 篇已经完成了命令行版 `todo-cli`，你已经能用 Go 语言写出一个可运行的小程序。但真实团队里的后端项目不能只停留在“功能能跑”。代码需要有清晰的目录边界、稳定的配置入口、可检索的结构化日志、可追踪的错误上下文，以及能在本地和 CI 中重复执行的测试。
 
-但真实后端服务不会只顺序执行一件事。一个 Todo 平台可能同时处理多个 HTTP 请求、并发查询数据库、异步统计任务、批量发送通知、等待外部接口返回、在超时时主动取消请求。Go 的并发模型正是后端服务、云原生控制器和 Operator 开发绕不开的基础能力。
-
-本篇对应 5 个章节主题：
-
-- 8.1 goroutine 与并发执行
-- 8.2 channel 通信模型
-- 8.3 context 超时、取消与请求链路控制
-- 8.4 sync、Mutex、WaitGroup 与 Once
-- 8.5 并发安全、竞态检测与限流思想
-
-本篇特色项目是：**开发并发 Todo 统计任务执行器，支持超时取消和并发数控制**。
-
-你会在上一篇 `cloud-native-todo-platform` Go module 中新增 `todo-stats` 命令。它会读取 `todo-cli` 保存的 JSON 数据，并并发执行多个统计任务，例如总数、已完成数量、未完成数量、长标题数量和模拟慢任务。这个项目会训练你用 goroutine 执行任务、用 channel 控制并发、用 context 管理超时、用 `sync.WaitGroup` 等待任务、用 `sync.Mutex` 保护共享结果、用 `sync.Once` 避免重复加载数据，并用 `go test -race` 检查数据竞争。
+本篇对应新版课程计划中的第 8 篇，类型为 **C 类：实践/开发章**。本篇特色项目是：**搭建 Todo API 工程骨架，并编写首个单元测试**。它会成为后续 `net/http` 标准库 API、Gin 重构、数据库、Redis、Docker 和 Kubernetes 章节的共同地基。
 
 ## 1. 本章学习目标
 
-学完本篇后，你应该能把 Go 并发能力用于真实后端任务，而不是只会写简单示例。
+**知识目标**
 
-具体目标如下：
+- 能解释 Go 后端项目中 `cmd/`、`internal/`、`test/` 等目录的职责边界。
+- 能描述配置、日志、错误处理和测试在生产项目中的作用。
+- 能对比单元测试、集成测试、覆盖率和 Benchmark 的适用场景。
 
-- 能解释 goroutine 是什么，为什么它比操作系统线程更轻量。
-- 能使用 `go` 关键字并发执行函数。
-- 能使用 channel 在 goroutine 之间传递结果、错误和控制信号。
-- 能区分无缓冲 channel、有缓冲 channel、关闭 channel 的使用场景。
-- 能使用 `context.WithTimeout` 和 `context.WithCancel` 控制请求生命周期。
-- 能使用 `sync.WaitGroup` 等待多个 goroutine 完成。
-- 能使用 `sync.Mutex` 保护共享数据，避免 data race。
-- 能使用 `sync.Once` 实现只执行一次的初始化逻辑。
-- 能使用有缓冲 channel 实现简单并发数限制。
-- 能在 Linux、macOS、WSL2 或 CI 中用 `go test -race ./...` 检测数据竞争。
-- 能识别 goroutine 泄漏、channel 死锁、忘记 cancel、错误闭包变量等常见问题。
-- 能完成一个可运行的并发 Todo 统计任务执行器。
+**技能目标**
 
-本篇结束时，你至少应该能独立完成以下命令组合：
+- 能独立搭建一个可运行的 Todo API 工程骨架，包含启动入口、配置包、日志包和领域服务包。
+- 能编写表驱动单元测试，并用手写 fake 隔离外部依赖。
+- 能执行 `go test ./...`、`go test ./... -cover` 和 Benchmark，判断工程健康状态。
+- 能把本章产出的工程骨架作为第 9 篇 `net/http` 标准库 HTTP 服务的基础。
 
-```bash
-go run ./cmd/todo-cli add "学习 Go 并发"
-go run ./cmd/todo-stats -concurrency 2 -timeout 2s
-go run ./cmd/todo-stats -concurrency 1 -timeout 100ms -slow 500ms
-go test ./...
-go test -race ./...
-```
+## 2. 本章工作场景与真实案例
 
-如果你使用 Windows 原生 PowerShell，`go test -race` 可能需要额外配置 cgo 和 C 编译器。本篇会在实验部分把普通测试和 race 检测分开说明，避免把工具链问题误判成代码问题。
+### 2.1 技术痛点
 
-这些能力会直接支撑后续 Go 工程化测试、Web API 请求超时、数据库连接池、后台任务、限流保护、Kubernetes Controller worker 和 Operator reconcile 队列。
+很多新手项目一开始只有一个 `main.go`，配置写死在代码里，日志只是 `fmt.Println`，错误只返回一句 `failed`，测试依赖真实文件或真实网络。这样的代码在个人练习中还能运行，一旦进入团队协作就会暴露问题：新人不知道业务代码放哪里，测试环境和生产环境配置混在一起，线上日志无法按字段检索，接口出错后没有上下文，CI 无法稳定判断本次提交是否破坏核心逻辑。
 
-## 2. 本章工作场景
+Go 工程化的目标不是把目录拆得很复杂，而是让“入口、配置、业务、依赖、测试”各自有清晰边界。边界清楚以后，后续接入 HTTP、数据库、缓存、容器镜像和 Kubernetes 部署时，改动才不会互相牵连。
 
-Go 并发不是为了“同时打印几行日志”，而是为了解决真实系统中的吞吐、等待、资源控制和取消问题。
+### 2.2 团队协作场景
 
-典型工作场景包括：
+后端开发负责维护 `internal/todo` 里的业务规则和测试，测试工程师关注 `go test ./...`、覆盖率和集成测试结果，运维或平台工程师关注启动参数、日志格式和健康检查。代码评审时，Reviewer 不只看功能是否能跑，还会看配置是否可覆盖、日志是否有上下文、错误是否能定位、测试是否能在无外部依赖的环境中稳定通过。
 
-- 后端 API 同时处理多个用户请求，每个请求都有自己的超时时间和取消信号。
-- 一个接口需要同时查询 Todo、用户、权限和统计数据，多个慢操作可以并发执行。
-- 后台任务需要批量扫描 Todo 数据，但不能无限制启动 goroutine 打爆数据库。
-- DevOps 工具需要并发检查多个服务或集群资源，同时限制并发数避免触发限流。
-- SRE 巡检程序需要在超时后停止所有子任务，防止巡检命令一直挂住。
-- Kubernetes Controller 会从 workqueue 中取事件，用多个 worker 并发执行 reconcile。
-- Operator 开发中，每个 reconcile 都应该响应 context 取消，避免控制器关闭时 goroutine 泄漏。
+如果线上出现 Todo 创建失败，开发会先根据结构化日志里的 `component`、`operation`、`error` 字段定位代码路径；测试会补充失败用例；平台工程师会确认配置和启动命令是否正确。工程化让这些角色能围绕同一套项目结构协作，而不是靠口头约定猜测。
 
-本篇项目把这些场景缩小到一个可复现实验：
+### 2.3 课程项目关联
 
-```mermaid
-flowchart LR
-    CLI["todo-stats CLI"]
-    Loader["OnceLoader<br/>只加载一次 Todo 数据"]
-    Executor["Executor<br/>并发任务执行器"]
-    Limit["并发数限制<br/>buffered channel"]
-    Cancel["超时取消<br/>context"]
-    Collector["结果收集<br/>Mutex"]
-    Race["竞态检测<br/>go test -race"]
+本章会把 `Cloud Native Todo Platform` 从命令行练习推进到后端服务工程骨架阶段。产出包括 `cmd/todo-api` 启动入口、`internal/config` 配置包、`internal/logger` 日志包、`internal/todo` 领域服务和测试。第 9 篇会在这个骨架上加入 `net/http` 路由和 Handler，第 12 篇会把内存仓储替换为 PostgreSQL，第 15 篇以后会直接复用启动入口构建 Docker 镜像并部署到 Kubernetes。
 
-    CLI --> Loader --> Executor
-    Executor --> Limit
-    Executor --> Cancel
-    Executor --> Collector
-    Collector --> Race
-```
+## 3. 核心概念
 
-你要训练的不是某个单独 API，而是一套并发工作流：**启动任务、限制资源、等待完成、处理取消、收集结果、验证安全**。
+### 3.1 Go 项目目录结构
 
-## 3. 前置知识
+**是什么**：Go 项目目录结构是代码职责的组织方式。它决定入口程序、业务包、内部实现和测试文件分别放在哪里。
 
-### 必须掌握
+**为什么需要它**：没有目录边界时，入口代码会混进业务逻辑，测试很难隔离依赖，后续接入 HTTP、数据库、Redis 时会不断改同一个文件。目录结构不是形式主义，它是在提前给项目留出可演进空间。
 
-学习本篇前，你需要具备以下基础：
-
-- 已完成第 7 篇 Go 语言基础。
-- 能理解 `package main`、普通 package、函数、结构体、方法和 interface。
-- 能运行 `go run`、`go test`、`go build`。
-- 已经创建过 `todo-cli`，并知道数据保存在 JSON 文件中。
-- 能理解命令行参数、环境变量和退出码。
-
-### 建议了解
-
-以下内容不要求非常熟练，但建议有基本概念：
-
-- HTTP 请求通常有超时时间。
-- 数据库和外部接口不是越并发越好，需要连接数和 QPS 限制。
-- 后台任务失败时不能只看最后一条错误，要收集每个任务的结果。
-- Kubernetes Controller 的 worker 本质也是并发任务执行模型。
-
-### 环境差异说明
-
-Go 并发语法跨平台一致，但命令行参数、环境变量和文件路径仍然存在差异。
-
-=== "Linux / WSL2"
-
-    推荐环境。后续 Docker、Kubernetes 和 Operator 实验也更接近生产环境。
-
-    ```bash
-    go version
-    go env GOMOD
-    ```
-
-=== "macOS"
-
-    可以直接完成本篇实验。
-
-    ```bash
-    go version
-    go env GOMOD
-    ```
-
-=== "Windows PowerShell"
-
-    Windows 可以完成本篇实验。注意 PowerShell 中环境变量和路径写法不同。
-
-    ```powershell
-    go version
-    go env GOMOD
-    ```
-
-## 4. 核心概念
-
-### 4.1 goroutine
-
-goroutine 是 Go 管理的轻量级并发执行单元。启动 goroutine 只需要在函数调用前加 `go`：
-
-```go
-go func() {
-	fmt.Println("run in another goroutine")
-}()
-```
-
-这行代码的意思是：当前 goroutine 不等待函数执行完，而是让 Go runtime 调度另一个 goroutine 去执行它。
-
-新手最容易误解的一点是：**并发不等于一定更快**。如果任务很小，启动 goroutine、调度和同步本身也有成本。并发真正适合的是 I/O 等待、外部请求、批量任务、独立计算等可以重叠执行的场景。
-
-### 4.2 channel
-
-channel 是 goroutine 之间通信的管道。
-
-```go
-ch := make(chan string)
-
-go func() {
-	ch <- "done"
-}()
-
-msg := <-ch
-fmt.Println(msg)
-```
-
-无缓冲 channel 会让发送方和接收方同步等待。有缓冲 channel 可以暂存一定数量的数据：
-
-```go
-sem := make(chan struct{}, 3)
-```
-
-这个 `sem` 可以作为并发数限制器：每个任务开始前写入一个空结构体，结束后取出一个空结构体。如果缓冲区满了，新任务就会等待。
-
-### 4.3 context
-
-`context.Context` 用于传递取消、超时和请求范围内的控制信号。
-
-```go
-ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-defer cancel()
-```
-
-常见规则：
-
-- 函数第一个参数通常是 `ctx context.Context`。
-- 不要把 `context.Context` 存进结构体长期持有。
-- 创建了 `WithCancel`、`WithTimeout` 或 `WithDeadline` 后，应该调用 `cancel`。
-- goroutine 内部要监听 `ctx.Done()`，否则取消信号不会自动停止你的代码。
-
-### 4.4 sync.WaitGroup、Mutex 与 Once
-
-`sync.WaitGroup` 用于等待一组 goroutine 完成：
-
-```go
-var wg sync.WaitGroup
-
-wg.Add(1)
-go func() {
-	defer wg.Done()
-	// do work
-}()
-
-wg.Wait()
-```
-
-`sync.Mutex` 用于保护共享数据：
-
-```go
-var mu sync.Mutex
-mu.Lock()
-results = append(results, result)
-mu.Unlock()
-```
-
-如果多个 goroutine 同时读写同一份数据，并且没有同步保护，就可能出现数据竞争。
-
-`sync.Once` 用于保证某段初始化逻辑只执行一次：
-
-```go
-var once sync.Once
-once.Do(func() {
-	// init once
-})
-```
-
-本篇项目中，`OnceLoader` 会用 `sync.Once` 保证 Todo JSON 文件只加载一次。
-
-要注意，`sync.Once` 不会因为函数返回错误就自动重试。第一次执行如果因为超时、文件权限或临时 IO 问题失败，后续调用也会直接复用第一次保存下来的错误。它适合“进程生命周期内只初始化一次”的稳定资源，例如读取固定配置、初始化日志组件；如果初始化需要失败重试，就要额外设计重试、重置或 `singleflight` 等机制。
-
-### 4.5 并发安全与竞态检测
-
-数据竞争指多个 goroutine 同时访问同一变量，至少一个是写操作，并且没有同步手段。
-
-Go 提供 race detector：
-
-```bash
-go test -race ./...
-```
-
-它会在测试运行时检测数据竞争。它不是静态扫描，而是运行时检测，所以测试覆盖越好，越容易发现问题。
-
-在 Windows 原生环境中，race detector 通常需要启用 cgo，并且本机要有可用的 C 编译器。如果你看到 `go: -race requires cgo` 或找不到 `gcc`，优先在 WSL2、Linux、macOS 或 CI 环境中执行这一步。本篇代码本身不依赖 cgo，只有 `-race` 检测工具链需要额外环境。
-
-### 4.6 限流思想
-
-限流不是 Go 独有概念，但 Go 很适合实现简单限流。最小模型是有缓冲 channel：
-
-```go
-limit := make(chan struct{}, 5)
-
-limit <- struct{}{}
-defer func() { <-limit }()
-```
-
-这表示最多允许 5 个任务同时进入关键区域。真实后端系统中，限流可能用于：
-
-- 限制并发请求数。
-- 限制数据库查询并发。
-- 限制外部 API 调用速度。
-- 限制 Controller worker 数。
-
-本篇先用并发数控制训练资源保护思维，后续 Web API 和 Kubernetes Controller 会继续扩展。
-
-## 5. 原理深入
-
-### 5.1 Go runtime 如何调度 goroutine
-
-Go runtime 会把大量 goroutine 调度到较少数量的操作系统线程上执行。你可以把它理解为：
-
-```mermaid
-flowchart LR
-    G["goroutine<br/>大量任务"]
-    P["processor<br/>调度上下文"]
-    M["machine<br/>OS thread"]
-    CPU["CPU core"]
-
-    G --> P --> M --> CPU
-```
-
-这就是常说的 G-P-M 调度模型。学习阶段不需要死记每个内部细节，但要理解几个结论：
-
-- goroutine 很轻量，但不是免费。
-- 阻塞 I/O、定时器、系统调用都需要 runtime 参与调度。
-- CPU 密集任务过多也会互相抢占 CPU。
-- 并发数要受业务资源约束，而不是盲目“开越多越好”。
-
-### 5.2 channel 的阻塞语义
-
-channel 的阻塞语义是 Go 并发模型的核心。
-
-无缓冲 channel：
-
-```go
-ch := make(chan int)
-ch <- 1
-```
-
-如果没有另一个 goroutine 接收，发送操作会一直阻塞。
-
-有缓冲 channel：
-
-```go
-ch := make(chan int, 2)
-ch <- 1
-ch <- 2
-```
-
-前两次发送可以立即完成，第三次发送会等到缓冲区有空位。
-
-因此，有缓冲 channel 可以表达“容量”和“背压”。本篇的并发数限制就是利用这个性质。
-
-### 5.3 context 取消不会强行杀死 goroutine
-
-`context` 只是传递信号，不会像操作系统一样强制杀掉 goroutine。
-
-下面这段代码不会响应取消：
-
-```go
-func badJob(ctx context.Context) {
-	for {
-		// 忽略 ctx.Done()
-	}
-}
-```
-
-正确做法是在循环、等待和耗时操作中检查 `ctx.Done()`：
-
-```go
-func goodJob(ctx context.Context) error {
-	for {
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		default:
-			// do small work
-		}
-	}
-}
-```
-
-这对后端请求、数据库查询、外部 API 调用和 Kubernetes Controller 都非常重要。你不能只创建 context，还要让业务代码尊重它。
-
-### 5.4 WaitGroup 和 Add 的顺序
-
-`WaitGroup` 的常见规则是：先 `Add`，再启动 goroutine，在 goroutine 中 `defer Done`。
-
-推荐：
-
-```go
-wg.Add(1)
-go func() {
-	defer wg.Done()
-	work()
-}()
-```
-
-不推荐在 goroutine 里面再 `Add`，因为主 goroutine 可能已经执行到 `Wait`，造成计数时序问题。
-
-### 5.5 Mutex 保护的是临界区
-
-`Mutex` 不保护变量名，它保护的是一段临界区。
-
-```go
-mu.Lock()
-results = append(results, result)
-mu.Unlock()
-```
-
-只有所有读写共享变量的地方都遵守同一把锁，保护才有效。如果某些地方加锁、某些地方不加锁，仍然会有数据竞争。
-
-### 5.6 本篇任务执行器的运行流程
-
-本篇 `Executor` 的核心流程如下：
-
-```mermaid
-sequenceDiagram
-    participant CLI as todo-stats
-    participant Loader as OnceLoader
-    participant Exec as Executor
-    participant Sem as Limit Channel
-    participant Job as Stats Job
-    participant Col as Collector
-
-    CLI->>Loader: Load(ctx)
-    Loader->>Loader: sync.Once.Do(read JSON)
-    CLI->>Exec: Run(ctx, items, jobs)
-    loop each job
-        Exec->>Sem: acquire slot
-        Exec->>Job: Run(ctx, items)
-        Job-->>Exec: value/error
-        Exec->>Col: Add(result) with Mutex
-        Exec->>Sem: release slot
-    end
-    Exec-->>CLI: sorted results
-```
-
-这套流程和真实后端 worker、批处理任务、Controller reconcile 队列非常接近。
-
-## 6. 手把手实验
-
-### 6.1 实验目标
-
-本实验会新增一个 `todo-stats` 命令，用于并发统计 Todo 数据。
-
-它支持：
-
-- 读取第 7 篇 `todo-cli` 产生的 JSON 文件。
-- 并发执行多个统计任务。
-- 用 `-concurrency` 控制最大并发数。
-- 用 `-timeout` 控制整体超时时间。
-- 用 `-slow` 模拟慢任务，观察取消效果。
-- 用 `go test -race` 检查数据竞争。
-
-本篇不涉及 YAML。并发控制先在 Go 进程内完成；后续 Kubernetes 章节会学习资源限额、HPA、Controller worker 等更大范围的并发与资源控制。
-
-### 6.2 实验环境
-
-确认在课程项目根目录：
-
-=== "Linux / macOS / WSL2"
-
-    ```bash
-    cd ~/workspace/cloud-native-todo-platform
-    go env GOMOD
-    git status --short --branch
-    ```
-
-=== "Windows PowerShell"
-
-    ```powershell
-    cd D:\workspace\cloud-native-todo-platform
-    go env GOMOD
-    git status --short --branch
-    ```
-
-如果你还没有第 7 篇的项目文件，可以先按第 7 篇完成 `go.mod`、`cmd/todo-cli` 和 `internal/todo`。本篇新增代码会放在同一个 module 中。
-
-### 6.3 文件目录结构
-
-创建目录：
-
-=== "Linux / macOS / WSL2"
-
-    ```bash
-    mkdir -p cmd/todo-stats internal/stats
-    ```
-
-=== "Windows PowerShell"
-
-    ```powershell
-    New-Item -ItemType Directory -Force cmd\todo-stats, internal\stats
-    ```
-
-最终新增结构如下：
+**在项目中怎么用**：本课程采用下面的最小工程骨架：
 
 ```text
 cloud-native-todo-platform/
 ├── cmd/
-│   ├── todo-cli/
-│   └── todo-stats/
+│   └── todo-api/
 │       └── main.go
-└── internal/
-    ├── todo/
-    └── stats/
-        ├── executor.go
-        ├── executor_test.go
-        └── stats.go
+├── internal/
+│   ├── app/
+│   │   └── app.go
+│   ├── config/
+│   │   └── config.go
+│   ├── logger/
+│   │   └── logger.go
+│   └── todo/
+│       ├── model.go
+│       ├── repository.go
+│       ├── service.go
+│       └── service_test.go
+└── test/
+    └── integration/
+        └── app_test.go
 ```
 
-### 6.4 编写统计模型和任务
+`cmd/todo-api` 只负责进程启动；`internal/config` 负责读取配置；`internal/logger` 负责创建日志实例；`internal/todo` 负责 Todo 领域逻辑；`test/integration` 放跨包协作测试。`internal/` 是 Go 的特殊目录，外部 module 不能直接 import 它，适合放不希望暴露给外部项目的业务实现。
 
-创建 `internal/stats/stats.go`：
+### 3.2 配置管理
 
-```go title="internal/stats/stats.go"
-package stats
+**是什么**：配置管理是把端口、运行环境、日志级别等运行参数从代码中分离出来。
+
+**为什么需要它**：开发、测试、生产环境往往使用不同端口、不同日志级别和不同外部依赖。把这些值写死在代码里，会导致每次切环境都要改代码，CI 也无法用环境变量覆盖配置。
+
+**在项目中怎么用**：本章先使用环境变量实现最小配置加载。
+
+```go
+cfg := config.Load()
+fmt.Println(cfg.Port)
+```
+
+配置包会提供默认值，例如 `TODO_API_PORT` 未设置时默认使用 `8080`。本章先只管理服务启动所需的最小配置，数据存储仍使用内存仓储；后续数据库和 Kubernetes 章节会继续把配置来源扩展为配置文件、Kubernetes `ConfigMap`、`Secret` 或 Helm values。
+
+### 3.3 结构化日志
+
+**是什么**：结构化日志是用键值对输出日志，而不是只输出一整段人类可读文本。
+
+**为什么需要它**：生产环境中的日志通常会进入 Loki、ELK 或云厂商日志平台。键值对日志可以按 `level`、`component`、`operation`、`todo_id` 等字段检索，比单纯字符串更容易排障。
+
+**在项目中怎么用**：
+
+```go
+log.Info("todo created", "component", "todo", "todo_id", item.ID)
+```
+
+本章使用 Go 标准库 `log/slog`。它不引入第三方依赖，适合教学阶段建立结构化日志意识。后续如果替换为 `zap`、`zerolog` 或公司内部日志库，只要封装边界清晰，业务代码不需要大面积重写。
+
+### 3.4 错误处理规范
+
+**是什么**：Go 推荐显式返回 `error`，并用 `%w` 包装底层错误，让调用方既能看到上下文，也能用 `errors.Is` 或 `errors.As` 判断错误类型。
+
+**为什么需要它**：如果只返回 `failed`，排障时不知道是参数错误、文件错误还是数据库错误。如果每一层都丢失上下文，日志中只会剩下模糊的失败信息。
+
+**在项目中怎么用**：
+
+```go
+if err != nil {
+	return Todo{}, fmt.Errorf("save todo: %w", err)
+}
+```
+
+这条错误信息既说明当前操作是 `save todo`，又保留了底层仓储错误。后续 HTTP Handler 可以根据错误类型返回不同状态码。
+
+### 3.5 测试、覆盖率与 Benchmark
+
+**是什么**：测试是用代码验证代码行为。单元测试关注一个函数或一个服务的边界，集成测试关注多个包协作，覆盖率显示哪些代码路径被测试执行过，Benchmark 用于测量某段代码的性能。
+
+**为什么需要它**：没有测试，重构项目结构时只能靠人工点击验证。没有覆盖率，团队不知道核心逻辑是否缺测。没有 Benchmark，就很难在优化前后判断性能变化。
+
+**在项目中怎么用**：
+
+```bash
+go test ./...
+go test ./... -cover
+go test ./internal/todo -bench BenchmarkServiceStats -benchmem
+```
+
+这三条命令分别验证正确性、观察测试覆盖范围和测量统计逻辑性能。本章会把它们作为工程质量闭环的一部分。
+
+## 4. 原理深入
+
+### 4.1 从启动入口到业务服务的数据流
+
+本章的程序暂时不启动 HTTP Server，但已经具备真实服务的启动链路。
+
+```mermaid
+flowchart LR
+    Main["cmd/todo-api/main.go"]
+    Config["internal/config.Load"]
+    Logger["internal/logger.New"]
+    App["internal/app.New"]
+    Repo["todo.MemoryRepository"]
+    Service["todo.Service"]
+
+    Main --> Config
+    Main --> Logger
+    Main --> App
+    App --> Repo
+    App --> Service
+```
+
+启动入口先读取配置，再创建日志，然后组装应用依赖。业务逻辑不会直接读取环境变量，也不会自己创建全局日志实例。这样做的好处是：测试可以绕过真实环境变量，直接构造配置和 fake 仓储；后续 HTTP Handler 也可以复用同一个 `todo.Service`。
+
+### 4.2 依赖倒置让测试更稳定
+
+Todo 服务不直接依赖某个具体数据库，而是依赖一个 `Repository` 接口。内存仓储、fake 仓储、PostgreSQL 仓储都可以实现这个接口。
+
+```mermaid
+flowchart TB
+    Service["todo.Service"]
+    Interface["todo.Repository 接口"]
+    Memory["MemoryRepository"]
+    Fake["测试 fakeRepository"]
+    Postgres["后续 PostgreSQLRepository"]
+
+    Service --> Interface
+    Memory -.实现.-> Interface
+    Fake -.实现.-> Interface
+    Postgres -.后续实现.-> Interface
+```
+
+这种设计让单元测试不需要启动数据库，也不需要写临时文件。测试只需要提供一个 fake 仓储，就能验证标题校验、默认状态、错误包装和统计逻辑。
+
+### 4.3 表驱动测试为什么适合 Go
+
+表驱动测试把输入、预期输出和预期错误组织成一组测试用例。它适合验证同一个函数在多种边界条件下的行为，例如标题为空、标题过长、标题合法。
+
+执行流程是：准备测试表，循环每个 case，用 `t.Run` 创建子测试，调用目标函数，比较结果。这样新增边界条件只需要加一行 case，不需要复制整段测试逻辑。
+
+### 4.4 集成测试的边界
+
+本章的集成测试不会连接真实 HTTP、数据库或 Redis，而是验证配置、应用组装、内存仓储和 Todo 服务能否协同工作。它比单元测试覆盖范围更大，但仍然保持轻量。后续数据库章节会引入真正依赖 PostgreSQL 的集成测试，那时需要 Docker Compose 或测试容器来提供外部依赖。
+
+### 4.5 覆盖率和 Benchmark 不能替代业务判断
+
+覆盖率高不代表测试质量一定高。如果测试只执行代码却不校验结果，覆盖率数字也会很好看。Benchmark 也不是越快越好，它必须和真实业务路径匹配。本章要求你把覆盖率和 Benchmark 当作辅助信号：覆盖率帮助发现缺测区域，Benchmark 帮助发现性能变化，但最终仍要看测试是否覆盖关键业务规则。
+
+## 5. 手把手实验
+
+### 5.1 实验目标
+
+在课程项目中搭建 Todo API 工程骨架，完成配置、日志、应用组装、Todo 服务、单元测试、集成测试、覆盖率和 Benchmark，并确保 `go test ./...` 通过。
+
+本章不涉及 YAML。配置先通过 Go 代码和环境变量表达；Kubernetes `ConfigMap`、`Secret`、Deployment YAML 会在后续 Kubernetes 阶段完整展开。
+
+### 5.2 实验环境
+
+| 工具 | 建议版本 | 用途 |
+|---|---:|---|
+| Go | 1.26.x | 编译、测试和运行 Todo API 骨架 |
+| Git | 2.40+ | 管理课程项目代码 |
+| 终端 | Bash / Zsh / PowerShell | 执行实验命令 |
+
+检查 Go 版本：
+
+```bash
+go version
+```
+
+预期输出类似：
+
+```text
+go version go1.26.0 linux/amd64
+```
+
+如果你使用的是 Go 1.21 到 1.25，本章代码也可以运行，因为 `log/slog` 从 Go 1.21 开始提供。课程统一版本以 Go 1.26.x 为准。
+
+### 5.3 从第 7 篇迁移到工程骨架
+
+本章沿用第 7 篇创建的 Go module。先确认当前 module path：
+
+```bash
+go list -m
+```
+
+如果你完全按第 7 篇执行，预期输出是：
+
+```text
+cloud-native-todo-platform
+```
+
+本章代码统一使用这个 module path，例如：
+
+```go
+import "cloud-native-todo-platform/internal/todo"
+```
+
+如果你的 `go list -m` 输出不是 `cloud-native-todo-platform`，不要直接复制 import path。你需要把本章所有 `cloud-native-todo-platform/...` 替换为你的实际 module path。
+
+从第 7 篇迁移时，注意两点：
+
+- 保留 `cmd/todo-cli`，它仍然是 Todo 项目的命令行入口。
+- 如果第 7 篇已经有 `internal/todo`，不要直接删除。先对比已有类型和函数，再把本章的领域模型、仓储接口、服务层和测试合并进去。
+
+本章暂时不会改造 `todo-cli` 调用新的 `todo.Service`。这样做是为了让新手先把后端工程骨架搭起来，避免在同一章同时处理 CLI 重构、服务层抽象和测试迁移。后续章节会继续收敛代码复用边界。
+
+### 5.4 文件目录结构
+
+在项目根目录创建目录：
+
+=== "Linux / macOS / WSL2"
+
+    ```bash
+    mkdir -p cmd/todo-api internal/app internal/config internal/logger internal/todo test/integration
+    ```
+
+=== "Windows PowerShell"
+
+    ```powershell
+    New-Item -ItemType Directory -Force cmd\todo-api, internal\app, internal\config, internal\logger, internal\todo, test\integration
+    ```
+
+如果你还没有 `go.mod`，初始化 module。课程推荐沿用第 7 篇的 module path：
+
+```bash
+go mod init cloud-native-todo-platform
+```
+
+最终结构如下：
+
+```text
+cloud-native-todo-platform/
+├── cmd/
+│   └── todo-api/
+│       └── main.go
+├── internal/
+│   ├── app/
+│   │   └── app.go
+│   ├── config/
+│   │   └── config.go
+│   ├── logger/
+│   │   └── logger.go
+│   └── todo/
+│       ├── model.go
+│       ├── repository.go
+│       ├── service.go
+│       └── service_test.go
+└── test/
+    └── integration/
+        └── app_test.go
+```
+
+下面代码中的 import path 使用 `cloud-native-todo-platform`。如果你的 `go.mod` module 名称不同，请用 `go list -m` 查看当前 module，并把代码中的 import path 替换为你的实际 module 名。
+
+### 5.5 完整代码
+
+创建 `internal/config/config.go`：
+
+```go
+package config
 
 import (
-	"context"
-	"encoding/json"
-	"errors"
-	"fmt"
 	"os"
-	"strings"
-	"sync"
-	"time"
+	"strconv"
 )
+
+// Config contains runtime settings for the Todo API process.
+type Config struct {
+	Env      string
+	Port     int
+	LogLevel string
+}
+
+// Load reads configuration from environment variables and applies defaults.
+func Load() Config {
+	return Config{
+		Env:      getString("TODO_API_ENV", "dev"),
+		Port:     getInt("TODO_API_PORT", 8080),
+		LogLevel: getString("TODO_API_LOG_LEVEL", "info"),
+	}
+}
+
+func getString(key string, fallback string) string {
+	value := os.Getenv(key)
+	if value == "" {
+		return fallback
+	}
+	return value
+}
+
+func getInt(key string, fallback int) int {
+	value := os.Getenv(key)
+	if value == "" {
+		return fallback
+	}
+	parsed, err := strconv.Atoi(value)
+	if err != nil {
+		return fallback
+	}
+	return parsed
+}
+```
+
+创建 `internal/logger/logger.go`：
+
+```go
+package logger
+
+import (
+	"log/slog"
+	"os"
+)
+
+// New creates a JSON structured logger.
+func New(level string) *slog.Logger {
+	handlerOptions := &slog.HandlerOptions{
+		Level: parseLevel(level),
+	}
+	return slog.New(slog.NewJSONHandler(os.Stdout, handlerOptions))
+}
+
+func parseLevel(level string) slog.Level {
+	switch level {
+	case "debug":
+		return slog.LevelDebug
+	case "warn":
+		return slog.LevelWarn
+	case "error":
+		return slog.LevelError
+	default:
+		return slog.LevelInfo
+	}
+}
+```
+
+创建 `internal/todo/model.go`：
+
+```go
+package todo
+
+import "time"
+
+// Status describes the lifecycle state of a Todo item.
+type Status string
 
 const (
-	StatusPending = "pending"
-	StatusDone    = "done"
+	// StatusPending means the Todo item has not been completed.
+	StatusPending Status = "pending"
+	// StatusDone means the Todo item has been completed.
+	StatusDone Status = "done"
 )
 
-type TodoItem struct {
-	ID        int       `json:"id"`
-	Title     string    `json:"title"`
-	Status    string    `json:"status"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+// Todo is the core domain model used by the Todo platform.
+type Todo struct {
+	ID        int64
+	Title     string
+	Status    Status
+	CreatedAt time.Time
+	UpdatedAt time.Time
 }
 
-type Job struct {
-	Name string
-	Run  func(context.Context, []TodoItem) (int, error)
-}
-
-type OnceLoader struct {
-	path  string
-	once  sync.Once
-	items []TodoItem
-	err   error
-}
-
-func NewOnceLoader(path string) *OnceLoader {
-	return &OnceLoader{path: path}
-}
-
-func (l *OnceLoader) Load(ctx context.Context) ([]TodoItem, error) {
-	l.once.Do(func() {
-		l.items, l.err = LoadFromFile(ctx, l.path)
-	})
-	return l.items, l.err
-}
-
-func LoadFromFile(ctx context.Context, path string) ([]TodoItem, error) {
-	if strings.TrimSpace(path) == "" {
-		return nil, errors.New("todo data path is empty")
-	}
-
-	select {
-	case <-ctx.Done():
-		return nil, ctx.Err()
-	default:
-	}
-
-	data, err := os.ReadFile(path)
-	if errors.Is(err, os.ErrNotExist) {
-		return []TodoItem{}, nil
-	}
-	if err != nil {
-		return nil, fmt.Errorf("read todo data %s: %w", path, err)
-	}
-	if len(data) == 0 {
-		return []TodoItem{}, nil
-	}
-
-	var items []TodoItem
-	if err := json.Unmarshal(data, &items); err != nil {
-		return nil, fmt.Errorf("parse todo data %s: %w", path, err)
-	}
-
-	select {
-	case <-ctx.Done():
-		return nil, ctx.Err()
-	default:
-		return items, nil
-	}
-}
-
-func DefaultJobs() []Job {
-	return []Job{
-		{
-			Name: "total",
-			Run: func(ctx context.Context, items []TodoItem) (int, error) {
-				return countBy(ctx, items, func(TodoItem) bool { return true })
-			},
-		},
-		{
-			Name: "done",
-			Run: func(ctx context.Context, items []TodoItem) (int, error) {
-				return countBy(ctx, items, func(item TodoItem) bool {
-					return item.Status == StatusDone
-				})
-			},
-		},
-		{
-			Name: "pending",
-			Run: func(ctx context.Context, items []TodoItem) (int, error) {
-				return countBy(ctx, items, func(item TodoItem) bool {
-					return item.Status == StatusPending
-				})
-			},
-		},
-		{
-			Name: "long_title",
-			Run: func(ctx context.Context, items []TodoItem) (int, error) {
-				return countBy(ctx, items, func(item TodoItem) bool {
-					return len([]rune(item.Title)) >= 12
-				})
-			},
-		},
-	}
-}
-
-func SlowJob(name string, delay time.Duration) Job {
-	return Job{
-		Name: name,
-		Run: func(ctx context.Context, items []TodoItem) (int, error) {
-			timer := time.NewTimer(delay)
-			defer timer.Stop()
-
-			select {
-			case <-ctx.Done():
-				return 0, ctx.Err()
-			case <-timer.C:
-				return len(items), nil
-			}
-		},
-	}
-}
-
-func countBy(ctx context.Context, items []TodoItem, match func(TodoItem) bool) (int, error) {
-	count := 0
-	for _, item := range items {
-		select {
-		case <-ctx.Done():
-			return 0, ctx.Err()
-		default:
-		}
-
-		if match(item) {
-			count++
-		}
-	}
-	return count, nil
+// Stats summarizes Todo items by status.
+type Stats struct {
+	Total   int
+	Pending int
+	Done    int
 }
 ```
 
-这段代码体现了几个关键点：
+创建 `internal/todo/repository.go`：
 
-- `TodoItem` 复用第 7 篇 JSON 文件格式，不需要重复实现 Todo CLI。
-- `Job` 用函数表达一个统计任务。
-- `OnceLoader` 使用 `sync.Once` 保证同一个 loader 只加载一次文件。
-- `LoadFromFile` 在读取前后检查 `ctx.Done()`。
-- `DefaultJobs` 返回多个可并发执行的统计任务。
-- `SlowJob` 用于模拟慢任务和验证超时取消。
+```go
+package todo
 
-这里的 `TodoItem` 是为了让本篇聚焦并发模型，直接按第 7 篇 JSON 文件格式定义了一个轻量 DTO，没有反向依赖 `internal/todo.Item`。真实项目中，如果多个包长期共享同一份 Todo 数据结构，应把领域模型或传输 DTO 收敛到清晰的共享包或 API 契约里，否则字段名、时间格式、状态枚举变更时容易出现 schema drift。
+import (
+	"context"
+	"sync"
+)
 
-`OnceLoader` 还有一个生产边界：它会缓存第一次加载得到的结果，也会缓存第一次加载得到的错误。如果第一次调用时 context 已超时或文件临时不可读，后续 `Load` 不会再次读取文件。因此，本篇写法适合演示“只加载一次”的语义；生产中需要重试的初始化逻辑，不应该裸用 `sync.Once` 兜住所有失败。
+// Repository defines persistence behavior required by Service.
+type Repository interface {
+	Save(context.Context, Todo) (Todo, error)
+	List(context.Context) ([]Todo, error)
+}
 
-### 6.5 编写并发执行器
+// MemoryRepository stores Todo items in memory for early course chapters.
+type MemoryRepository struct {
+	mu     sync.Mutex
+	nextID int64
+	items  []Todo
+}
 
-创建 `internal/stats/executor.go`：
+// NewMemoryRepository creates an empty in-memory Todo repository.
+func NewMemoryRepository() *MemoryRepository {
+	return &MemoryRepository{nextID: 1}
+}
 
-```go title="internal/stats/executor.go"
-package stats
+// Save stores a Todo item and assigns an ID when needed.
+func (r *MemoryRepository) Save(ctx context.Context, item Todo) (Todo, error) {
+	select {
+	case <-ctx.Done():
+		return Todo{}, ctx.Err()
+	default:
+	}
+
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if item.ID == 0 {
+		item.ID = r.nextID
+		r.nextID++
+	}
+	r.items = append(r.items, item)
+	return item, nil
+}
+
+// List returns a copy of all Todo items.
+func (r *MemoryRepository) List(ctx context.Context) ([]Todo, error) {
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	default:
+	}
+
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	copied := make([]Todo, len(r.items))
+	copy(copied, r.items)
+	return copied, nil
+}
+```
+
+创建 `internal/todo/service.go`：
+
+```go
+package todo
 
 import (
 	"context"
 	"errors"
-	"sort"
-	"sync"
+	"fmt"
+	"strings"
 	"time"
 )
 
-type Executor struct {
-	Concurrency int
+var (
+	// ErrEmptyTitle indicates that a Todo title is blank.
+	ErrEmptyTitle = errors.New("todo title is empty")
+	// ErrTitleTooLong indicates that a Todo title exceeds the allowed length.
+	ErrTitleTooLong = errors.New("todo title is too long")
+)
+
+const maxTitleLength = 120
+
+// Service implements Todo business rules.
+type Service struct {
+	repo Repository
+	now  func() time.Time
 }
 
-type JobResult struct {
-	Index    int
-	Name     string
-	Value    int
-	Duration time.Duration
-	Err      error
-}
-
-type resultCollector struct {
-	mu      sync.Mutex
-	results []JobResult
-}
-
-func (c *resultCollector) Add(result JobResult) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	c.results = append(c.results, result)
-}
-
-func (c *resultCollector) Items() []JobResult {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	out := make([]JobResult, len(c.results))
-	copy(out, c.results)
-	return out
-}
-
-func (e Executor) Run(ctx context.Context, items []TodoItem, jobs []Job) ([]JobResult, error) {
-	if e.Concurrency <= 0 {
-		return nil, errors.New("concurrency must be greater than 0")
+// NewService creates a Todo service with production defaults.
+func NewService(repo Repository) *Service {
+	return &Service{
+		repo: repo,
+		now:  time.Now,
 	}
-	if len(jobs) == 0 {
-		return []JobResult{}, nil
+}
+
+// WithClock replaces the clock function, which is useful in tests.
+func (s *Service) WithClock(now func() time.Time) {
+	s.now = now
+}
+
+// Create validates input and stores a new Todo item.
+func (s *Service) Create(ctx context.Context, title string) (Todo, error) {
+	trimmed := strings.TrimSpace(title)
+	if trimmed == "" {
+		return Todo{}, ErrEmptyTitle
+	}
+	if len([]rune(trimmed)) > maxTitleLength {
+		return Todo{}, ErrTitleTooLong
 	}
 
-	limit := make(chan struct{}, e.Concurrency)
-	collector := &resultCollector{}
+	timestamp := s.now().UTC()
+	item := Todo{
+		Title:     trimmed,
+		Status:    StatusPending,
+		CreatedAt: timestamp,
+		UpdatedAt: timestamp,
+	}
 
-	var wg sync.WaitGroup
-	for i, job := range jobs {
-		i, job := i, job
+	saved, err := s.repo.Save(ctx, item)
+	if err != nil {
+		return Todo{}, fmt.Errorf("save todo: %w", err)
+	}
+	return saved, nil
+}
 
-		select {
-		case limit <- struct{}{}:
-		case <-ctx.Done():
-			collector.Add(JobResult{Index: i, Name: job.Name, Err: ctx.Err()})
-			continue
+// List returns all Todo items.
+func (s *Service) List(ctx context.Context) ([]Todo, error) {
+	items, err := s.repo.List(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("list todos: %w", err)
+	}
+	return items, nil
+}
+
+// Stats returns aggregate counters for Todo items.
+func (s *Service) Stats(ctx context.Context) (Stats, error) {
+	items, err := s.List(ctx)
+	if err != nil {
+		return Stats{}, err
+	}
+
+	stats := Stats{Total: len(items)}
+	for _, item := range items {
+		switch item.Status {
+		case StatusDone:
+			stats.Done++
+		default:
+			stats.Pending++
 		}
-
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			defer func() { <-limit }()
-
-			start := time.Now()
-			value, err := job.Run(ctx, items)
-			collector.Add(JobResult{
-				Index:    i,
-				Name:     job.Name,
-				Value:    value,
-				Duration: time.Since(start),
-				Err:      err,
-			})
-		}()
 	}
-
-	wg.Wait()
-	results := collector.Items()
-	sort.Slice(results, func(i, j int) bool {
-		return results[i].Index < results[j].Index
-	})
-
-	return results, nil
+	return stats, nil
 }
 ```
 
-这段执行器代码是本篇的核心：
+创建 `internal/app/app.go`：
 
-- `limit := make(chan struct{}, e.Concurrency)` 用有缓冲 channel 控制并发数。
-- `WaitGroup` 等待所有 goroutine 完成。
-- `resultCollector` 用 `Mutex` 保护共享结果切片。
-- 每个任务先获取并发槽位，再启动 goroutine，结束时释放槽位。
-- `select` 同时等待“拿到槽位”或“上下文已取消”，避免超时后继续排队启动新任务。
-- 最后按 `Index` 排序，让输出顺序稳定，便于测试和阅读。
+```go
+package app
 
-这是一种教学友好的 semaphore 模型：有缓冲 channel 的容量就是最大并发数，代码短，适合先理解资源保护。真实生产中，如果任务数量很多、需要持续消费队列、需要失败重试或需要更清晰的生命周期管理，通常会改成 worker pool、队列消费者，或使用 `errgroup.Group` 配合 `SetLimit`。
+import (
+	"context"
+	"log/slog"
 
-注意：`context` 不能强行杀死正在执行的任务。任务函数必须像 `SlowJob` 和 `countBy` 一样主动检查 `ctx.Done()`。
+	"cloud-native-todo-platform/internal/config"
+	"cloud-native-todo-platform/internal/todo"
+)
 
-### 6.6 编写 CLI 入口
+// App holds application dependencies assembled at process startup.
+type App struct {
+	Config config.Config
+	Logger *slog.Logger
+	Todos  *todo.Service
+}
 
-创建 `cmd/todo-stats/main.go`：
+// New assembles the Todo API application.
+func New(cfg config.Config, logger *slog.Logger) *App {
+	repo := todo.NewMemoryRepository()
+	service := todo.NewService(repo)
+	return &App{
+		Config: cfg,
+		Logger: logger,
+		Todos:  service,
+	}
+}
 
-```go title="cmd/todo-stats/main.go"
+// Health verifies that the application dependencies are ready.
+func (a *App) Health(ctx context.Context) error {
+	_, err := a.Todos.List(ctx)
+	return err
+}
+```
+
+创建 `cmd/todo-api/main.go`：
+
+```go
 package main
 
 import (
 	"context"
-	"errors"
-	"flag"
 	"fmt"
 	"os"
-	"path/filepath"
-	"strings"
-	"time"
 
-	"cloud-native-todo-platform/internal/stats"
+	"cloud-native-todo-platform/internal/app"
+	"cloud-native-todo-platform/internal/config"
+	"cloud-native-todo-platform/internal/logger"
 )
 
 func main() {
-	if err := run(os.Args[1:]); err != nil {
-		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+	ctx := context.Background()
+	cfg := config.Load()
+	log := logger.New(cfg.LogLevel)
+	application := app.New(cfg, log)
+
+	if err := application.Health(ctx); err != nil {
+		log.Error("application health check failed", "error", err)
 		os.Exit(1)
 	}
-}
 
-func run(args []string) error {
-	flags := flag.NewFlagSet("todo-stats", flag.ContinueOnError)
-	dataPath := flags.String("data", defaultDataPath(), "todo JSON data file")
-	concurrency := flags.Int("concurrency", 2, "maximum concurrent jobs")
-	timeout := flags.Duration("timeout", 2*time.Second, "overall timeout")
-	slow := flags.Duration("slow", 0, "add a simulated slow job")
-
-	if err := flags.Parse(args); err != nil {
-		return err
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), *timeout)
-	defer cancel()
-
-	loader := stats.NewOnceLoader(*dataPath)
-	items, err := loader.Load(ctx)
-	if err != nil {
-		return err
-	}
-
-	jobs := stats.DefaultJobs()
-	if *slow > 0 {
-		jobs = append(jobs, stats.SlowJob("slow_check", *slow))
-	}
-
-	executor := stats.Executor{Concurrency: *concurrency}
-	results, err := executor.Run(ctx, items, jobs)
-	if err != nil {
-		return err
-	}
-
-	failed := false
-	for _, result := range results {
-		if result.Err != nil {
-			failed = true
-			fmt.Printf("%s: error=%v\n", result.Name, result.Err)
-			continue
-		}
-		fmt.Printf("%s=%d duration=%s\n", result.Name, result.Value, result.Duration.Round(time.Millisecond))
-	}
-
-	if failed {
-		return errors.New("one or more stats jobs failed")
-	}
-	return nil
-}
-
-func defaultDataPath() string {
-	if path := strings.TrimSpace(os.Getenv("TODO_STATS_DATA")); path != "" {
-		return path
-	}
-	if path := strings.TrimSpace(os.Getenv("TODO_CLI_DATA")); path != "" {
-		return path
-	}
-
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return filepath.Join(".todo-cli", "todos.json")
-	}
-	return filepath.Join(home, ".todo-cli", "todos.json")
+	log.Info(
+		"todo api skeleton started",
+		"env", cfg.Env,
+		"port", cfg.Port,
+	)
+	fmt.Printf("todo api skeleton ready on :%d\n", cfg.Port)
 }
 ```
 
-这段 CLI 入口有几个重要设计：
+创建 `internal/todo/service_test.go`：
 
-- 使用标准库 `flag` 解析参数，这是比手写 `os.Args` 更适合多参数命令的方式。
-- `-concurrency` 控制并发数。
-- `-timeout` 控制整体任务超时。
-- `-slow` 用于制造慢任务，方便观察 context 取消。
-- 默认优先读取 `TODO_STATS_DATA`，其次兼容第 7 篇的 `TODO_CLI_DATA`。
-- 任何任务失败都会让进程返回非 0 退出码，方便 CI/CD 和脚本判断。
-
-### 6.7 编写并发测试
-
-创建 `internal/stats/executor_test.go`：
-
-```go title="internal/stats/executor_test.go"
-package stats
+```go
+package todo
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
-	"os"
-	"path/filepath"
-	"sync/atomic"
+	"strings"
 	"testing"
 	"time"
 )
 
-func TestDefaultJobs(t *testing.T) {
-	items := []TodoItem{
-		{ID: 1, Title: "learn goroutine", Status: StatusDone},
-		{ID: 2, Title: "learn channel", Status: StatusPending},
-		{ID: 3, Title: "short", Status: StatusPending},
-	}
-
-	results, err := Executor{Concurrency: 2}.Run(context.Background(), items, DefaultJobs())
-	if err != nil {
-		t.Fatalf("run jobs: %v", err)
-	}
-
-	values := map[string]int{}
-	for _, result := range results {
-		if result.Err != nil {
-			t.Fatalf("job %s error: %v", result.Name, result.Err)
-		}
-		values[result.Name] = result.Value
-	}
-
-	if values["total"] != 3 {
-		t.Fatalf("total = %d, want 3", values["total"])
-	}
-	if values["done"] != 1 {
-		t.Fatalf("done = %d, want 1", values["done"])
-	}
-	if values["pending"] != 2 {
-		t.Fatalf("pending = %d, want 2", values["pending"])
-	}
-	if values["long_title"] != 2 {
-		t.Fatalf("long_title = %d, want 2", values["long_title"])
-	}
+type fakeRepository struct {
+	items   []Todo
+	saveErr error
+	listErr error
 }
 
-func TestExecutorLimitsConcurrency(t *testing.T) {
-	var running int32
-	var maxRunning int32
+func (r *fakeRepository) Save(ctx context.Context, item Todo) (Todo, error) {
+	if r.saveErr != nil {
+		return Todo{}, r.saveErr
+	}
+	item.ID = int64(len(r.items) + 1)
+	r.items = append(r.items, item)
+	return item, nil
+}
 
-	jobs := make([]Job, 6)
-	for i := range jobs {
-		jobs[i] = Job{
-			Name: "limited",
-			Run: func(ctx context.Context, items []TodoItem) (int, error) {
-				now := atomic.AddInt32(&running, 1)
-				for {
-					old := atomic.LoadInt32(&maxRunning)
-					if now <= old || atomic.CompareAndSwapInt32(&maxRunning, old, now) {
-						break
-					}
+func (r *fakeRepository) List(ctx context.Context) ([]Todo, error) {
+	if r.listErr != nil {
+		return nil, r.listErr
+	}
+	copied := make([]Todo, len(r.items))
+	copy(copied, r.items)
+	return copied, nil
+}
+
+func TestServiceCreate(t *testing.T) {
+	fixedTime := time.Date(2026, 5, 27, 10, 0, 0, 0, time.UTC)
+
+	tests := []struct {
+		name    string
+		title   string
+		wantErr error
+	}{
+		{name: "valid title", title: "write first unit test"},
+		{name: "trim title", title: "  ship todo api  "},
+		{name: "empty title", title: "   ", wantErr: ErrEmptyTitle},
+		{name: "too long title", title: strings.Repeat("长", 121), wantErr: ErrTitleTooLong},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			repo := &fakeRepository{}
+			service := NewService(repo)
+			service.WithClock(func() time.Time { return fixedTime })
+
+			got, err := service.Create(context.Background(), tt.title)
+			if tt.wantErr != nil {
+				if !errors.Is(err, tt.wantErr) {
+					t.Fatalf("Create() error = %v, want %v", err, tt.wantErr)
 				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("Create() unexpected error = %v", err)
+			}
+			if got.ID == 0 {
+				t.Fatal("Create() did not assign ID")
+			}
+			if got.Status != StatusPending {
+				t.Fatalf("Create() status = %s, want %s", got.Status, StatusPending)
+			}
+			if got.CreatedAt != fixedTime {
+				t.Fatalf("Create() CreatedAt = %v, want %v", got.CreatedAt, fixedTime)
+			}
+		})
+	}
+}
 
-				timer := time.NewTimer(20 * time.Millisecond)
-				defer timer.Stop()
-				select {
-				case <-ctx.Done():
-					atomic.AddInt32(&running, -1)
-					return 0, ctx.Err()
-				case <-timer.C:
-					atomic.AddInt32(&running, -1)
-					return len(items), nil
-				}
-			},
+func TestServiceStats(t *testing.T) {
+	repo := &fakeRepository{
+		items: []Todo{
+			{ID: 1, Title: "a", Status: StatusPending},
+			{ID: 2, Title: "b", Status: StatusDone},
+			{ID: 3, Title: "c", Status: StatusPending},
+		},
+	}
+	service := NewService(repo)
+
+	got, err := service.Stats(context.Background())
+	if err != nil {
+		t.Fatalf("Stats() unexpected error = %v", err)
+	}
+	if got.Total != 3 || got.Pending != 2 || got.Done != 1 {
+		t.Fatalf("Stats() = %+v, want total=3 pending=2 done=1", got)
+	}
+}
+
+func TestServiceCreateWrapsRepositoryError(t *testing.T) {
+	repoErr := errors.New("disk is full")
+	service := NewService(&fakeRepository{saveErr: repoErr})
+
+	_, err := service.Create(context.Background(), "write error test")
+	if !errors.Is(err, repoErr) {
+		t.Fatalf("Create() error = %v, want wrapped %v", err, repoErr)
+	}
+}
+
+func BenchmarkServiceStats(b *testing.B) {
+	repo := &fakeRepository{}
+	for i := 0; i < 1000; i++ {
+		status := StatusPending
+		if i%3 == 0 {
+			status = StatusDone
 		}
+		repo.items = append(repo.items, Todo{ID: int64(i + 1), Title: "benchmark", Status: status})
 	}
+	service := NewService(repo)
 
-	_, err := Executor{Concurrency: 2}.Run(context.Background(), []TodoItem{{ID: 1}}, jobs)
-	if err != nil {
-		t.Fatalf("run jobs: %v", err)
-	}
-	if maxRunning > 2 {
-		t.Fatalf("max running = %d, want <= 2", maxRunning)
-	}
-}
-
-func TestExecutorCancelsSlowJob(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Millisecond)
-	defer cancel()
-
-	results, err := Executor{Concurrency: 1}.Run(ctx, []TodoItem{{ID: 1}}, []Job{
-		SlowJob("slow_check", 100*time.Millisecond),
-	})
-	if err != nil {
-		t.Fatalf("run jobs: %v", err)
-	}
-	if len(results) != 1 {
-		t.Fatalf("len(results) = %d, want 1", len(results))
-	}
-	if !errors.Is(results[0].Err, context.DeadlineExceeded) {
-		t.Fatalf("error = %v, want context deadline exceeded", results[0].Err)
-	}
-}
-
-func TestOnceLoaderLoadsOnlyOnce(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "todos.json")
-	writeItems(t, path, []TodoItem{{ID: 1, Title: "first", Status: StatusPending}})
-
-	loader := NewOnceLoader(path)
-	items, err := loader.Load(context.Background())
-	if err != nil {
-		t.Fatalf("first load: %v", err)
-	}
-	if len(items) != 1 {
-		t.Fatalf("len(first items) = %d, want 1", len(items))
-	}
-
-	writeItems(t, path, []TodoItem{
-		{ID: 1, Title: "first", Status: StatusPending},
-		{ID: 2, Title: "second", Status: StatusDone},
-	})
-
-	items, err = loader.Load(context.Background())
-	if err != nil {
-		t.Fatalf("second load: %v", err)
-	}
-	if len(items) != 1 {
-		t.Fatalf("len(second items) = %d, want cached 1", len(items))
-	}
-}
-
-func writeItems(t *testing.T, path string, items []TodoItem) {
-	t.Helper()
-
-	data, err := json.Marshal(items)
-	if err != nil {
-		t.Fatalf("marshal items: %v", err)
-	}
-	if err := os.WriteFile(path, data, 0600); err != nil {
-		t.Fatalf("write items: %v", err)
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		if _, err := service.Stats(context.Background()); err != nil {
+			b.Fatal(err)
+		}
 	}
 }
 ```
 
-这些测试分别验证：
+创建 `test/integration/app_test.go`：
 
-- 默认统计任务结果是否正确。
-- 并发数是否真的被限制在 `2`。
-- 超时 context 是否能取消慢任务。
-- `sync.Once` 是否保证 loader 只加载一次文件。
+```go
+package integration
 
-`TestExecutorLimitsConcurrency` 使用 `sync/atomic` 记录并发中的任务数量，这是为了避免测试本身引入数据竞争。
+import (
+	"context"
+	"io"
+	"log/slog"
+	"testing"
 
-### 6.8 准备 Todo 数据
+	"cloud-native-todo-platform/internal/app"
+	"cloud-native-todo-platform/internal/config"
+)
 
-如果你已经完成第 7 篇，可以直接用 `todo-cli` 创建数据：
+func TestAppCreatesTodo(t *testing.T) {
+	cfg := config.Config{
+		Env:      "test",
+		Port:     18080,
+		LogLevel: "error",
+	}
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	application := app.New(cfg, logger)
 
-=== "Linux / macOS / WSL2"
+	if err := application.Health(context.Background()); err != nil {
+		t.Fatalf("Health() unexpected error = %v", err)
+	}
 
-    ```bash
-    export TODO_CLI_DATA="$(pwd)/.todo-cli/todos.json"
-    rm -rf .todo-cli
+	created, err := application.Todos.Create(context.Background(), "integration test todo")
+	if err != nil {
+		t.Fatalf("Create() unexpected error = %v", err)
+	}
+	if created.ID == 0 {
+		t.Fatal("Create() did not assign ID")
+	}
 
-    go run ./cmd/todo-cli add "学习 goroutine 与 channel"
-    go run ./cmd/todo-cli add "练习 context 超时取消"
-    go run ./cmd/todo-cli done 1
-    go run ./cmd/todo-cli list
-    ```
-
-=== "Windows PowerShell"
-
-    ```powershell
-    $env:TODO_CLI_DATA = "$PWD\.todo-cli\todos.json"
-    Remove-Item -Recurse -Force .todo-cli -ErrorAction SilentlyContinue
-
-    go run ./cmd/todo-cli add "学习 goroutine 与 channel"
-    go run ./cmd/todo-cli add "练习 context 超时取消"
-    go run ./cmd/todo-cli done 1
-    go run ./cmd/todo-cli list
-    ```
-
-预期输出类似：
-
-```text
-added #1: 学习 goroutine 与 channel
-added #2: 练习 context 超时取消
-done #1: 学习 goroutine 与 channel
-1. [x] 学习 goroutine 与 channel (done)
-2. [ ] 练习 context 超时取消 (pending)
+	items, err := application.Todos.List(context.Background())
+	if err != nil {
+		t.Fatalf("List() unexpected error = %v", err)
+	}
+	if len(items) != 1 {
+		t.Fatalf("List() length = %d, want 1", len(items))
+	}
+}
 ```
 
-### 6.9 运行统计执行器
+### 5.6 执行命令
 
-先格式化和测试：
+先格式化全部 Go 代码，避免格式问题进入提交：
 
 ```bash
 go fmt ./...
+```
+
+预期输出通常为空，表示格式化成功。
+
+执行静态检查，提前发现不可达代码、格式化字符串错误等问题：
+
+```bash
+go vet ./...
+```
+
+预期输出通常为空。如果 `go vet` 输出问题，先按提示修正，再继续执行测试。
+
+执行所有测试：
+
+```bash
 go test ./...
 ```
 
-运行统计命令：
+预期输出类似：
 
-=== "Linux / macOS / WSL2"
+```text
+?   	cloud-native-todo-platform/cmd/todo-api	[no test files]
+?   	cloud-native-todo-platform/internal/app	[no test files]
+?   	cloud-native-todo-platform/internal/config	[no test files]
+?   	cloud-native-todo-platform/internal/logger	[no test files]
+ok  	cloud-native-todo-platform/internal/todo	0.003s
+ok  	cloud-native-todo-platform/test/integration	0.004s
+```
 
-    ```bash
-    export TODO_CLI_DATA="$(pwd)/.todo-cli/todos.json"
-    go run ./cmd/todo-stats -concurrency 2 -timeout 2s
-    ```
+查看覆盖率：
 
-=== "Windows PowerShell"
-
-    ```powershell
-    $env:TODO_CLI_DATA = "$PWD\.todo-cli\todos.json"
-    go run ./cmd/todo-stats -concurrency 2 -timeout 2s
-    ```
+```bash
+go test ./... -cover
+```
 
 预期输出类似：
 
 ```text
-total=2 duration=0s
-done=1 duration=0s
-pending=1 duration=0s
-long_title=2 duration=0s
+ok  	cloud-native-todo-platform/internal/todo	0.003s	coverage: 55.8% of statements
+ok  	cloud-native-todo-platform/test/integration	0.004s	coverage: 29.4% of statements
 ```
 
-`duration` 的具体值会因机器而异。重要的是统计值正确，命令退出码为 `0`。
+覆盖率数字会随着 Go 版本、代码细节和测试范围变化，不要求和示例完全一致。学习阶段更重要的是确认核心业务规则被测试覆盖，而不是追求某个固定百分比。
 
-### 6.10 验证超时取消
+生成覆盖率文件并查看函数级覆盖率：
 
-运行一个慢任务，并把整体超时时间设置得很短：
+```bash
+go test ./... -coverprofile coverage.out
+go tool cover -func coverage.out
+```
 
-=== "Linux / macOS / WSL2"
+预期输出会列出每个函数的覆盖率，最后一行是 `total:`。如果某个核心函数覆盖率为 `0.0%`，说明测试没有执行到该路径。这里使用空格形式而不是 `-coverprofile=coverage.out`，是为了在 Windows PowerShell、Bash 和 CI 中保持一致的参数解析行为。
 
-    ```bash
-    go run ./cmd/todo-stats -concurrency 1 -timeout 100ms -slow 500ms
-    echo $?
-    ```
+运行 Benchmark：
 
-=== "Windows PowerShell"
-
-    ```powershell
-    go run ./cmd/todo-stats -concurrency 1 -timeout 100ms -slow 500ms
-    $LASTEXITCODE
-    ```
+```bash
+go test ./internal/todo -bench BenchmarkServiceStats -benchmem
+```
 
 预期输出类似：
 
 ```text
-total=2 duration=0s
-done=1 duration=0s
-pending=1 duration=0s
-long_title=2 duration=0s
-slow_check: error=context deadline exceeded
-error: one or more stats jobs failed
+BenchmarkServiceStats-8   	  100000	     12345 ns/op	   24576 B/op	       1 allocs/op
+PASS
+ok  	cloud-native-todo-platform/internal/todo	1.456s
 ```
 
-上面的普通统计结果写到 stdout，最后的 `error:` 写到 stderr。不同终端或 CI 对 stdout/stderr 的合并顺序可能略有差异，所以不要用完整行顺序做唯一判断；关键是能看到 `slow_check: error=context deadline exceeded`，并且退出码是非 `0`。
+启动 Todo API 工程骨架：
 
-退出码应该是非 `0`。这说明：
-
-- `context.WithTimeout` 到期后触发取消。
-- `SlowJob` 监听了 `ctx.Done()`。
-- CLI 能把任务失败转换为进程失败。
-
-### 6.11 验证竞态检测
-
-=== "Linux / macOS / WSL2 / CI"
-
-    ```bash
-    go test -race ./...
-    ```
-
-=== "Windows PowerShell"
-
-    Windows 原生环境不把 race 检测作为本篇必跑命令。Go race detector 依赖 cgo，常见本机环境还需要 C 编译器。
-
-    如果你已经配置好 `CGO_ENABLED=1` 和 C 编译器，可以执行：
-
-    ```powershell
-    go test -race ./...
-    ```
-
-    如果看到下面错误，推荐切换到 WSL2 Ubuntu 或 Linux CI 执行：
-
-    ```text
-    go: -race requires cgo; enable cgo by setting CGO_ENABLED=1
-    ```
+```bash
+go run ./cmd/todo-api
+```
 
 预期输出类似：
 
 ```text
-?   	cloud-native-todo-platform/cmd/todo-cli	[no test files]
-?   	cloud-native-todo-platform/cmd/todo-stats	[no test files]
-ok  	cloud-native-todo-platform/internal/stats	1.234s
-ok  	cloud-native-todo-platform/internal/todo	1.234s
+{"time":"2026-05-27T10:00:00.000000000Z","level":"INFO","msg":"todo api skeleton started","env":"dev","port":8080}
+todo api skeleton ready on :8080
 ```
 
-如果有数据竞争，race detector 会输出 `WARNING: DATA RACE`，并标明读写发生的 goroutine 和代码行。
+### 5.7 验证方法
 
-为什么这一步重要：很多并发 bug 在普通测试中不一定稳定复现，但 `-race` 能在测试运行过程中发现未同步的共享变量访问。
+当你看到以下结果时，说明本章实验成功：
 
-### 6.12 清理步骤
+- `go fmt ./...` 执行完成，没有格式错误。
+- `go vet ./...` 执行完成，没有静态检查报错。
+- `go test ./...` 中 `internal/todo` 和 `test/integration` 都显示 `ok`。
+- `go test ./... -cover` 能看到 `internal/todo` 的覆盖率，且核心业务函数不是 `0.0%`。
+- `go tool cover -func coverage.out` 能输出函数级覆盖率。
+- Benchmark 输出包含 `ns/op`、`B/op` 和 `allocs/op`。
+- `go run ./cmd/todo-api` 输出 JSON 结构化日志和 `todo api skeleton ready`。
 
-清理本篇临时数据和构建产物：
+### 5.8 清理步骤
+
+本章没有启动后台服务，也没有创建外部资源。若你设置了环境变量，可以按需清理。
 
 === "Linux / macOS / WSL2"
 
     ```bash
-    rm -rf .todo-cli bin
-    unset TODO_CLI_DATA
-    unset TODO_STATS_DATA
+    unset TODO_API_ENV
+    unset TODO_API_PORT
+    unset TODO_API_LOG_LEVEL
+    rm -f coverage.out
     ```
 
 === "Windows PowerShell"
 
     ```powershell
-    Remove-Item -Recurse -Force .todo-cli, bin -ErrorAction SilentlyContinue
-    Remove-Item Env:TODO_CLI_DATA -ErrorAction SilentlyContinue
-    Remove-Item Env:TODO_STATS_DATA -ErrorAction SilentlyContinue
+    Remove-Item Env:TODO_API_ENV -ErrorAction SilentlyContinue
+    Remove-Item Env:TODO_API_PORT -ErrorAction SilentlyContinue
+    Remove-Item Env:TODO_API_LOG_LEVEL -ErrorAction SilentlyContinue
+    Remove-Item coverage.out -ErrorAction SilentlyContinue
     ```
 
-不要删除 `cmd/todo-stats` 和 `internal/stats`，它们是本篇项目成果，会被后续工程化和测试章节继续使用。
+不要删除本章新增的 `cmd/todo-api`、`internal/config`、`internal/logger`、`internal/app` 和 `internal/todo`，它们会被后续章节继续使用。
 
-## 7. 真实工作案例
+预计耗时：60 分钟（动手操作约 40 分钟）。
 
-某公司 Todo 平台上线后，需要在管理后台展示任务统计：总任务数、已完成任务数、未完成任务数、长时间未更新任务数、异常任务数。后端团队最初把所有统计顺序执行，接口偶尔超过 3 秒。
+## 6. 常见错误与排障
 
-优化方案通常不是“无限开 goroutine”，而是分层处理：
+### 错误 1：import path 和 go.mod 不一致
 
-- 后端开发把独立统计任务拆成多个 job。
-- 每个请求带上 `context.Context`，用户取消请求或网关超时时，后端统计任务也要停止。
-- 对数据库查询设置并发上限，避免同时打满连接池。
-- 对结果收集使用 channel 或锁，避免数据竞争。
-- 测试工程师增加 `go test -race` 和超时取消测试。
-- SRE 关注慢查询、超时率、任务队列长度和 goroutine 数量。
-- 平台工程师后续把这套 worker 模型迁移到 Kubernetes Controller 中，用固定 worker 数处理资源事件。
+- **现象**：
 
-本篇 `todo-stats` 是这个真实场景的缩小版：统计任务很小，但模型完整，能迁移到更复杂的 API 和 Controller 中。
+  ```text
+  package cloud-native-todo-platform/internal/config is not in std
+  ```
 
-## 8. 常见错误
+- **原因**：代码里的 import path 和 `go.mod` 中的 module 名称不一致，Go 无法把它识别为当前项目内部包。
+- **排查**：查看当前 module 名称。
 
-| 错误现象 | 常见原因 | 修复方向 |
-|---|---|---|
-| 程序直接退出，没有看到 goroutine 输出 | 主 goroutine 结束太快，没有等待子 goroutine | 使用 `sync.WaitGroup` 或 channel 等待 |
-| `fatal error: all goroutines are asleep - deadlock` | channel 发送或接收没有对应另一端 | 检查无缓冲 channel 的发送接收顺序 |
-| 超时后任务仍然继续执行 | 任务函数没有监听 `ctx.Done()` | 在循环、等待、慢操作中加入 `select` |
-| goroutine 数量越来越多 | goroutine 被阻塞或没有退出条件 | 增加取消信号、关闭 channel、限制并发 |
-| `WARNING: DATA RACE` | 多个 goroutine 同时读写共享变量 | 使用 Mutex、channel、atomic 或避免共享 |
-| 并发数设置很大后系统更慢 | 数据库、CPU、外部接口被打满 | 根据资源瓶颈设置合理并发上限 |
-| `concurrency must be greater than 0` | `-concurrency` 设置为 0 或负数 | 设置为 1 或更大 |
-| `context deadline exceeded` | 超时时间太短或任务太慢 | 调整 `-timeout`，同时排查慢任务原因 |
-| `go: -race requires cgo` | Windows 原生环境未启用 cgo 或缺少 C 编译器 | 在 WSL2 / Linux CI 中执行 race 检测，或补齐本机 C 编译器 |
-| 测试偶发失败 | 测试依赖时间、调度顺序或共享状态 | 使用 `t.TempDir()`、固定数据和同步机制 |
+  ```bash
+  go list -m
+  ```
 
-并发错误最麻烦的地方是“不稳定”。一次通过不代表没有问题，所以本篇要求同时使用普通测试、race 测试和超时测试。
+  输出如果不是 `cloud-native-todo-platform`，就需要同步替换代码里的 import path。
 
-## 9. 排障方法
+- **修复**：把 `cmd/todo-api/main.go`、`internal/app/app.go`、`test/integration/app_test.go` 中的 module 前缀替换为 `go list -m` 输出的值。
+- **预防**：初始化项目后先确认 `go.mod`，再复制跨包 import 代码。
 
-### 9.1 查看 goroutine 是否泄漏
+### 错误 2：测试文件 package 名称写错
 
-学习阶段可以在测试中关注 goroutine 数量：
+- **现象**：
 
-```go
-before := runtime.NumGoroutine()
-// run task
-after := runtime.NumGoroutine()
-```
+  ```text
+  found packages todo (model.go) and todos (service_test.go) in internal/todo
+  ```
 
-生产中更常用 pprof 观察 goroutine：
+- **原因**：同一个目录下的 Go 文件必须属于同一个 package，除非测试文件使用 `todo_test` 这种外部测试包命名。这里把 `service_test.go` 误写成了 `package todos`。
+- **排查**：检查当前目录的 package 声明。
 
-```bash
-go tool pprof http://127.0.0.1:6060/debug/pprof/goroutine
-```
+  ```bash
+  rg "^package " internal/todo
+  ```
 
-本篇还不会启动 pprof HTTP 服务，第 13 篇 Go 后端生产化会系统展开。
+  如果输出中同时出现 `package todo` 和 `package todos`，说明包名不一致。
 
-最常见的泄漏之一，是 goroutine 永远阻塞在 channel 发送上：
+- **修复**：把 `service_test.go` 的第一行改为 `package todo`。
+- **预防**：新建测试文件时优先复制同目录已有文件的 package 声明。
 
-```go
-func badSend(out chan<- int) {
-	go func() {
-		out <- 1
-	}()
-}
-```
+### 错误 3：表驱动测试没有 return，导致继续检查空结果
 
-如果没有任何接收者，这个 goroutine 就不会退出。更稳妥的写法是让 goroutine 也接受 context 取消：
+- **现象**：
 
-```go
-func goodSend(ctx context.Context, out chan<- int) {
-	go func() {
-		select {
-		case out <- 1:
-		case <-ctx.Done():
-			return
-		}
-	}()
-}
-```
+  ```text
+  --- FAIL: TestServiceCreate/empty_title
+      service_test.go:50: Create() did not assign ID
+  ```
 
-这就是本篇反复强调 `ctx.Done()` 的原因：它不是装饰参数，而是 goroutine 生命周期的退出信号。
+- **原因**：测试已经匹配到预期错误，但没有 `return`，继续执行成功分支的断言，导致误判。
+- **排查**：查看测试中处理 `wantErr` 的分支。
 
-### 9.2 检查数据竞争
+  ```bash
+  go test ./internal/todo -run TestServiceCreate -v
+  ```
 
-```bash
-go test -race ./...
-```
+  子测试名会显示是哪一个 case 失败。
 
-判断依据：
+- **修复**：在确认预期错误后立即 `return`，避免继续执行成功路径断言。
+- **预防**：表驱动测试中把错误分支和成功分支写清楚，不要让两条路径混在一起。
 
-- 没有 `WARNING: DATA RACE`，说明测试覆盖到的并发路径暂未发现数据竞争。
-- 如果出现 `WARNING: DATA RACE`，重点看报告中的 `Read` 和 `Previous write` 两段栈。
-- 修复方向通常是加锁、改用 channel 汇总、使用 atomic 或取消共享变量。
+### 错误 4：结构化日志没有输出字段
 
-### 9.3 定位某个并发测试
+- **现象**：
 
-```bash
-go test ./internal/stats -run TestExecutorCancelsSlowJob -v
-```
+  ```text
+  {"time":"...","level":"INFO","msg":"todo api skeleton started"}
+  ```
 
-判断依据：
+- **原因**：调用 `log.Info` 时只传了消息，没有追加键值对，日志平台无法按字段检索。
+- **排查**：检查日志调用是否是成对的 key/value。
 
-- `-run` 只运行匹配的测试，便于缩小范围。
-- `-v` 会输出测试名称和耗时。
-- 如果单测通过但全量测试失败，可能存在共享状态、执行顺序或资源竞争问题。
+  ```bash
+  rg "log\\.Info|log\\.Error" cmd internal
+  ```
 
-### 9.4 检查超时是否生效
+- **修复**：把关键上下文字段加到日志调用中，例如 `"env", cfg.Env, "port", cfg.Port`。
+- **预防**：评审日志时关注是否包含 `component`、`operation`、业务 ID 和错误上下文。
 
-```bash
-go run ./cmd/todo-stats -concurrency 1 -timeout 100ms -slow 500ms
-```
+### 错误 5：覆盖率文件不存在
 
-判断依据：
+- **现象**：
 
-- 应该出现 `context deadline exceeded`。
-- 进程退出码应该非 `0`。
-- 如果命令卡住，说明慢任务没有监听 `ctx.Done()`。
+  ```text
+  cover: open coverage.out: The system cannot find the file specified.
+  ```
 
-### 9.5 检查并发数限制是否生效
+- **原因**：直接执行了 `go tool cover -func coverage.out`，但之前没有先执行 `go test ./... -coverprofile coverage.out` 生成覆盖率文件。
+- **排查**：确认当前目录是否存在覆盖率文件。
 
-运行测试：
+  ```bash
+  ls coverage.out
+  ```
 
-```bash
-go test ./internal/stats -run TestExecutorLimitsConcurrency -v
-```
+  Windows PowerShell 使用：
 
-判断依据：
+  ```powershell
+  Get-ChildItem coverage.out
+  ```
 
-- 测试通过说明同时运行中的任务数没有超过限制。
-- 如果失败，检查是否所有任务都先获取 `limit` 槽位再开始执行。
-- 检查任务结束时是否 `defer` 释放槽位。
+- **修复**：先生成覆盖率文件，再查看函数级覆盖率。
 
-### 9.6 检查 Todo 数据路径
+  ```bash
+  go test ./... -coverprofile coverage.out
+  go tool cover -func coverage.out
+  ```
 
-```bash
-go run ./cmd/todo-stats -data .todo-cli/todos.json
-```
+- **预防**：把覆盖率命令写进统一验证脚本或 CI workflow，避免手工漏步骤。
 
-Windows PowerShell：
+## 7. 生产环境注意事项
 
-```powershell
-go run ./cmd/todo-stats -data .todo-cli\todos.json
-```
+1. **配置必须可覆盖且默认值明确**：生产环境不能依赖开发机上的隐式配置。端口、日志级别、数据库地址、缓存地址等参数都应该有清晰来源，并能通过环境变量、配置文件或 Kubernetes `ConfigMap` 覆盖。默认值适合本地开发，但生产部署必须显式声明关键配置，避免因为环境差异导致服务启动在错误端口或连接错误依赖。
 
-判断依据：
+2. **日志要服务于检索和告警**：生产日志不是写给本地终端看的，而是写给日志平台、告警规则和排障流程看的。日志字段要稳定，错误日志要包含操作名和错误对象，避免只输出自然语言。不要在日志中打印密码、token、身份证号等敏感信息，后续接入 Loki 和 OpenTelemetry 时也会继续复用这个原则。
 
-- 如果 `-data` 指定后成功，说明默认环境变量或家目录路径不符合预期。
-- 如果 JSON 解析失败，回到第 7 篇排查数据文件格式。
+3. **测试要隔离外部依赖**：单元测试应该尽量不依赖真实数据库、真实网络和真实文件路径。外部依赖越多，测试越慢、越脆弱，也越难在 CI 中稳定运行。本章先使用 fake 仓储验证业务规则，后续数据库章节再用专门的集成测试验证 PostgreSQL 行为。
 
-## 10. 生产环境注意事项
+4. **覆盖率不能替代关键路径审查**：覆盖率数字能发现明显缺测，但不能证明业务逻辑正确。生产项目更应该关注核心规则是否有测试，例如参数校验、错误包装、状态转换、权限判断和回滚逻辑。不要为了追求覆盖率而写没有断言的测试。
 
-### 10.1 不要无限制启动 goroutine
+5. **Benchmark 要和真实瓶颈关联**：Benchmark 适合比较同一段逻辑在不同实现下的性能变化，但不能凭一个微基准就决定整体架构。后续接入数据库和 Redis 后，真正的瓶颈可能来自 I/O、连接池、锁竞争或网络延迟。本章 Benchmark 的价值是建立测量习惯，而不是提前做复杂优化。
 
-goroutine 很轻量，但不是无限资源。每个 goroutine 都需要栈、调度和可能的外部资源。生产中应根据资源瓶颈设置并发上限，例如：
+## 8. 本章小项目
 
-- 数据库连接池大小。
-- 外部 API QPS 限制。
-- CPU 核数和任务类型。
-- Kubernetes Controller worker 数。
+本章小项目是：**Todo API 工程骨架 + 首个单元测试**。
 
-### 10.2 context 必须贯穿调用链
+### 项目产出
 
-如果入口创建了 context，但下游函数不接收或不检查它，超时取消就会失效。
+- `cmd/todo-api/main.go`：Todo API 进程启动入口。
+- `internal/config`：配置加载包，支持环境变量和默认值。
+- `internal/logger`：基于 `log/slog` 的 JSON 结构化日志。
+- `internal/app`：应用依赖组装层。
+- `internal/todo`：Todo 领域模型、仓储接口、内存仓储和服务层。
+- `internal/todo/service_test.go`：表驱动单元测试、fake 仓储和 Benchmark。
+- `test/integration/app_test.go`：应用组装集成测试。
 
-推荐函数签名：
+### 验收标准
 
-```go
-func QueryTodoStats(ctx context.Context, userID string) (Stats, error)
-```
+完成后应能观察到以下结果：
 
-不要把 context 存进全局变量或长期结构体中。它应该跟随一次请求、一次任务或一次 reconcile 生命周期传递。
+- 执行 `go test ./...`，所有包通过测试。
+- 执行 `go vet ./...`，没有静态检查报错。
+- 执行 `go test ./... -cover`，能看到 `internal/todo` 的覆盖率。
+- 执行 `go test ./... -coverprofile coverage.out` 和 `go tool cover -func coverage.out`，能看到函数级覆盖率。
+- 执行 `go test ./internal/todo -bench BenchmarkServiceStats -benchmem`，能看到 Benchmark 指标。
+- 执行 `go run ./cmd/todo-api`，终端输出 JSON 日志和启动提示。
+- 代码中没有真实密码、真实 IP、个人绝对路径或硬编码生产配置。
 
-### 10.3 加锁要小心粒度
-
-锁太大，会让并发退化成串行。锁太小或漏锁，会出现数据竞争。
-
-本篇 `resultCollector` 只在 append 和 copy 结果时加锁，任务执行本身不持有锁，这就是比较合理的粒度。
-
-### 10.4 竞态检测要进入 CI
-
-建议在 PR 或夜间任务中执行：
-
-```bash
-go test -race ./...
-```
-
-`-race` 会增加运行时间和资源消耗，不一定每次本地开发都跑，但涉及并发逻辑的 PR 必须至少跑一次。
-
-如果本机是 Windows 且没有 C 编译器，可以把 race 检测放到 Linux CI 或 WSL2 中执行；如果坚持在 Windows 原生环境执行，需要确认 `CGO_ENABLED=1` 并安装可用的 C 编译器。不要因为本机工具链麻烦就跳过并发代码审查。
-
-### 10.5 超时不是越短越好
-
-超时太短会导致正常请求被误杀，超时太长会拖垮资源。生产中要结合：
-
-- P95 / P99 延迟。
-- 上游网关超时时间。
-- 下游数据库和外部 API 的 SLA。
-- 重试策略和幂等性。
-
-### 10.6 Operator 中的并发控制更敏感
-
-Kubernetes Controller / Operator 通常有 worker 并发数。并发数过小，资源处理慢；并发数过大，可能打爆 API Server 或下游系统。
-
-后续 Operator 章节会继续学习：
-
-- workqueue。
-- rate limiting queue。
-- reconcile 超时。
-- leader election。
-- controller-runtime 的并发参数。
-
-### 10.7 任务失败策略要提前约定
-
-本篇 `todo-stats` 会尽量收集所有任务结果，然后只要有一个任务失败，就让 CLI 返回非 0。这样适合统计类工具：即使慢任务超时，其他统计结果仍然有排障价值。
-
-生产系统要按业务语义选择失败策略：
-
-- 如果任务彼此独立，可以继续收集全部结果，再统一返回部分失败。
-- 如果任何一个任务失败都会让整体结果失去意义，应该 fail fast，并取消剩余任务。
-- 如果任务调用外部系统成本很高，失败后还要考虑重试、退避和幂等性。
-
-也就是说，并发控制不仅是“同时跑几个”，还包括“失败后其他任务是否继续跑”。
-
-## 11. 本章小项目
-
-本章小项目是：**并发 Todo 统计任务执行器 `todo-stats`**。
-
-### 项目目标
-
-完成一个可测试、可取消、可控并发数的统计任务执行器：
-
-- 使用 goroutine 并发执行统计任务。
-- 使用有缓冲 channel 控制并发数。
-- 使用 context 支持超时取消。
-- 使用 WaitGroup 等待任务完成。
-- 使用 Mutex 保护共享结果。
-- 使用 Once 缓存 Todo 数据加载。
-- 使用 race detector 验证并发安全。
-
-### 验收命令
-
-=== "Linux / macOS / WSL2"
-
-    ```bash
-    export TODO_CLI_DATA="$(pwd)/.todo-cli/todos.json"
-    rm -rf .todo-cli
-
-    go run ./cmd/todo-cli add "学习 goroutine 与 channel"
-    go run ./cmd/todo-cli add "练习 context 超时取消"
-    go run ./cmd/todo-cli done 1
-
-    go fmt ./...
-    go test ./...
-    go test -race ./...
-    go run ./cmd/todo-stats -concurrency 2 -timeout 2s
-    go run ./cmd/todo-stats -concurrency 1 -timeout 100ms -slow 500ms
-    ```
-
-=== "Windows PowerShell"
-
-    ```powershell
-    $env:TODO_CLI_DATA = "$PWD\.todo-cli\todos.json"
-    Remove-Item -Recurse -Force .todo-cli -ErrorAction SilentlyContinue
-
-    go run ./cmd/todo-cli add "学习 goroutine 与 channel"
-    go run ./cmd/todo-cli add "练习 context 超时取消"
-    go run ./cmd/todo-cli done 1
-
-    go fmt ./...
-    go test ./...
-    go run ./cmd/todo-stats -concurrency 2 -timeout 2s
-    go run ./cmd/todo-stats -concurrency 1 -timeout 100ms -slow 500ms
-    ```
-
-Windows 原生环境中，`go test -race ./...` 不作为必跑验收项。请在 WSL2 Ubuntu、Linux/macOS 或 CI 中补跑 race 检测；如果已经配置好 cgo 和 C 编译器，也可以在 Windows PowerShell 中自行执行。
-
-第二个 `todo-stats` 命令预期会因为 `slow_check` 超时而返回非 0，这是本篇刻意验证的取消行为，不是实验失败。
-
-### 能力验收标准
-
-你可以用下面清单自检：
-
-- 能解释 goroutine 和普通函数调用的区别。
-- 能解释 channel 为什么会阻塞。
-- 能解释 `context.WithTimeout` 为什么要 `defer cancel()`。
-- 能解释 `WaitGroup` 的 `Add`、`Done`、`Wait` 顺序。
-- 能解释为什么共享结果切片需要 Mutex。
-- 能解释 `sync.Once` 在 loader 中的作用。
-- 能解释有缓冲 channel 如何限制并发数。
-- 能使用 `go test -race ./...` 检查数据竞争。
-- 能故意制造慢任务，并观察 `context deadline exceeded`。
-
-### 作品集说明
-
-完成本篇后，你的作品集可以新增一条：
-
-```text
-使用 Go 开发并发 Todo 统计任务执行器，支持 goroutine 并发执行、context 超时取消、并发数控制、race detector 验证和稳定单元测试。
-```
-
-这比“了解 Go 并发”更有说服力，因为它展示了你不仅会启动 goroutine，还能控制资源、处理取消、避免数据竞争。
-
-## 12. 本章练习题
+## 9. 本章练习题
 
 ### 基础题
 
-1. goroutine 和线程是什么关系？
-2. 无缓冲 channel 和有缓冲 channel 的区别是什么？
-3. `context.WithTimeout` 和 `context.WithCancel` 分别适合什么场景？
-4. `WaitGroup` 为什么通常要先 `Add` 再启动 goroutine？
-5. 什么是数据竞争？
-6. `Mutex` 和 channel 都能做同步，它们的使用边界有什么不同？
-7. `sync.Once` 适合解决什么问题？
-8. 为什么限流是高并发系统的基础能力？
+1. 为什么本课程把启动入口放在 `cmd/todo-api`，而不是把所有代码都写在 `main.go`？
+2. `internal/` 目录和普通目录相比有什么特殊含义？
+3. 结构化日志相比 `fmt.Println` 在生产排障中有什么优势？
+4. 为什么错误包装时要使用 `%w`，而不是只拼接字符串？
+5. 单元测试和集成测试的边界分别是什么？
 
 ### 实操题
 
-1. 给 `todo-stats` 增加 `recent` 统计任务，统计最近 24 小时创建的 Todo。
-2. 给 `todo-stats` 增加 `-repeat` 参数，让统计任务重复执行多轮。
-3. 故意删除 `resultCollector` 中的锁，运行 `go test -race ./...` 观察结果。
-4. 把 `-concurrency` 分别设置为 `1`、`2`、`4`，观察测试和运行耗时变化。
-5. 给 `SlowJob` 增加不同任务名，模拟多个外部 API 调用。
+1. 给 `config.Config` 增加 `ShutdownTimeoutSeconds` 字段，并通过 `TODO_API_SHUTDOWN_TIMEOUT_SECONDS` 环境变量覆盖。当 `go run ./cmd/todo-api` 输出该字段时，说明操作成功。
+2. 给 `todo.Service` 增加 `MarkDone(ctx, id)` 方法，并补充表驱动测试。当 `go test ./internal/todo -run TestServiceMarkDone -v` 通过时，说明操作成功。
+3. 生成 HTML 覆盖率报告：执行 `go test ./... -coverprofile coverage.out` 和 `go tool cover -html coverage.out`。当浏览器中能看到 `internal/todo/service.go` 的覆盖行时，说明操作成功。
 
 ### 思考题
 
-1. 如果统计任务需要访问数据库，并发数应该如何确定？
-2. 如果某个任务失败，是否应该取消其他任务？为什么？
-3. Web API 中，请求超时和后端任务超时应该如何配合？
-4. Kubernetes Controller worker 数设置过大会产生什么风险？
-5. 为什么 `context` 只能传递取消信号，不能强制杀死 goroutine？
+1. 如果团队要求所有日志都必须包含 `request_id`，你会把这个字段放在日志包、应用层，还是后续 HTTP 中间件里？为什么？
+2. 如果一个 PR 只提高了覆盖率数字，但没有新增关键业务断言，Reviewer 应该如何判断它是否有价值？
 
-## 13. 本章面试题
+## 10. 本章面试题
 
-### 1. goroutine 是什么？
+### 面试题：你会如何设计一个 Go 后端项目的目录结构？
 
-参考答案：
+**一句话结论**：我会把进程入口、内部业务包、应用组装、测试和部署配置分层组织，避免入口代码和业务逻辑混在一起。
 
-goroutine 是 Go runtime 管理的轻量级并发执行单元。它不是操作系统线程本身，而是由 Go runtime 调度到 OS thread 上执行。goroutine 启动成本较低，适合处理大量并发任务，但并不意味着可以无限制创建，仍然要考虑内存、调度、下游资源和退出条件。
+**展开解释**：常见做法是把可执行程序放在 `cmd/<app-name>`，把不希望外部依赖的业务实现放在 `internal/`，例如 `internal/config`、`internal/logger`、`internal/todo`。跨包集成测试可以放在 `test/`。这样启动入口只负责读取配置、创建日志和组装依赖，业务规则留在可测试的服务包中。
 
-### 2. channel 的作用是什么？
+**深入追问**：目录结构不应该一开始就过度复杂。小项目可以从 `cmd/` 和 `internal/` 开始，随着数据库、缓存、HTTP、队列等依赖增加，再拆分 repository、handler、middleware 等包。关键是依赖方向清晰，业务层不要反向依赖具体传输协议或部署平台。
 
-参考答案：
+### 面试题：Go 项目中如何做配置管理？
 
-channel 用于 goroutine 之间通信和同步。无缓冲 channel 会让发送和接收同步等待，有缓冲 channel 可以容纳一定数量的数据，也常用于并发数限制和背压控制。使用 channel 时要特别注意关闭时机、发送接收匹配和死锁风险。
+**一句话结论**：配置应该从代码中分离，通过环境变量、配置文件或配置中心注入，并在启动时集中加载和校验。
 
-### 3. context 解决什么问题？
+**展开解释**：开发、测试、生产环境的端口、日志级别、数据库地址通常不同，因此不能硬编码在业务逻辑里。我通常会定义一个 `Config` 结构体，在启动阶段加载默认值和环境变量，并对关键字段做校验。业务代码只依赖配置对象，不直接调用 `os.Getenv`。
 
-参考答案：
+**深入追问**：在 Kubernetes 中，非敏感配置可以来自 `ConfigMap`，敏感配置来自 `Secret`，镜像本身不应该包含环境特定配置。配置变更还要考虑回滚、审计和日志脱敏。
 
-context 用于传递取消、超时、截止时间和请求范围内的值。后端服务中，它通常从 HTTP 请求入口传入数据库、外部 API、后台任务等下游调用。`context` 不会强行杀死 goroutine，业务代码必须主动监听 `ctx.Done()` 并返回。
+### 面试题：如何理解单元测试、集成测试和覆盖率？
 
-### 4. WaitGroup 使用时有哪些注意点？
+**一句话结论**：单元测试验证小边界，集成测试验证组件协作，覆盖率是辅助指标，不是质量本身。
 
-参考答案：
+**展开解释**：单元测试应该尽量隔离外部依赖，例如用 fake 仓储验证服务层规则。集成测试可以验证配置、应用组装、仓储和服务是否能协同工作。覆盖率能提示哪些代码路径没有被执行，但如果测试没有有效断言，覆盖率再高也不能说明业务正确。
 
-常见写法是启动 goroutine 前调用 `Add`，goroutine 内部 `defer Done`，主 goroutine 调用 `Wait`。不要在 goroutine 内部再 `Add`，避免和 `Wait` 发生时序问题。`Done` 调用次数必须和 `Add` 计数匹配，否则可能 panic 或永久等待。
+**深入追问**：真实项目里我会把核心业务规则、错误路径和边界条件作为优先测试对象。数据库、Redis、消息队列这类外部依赖会放到单独的集成测试或端到端测试中，并在 CI 中使用容器化依赖保证可复现。
 
-### 5. 什么是 data race，如何排查？
+### 面试题：为什么要使用结构化日志？
 
-参考答案：
+**一句话结论**：结构化日志让生产日志可以按字段检索、聚合和告警，比普通文本更适合排障。
 
-data race 是多个 goroutine 同时访问同一内存位置，至少一个是写操作，并且没有同步保护。Go 可以用 `go test -race ./...` 检测运行时数据竞争。修复方式包括加锁、通过 channel 串行化访问、使用 atomic 或避免共享可变状态。
+**展开解释**：普通文本日志适合人眼阅读，但日志平台很难可靠提取字段。结构化日志用 key/value 记录 `component`、`operation`、`user_id`、`todo_id`、`error` 等上下文，排障时可以快速筛选同一类问题，也方便后续和 tracing、metrics 关联。
 
-### 6. Mutex 和 channel 如何选择？
+**深入追问**：结构化日志还要注意字段命名稳定和敏感信息脱敏。日志级别也要有边界：debug 用于开发定位，info 记录关键生命周期，warn 表示可恢复异常，error 表示需要关注的失败。
 
-参考答案：
+### 面试题：Go 错误处理为什么强调包装和判断？
 
-如果只是保护一小段共享内存读写，`Mutex` 简洁直接。如果核心问题是 goroutine 间传递任务、结果或控制信号，channel 更合适。两者不是互斥关系，真实项目中经常同时使用。关键是让同步边界清晰，不要为了“用 channel”而绕复杂。
+**一句话结论**：错误包装保留上下文，错误判断保留机器可处理能力，两者结合才能既方便排障又方便分支处理。
 
-### 7. 如何限制 goroutine 并发数？
+**展开解释**：`fmt.Errorf("save todo: %w", err)` 可以告诉我们失败发生在保存 Todo 的阶段，同时保留底层错误。调用方可以用 `errors.Is` 判断是否是参数错误、上下文取消或仓储错误，再决定返回什么 HTTP 状态码或日志级别。
 
-参考答案：
+**深入追问**：不要在每一层都重复打印日志，否则同一个错误会被记录多次。通常在边界层记录日志，例如 HTTP Handler、任务入口或进程入口；内部层负责返回带上下文的错误。
 
-常见做法包括 worker pool、有缓冲 channel 作为 semaphore、errgroup 配合 SetLimit 等。本篇使用有缓冲 channel：任务开始前写入一个 token，结束后释放 token。缓冲区容量就是最大并发数。
+## 11. 本章总结
 
-### 8. Go 并发中常见泄漏有哪些？
+本章把 Todo 项目从“能运行的小程序”推进到“可持续演进的后端工程骨架”。你学习了 Go 项目目录边界、配置加载、结构化日志、错误包装、仓储接口、服务层、表驱动测试、集成测试、覆盖率和 Benchmark。小项目产出了 `cmd/todo-api`、`internal/config`、`internal/logger`、`internal/app` 和 `internal/todo`，并通过 `go test ./...` 验证。学完本章后，你已经能承担真实团队中“搭建 Go 服务骨架、拆分业务包、补齐基础测试、建立本地验证命令”的工作任务。
 
-参考答案：
+## 12. 下一章衔接
 
-常见泄漏包括 goroutine 永久阻塞在 channel 收发、没有监听 context 取消、ticker 或 timer 没停止、后台循环没有退出条件、下游调用没有超时。排查时可以结合日志、pprof goroutine、运行时指标和超时测试。
-
-### 9. 为什么高并发系统需要限流？
-
-参考答案：
-
-因为系统瓶颈通常在数据库、缓存、外部 API、CPU、内存或锁竞争上。无限并发会把等待变成堆积，最终导致雪崩。限流通过控制进入系统或进入关键资源的并发数量，让系统保持可预测的延迟和稳定性。
-
-### 10. Kubernetes Controller 的 worker 和 Go 并发有什么关系？
-
-参考答案：
-
-Controller 通常用多个 worker 从队列中取资源事件，并发执行 reconcile。worker 数本质上就是并发度控制。worker 过少处理慢，过多可能打爆 API Server 或下游系统。Operator 开发中要结合队列限速、context、重试和幂等 reconcile 设计并发模型。
-
-## 14. 本章总结
-
-本篇完成了 Go 后端开发中非常关键的一步：从顺序程序进入可控并发程序。
-
-你已经学习并实践了：
-
-- goroutine 并发执行。
-- channel 通信和并发数限制。
-- context 超时和取消。
-- WaitGroup 等待任务完成。
-- Mutex 保护共享结果。
-- Once 保证只加载一次数据。
-- race detector 检测数据竞争。
-- 一个完整可运行的 `todo-stats` 并发统计执行器。
-
-本篇能力价值在于：你开始具备后端高并发开发的基本判断力。并发不是“开更多 goroutine”，而是要能控制生命周期、资源、错误和共享状态。
-
-## 15. 下一章衔接
-
-下一篇将进入 Go 工程化与测试。
-
-本篇已经有 `todo-cli` 和 `todo-stats` 两个命令，也有 `internal/todo` 和 `internal/stats` 两个业务包。接下来，项目需要更正规的工程化能力：
-
-- 更清晰的包边界。
-- 更完整的单元测试和表格驱动测试。
-- mock、测试夹具和覆盖率。
-- Makefile 或脚本统一入口。
-- GitHub Actions 中执行 `go test`、`go test -race` 和 `go build`。
-
-也就是说，第 9 篇会把本篇并发代码纳入更稳定的工程质量体系，为后续 Web API 和生产化服务打基础。
+下一章会在本章的工程骨架上加入 `net/http` 标准库 HTTP 服务。`cmd/todo-api` 会从“启动后打印日志”演进为真正监听端口的 API 进程，`internal/todo.Service` 会被 Handler 调用，配置、日志和测试命令也会继续复用。如果跳过本章直接写 HTTP，很容易把路由、业务规则、配置和日志全部塞进 `main.go`，后续接入 Gin、数据库和容器化时会很难维护。

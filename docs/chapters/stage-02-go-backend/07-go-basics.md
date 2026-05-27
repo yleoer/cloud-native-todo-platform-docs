@@ -14,7 +14,7 @@
 
 本篇特色项目是：**开发命令行版 Todo 管理器 `todo-cli`**。
 
-你会在 `cloud-native-todo-platform` 仓库中创建一个 Go module，编写一个可运行、可测试、可持续演进的 CLI 程序，支持 Todo 的新增、列表、修改、完成和删除。这个 CLI 会在后续章节继续演进：第 8 篇会引入并发，第 9 篇会强化测试和工程化，第 10 篇会改造为 Web API。
+你会在 `cloud-native-todo-platform` 仓库中创建一个 Go module，编写一个可运行、可测试、可持续演进的 CLI 程序，支持 Todo 的新增、列表、修改、完成和删除。这个 CLI 会在后续章节继续演进：第 8 篇会强化工程化与测试，第 9 篇会进入 `net/http` 标准库 HTTP 服务，第 11 篇会再系统学习 Go 并发。
 
 ## 1. 本章学习目标
 
@@ -48,7 +48,7 @@ go run ./cmd/todo-cli update 1 "学习 Go module 与包管理"
 go run ./cmd/todo-cli delete 1
 ```
 
-这些能力会直接支撑后续 Go 并发、Web API、数据库访问、Docker 镜像构建、Kubernetes 探针和 Operator Controller 开发。
+这些能力会直接支撑后续 Go 工程化、Web API、并发任务、数据库访问、Docker 镜像构建、Kubernetes 探针和 Operator Controller 开发。
 
 ## 2. 本章工作场景
 
@@ -1831,18 +1831,10 @@ CLI 程序应该有清晰的参数、稳定的输出、明确的退出码和可�
 - Go module、package 和基础工程目录。
 - 一个完整可运行的 `todo-cli` 项目。
 
-本篇的关键不是“背下语法”，而是理解 Go 如何表达业务对象、业务行为、错误边界和工程结构。`todo-cli` 是后续 Todo 平台的第一块 Go 代码资产，它会继续演进为并发任务、可测试服务、Web API、数据库服务和云原生应用。
+本篇的关键不是“背下语法”，而是理解 Go 如何表达业务对象、业务行为、错误边界和工程结构。`todo-cli` 是后续 Todo 平台的第一块 Go 代码资产，它会继续演进为可测试服务、Web API、并发任务、数据库服务和云原生应用。
 
 ## 15. 下一章衔接
 
-下一篇将进入 Go 并发编程。
+下一篇将进入 Go 工程化与测试。
 
-本篇的 `todo-cli` 目前是单进程、顺序执行、文件存储的程序。真实后端服务会面对更多并发场景：
-
-- 多个请求同时创建 Todo。
-- 后台任务异步处理 Todo 事件。
-- 服务需要设置超时和取消。
-- 数据同步、日志处理、批量导入需要 worker。
-- Kubernetes Controller 会通过队列和 worker 并发处理资源事件。
-
-因此，下一篇会在本篇 Go 基础之上学习 goroutine、channel、context、sync、并发安全和常见并发错误，为后续 Web API 和 Operator Controller 打基础。
+本篇的 `todo-cli` 已经能表达基本业务对象和命令行行为，但还缺少真实后端项目需要的目录边界、配置入口、结构化日志、服务层抽象和测试体系。下一篇会把本篇的 Go module 整理成 Todo API 工程骨架，为后续 `net/http` 服务、数据库持久化、容器化和 Kubernetes 部署打基础。如果跳过工程化直接写 HTTP，后续很容易把路由、配置、业务逻辑和测试全部挤在 `main.go` 里。
