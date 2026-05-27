@@ -2,7 +2,7 @@
 
 第 1 篇已经完成课程仓库、工具链和基础 YAML 准备。从本篇开始，我们把注意力放到后端开发和云原生排障每天都会碰到的 Linux 基础能力：目录、文件、权限、文本处理、压缩、软链接和环境变量。
 
-Go 服务最终通常运行在 Linux 服务器、容器或 Kubernetes 节点中。配置读不到、日志写不进去、脚本找不到文件、挂载目录权限异常、Pod 启动失败，很多时候不是框架问题，而是路径、权限和文件操作没有处理清楚。
+Go 服务运行在 Linux 之上，无论是物理服务器、虚拟机、Docker 容器还是 Kubernetes Pod。配置读不到、日志写不进去、脚本找不到文件、挂载目录权限异常、Pod 启动失败，很多时候不是框架问题，而是路径、权限和文件操作没有处理清楚。
 
 本篇对应 5 个章节主题：
 
@@ -318,6 +318,12 @@ server/todo-platform/current -> releases/2026-05-27-001
 
 发布新版本时，可以创建新的 `releases/<版本>` 目录，再把 `current` 指向新版本。回滚时只要把 `current` 指回旧版本。这种方式比覆盖原目录更可控。
 
+`readlink` 命令可以查看软链接指向的目标路径：
+
+```bash
+$ readlink server/todo-platform/current
+```
+
 环境变量是传递运行参数的一种方式：
 
 ```bash
@@ -453,7 +459,9 @@ $ cd ~/workspace/cloud-native-todo-platform
 
 === "Windows + WSL2"
 
-    在 WSL2 Ubuntu 终端中执行本章所有 Linux 命令。课程仓库建议放在 `~/workspace/cloud-native-todo-platform`，不要放在 `/mnt/c/Users/...` 下，避免跨文件系统带来的性能、权限和换行符问题。
+    在 WSL2 Ubuntu 终端中执行本章所有 Linux 命令。课程仓库必须放在 WSL2 的 Linux 文件系统中，例如 `~/workspace/cloud-native-todo-platform`。不要放在 `/mnt/c/...`、`/mnt/d/...` 这类 Windows 挂载盘下，否则 `chmod`、`stat`、软链接和脚本换行符都可能表现异常，导致权限实验输出和预期不一致。
+
+    执行实验前可以用 `pwd` 自检：如果路径以 `/mnt/` 开头，建议先把仓库移动到 `~/workspace` 后再继续。
 
 === "macOS"
 
@@ -504,7 +512,7 @@ $ find server scripts -maxdepth 4 -print
 
 配置文件 `server/todo-platform/config/app.env`：
 
-```bash title="server/todo-platform/config/app.env"
+```text title="server/todo-platform/config/app.env"
 TODO_ENV=dev
 TODO_HTTP_ADDR=127.0.0.1:8080
 TODO_CONFIG_DIR=server/todo-platform/config
@@ -545,11 +553,14 @@ fail() {
 
 file_mode() {
   local path="$1"
-  if stat -c '%a' "$path" >/dev/null 2>&1; then
-    stat -c '%a' "$path"
+  local mode
+  if mode="$(stat -c '%a' "$path" 2>/dev/null)"; then
+    :
   else
-    stat -f '%Lp' "$path"
+    mode="$(stat -f '%Lp' "$path")"
   fi
+  # macOS may return modes like 0750; normalize before comparing.
+  printf '%s\n' "$mode" | sed 's/^0*//; s/^$/0/'
 }
 
 require_dir() {
@@ -583,7 +594,7 @@ require_mode() {
   if [[ "$actual" == "$expected" ]]; then
     ok "mode ${expected}: ${path#$ROOT_DIR/}"
   else
-    warn "mode expected ${expected}, got ${actual}: ${path#$ROOT_DIR/}"
+    fail "mode expected ${expected}, got ${actual}: ${path#$ROOT_DIR/}"
   fi
 }
 
@@ -1022,7 +1033,39 @@ $ rm -f scripts/check-server-layout.sh
   $ chmod +x scripts/check-server-layout.sh
   ```
 
-- **预防**：VS Code 右下角选择 `LF`；课程仓库放在 WSL2 的 Linux 文件系统下，不要放在 `/mnt/c` 下反复执行脚本。
+- **预防**：VS Code 右下角选择 `LF`；课程仓库放在 WSL2 的 Linux 文件系统下，不要放在 `/mnt/c`、`/mnt/d` 这类 Windows 挂载盘下反复执行脚本。
+
+### 错误 6：WSL2 中 `chmod` 后权限仍显示 `777`
+
+- **现象**：
+
+  ```text
+  [FAIL] mode expected 750, got 777: server/todo-platform/config
+  [FAIL] mode expected 640, got 777: server/todo-platform/config/app.env
+  ```
+
+- **原因**：课程仓库位于 `/mnt/c`、`/mnt/d` 这类 Windows 挂载盘。WSL2 访问 Windows 文件系统时可能不按 Linux 原生方式保存 Unix 权限位，`chmod` 看起来执行了，但 `stat` 看到的权限仍可能是 `777`。
+
+- **排查**：
+
+  ```bash
+  $ pwd
+  $ stat server/todo-platform/config/app.env
+  ```
+
+  如果 `pwd` 以 `/mnt/` 开头，并且 `chmod 640` 后仍显示 `777`，基本可以确认是 Windows 挂载盘权限语义导致的。
+
+- **修复**：把仓库放到 WSL2 Linux 文件系统中重新执行实验。
+
+  ```bash
+  $ mkdir -p ~/workspace
+  $ cp -a /mnt/c/Users/<你的用户名>/cloud-native-todo-platform ~/workspace/
+  $ cd ~/workspace/cloud-native-todo-platform
+  ```
+
+  如果你已经用 Git 管理仓库，也可以在 WSL2 中重新 `git clone` 到 `~/workspace`。
+
+- **预防**：涉及 `chmod`、软链接、Shell 脚本和 Linux 权限的实验，都优先在 WSL2 的 `~/workspace`、`/home/<user>/...` 这类 Linux 原生路径下执行。
 
 ## 7. 生产环境注意事项
 
