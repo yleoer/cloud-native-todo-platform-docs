@@ -11,7 +11,7 @@
 
 ## 🎯 学习路径
 
-当前已完成 **阶段一：基础环境与工具链**、**阶段二：Go 语言与后端开发**，并已开始 **阶段三：Docker 容器技术**。课程会继续围绕 **Cloud Native Todo Platform** 项目推进容器化交付。
+当前已完成 **阶段一：基础环境与工具链**、**阶段二：Go 语言与后端开发**，并已开始 **阶段三：Docker 容器技术**。课程会继续围绕 **Cloud Native Todo Platform** 项目推进容器化交付和容器运行时理解。
 
 <details open>
 <summary><strong>阶段一：基础环境与工具链（第 1-6 篇 + 出版附录，已完成）</strong></summary>
@@ -46,14 +46,14 @@ Linux 命令、Git 协作、Shell 脚本等云原生开发必备基础。
 </details>
 
 <details>
-<summary><strong>阶段三：Docker 容器技术（第 14-18 篇，第 14-16 篇已完成）</strong></summary>
+<summary><strong>阶段三：Docker 容器技术（第 14-18 篇，第 14-17 篇已完成）</strong></summary>
 
 Docker 使用、Dockerfile 编写、Docker Compose 本地编排、容器原理和运行时机制。
 
 - [第 14 篇：Docker 基础](docs/chapters/stage-03-docker/14-docker-basics.md)
 - [第 15 篇：Dockerfile 与镜像构建](docs/chapters/stage-03-docker/15-dockerfile.md)
 - [第 16 篇：Docker Compose 本地编排](docs/chapters/stage-03-docker/16-docker-compose.md)
-- 第 17 篇：容器运行原理
+- [第 17 篇：容器运行原理](docs/chapters/stage-03-docker/17-container-internals.md)
 - 第 18 篇：OCI、containerd、runc 与 CRI
 
 </details>
@@ -191,7 +191,8 @@ docs/
 │   ├── stage-03-docker/        # 阶段三：Docker 容器技术
 │   │   ├── 14-docker-basics.md      # 第 14 篇：Docker 基础
 │   │   ├── 15-dockerfile.md         # 第 15 篇：Dockerfile 与镜像构建
-│   │   └── 16-docker-compose.md     # 第 16 篇：Docker Compose 本地编排
+│   │   ├── 16-docker-compose.md     # 第 16 篇：Docker Compose 本地编排
+│   │   └── 17-container-internals.md # 第 17 篇：容器运行原理
 │   └── ...                     # 后续阶段章节（待完成）
 ├── projects/                   # 项目实战
 ├── labs/                       # 实验索引
