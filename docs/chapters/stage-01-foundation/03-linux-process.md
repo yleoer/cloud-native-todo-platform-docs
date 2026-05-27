@@ -256,6 +256,8 @@ CentOS Linux 7 已经停止维护，不建议作为新学习环境和新生产�
 $ sudo ss -lntp | grep 18080
 ```
 
+`ss -lnt` 只看监听端口，通常普通用户也能执行；`ss -lntp` 会额外显示进程名和 PID，在很多系统上需要 `sudo` 才能看全。因此脚本里只做端口存在性检查，人工排障时再用 `sudo ss -lntp` 确认进程归属。
+
 查看磁盘空间：
 
 ```bash
@@ -748,6 +750,8 @@ WantedBy=multi-user.target
 | `NoNewPrivileges` | 禁止服务进程获得新权限 |
 | `ProtectSystem` / `ProtectHome` | 降低服务误写系统目录和用户目录的风险 |
 
+严格来说，`RuntimeDirectory=todo-platform` 创建的 `/run/todo-platform` 会自动给服务进程可写权限，本篇把它也写进 `ReadWritePaths` 是为了让初学者更直观看到哪些目录属于服务运行时写入范围。
+
 检查脚本 `scripts/check-process-service.sh`：
 
 ```bash title="scripts/check-process-service.sh"
@@ -844,6 +848,7 @@ main() {
     fail "health endpoint failed: $URL/healthz"
   fi
 
+  # Do not use -p here: showing process names often requires sudo.
   if ss -lnt | grep -q ":${PORT} "; then
     ok "port listening: $PORT"
   else
@@ -883,6 +888,8 @@ $ ls
 ```bash
 $ test -f go.mod || go mod init github.com/your-name/cloud-native-todo-platform
 ```
+
+请把 `your-name` 替换为你的 GitHub 用户名或组织名；如果只是本地实验，保留这个示例模块名也不影响本篇编译。
 
 创建实验目录：
 
@@ -940,15 +947,18 @@ $ sudo chown root:todo /etc/todo-platform/process-demo.env
 $ sudo chmod 640 /etc/todo-platform/process-demo.env
 ```
 
+这里使用 `<<'EOF'` 是为了让 Shell 原样写入内容，不展开文件里的 `$VARIABLE`。写配置文件时推荐使用这种写法，避免环境变量被当前终端提前替换。
+
 将 5.4 中的 unit 内容保存为 `deployments/systemd/todo-process-demo.service`，再安装到 systemd：
 
 ```bash
 $ sudo cp deployments/systemd/todo-process-demo.service /etc/systemd/system/todo-process-demo.service
 $ systemd-analyze verify /etc/systemd/system/todo-process-demo.service
+$ echo $?
 $ sudo systemctl daemon-reload
 ```
 
-`systemd-analyze verify` 用来提前检查 unit 语法。如果没有输出，通常表示没有发现明显配置错误；如果提示 `Command ... is not executable`，优先检查二进制文件是否已经安装到 `/opt/todo-platform/bin/todo-process-demo`。
+`systemd-analyze verify` 用来提前检查 unit 语法。判断标准以退出码为准：`echo $?` 输出 `0` 表示语法检查通过；如果有错误，它会打印具体配置问题。如果提示 `Command ... is not executable`，优先检查二进制文件是否已经安装到 `/opt/todo-platform/bin/todo-process-demo`。
 
 启动服务并设置开机自启：
 
@@ -989,6 +999,8 @@ $ df -h
 ```
 
 `/memory?mb=16&hold=true` 会让进程短暂持有一块内存，便于观察 RSS 变化；随后访问 `/memory?clear=true` 是为了释放这块实验内存，避免影响后续观察。
+
+`/work?ms=1000` 使用忙循环制造短暂 CPU 占用，只用于教学观察；真实生产代码不要用忙循环模拟等待，应该使用正常业务逻辑、定时器或队列任务。
 
 将 5.4 中的检查脚本保存为 `scripts/check-process-service.sh`，再赋予执行权限：
 
@@ -1071,6 +1083,8 @@ $ test "$(cat /run/todo-platform/todo-process-demo.pid)" = "$PID"
 $ sudo ss -lntp | grep 18080
 $ ./scripts/check-process-service.sh
 ```
+
+这里的 `go build` 只验证源码还能编译，并不会自动更新 systemd 正在运行的 `/opt/todo-platform/bin/todo-process-demo`。如果你修改代码后希望服务运行新版本，需要重新执行 `sudo install -o root -g root -m 0755 bin/todo-process-demo /opt/todo-platform/bin/todo-process-demo`，再执行 `sudo systemctl restart todo-process-demo`。
 
 判断标准：
 
