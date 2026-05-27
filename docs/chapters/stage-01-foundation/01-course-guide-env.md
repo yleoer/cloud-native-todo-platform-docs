@@ -4,7 +4,7 @@
 
 本篇不要求任何前置课程知识。你只需要准备一台满足硬件要求的电脑，跟着本篇完成课程起点环境。
 
-本篇不急着写业务功能，而是先完成三件事：看清完整学习路线，理解 `Cloud Native Todo Platform` 项目会如何逐步演进，准备后续 Go、Docker、Kubernetes、Helm、CI/CD、Operator 开发都要依赖的统一实验环境，并掌握后续声明式配置都会用到的 YAML 基础语法。
+本篇不急着写业务功能，而是先完成这几件事：看清完整学习路线，理解 `Cloud Native Todo Platform` 项目会如何逐步演进，准备后续 Go、Docker、Kubernetes、Helm、CI/CD、Operator 开发都要依赖的统一实验环境，并掌握后续声明式配置都会用到的 YAML 基础语法。
 
 本篇对应 6 个章节主题：
 
@@ -244,17 +244,26 @@ Windows Terminal
 
 ### 4.3 kubectl、kind 与 kubeconfig
 
-`kind` 用 Docker 容器模拟 Kubernetes 节点，适合本地学习和集成测试。`kubectl` 通过 kubeconfig 连接 Kubernetes 集群。
+`kind` 并不是让 Kubernetes 继续用 Docker Engine 直接运行 Pod。更准确地说，`kind` 会把每个本地 Kubernetes 节点做成一个外层容器，这个外层节点容器可以由 Docker 或 Podman 承载；节点容器内部运行 kubelet、containerd 等组件，Pod 容器仍由 kubelet 通过 CRI 调用 containerd 创建。
+
+`kubectl` 则通过 kubeconfig 连接 Kubernetes 集群。它不关心底层节点是物理机、虚拟机，还是 kind 创建出来的本地节点容器。
 
 三者关系如下：
 
 ```text
 kind create cluster
-  -> 创建本地 Kubernetes 集群
+  -> 让 Docker/Podman 在本机启动 kind node 容器
+  -> node 容器内部运行 Kubernetes 组件和 containerd
   -> 写入 kubeconfig context
 kubectl
   -> 读取 kubeconfig
   -> 访问当前 context 指向的集群
+
+Pod 创建链路
+  -> kubelet
+  -> CRI
+  -> containerd
+  -> runc
 ```
 
 查看当前集群上下文：
@@ -755,6 +764,21 @@ EOF
 
 `KIND_NODE_IMAGE` 使用 kind v0.31 官方发布中已经预构建的节点镜像，并锁定 digest，保证同学之间创建出来的本地集群版本一致。课程主线的 Kubernetes / kubectl 基线仍是 1.36.x；如果 kind 后续官方发布 1.36.x 节点镜像，只需要更新这一行并重新创建本地集群。
 
+校验这个 digest 的方法如下：
+
+```bash
+$ docker pull kindest/node:v1.35.0
+$ docker inspect kindest/node:v1.35.0 --format '{{.RepoDigests}}'
+```
+
+预期输出应包含：
+
+```text
+kindest/node@sha256:452d707d4862f52530247495d180205e029056831160e22870e37e3f6c1ac31f
+```
+
+kind v0.31 官方发布的预构建节点镜像中没有 1.36.x 节点镜像，因此本篇先锁定 `v1.35.0` 作为 kind 烟测集群。后续如果 kind 官方发布 `kindest/node:v1.36.x`，再把 `KIND_NODE_IMAGE` 和 5.10 的预期节点版本一起升级。
+
 创建环境检查脚本：
 
 ```bash title="scripts/check-env.sh"
@@ -862,6 +886,12 @@ main "$@"
 
 Helm 版本检查使用 `helm version --template '{{.Version}}'`，是为了只取 `v4.2.x` 这样的语义版本，避免默认输出中的 Git commit、GoVersion 等字段影响脚本判断。
 
+WSL2 换行符提醒：如果你在 Windows 编辑器里创建脚本，要确认文件使用 LF 换行。若执行脚本时出现 `$'\r': command not found`，可以在 WSL2 中运行：
+
+```bash
+$ sed -i 's/\r$//' scripts/check-env.sh
+```
+
 赋予执行权限：
 
 ```bash
@@ -914,6 +944,8 @@ todo-dev-control-plane   Ready    control-plane   ...   v1.35.0
 ```
 
 这里看到的节点版本来自 `KIND_NODE_IMAGE`。如果后续你把 `KIND_NODE_IMAGE` 更新为官方可用的 1.36.x 节点镜像，预期输出也应随之变为 `v1.36.x`。
+
+`kubectl` 与 Kubernetes API Server 通常遵循一个小版本以内的版本偏差兼容原则。课程使用 `kubectl` 1.36.x 操作 kind v1.35.0 烟测集群是可接受的；进入后续正式 Kubernetes 章节时，会再把集群版本与课程主线基线对齐。
 
 应用前面写的 YAML：
 
@@ -1213,7 +1245,13 @@ $ git log --oneline -1
 
 ### 基础题
 
-1. 下面 YAML 片段中，`- docker` 为什么不能比 `- go` 多缩进两个空格？应该如何修复？
+1. 找出下面 YAML 片段的问题，并说明如何修复。
+
+    ```yaml
+    tools:
+    - go
+      - docker
+    ```
 2. `kubectl` 和 `kind` 分别解决什么问题？
 3. 为什么 Windows 学员推荐使用 WSL2 Ubuntu 作为主力学习终端？
 4. 为什么 `.env` 和 kubeconfig 不应该提交到 Git？
@@ -1258,7 +1296,7 @@ $ git log --oneline -1
 
 一句话结论：`kind` 负责创建本地集群，`kubectl` 负责访问集群，kubeconfig 负责告诉 `kubectl` 访问哪个集群。
 
-展开解释：`kind` 用 Docker 容器创建本地 Kubernetes 集群。`kubectl` 是 Kubernetes 客户端。kubeconfig 保存集群地址、用户凭据和当前 context。创建 kind 集群后，kind 会把连接信息写入 kubeconfig，kubectl 根据当前 context 访问对应集群。
+展开解释：`kind` 用 Docker 或 Podman 在本机承载外层节点容器，节点容器内部运行 Kubernetes 组件和 containerd；Pod 仍由 kubelet 通过 CRI 调用 containerd 创建。`kubectl` 是 Kubernetes 客户端。kubeconfig 保存集群地址、用户凭据和当前 context。创建 kind 集群后，kind 会把连接信息写入 kubeconfig，kubectl 根据当前 context 访问对应集群。
 
 深入追问：为什么执行危险命令前要看 context？可以回答：同一台机器可能同时保存本地、测试、生产多个 kubeconfig；误把删除命令发到生产集群，是非常典型的运维事故来源。
 
