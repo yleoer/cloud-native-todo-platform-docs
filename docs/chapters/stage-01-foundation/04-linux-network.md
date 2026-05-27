@@ -129,12 +129,12 @@ IP 地址用于定位网络中的主机或接口。
 |---|---|---|
 | `127.0.0.1` | IPv4 回环地址，只能本机访问 | 本地开发、健康检查 |
 | `::1` | IPv6 回环地址，只能本机访问 | IPv6 本地访问 |
-| `0.0.0.0` | 监听所有 IPv4 网卡地址 | 服务对外提供访问 |
+| `0.0.0.0` | 监听本机所有 IPv4 地址（所有网络接口） | 服务对外提供访问 |
 | `192.168.x.x` | 常见内网地址 | 局域网或虚拟网络 |
 | `10.x.x.x` | 常见内网地址 | 云服务器、容器、Kubernetes 集群 |
 | 公网 IP | Internet 可路由地址 | 对外服务入口 |
 
-监听地址决定服务接受哪些来源的连接。如果服务监听 `127.0.0.1:18080`，通常只有本机能访问。如果服务监听 `0.0.0.0:18080`，表示绑定所有 IPv4 网卡；只要防火墙、安全组和路由允许，其他机器也可能访问。
+监听地址决定服务接受哪些来源的连接。如果服务监听 `127.0.0.1:18080`，通常只有本机能访问。如果服务监听 `0.0.0.0:18080`，表示监听本机所有 IPv4 地址（所有网络接口）；只要防火墙、安全组和路由允许，其他机器也可能访问。
 
 不要随意监听 `0.0.0.0`。它很方便，但也更容易把开发服务暴露到局域网或公网。生产环境必须配合认证、TLS、防火墙、安全组和最小暴露原则。
 
@@ -378,6 +378,8 @@ $ sudo tcpdump -i any -nn 'tcp port 18080' -c 6
 
 说明：本篇不编写 Kubernetes YAML。这里训练的是 Linux 网络与 HTTP 排障能力；后续 Kubernetes 阶段会把这些能力迁移到 Service、Ingress、Gateway API、CoreDNS 和 NetworkPolicy。
 
+第 3 篇已经演示过 systemd 后台托管服务。本篇为了方便观察前台日志、制造端口冲突和配合三终端抓包，故意直接以前台进程运行服务。
+
 ### 5.2 实验环境
 
 建议在第 1 篇创建的仓库中执行：
@@ -454,6 +456,8 @@ cloud-native-todo-platform/
 ### 5.4 完整代码和配置
 
 Go HTTP 服务 `api/cmd/todo-network-demo/main.go`：
+
+本篇的日志中间件会包装整个 `mux`，而不是像第 3 篇那样逐个包装 handler。这样即使请求匹配不到业务路由并返回 `404`，也能被统一记录。
 
 ```go title="api/cmd/todo-network-demo/main.go"
 package main
@@ -742,6 +746,8 @@ network-clean:
 	rm -f /tmp/todo-network-demo.pcap network-debug-report.txt
 ```
 
+`network-run` 会在前台运行服务并阻塞当前终端，适合单独调试。三终端抓包实验中，直接执行 `./bin/todo-network-demo` 更容易看清每个终端的角色。
+
 ### 5.5 执行命令
 
 先确认你在课程仓库根目录：
@@ -791,10 +797,13 @@ $ TODO_ADDR=127.0.0.1:18080 ./bin/todo-network-demo
 
 ```bash
 $ curl -i http://127.0.0.1:18080/healthz
+$ curl -i http://127.0.0.1:18080/readyz
 $ curl -i http://localhost:18080/todos
 $ curl -i -H 'X-Request-ID: demo-001' 'http://127.0.0.1:18080/debug/request?from=course'
 $ curl -i http://127.0.0.1:18080/not-found
 ```
+
+默认 `TODO_READY=true`，所以 `/readyz` 会返回 `200`。后面的练习会让你用 `TODO_READY=false` 启动服务，观察就绪检查变成 `503`。
 
 查看地址、路由和监听端口：
 
@@ -823,7 +832,7 @@ $ nslookup localhost
 $ ./scripts/check-network-demo.sh
 ```
 
-制造端口冲突。在服务已经运行时，另开终端再次启动同端口服务：
+制造端口冲突。保持第一个终端中的服务运行，不要关闭；然后另开终端再次启动同端口服务：
 
 ```bash
 $ TODO_ADDR=127.0.0.1:18080 ./bin/todo-network-demo
@@ -880,6 +889,17 @@ Date: Wed, 27 May 2026 06:00:00 GMT
 Content-Length: <length>
 
 {"service":"todo-network-demo","status":"ok","time":"2026-05-27T14:00:00+08:00"}
+```
+
+上面的第一行是状态行，中间几行是响应头，空行之后是响应体。使用 `curl -i` 的目的就是把这三部分一起显示出来。
+
+就绪检查预期类似：
+
+```http
+HTTP/1.1 200 OK
+Content-Type: application/json
+
+{"status":"ready"}
 ```
 
 Todo 列表预期类似：
@@ -940,11 +960,12 @@ Network demo check completed.
 $ TODO_ADDR=127.0.0.1:18080 ./bin/todo-network-demo
 ```
 
-然后在当前终端集中执行下面命令：
+然后在当前终端集中执行下面命令。以下命令假设服务已经在另一个终端中运行；`go build` 只验证代码可编译，不影响已经运行的服务进程。
 
 ```bash
 $ go build -o bin/todo-network-demo ./api/cmd/todo-network-demo
 $ curl -fsS http://127.0.0.1:18080/healthz
+$ curl -fsS http://127.0.0.1:18080/readyz
 $ curl -fsS http://127.0.0.1:18080/todos
 $ test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:18080/not-found)" = "404"
 $ ss -lnt 'sport = :18080'
@@ -958,6 +979,7 @@ $ test -f network-debug-report.txt
 
 - `go build` 能成功生成 `bin/todo-network-demo`。
 - `/healthz` 返回 `status=ok`。
+- `/readyz` 在默认配置下返回 `status=ready`。
 - `/todos` 返回 3 条示例 Todo。
 - `/not-found` 返回 HTTP `404`。
 - `ss` 能看到 `127.0.0.1:18080` 或 `0.0.0.0:18080` 处于 `LISTEN`。
