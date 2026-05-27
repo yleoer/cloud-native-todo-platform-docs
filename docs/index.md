@@ -76,7 +76,7 @@ hide:
 - [第 3 篇：Linux 进程、服务与软件管理 [A]](chapters/stage-01-foundation/03-linux-process.md)
 - [第 4 篇：Linux 网络基础与排障 [A]](chapters/stage-01-foundation/04-linux-network.md)
 - [第 5 篇：Git 基础与团队协作 [A]](chapters/stage-01-foundation/05-git-basics.md)
-- [第 6 篇：Shell 脚本与自动化基础](chapters/stage-01-foundation/06-shell-scripting.md)
+- [第 6 篇：Shell 脚本与自动化基础 [A]](chapters/stage-01-foundation/06-shell-scripting.md)
 - [附录 A：基础环境作品集验收](chapters/stage-01-foundation/stage-01-acceptance.md)
 - [附录 B：命令速查与排障手册](chapters/stage-01-foundation/stage-01-cheatsheet-troubleshooting.md)
 

@@ -1,173 +1,132 @@
-# 第 6 篇：Shell 脚本与自动化基础
+# 第 6 篇：Shell 脚本与自动化基础 [A]
 
-前 5 篇已经完成了开发环境、Linux 文件系统、进程服务、网络排障和 Git 团队协作。到这里，`Cloud Native Todo Platform` 已经具备了一个工程项目最基本的运行土壤。
+前 5 篇已经完成了开发环境、Linux 文件系统、进程服务、网络排障和 Git 团队协作。到这里，`Cloud Native Todo Platform` 已经不只是一个能运行的 Demo，而是一个需要被反复启动、检查、清理和提交的工程项目。
 
-但真实工作中，工程师每天不会手工重复输入一长串命令。启动服务、检查环境、清理临时进程、查看日志、判断健康状态、打包构建、触发部署，这些动作都应该逐步沉淀成脚本。Shell 脚本就是云原生工程中最常见的自动化胶水。
+真实工作中，工程师不会每天手工重复输入长串命令。启动服务、检查依赖、判断健康状态、清理旧进程、查看日志、在 CI 中拦截错误，这些动作都应该逐步沉淀成脚本。Shell 脚本就是云原生工程里最常见的自动化胶水。
 
-本篇对应 5 个章节主题：
+本篇对应 4 个章节主题：
 
-- 6.1 Shell 变量、参数与退出码
-- 6.2 条件判断、循环与函数
-- 6.3 文件处理、日志处理与管道
-- 6.4 编写项目启动和健康检查脚本
-- 6.5 Shell 脚本常见安全问题
+- 6.1 Shell 变量、参数、退出码与条件判断
+- 6.2 循环、函数、文件处理与管道
+- 6.3 编写项目启动、健康检查和清理脚本
+- 6.4 Shell 脚本常见问题与环境变量管理
 
-本篇特色项目是：**为 Todo 平台编写 `dev.sh`、`check.sh`、`clean.sh` 脚本**。
+本篇特色项目是：**为 Todo 平台编写 `dev.sh`、`check.sh`、`clean.sh` 脚本，实现一键启动、检查和清理**。
 
-你会在 `cloud-native-todo-platform` 仓库中新增 `scripts/` 目录，用 3 个脚本完成本地开发最小闭环：启动 Todo Demo 服务、检查依赖和健康状态、清理运行中的进程与临时文件。
+你会在课程项目中新增 `scripts/` 目录，用 3 个脚本建立本地开发最小闭环：`dev.sh` 启动 Todo 开发服务，`check.sh` 检查工具、文件和 HTTP 健康状态，`clean.sh` 清理进程与运行时文件。这个脚本入口会被后续 Go、Docker、Kubernetes、CI/CD 和 Operator 章节持续复用。
 
 ## 1. 本章学习目标
 
-学完本篇后，你应该能够把重复命令整理成可复用、可检查、可排障的 Shell 脚本。
+学完本篇后，你应该能把重复命令整理成可复用、可检查、可排障的 Shell 脚本，并能说明每个脚本失败时为什么要返回非 `0` 退出码。
 
-具体目标如下：
+### 1.1 知识目标
 
-- 能解释 Shell、Bash、脚本文件、解释器之间的关系。
-- 能使用变量、环境变量、位置参数和默认值。
-- 能理解退出码 `0` 和非 `0` 的含义，并用退出码判断脚本是否成功。
-- 能使用 `if`、`case`、`for`、`while` 编写基本控制逻辑。
-- 能封装函数，减少重复代码。
-- 能使用 `grep`、`awk`、`sed`、`find`、`xargs`、管道处理文件和日志。
-- 能理解 `set -euo pipefail` 的作用和使用边界。
-- 能编写 `dev.sh` 启动本地服务。
-- 能编写 `check.sh` 检查工具、目录、脚本权限和 HTTP 健康状态。
-- 能编写 `clean.sh` 清理进程、PID 文件和临时日志。
-- 能识别 Shell 脚本中常见安全问题，例如未引用变量、危险 `rm -rf`、`eval`、泄露密钥。
+- 能解释 Shell、Bash、脚本文件和 shebang 的关系。
+- 能说明变量、环境变量、位置参数、默认值和 `.env` 文件的用途。
+- 能解释退出码 `0` 与非 `0` 在本地脚本和 CI/CD 中的意义。
+- 能描述 `if`、`case`、`for`、函数、管道和文件测试表达式的常见用法。
+- 能解释 `set -Eeuo pipefail` 能减少哪些隐性错误，以及它不是万能保险。
 
-本篇结束时，你至少应该能独立完成以下命令组合：
+### 1.2 技能目标
+
+- 能编写带 shebang、严格模式、函数和清晰日志的 Bash 脚本。
+- 能使用环境变量和 `.env.example` 管理本地开发参数。
+- 能编写 `dev.sh` 启动本地 Todo 服务，并用 PID 文件记录进程。
+- 能编写 `check.sh` 检查依赖命令、脚本权限、Git 状态和 HTTP 健康状态。
+- 能编写 `clean.sh` 安全清理服务进程、日志和本地运行时目录。
+- 能通过 `bash -n`、ShellCheck 和退出码判断脚本是否适合进入 PR。
+
+本篇结束时，你至少应该能独立完成下面这组命令：
 
 ```bash
-chmod +x scripts/*.sh
-./scripts/dev.sh
-./scripts/check.sh
-echo $?
-TODO_CLEAN_LOGS=true ./scripts/clean.sh
+$ ./scripts/dev.sh
+$ ./scripts/check.sh
+$ curl -fsS http://127.0.0.1:18080/healthz
+$ ./scripts/clean.sh
+$ TODO_PORT=18081 ./scripts/dev.sh
+$ TODO_PORT=18081 ./scripts/check.sh
+$ TODO_CLEAN_LOGS=true ./scripts/clean.sh
 ```
 
-这些能力会在后续 Go 开发、Docker 构建、Kubernetes 部署、CI/CD 流水线和生产排障中反复使用。
+这些命令会成为后续章节的本地开发入口。后面写 Go API、Dockerfile、Compose、Kubernetes YAML 和 Operator 控制器时，都需要同样的自动化意识。
 
-## 2. 本章工作场景
+## 2. 本章工作场景与真实案例
 
-Shell 脚本的价值不是“炫技”，而是把可重复流程固化下来，降低人为操作错误。
+### 2.1 技术痛点
 
-典型工作场景包括：
+没有脚本时，项目协作会出现很多低级但高频的问题：
 
-- 后端开发每天启动本地 API 服务，不想反复输入 `go run`、端口、日志目录等命令。
-- 新同事拉取仓库后，需要一键检查 Go、Git、Docker、kubectl 是否安装。
-- 测试同学需要运行健康检查脚本，判断服务是否真的可访问。
-- DevOps 需要在 CI 中执行构建、测试、打包、镜像推送和部署脚本。
-- SRE 排查线上问题时，用脚本批量收集日志、进程、端口、磁盘和网络信息。
-- Kubernetes 运维中，经常用 Shell 包装 `kubectl get`、`kubectl logs`、`kubectl describe`、`helm upgrade` 等命令。
-- Operator 开发中，脚本会用于生成代码、运行测试、安装 CRD、部署 Controller。
+- 新同学不知道启动服务要先创建哪些目录、设置哪些环境变量。
+- 每个人手工输入的命令略有不同，排查问题时无法复现。
+- 旧进程占用端口，新服务启动失败，但终端里只看到一串零散错误。
+- CI 中某个检查已经失败，脚本却因为最后一条命令成功而返回 `0`。
+- 清理脚本没有校验路径，变量为空时可能删除错误目录。
+- `.env` 被误提交到仓库，数据库密码、Token 或 kubeconfig 路径进入远程历史。
 
-本篇不把 Shell 当作孤立语法来学，而是围绕 Todo 平台形成一套实际工作流：
+Shell 脚本的价值不是把命令藏起来，而是把团队共识变成可执行、可失败、可审查的工程入口。
+
+### 2.2 真实协作场景
+
+在企业项目中，Shell 脚本通常承担这些职责：
+
+- 后端开发执行 `./scripts/dev.sh` 一键启动本地 API。
+- 测试同学执行 `./scripts/check.sh` 判断依赖、脚本权限和服务健康状态是否正确。
+- Reviewer 在 PR/MR 中查看脚本是否有正确退出码、是否会误删文件、是否会泄露密钥。
+- CI/CD 在 PR 上执行 `bash -n scripts/*.sh` 和 `shellcheck scripts/*.sh`。
+- SRE 或平台团队把脚本模式演进为 Docker Compose、Kubernetes Job、Helm hook 或 GitHub Actions。
 
 ```mermaid
 flowchart LR
-    Dev["dev.sh<br/>启动本地服务"]
-    Check["check.sh<br/>检查环境和健康状态"]
-    Logs["查看日志<br/>grep / tail / awk"]
-    Clean["clean.sh<br/>清理进程和临时文件"]
-    Next["后续章节<br/>Go / Docker / Kubernetes"]
-
-    Dev --> Check --> Logs --> Clean --> Next
+    Dev["dev.sh\n启动本地服务"] --> Check["check.sh\n检查依赖与健康状态"]
+    Check --> Logs["日志\n定位失败原因"]
+    Logs --> Clean["clean.sh\n清理进程与运行时文件"]
+    Check --> CI["CI/CD\n根据退出码判断是否通过"]
 ```
 
-## 3. 前置知识
+### 2.3 课程项目关联
 
-### 必须掌握
+本篇产出会被后续章节直接复用：
 
-学习本篇前，你需要具备以下基础：
+- 第 7 篇会在脚本基础上进入 Go CLI 开发。
+- 第 8 到第 14 篇会用 `dev.sh` 和 `check.sh` 支撑本地 Go API 开发。
+- 第 15 到第 19 篇会把本地启动逻辑逐步演进到 Docker 和 Docker Compose。
+- 第 20 到第 33 篇会把健康检查、日志和清理思路迁移到 Kubernetes、Helm 和生产排障。
+- 第 34 到第 41 篇会在 Operator 开发中继续依赖脚本完成代码生成、测试和本地调试。
 
-- 已经完成第 1 篇环境准备，能使用终端。
-- 已经完成 Linux 文件、进程、网络和 Git 基础。
-- 已经安装 Git、Go、curl。
-- 能进入 `cloud-native-todo-platform` 仓库。
-- 知道进程、端口、PID 文件、日志文件的基本含义。
+本篇真实案例是：
 
-### 建议了解
+> Todo 平台团队希望把“启动服务、检查健康状态、清理旧进程”从口头说明变成固定脚本。你需要编写 `dev.sh`、`check.sh`、`clean.sh`，让任何成员都能在同样的入口上完成本地开发闭环。
 
-以下内容不要求非常熟练，但建议有基本概念：
+## 3. 核心概念
 
-- Go HTTP 服务可以通过 `go run` 启动。
-- HTTP 健康检查通常通过 `/healthz` 返回 `200 OK`。
-- CI/CD 本质上也是按顺序执行脚本和命令。
-- Docker、Kubernetes、Helm 很多自动化操作都会被 Shell 脚本包装。
+### 3.1 Shell、Bash 与 shebang
 
-### 环境差异说明
+Shell 是用户和操作系统之间的命令解释器。Bash 是 Linux 世界最常见的 Shell 之一。脚本文件本质上是一组按顺序执行的命令。
 
-Shell 脚本在不同系统上差异明显。本篇脚本使用 Bash，不使用 PowerShell。
-
-=== "Linux / WSL2"
-
-    推荐环境。Ubuntu、Debian、Rocky Linux、AlmaLinux、Fedora 等都可以完成本篇实验。
-
-    检查 Bash：
-
-    ```bash
-    bash --version
-    ```
-
-=== "macOS"
-
-    macOS 可以完成本篇实验，但系统自带 Bash 版本可能较旧。本篇脚本不使用 Bash 4 以上专属语法，因此可以运行。
-
-    检查：
-
-    ```bash
-    /bin/bash --version
-    ```
-
-=== "Windows"
-
-    推荐使用 WSL2 Ubuntu 完成本篇实验。Git Bash 也可以运行大部分命令，但路径、进程和端口行为可能和 Linux 不完全一致。
-
-    在 PowerShell 中进入 WSL2：
-
-    ```powershell
-    wsl
-    ```
-
-    然后在 WSL2 中执行本篇 Bash 命令。
-
-## 4. 核心概念
-
-### 4.1 Shell、Bash 与脚本文件
-
-Shell 是用户和操作系统之间的命令解释器。Bash 是 Linux 世界最常见的 Shell 之一。
-
-脚本文件就是把一组命令写到文件里，由解释器按顺序执行。例如：
-
-```bash
-#!/usr/bin/env bash
-echo "hello shell"
-```
-
-第一行叫 shebang，表示用哪个解释器运行脚本：
+脚本第一行通常是 shebang：
 
 ```bash
 #!/usr/bin/env bash
 ```
 
-推荐使用 `/usr/bin/env bash`，因为它会从 `PATH` 中找到 Bash，跨环境适应性更好。
+推荐使用 `/usr/bin/env bash`，因为它会从 `PATH` 中寻找 Bash，比硬编码 `/bin/bash` 更适合不同 Linux、macOS 和 WSL2 环境。
 
-### 4.2 变量与环境变量
+### 3.2 变量、环境变量和默认值
 
-Shell 变量定义时等号两侧不能有空格：
-
-```bash
-APP_NAME="todo-platform"
-PORT="18080"
-echo "$APP_NAME listens on $PORT"
-```
-
-读取变量时建议加双引号：
+Shell 变量定义时，等号两侧不能有空格：
 
 ```bash
-echo "$APP_NAME"
+$ name="todo"
+$ printf '%s\n' "$name"
 ```
 
-如果变量可能为空，可以使用默认值：
+环境变量可以传给子进程。下面命令只对本次脚本执行生效：
+
+```bash
+$ TODO_PORT=18081 ./scripts/dev.sh
+```
+
+脚本里常用默认值写法：
 
 ```bash
 PORT="${TODO_PORT:-18080}"
@@ -175,15 +134,11 @@ PORT="${TODO_PORT:-18080}"
 
 含义是：如果环境变量 `TODO_PORT` 存在且非空，就使用它；否则使用 `18080`。
 
-运行脚本时传入环境变量：
+`.env` 文件用于保存本地开发参数，例如端口、日志级别和临时开关。真实项目中通常提交 `.env.example`，但不提交 `.env`。
 
-```bash
-TODO_PORT=18081 ./scripts/dev.sh
-```
+### 3.3 位置参数与 `case`
 
-### 4.3 位置参数
-
-位置参数用于接收命令行参数：
+位置参数用于读取脚本参数：
 
 | 参数 | 含义 |
 |---|---|
@@ -191,281 +146,259 @@ TODO_PORT=18081 ./scripts/dev.sh
 | `$1` | 第 1 个参数 |
 | `$2` | 第 2 个参数 |
 | `$#` | 参数个数 |
-| `$@` | 所有参数，建议加双引号使用 |
+| `"$@"` | 所有参数，推荐带双引号使用 |
 
-示例：
-
-```bash
-#!/usr/bin/env bash
-name="${1:-world}"
-echo "hello $name"
-```
-
-运行：
+处理多个参数时，`case` 比一串 `if` 更清晰：
 
 ```bash
-bash hello.sh cloud
+case "$1" in
+  --logs) clean_logs=true ;;
+  --all) clean_all=true ;;
+  -h|--help) usage ;;
+  *) echo "unknown option: $1" >&2; exit 1 ;;
+esac
 ```
 
-输出：
+本篇的 `clean.sh` 会用参数控制是否清理日志和全部运行时目录。
 
-```text
-hello cloud
-```
+### 3.4 退出码
 
-### 4.4 退出码
-
-Shell 中，退出码决定一个命令是否成功。
+Shell 中，退出码决定命令是否成功：
 
 ```bash
-true
-echo $?
+$ true
+$ echo $?
+0
 
-false
-echo $?
+$ false
+$ echo $?
+1
 ```
 
-约定：
+约定如下：
 
 | 退出码 | 含义 |
-|---:|---|
+|---|---|
 | `0` | 成功 |
 | 非 `0` | 失败 |
 
-脚本中主动返回失败：
+CI/CD 判断脚本是否通过，主要看退出码。如果 `check.sh` 发现健康检查失败但最后 `exit 0`，流水线会误以为一切正常。
 
-```bash
-exit 1
-```
+### 3.5 条件、循环和函数
 
-CI/CD 判断脚本是否通过，主要就是看退出码。如果 `check.sh` 返回 `0`，流水线继续；如果返回 `1`，流水线失败。
-
-### 4.5 条件判断
-
-常见判断：
-
-```bash
-if [[ -f "go.mod" ]]; then
-  echo "go module exists"
-else
-  echo "go.mod not found"
-fi
-```
-
-常用文件判断：
+文件检查常用表达式如下：
 
 | 表达式 | 含义 |
 |---|---|
 | `-f file` | 普通文件存在 |
 | `-d dir` | 目录存在 |
-| `-x file` | 文件可执行 |
+| `-x file` | 文件存在且可执行 |
 | `-n "$var"` | 字符串非空 |
 | `-z "$var"` | 字符串为空 |
 
-判断命令是否存在：
+循环常用于批量检查命令或文件：
 
 ```bash
-if command -v go >/dev/null 2>&1; then
-  go version
-else
-  echo "go not found"
-fi
-```
-
-### 4.6 循环与函数
-
-循环适合批量处理：
-
-```bash
-for cmd in git go curl; do
-  if command -v "$cmd" >/dev/null 2>&1; then
-    echo "[ok] $cmd"
-  else
-    echo "[missing] $cmd"
-  fi
+for cmd in bash git go curl; do
+  command -v "$cmd" >/dev/null || echo "missing: $cmd"
 done
 ```
 
-函数适合复用逻辑：
+函数用于把重复逻辑命名：
 
 ```bash
 log() {
-  printf '[info] %s\n' "$*"
-}
-
-die() {
-  printf '[error] %s\n' "$*" >&2
-  exit 1
+  printf '[check] %s\n' "$*"
 }
 ```
 
-函数本质上是给一组命令命名。`dev.sh`、`check.sh`、`clean.sh` 都会大量使用函数。
+好的脚本会把“日志输出、失败退出、依赖检查、安全删除”封装成函数，而不是到处复制粘贴。
 
-### 4.7 文件、日志与管道
+### 3.6 管道、文件和日志处理
 
 管道把前一个命令的输出交给后一个命令：
 
 ```bash
-cat app.log | grep "ERROR"
+$ tail -n 50 .todo-platform/logs/todo-dev.log | grep -i error
 ```
 
-更常见写法：
+日志排查中常见组合如下：
 
 ```bash
-grep "ERROR" app.log
+$ grep -R "address already in use" .todo-platform/logs
+$ find .todo-platform -type f -maxdepth 3 -print
+$ awk '{print $1}' access.log | sort | uniq -c | sort -nr
 ```
 
-常用日志命令：
+管道很强大，也很容易隐藏错误。本篇会使用 `set -o pipefail`，让管道中任一命令失败都能被脚本感知。
 
-```bash
-tail -n 50 app.log
-grep -n "ERROR" app.log
-awk '{print $1, $2}' app.log
-sed 's/error/ERROR/g' app.log
-```
+## 4. 原理深入
 
-在排障中，脚本经常把 `grep`、`awk`、`sed`、`sort`、`uniq` 组合起来处理日志。
+### 4.1 脚本如何被执行
 
-## 5. 原理深入
-
-### 5.1 Shell 脚本如何执行
-
-当你执行：
-
-```bash
-./scripts/check.sh
-```
-
-系统大致经历：
+执行脚本时，操作系统会读取 shebang，找到解释器，然后由解释器逐行执行命令。
 
 ```mermaid
 flowchart LR
-    User["用户执行脚本"]
-    Kernel["内核读取 shebang"]
-    Bash["启动 bash 解释器"]
-    Script["逐行解析脚本"]
-    Commands["执行 git / go / curl 等命令"]
-    Exit["返回退出码"]
-
-    User --> Kernel --> Bash --> Script --> Commands --> Exit
+    User["用户执行\n./scripts/check.sh"] --> Kernel["操作系统读取 shebang"]
+    Kernel --> Bash["bash 解释脚本"]
+    Bash --> Cmd["执行 git/go/curl 等命令"]
+    Cmd --> Code["返回退出码"]
 ```
 
-脚本不是一次性编译成二进制，而是由解释器读取并执行。脚本中的每个外部命令，例如 `go`、`curl`、`grep`，都会再启动对应进程。
+脚本不是编译后的二进制文件。它每调用一次外部命令，例如 `go`、`curl`、`grep`，通常都会启动一个新进程。这也是为什么脚本适合编排命令，不适合承载复杂业务逻辑。
 
-### 5.2 为什么要使用 `set -euo pipefail`
+### 4.2 `set -Eeuo pipefail` 的边界
 
-很多生产事故来自脚本失败后继续执行。
-
-推荐在 Bash 脚本开头写：
+生产脚本常见开头如下：
 
 ```bash
 set -Eeuo pipefail
 ```
-
-含义：
 
 | 选项 | 作用 |
 |---|---|
 | `-e` | 命令失败时尽快退出 |
-| `-E` | 让 ERR trap 在函数中也生效 |
+| `-E` | 让 `ERR` trap 在函数中也生效 |
 | `-u` | 使用未定义变量时报错 |
 | `-o pipefail` | 管道中任一命令失败，整个管道失败 |
 
-示例：
+没有 `pipefail` 时，下面这种命令可能看起来成功：
 
 ```bash
-set -o pipefail
-grep "ERROR" missing.log | wc -l
-echo $?
+$ grep "ERROR" missing.log | wc -l
 ```
 
-如果没有 `pipefail`，`wc -l` 可能成功，导致整个管道看起来成功。生产脚本中这会掩盖真实错误。
+如果最后的 `wc -l` 成功，整条管道可能返回成功，前面的 `grep` 失败被掩盖。`pipefail` 可以降低这种风险。
 
-`-E` 通常和 `trap ERR` 配合使用，用来在脚本失败时输出更清晰的诊断信息：
+但严格模式不是万能的。允许失败的命令要显式处理：
 
 ```bash
-#!/usr/bin/env bash
-set -Eeuo pipefail
-
-on_error() {
-  local line="$1"
-  printf 'script failed at line %s\n' "$line" >&2
-}
-
-trap 'on_error "$LINENO"' ERR
-
-prepare() {
-  grep "ERROR" missing.log
-}
-
-prepare
+if ! curl -fsS "$url" >/dev/null; then
+  echo "health check failed" >&2
+  exit 1
+fi
 ```
 
-为什么这样做：函数里的命令失败时，`-E` 会让 `ERR` trap 也生效。真实 CI/CD 中，失败日志如果只显示“命令返回 1”，排障成本会很高；加上失败行号和上下文，能更快定位问题。
+### 4.3 `.env` 的收益与风险
 
-### 5.3 退出码如何影响 CI/CD
+`.env` 可以让开发者不用每次输入端口和开关：
 
-CI/CD 平台不会理解你的中文日志，它主要看命令退出码。
-
-```mermaid
-flowchart TD
-    Start["CI 执行 check.sh"]
-    Check["脚本执行检查"]
-    Code{"退出码是否为 0"}
-    Pass["流水线继续"]
-    Fail["流水线失败并阻止合并"]
-
-    Start --> Check --> Code
-    Code -->|是| Pass
-    Code -->|否| Fail
+```text
+TODO_HOST=127.0.0.1
+TODO_PORT=18080
+TODO_REQUIRE_SHELLCHECK=false
 ```
 
-这就是为什么 `check.sh` 必须清晰返回退出码。只打印“失败了”但最后 `exit 0`，对自动化系统来说仍然是成功。
+但 `.env` 也容易带来两个风险：
 
-### 5.4 幂等性
+- 把真实密码、Token、kubeconfig 路径提交到 Git。
+- 使用 `source .env` 时，如果 `.env` 不是可信文件，里面的命令可能被执行。
 
-幂等性表示同一个脚本执行多次，结果仍然可控。
+本篇只解析简单的 `KEY=VALUE` 行，并且提交 `.env.example` 而不是 `.env`。后续涉及真实密钥时，应使用 Secret Manager、Kubernetes Secret 或 CI/CD 平台的加密变量。
 
-好的脚本：
+本篇的 `.env` 解析器刻意保持简单，只支持普通 `KEY=VALUE` 和双引号包裹的值，不支持 `export KEY=value`、变量插值、命令替换或多行值。这样做是为了避免把 `.env` 当成脚本执行。
+
+### 4.4 幂等性与安全清理
+
+幂等性是指同一操作执行多次，结果仍然可预期。
 
 ```bash
-mkdir -p logs
+$ mkdir -p .todo-platform/logs
+$ mkdir -p .todo-platform/logs
 ```
 
-重复执行不会失败。
+第二次执行不会报错，这就是幂等。
 
-不好的脚本：
+清理脚本更需要防御式设计。下面这种命令很危险：
 
 ```bash
-mkdir logs
+rm -rf "$target"
 ```
 
-第二次执行可能因为目录已存在而失败。
+如果 `target` 为空、拼错或指向错误目录，可能造成严重事故。更安全的做法是先确认路径非空，并限制只能删除项目运行时目录。
 
-本篇的 `dev.sh` 会检查服务是否已经运行；`clean.sh` 会检查 PID 是否存在；这些都是幂等性设计。
+### 4.5 Shell 与后续云原生工具的关系
 
-### 5.5 Shell 脚本与后续课程的关系
+Shell 不会替代 Docker、Kubernetes、Helm 或 Operator，但它会出现在所有阶段：
 
-后续课程会大量使用脚本：
-
-| 后续阶段 | Shell 脚本用途 |
+| 阶段 | Shell 用途 |
 |---|---|
-| Go 开发 | 启动服务、运行测试、生成代码 |
-| Docker | 构建镜像、扫描镜像、清理容器 |
-| Kubernetes | 部署 YAML、检查 Pod、收集日志 |
-| Helm | install、upgrade、rollback |
-| CI/CD | 封装流水线步骤 |
-| Operator | 安装 CRD、运行 envtest、部署 Controller |
+| Go 开发 | 启动服务、执行测试、生成代码 |
+| Docker | 构建镜像、运行 Compose、清理容器 |
+| Kubernetes | 包装 `kubectl get/logs/describe/rollout` |
+| CI/CD | 串联检查、构建、扫描和发布步骤 |
+| Operator | 执行 codegen、envtest、本地调试 |
 
-本篇的 3 个脚本是后续自动化能力的第一块积木。
+因此，本篇不是“学几个 Shell 语法”，而是为后续工程化动作建立可复用入口。
 
-## 6. 手把手实验
+## 5. 手把手实验
 
-本实验会在 `cloud-native-todo-platform` 仓库中创建：
+### 5.1 实验目标
+
+本实验会在 `cloud-native-todo-platform` 仓库中创建一套本地自动化脚本：
+
+- `.env.example`：声明可配置环境变量。
+- `scripts/dev.sh`：生成最小 Go HTTP 服务，构建二进制并后台启动。
+- `scripts/check.sh`：检查工具、文件、权限、Git 状态和 `/healthz`。
+- `scripts/clean.sh`：清理进程、日志和运行时目录。
+- `.github/workflows/scripts-check.yml`：可选 CI 检查脚本语法和 ShellCheck。
+
+完成后，你可以用一组固定命令启动、检查和清理本地 Todo 服务。
+
+预计耗时：45 到 70 分钟。
+
+### 5.2 实验环境
+
+本实验应在 `cloud-native-todo-platform` 项目仓库中执行，不是在课程文档仓库中执行。如果当前目录是 `cloud-native-todo-platform-docs` 或 `docs`，请先切换到真实项目仓库。
+
+| 项目 | 要求 |
+|---|---|
+| 系统 | Linux、WSL2 Ubuntu 或 macOS |
+| Shell | Bash 5.x 优先，macOS Bash 3.2 也可运行本实验 |
+| Git | 已完成第 5 篇 Git 工作流 |
+| Go | 1.22+，用于构建最小 HTTP 服务 |
+| curl | 用于 HTTP 健康检查 |
+| 可选 | ShellCheck，用于脚本静态检查 |
+
+确认工具版本：
+
+```bash
+$ bash --version | head -n 1
+$ git --version
+$ go version
+$ curl --version | head -n 1
+```
+
+如果使用 WSL2：
+
+```bash
+$ cd ~/workspace/cloud-native-todo-platform
+```
+
+如果使用 macOS：
+
+```bash
+$ cd ~/workspace/cloud-native-todo-platform
+```
+
+Windows 学员建议进入 WSL2 后执行本实验：
+
+```powershell
+PS> wsl
+```
+
+### 5.3 文件目录结构
+
+实验完成后的结构如下：
 
 ```text
 cloud-native-todo-platform/
-├── go.mod
+├── .env.example
+├── .gitignore
+├── .github/
+│   └── workflows/
+│       └── scripts-check.yml
 ├── cmd/
 │   └── todo-dev-server/
 │       └── main.go
@@ -482,140 +415,39 @@ cloud-native-todo-platform/
         └── todo-dev.pid
 ```
 
-其中：
+说明：
 
-- `go.mod` 是 Go 模块文件；如果仓库里还没有它，`dev.sh` 会为本实验自动生成。
-- `cmd/todo-dev-server/main.go` 是脚本自动生成的最小 Go HTTP 服务。
-- `scripts/dev.sh` 用于启动本地开发服务。
-- `scripts/check.sh` 用于检查依赖、脚本权限和健康状态。
-- `scripts/clean.sh` 用于清理开发进程和临时文件。
-- `.todo-platform/bin/` 保存本地构建出的二进制文件。
+- `cmd/todo-dev-server/main.go` 是本篇脚本自动生成的最小 Go HTTP 服务。
 - `.todo-platform/` 是本地运行时目录，不应该提交到 Git。
+- `.env.example` 可以提交，`.env` 不应该提交。
+- `.github/workflows/scripts-check.yml` 是可选 CI 文件，如果暂时不用 GitHub Actions，可以先不提交。
 
-### 6.1 实验目标
+### 5.4 完整代码和配置
 
-完成后，你应该能够：
+`.env.example`：
 
-- 一条命令启动 Todo Demo 服务。
-- 一条命令检查本地开发环境。
-- 一条命令清理开发进程和日志。
-- 通过退出码判断脚本成功或失败。
-- 理解脚本中的变量、函数、条件、循环和安全写法。
-
-### 6.2 实验环境
-
-注意：本实验应该在 `cloud-native-todo-platform` 项目仓库中执行，不是在课程文档仓库中执行。如果你当前目录是 `cloud-native-todo-platform-docs` 或 `docs`，请先切换到真实项目仓库。
-
-检查工具：
-
-```bash
-git --version
-go version
-curl --version
-bash --version
+```text title=".env.example"
+TODO_HOST=127.0.0.1
+TODO_PORT=18080
+TODO_REQUIRE_SHELLCHECK=false
 ```
 
-进入项目仓库：
+`scripts/dev.sh`：
 
-=== "Linux / macOS / WSL2"
-
-    ```bash
-    cd ~/workspace/cloud-native-todo-platform
-    ```
-
-=== "Windows PowerShell + WSL2"
-
-    ```powershell
-    wsl
-    cd ~/workspace/cloud-native-todo-platform
-    ```
-
-如果仓库还没有 Git 初始化：
-
-```bash
-git init -b main
-```
-
-### 6.3 创建脚本目录
-
-```bash
-mkdir -p scripts
-```
-
-为什么要这样做：项目脚本统一放到 `scripts/`，后续 CI/CD 和文档都可以引用固定路径，避免命令散落在 README、个人笔记或聊天记录里。
-
-### 6.4 热身：编写最小退出码脚本
-
-正式写项目脚本前，先用一个很小的脚本理解参数和退出码。
-
-```bash
-cat > scripts/exit-code-demo.sh <<'EOF'
-#!/usr/bin/env bash
-set -Eeuo pipefail
-
-mode="${1:-ok}"
-
-if [[ "$mode" == "ok" ]]; then
-  echo "demo success"
-  exit 0
-fi
-
-echo "demo failed" >&2
-exit 1
-EOF
-
-chmod +x scripts/exit-code-demo.sh
-```
-
-运行成功场景：
-
-```bash
-./scripts/exit-code-demo.sh ok
-echo $?
-```
-
-预期输出：
-
-```text
-demo success
-0
-```
-
-运行失败场景：
-
-```bash
-./scripts/exit-code-demo.sh fail || echo "exit code: $?"
-```
-
-预期输出：
-
-```text
-demo failed
-exit code: 1
-```
-
-为什么先做这个热身：后面的 `check.sh` 本质上也是把多个检查项汇总成一个最终退出码，CI/CD 会根据这个退出码决定 PR 能不能继续合并。
-
-### 6.5 编写 `dev.sh`
-
-`dev.sh` 负责生成最小 Go 服务、构建二进制文件并启动它。
-
-```bash
-cat > scripts/dev.sh <<'EOF'
+```bash title="scripts/dev.sh"
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ENV_FILE="$ROOT_DIR/.env"
 APP_DIR="$ROOT_DIR/cmd/todo-dev-server"
 BIN_DIR="$ROOT_DIR/.todo-platform/bin"
 RUN_DIR="$ROOT_DIR/.todo-platform/run"
 LOG_DIR="$ROOT_DIR/.todo-platform/logs"
 BIN_FILE="$BIN_DIR/todo-dev-server"
 PID_FILE="$RUN_DIR/todo-dev.pid"
+ADDR_FILE="$RUN_DIR/todo-dev.addr"
 LOG_FILE="$LOG_DIR/todo-dev.log"
-HOST="${TODO_HOST:-127.0.0.1}"
-PORT="${TODO_PORT:-18080}"
-ADDR="$HOST:$PORT"
 
 log() {
   printf '[dev] %s\n' "$*"
@@ -637,9 +469,34 @@ need_cmd() {
   command -v "$1" >/dev/null 2>&1 || die "missing command: $1"
 }
 
+load_env() {
+  [[ -f "$ENV_FILE" ]] || return 0
+
+  while IFS='=' read -r key value || [[ -n "$key" ]]; do
+    key="${key%$'\r'}"
+    value="${value%$'\r'}"
+    [[ -n "$key" ]] || continue
+    [[ "$key" == \#* ]] && continue
+    [[ "$key" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] || continue
+
+    value="${value#\"}"
+    value="${value%\"}"
+
+    if [[ -z "${!key:-}" ]]; then
+      export "$key=$value"
+    fi
+  done < "$ENV_FILE"
+}
+
 read_pid() {
   if [[ -f "$PID_FILE" ]]; then
     cat "$PID_FILE"
+  fi
+}
+
+read_addr() {
+  if [[ -f "$ADDR_FILE" ]]; then
+    cat "$ADDR_FILE"
   fi
 }
 
@@ -647,6 +504,14 @@ is_running() {
   local pid
   pid="$(read_pid || true)"
   [[ "$pid" =~ ^[0-9]+$ ]] && kill -0 "$pid" 2>/dev/null
+}
+
+validate_port() {
+  local port="$1"
+  local port_num
+  [[ "$port" =~ ^[0-9]+$ ]] || die "invalid TODO_PORT: $port"
+  port_num=$((10#$port))
+  (( port_num >= 1 && port_num <= 65535 )) || die "TODO_PORT out of range: $port"
 }
 
 write_demo_app() {
@@ -681,7 +546,7 @@ func main() {
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(map[string]string{
-			"status": "ok",
+			"status":  "ok",
 			"service": "todo-dev-server",
 		})
 	})
@@ -734,23 +599,40 @@ build_app() {
 }
 
 main() {
+  load_env
+
+  local host="${TODO_HOST:-127.0.0.1}"
+  local port="${TODO_PORT:-18080}"
+  validate_port "$port"
+  local addr="$host:$port"
+
   need_cmd go
+  need_cmd curl
 
   mkdir -p "$BIN_DIR" "$RUN_DIR" "$LOG_DIR"
 
   if is_running; then
-    log "todo dev server already running: pid=$(read_pid), url=http://$ADDR"
+    local running_addr
+    running_addr="$(read_addr || true)"
+    running_addr="${running_addr:-http://$addr}"
+
+    if [[ "$running_addr" != "http://$addr" ]]; then
+      die "todo dev server already running at $running_addr; run ./scripts/clean.sh --all before changing address to http://$addr"
+    fi
+
+    log "todo dev server already running: pid=$(read_pid), url=$running_addr"
     exit 0
   fi
 
   write_demo_app
   build_app
 
-  log "starting todo dev server on http://$ADDR"
+  log "starting todo dev server on http://$addr"
   (
     cd "$ROOT_DIR"
-    TODO_ADDR="$ADDR" nohup "$BIN_FILE" >"$LOG_FILE" 2>&1 &
+    TODO_ADDR="$addr" nohup "$BIN_FILE" >"$LOG_FILE" 2>&1 &
     echo "$!" >"$PID_FILE"
+    printf 'http://%s\n' "$addr" >"$ADDR_FILE"
   )
 
   sleep 2
@@ -760,45 +642,27 @@ main() {
     die "todo dev server failed to start"
   fi
 
-  if command -v curl >/dev/null 2>&1; then
-    curl -fsS "http://$ADDR/healthz" >/dev/null || die "health check failed"
-  fi
+  curl -fsS "http://$addr/healthz" >/dev/null || die "health check failed"
 
   log "started: pid=$(read_pid)"
-  log "health: http://$ADDR/healthz"
-  log "todos:  http://$ADDR/todos"
+  log "health: http://$addr/healthz"
+  log "todos:  http://$addr/todos"
   log "log:    $LOG_FILE"
 }
 
 main "$@"
-EOF
 ```
 
-关键点解释：
+`dev.sh` 会把进程号写入 `todo-dev.pid`，把真实访问地址写入 `todo-dev.addr`。如果服务已经运行，再用不同端口启动，脚本会提示先清理旧进程，避免输出一个并不存在的“新端口已运行”。
 
-- `set -Eeuo pipefail` 让脚本尽早暴露错误。
-- `ROOT_DIR` 通过脚本路径计算项目根目录，避免依赖当前终端所在目录。
-- `TODO_HOST` 和 `TODO_PORT` 可以通过环境变量覆盖默认监听地址。
-- `PID_FILE` 用于记录服务进程，方便后续清理。
-- `LOG_FILE` 保存服务日志，方便排障。
-- `write_demo_app` 只有在 Go 文件不存在时才生成，避免覆盖学习者后续代码。
-- `trap 'on_error "$LINENO"' ERR` 在脚本失败时输出失败行号，便于定位问题。
-- `go build -o "$BIN_FILE"` 先生成二进制文件，再启动二进制文件。这样 `PID_FILE` 记录的是实际服务进程，而不是 `go run` 的包装进程。
-- 如果项目还没有 `go.mod`，脚本会生成一个最小模块文件，保证本篇实验可以独立运行。后续第 7 篇会正式整理 Go 模块和业务代码。
+`scripts/check.sh`：
 
-### 6.6 编写 `check.sh`
-
-`check.sh` 负责检查开发环境、项目结构和服务健康状态。
-
-```bash
-cat > scripts/check.sh <<'EOF'
+```bash title="scripts/check.sh"
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-HOST="${TODO_HOST:-127.0.0.1}"
-PORT="${TODO_PORT:-18080}"
-ADDR="$HOST:$PORT"
+ENV_FILE="$ROOT_DIR/.env"
 STATUS=0
 
 info() {
@@ -816,6 +680,25 @@ warn() {
 fail() {
   printf '[check][fail] %s\n' "$*" >&2
   STATUS=1
+}
+
+load_env() {
+  [[ -f "$ENV_FILE" ]] || return 0
+
+  while IFS='=' read -r key value || [[ -n "$key" ]]; do
+    key="${key%$'\r'}"
+    value="${value%$'\r'}"
+    [[ -n "$key" ]] || continue
+    [[ "$key" == \#* ]] && continue
+    [[ "$key" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] || continue
+
+    value="${value#\"}"
+    value="${value%\"}"
+
+    if [[ -z "${!key:-}" ]]; then
+      export "$key=$value"
+    fi
+  done < "$ENV_FILE"
 }
 
 check_cmd() {
@@ -853,8 +736,60 @@ check_git_repo() {
   fi
 }
 
+check_gitignore() {
+  if [[ -f "$ROOT_DIR/.gitignore" ]] && grep -qxF ".todo-platform/" "$ROOT_DIR/.gitignore"; then
+    ok ".todo-platform/ is ignored"
+  else
+    fail ".todo-platform/ is not ignored by .gitignore"
+  fi
+}
+
+check_syntax() {
+  local file
+  for file in scripts/dev.sh scripts/check.sh scripts/clean.sh; do
+    if bash -n "$ROOT_DIR/$file"; then
+      ok "$file syntax ok"
+    else
+      fail "$file syntax error"
+    fi
+  done
+}
+
+check_shellcheck() {
+  if command -v shellcheck >/dev/null 2>&1; then
+    shellcheck "$ROOT_DIR"/scripts/*.sh || fail "shellcheck reported issues"
+    return
+  fi
+
+  if [[ "${TODO_REQUIRE_SHELLCHECK:-false}" == "true" ]]; then
+    fail "shellcheck is required but not installed"
+  else
+    warn "shellcheck not installed; skipped"
+  fi
+}
+
+validate_port() {
+  local port="$1"
+  local port_num
+  if [[ ! "$port" =~ ^[0-9]+$ ]]; then
+    fail "invalid TODO_PORT: $port"
+    return 1
+  fi
+
+  port_num=$((10#$port))
+  if (( port_num < 1 || port_num > 65535 )); then
+    fail "TODO_PORT out of range: $port"
+    return 1
+  fi
+}
+
 check_health() {
-  local url="http://$ADDR/healthz"
+  local host="${TODO_HOST:-127.0.0.1}"
+  local port="${TODO_PORT:-18080}"
+  local url="http://$host:$port/healthz"
+
+  validate_port "$port" || return
+
   info "checking $url"
 
   if curl -fsS "$url" >/dev/null; then
@@ -865,22 +800,25 @@ check_health() {
 }
 
 main() {
+  load_env
+
   info "root: $ROOT_DIR"
 
-  for cmd in bash git go curl; do
+  for cmd in bash git go curl grep; do
     check_cmd "$cmd"
   done
 
   check_git_repo
-
+  check_file ".env.example"
   check_file "scripts/dev.sh"
   check_file "scripts/check.sh"
   check_file "scripts/clean.sh"
-
   check_executable "scripts/dev.sh"
   check_executable "scripts/check.sh"
   check_executable "scripts/clean.sh"
-
+  check_gitignore
+  check_syntax
+  check_shellcheck
   check_health
 
   if [[ "$STATUS" -ne 0 ]]; then
@@ -892,22 +830,13 @@ main() {
 }
 
 main "$@"
-EOF
 ```
 
-关键点解释：
+`check.sh` 会在发起 HTTP 请求前校验 `TODO_PORT`。如果 `.env` 中写成 `TODO_PORT=abc`，脚本会报告端口配置错误，而不是笼统地说健康检查失败。
 
-- `STATUS=0` 表示当前检查结果成功。
-- 每个失败项调用 `fail`，把 `STATUS` 改为 `1`。
-- 脚本最后统一 `exit "$STATUS"`，这样 CI/CD 可以根据退出码判断结果。
-- `git -C "$ROOT_DIR"` 表示在项目根目录执行 Git 命令，不依赖当前目录。
+`scripts/clean.sh`：
 
-### 6.7 编写 `clean.sh`
-
-`clean.sh` 负责清理开发服务进程和运行时文件。
-
-```bash
-cat > scripts/clean.sh <<'EOF'
+```bash title="scripts/clean.sh"
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
@@ -915,7 +844,11 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 RUNTIME_DIR="$ROOT_DIR/.todo-platform"
 RUN_DIR="$RUNTIME_DIR/run"
 LOG_DIR="$RUNTIME_DIR/logs"
+BIN_FILE="$RUNTIME_DIR/bin/todo-dev-server"
 PID_FILE="$RUN_DIR/todo-dev.pid"
+ADDR_FILE="$RUN_DIR/todo-dev.addr"
+CLEAN_LOGS="${TODO_CLEAN_LOGS:-false}"
+CLEAN_ALL="${TODO_CLEAN_ALL:-false}"
 
 log() {
   printf '[clean] %s\n' "$*"
@@ -937,10 +870,47 @@ on_error() {
 
 trap 'on_error "$LINENO"' ERR
 
+usage() {
+  cat <<'USAGE'
+Usage: ./scripts/clean.sh [--logs] [--all]
+
+Options:
+  --logs   remove log files under .todo-platform/logs
+  --all    remove the whole .todo-platform runtime directory
+  -h, --help
+USAGE
+}
+
+parse_args() {
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --logs)
+        CLEAN_LOGS=true
+        ;;
+      --all)
+        CLEAN_LOGS=true
+        CLEAN_ALL=true
+        ;;
+      -h|--help)
+        usage
+        exit 0
+        ;;
+      *)
+        die "unknown option: $1"
+        ;;
+    esac
+    shift
+  done
+}
+
 read_pid() {
   if [[ -f "$PID_FILE" ]]; then
     cat "$PID_FILE"
   fi
+}
+
+clear_run_files() {
+  rm -f "$PID_FILE" "$ADDR_FILE"
 }
 
 safe_rm_dir() {
@@ -956,19 +926,36 @@ safe_rm_dir() {
   rm -rf "$target"
 }
 
+process_matches() {
+  local pid="$1"
+
+  if [[ -r "/proc/$pid/cmdline" ]]; then
+    tr '\0' ' ' < "/proc/$pid/cmdline" | grep -F -- "$BIN_FILE" >/dev/null
+    return
+  fi
+
+  return 0
+}
+
 stop_process() {
   local pid
   pid="$(read_pid || true)"
 
   if [[ ! "$pid" =~ ^[0-9]+$ ]]; then
     log "no valid pid file found"
-    rm -f "$PID_FILE"
+    clear_run_files
     return
   fi
 
   if ! kill -0 "$pid" 2>/dev/null; then
     log "process $pid is not running"
-    rm -f "$PID_FILE"
+    clear_run_files
+    return
+  fi
+
+  if ! process_matches "$pid"; then
+    warn "pid $pid does not look like todo-dev-server; removing stale run files only"
+    clear_run_files
     return
   fi
 
@@ -978,7 +965,7 @@ stop_process() {
   for _ in 1 2 3 4 5; do
     if ! kill -0 "$pid" 2>/dev/null; then
       log "process $pid stopped"
-      rm -f "$PID_FILE"
+      clear_run_files
       return
     fi
     sleep 1
@@ -986,20 +973,21 @@ stop_process() {
 
   warn "process $pid did not stop gracefully; sending SIGKILL"
   kill -9 "$pid" 2>/dev/null || true
-  rm -f "$PID_FILE"
+  clear_run_files
 }
 
 main() {
+  parse_args "$@"
   stop_process
 
-  if [[ "${TODO_CLEAN_LOGS:-false}" == "true" ]]; then
+  if [[ "$CLEAN_LOGS" == "true" ]]; then
     log "removing logs: $LOG_DIR"
     safe_rm_dir "$LOG_DIR"
   else
     log "keep logs: $LOG_DIR"
   fi
 
-  if [[ "${TODO_CLEAN_ALL:-false}" == "true" ]]; then
+  if [[ "$CLEAN_ALL" == "true" ]]; then
     log "removing runtime directory: $RUNTIME_DIR"
     safe_rm_dir "$RUNTIME_DIR"
   fi
@@ -1008,402 +996,32 @@ main() {
 }
 
 main "$@"
-EOF
 ```
 
-关键点解释：
+`clean.sh` 在 Linux/WSL2 中会通过 `/proc/$pid/cmdline` 校验 PID 是否像本篇启动的 `todo-dev-server`。这可以降低 PID 文件过旧、PID 被系统复用时误杀其他进程的风险；macOS 默认没有 `/proc`，本篇脚本会跳过这一步，生产脚本应按平台补充等价校验。
 
-- 先尝试普通 `kill`，给进程优雅退出机会。
-- 多次检查进程是否还存在。
-- 最后才使用 `kill -9`。
-- 默认不删除日志，只有设置 `TODO_CLEAN_LOGS=true` 才清理日志。
-- `safe_rm_dir` 会拒绝删除 `.todo-platform` 之外的路径，避免变量错误导致误删。
+可选 CI 文件 `.github/workflows/scripts-check.yml`：
 
-### 6.8 授予执行权限
-
-```bash
-chmod +x scripts/dev.sh scripts/check.sh scripts/clean.sh
-```
-
-验证：
-
-```bash
-ls -l scripts
-```
-
-预期能看到类似：
-
-```text
--rwxr-xr-x  dev.sh
--rwxr-xr-x  check.sh
--rwxr-xr-x  clean.sh
-```
-
-### 6.9 运行脚本
-
-启动服务：
-
-```bash
-./scripts/dev.sh
-```
-
-预期输出：
-
-```text
-[dev] starting todo dev server on http://127.0.0.1:18080
-[dev] started: pid=<PID>
-[dev] health: http://127.0.0.1:18080/healthz
-[dev] todos:  http://127.0.0.1:18080/todos
-```
-
-检查环境和服务：
-
-```bash
-./scripts/check.sh
-echo $?
-```
-
-预期输出包含：
-
-```text
-[check][ok] all checks passed
-0
-```
-
-访问接口：
-
-```bash
-curl -i http://127.0.0.1:18080/healthz
-curl -i http://127.0.0.1:18080/todos
-```
-
-清理服务：
-
-```bash
-./scripts/clean.sh
-```
-
-带日志清理：
-
-```bash
-TODO_CLEAN_LOGS=true ./scripts/clean.sh
-```
-
-### 6.10 修改端口运行
-
-如果 `18080` 被占用：
-
-```bash
-TODO_PORT=18081 ./scripts/dev.sh
-TODO_PORT=18081 ./scripts/check.sh
-./scripts/clean.sh
-```
-
-为什么 `dev.sh` 和 `check.sh` 都要带同一个端口：启动服务时监听 `18081`，健康检查也必须访问 `18081`。`clean.sh` 按 PID 文件清理服务进程，不依赖端口，所以不需要 `TODO_PORT`。
-
-### 6.11 查看日志
-
-查看最近日志：
-
-```bash
-tail -n 50 .todo-platform/logs/todo-dev.log
-```
-
-搜索错误：
-
-```bash
-grep -n "error\\|failed\\|panic" .todo-platform/logs/todo-dev.log || true
-```
-
-统计日志行数：
-
-```bash
-wc -l .todo-platform/logs/todo-dev.log
-```
-
-### 6.12 提交脚本
-
-运行检查：
-
-```bash
-./scripts/dev.sh
-./scripts/check.sh
-./scripts/clean.sh
-```
-
-查看 Git 状态：
-
-```bash
-git status --short
-```
-
-建议提交：
-
-```bash
-git add scripts/dev.sh scripts/check.sh scripts/clean.sh
-git commit -m "chore: add local development scripts" -m "Refs #4"
-```
-
-如果你决定把 `cmd/todo-dev-server/main.go` 也作为正式示例提交：
-
-```bash
-git add cmd/todo-dev-server/main.go
-git commit -m "chore: add todo dev server demo" -m "Refs #4"
-```
-
-本课程建议先把脚本作为本篇产出；后续第 7 篇会正式进入 Go 业务代码。
-
-### 6.13 清理步骤
-
-停止服务并删除日志：
-
-```bash
-TODO_CLEAN_LOGS=true ./scripts/clean.sh
-```
-
-删除全部本地运行时目录：
-
-```bash
-TODO_CLEAN_ALL=true ./scripts/clean.sh
-```
-
-如果只是在实验，不想保留脚本，建议分步删除并先查看状态：
-
-```bash
-pwd
-git status --short
-printf 'current directory: %s\n' "$PWD"
-test -f go.mod || { echo "not in project root"; exit 1; }
-test -d .todo-platform && find .todo-platform -maxdepth 2 -type f | head
-rm -rf .todo-platform
-rm -rf cmd/todo-dev-server
-rm -f scripts/dev.sh scripts/check.sh scripts/clean.sh scripts/exit-code-demo.sh
-```
-
-!!! warning "删除前必须确认目录"
-    这组 `rm -rf` 只允许在 `cloud-native-todo-platform` 项目根目录执行。执行前至少确认 `pwd`、`git status --short` 和 `go.mod`，不要在 `/`、`$HOME`、`/tmp` 或不确定目录中复制粘贴删除命令。真实项目中更推荐用 Git 丢弃未提交的实验文件，或让清理脚本像本篇 `safe_rm_dir` 一样限制可删除路径。
-
-## 7. 真实工作案例
-
-假设 Todo 平台团队进入 Go API 开发阶段，团队需要一个统一的本地开发入口。
-
-真实流程可能是：
-
-1. 后端开发执行 `./scripts/dev.sh` 启动本地 API。
-2. 测试同学执行 `./scripts/check.sh` 确认环境、脚本权限和健康检查。
-3. 如果服务异常，开发查看 `.todo-platform/logs/todo-dev.log`。
-4. 切换分支或重启服务前，执行 `./scripts/clean.sh` 清理旧进程。
-5. CI/CD 中复用 `check.sh` 的部分检查逻辑，确保脚本本身可执行。
-6. 后续 Docker 章节把 `dev.sh` 替换为 `docker compose up`。
-7. Kubernetes 章节把健康检查逻辑升级为 `kubectl rollout status` 和 `kubectl get pods`。
-
-职责边界如下：
-
-| 角色 | 关注点 |
-|---|---|
-| 后端开发 | 本地启动、日志、健康检查、脚本可维护性 |
-| 测试 | 环境一致性、检查项是否可重复执行 |
-| DevOps | 脚本是否可放入 CI/CD，退出码是否正确 |
-| SRE | 故障时能否快速定位进程、端口和日志 |
-| 安全同学 | 脚本是否泄露密钥，是否存在危险删除和命令注入 |
-
-这就是 Shell 脚本的真实价值：把团队共识固化为可以执行、可以失败、可以排查的自动化入口。
-
-## 8. 常见错误
-
-| 错误 | 现象 | 原因 |
-|---|---|---|
-| 变量两侧加空格 | `command not found` | Shell 把变量名当命令 |
-| 未引用变量 | 文件名有空格时脚本异常 | 没使用 `"$var"` |
-| 忘记 `chmod +x` | `Permission denied` | 脚本没有执行权限 |
-| 没有 shebang | 不同 Shell 执行结果不同 | 未指定解释器 |
-| 忽略退出码 | CI 显示成功但实际失败 | 脚本最后返回了 `0` |
-| 管道隐藏失败 | 前面的命令失败但整体成功 | 没有 `set -o pipefail` |
-| 使用危险 `rm -rf "$dir"` | 变量为空时误删 | 未校验路径 |
-| 滥用 `eval` | 命令注入风险 | 把字符串当命令执行 |
-| 在脚本中打印密钥 | CI 日志泄露 Token | 使用 `set -x` 或 echo 敏感变量 |
-| 脚本依赖当前目录 | 换目录执行就失败 | 没有计算项目根目录 |
-
-新手最容易忽略的是退出码。脚本打印“检查失败”但最后没有 `exit 1`，对自动化系统来说仍然是成功。
-
-## 9. 排障方法
-
-### 9.1 脚本没有执行权限
-
-现象：
-
-```text
-Permission denied
-```
-
-排查：
-
-```bash
-ls -l scripts/dev.sh
-```
-
-如果没有 `x` 权限：
-
-```bash
-chmod +x scripts/dev.sh
-```
-
-### 9.2 找不到命令
-
-现象：
-
-```text
-go: command not found
-```
-
-排查：
-
-```bash
-command -v go
-echo "$PATH"
-```
-
-修复方向：
-
-- 安装缺失工具。
-- 确认终端加载了正确的环境变量。
-- 在 CI 中显式安装工具版本。
-
-### 9.3 端口被占用
-
-现象：
-
-```text
-bind: address already in use
-```
-
-排查：
-
-```bash
-ss -lntp | grep 18080 || true
-lsof -iTCP:18080 -sTCP:LISTEN || true
-```
-
-修复方向：
-
-```bash
-./scripts/clean.sh
-```
-
-或换端口：
-
-```bash
-TODO_PORT=18081 ./scripts/dev.sh
-```
-
-### 9.4 健康检查失败
-
-排查：
-
-```bash
-./scripts/check.sh
-echo $?
-tail -n 80 .todo-platform/logs/todo-dev.log
-curl -v http://127.0.0.1:18080/healthz
-```
-
-判断依据：
-
-- `echo $?` 是 `0` 表示脚本成功。
-- `curl -v` 可以看到连接是否成功、HTTP 状态码是什么。
-- 日志中如果有 `address already in use`，说明端口冲突。
-
-### 9.5 脚本在 macOS 和 Linux 表现不同
-
-常见原因：
-
-- `sed -i` 在 macOS 和 Linux 参数不同。
-- macOS 自带 Bash 版本较旧。
-- 某些 GNU 工具在 macOS 上不存在。
-
-排查：
-
-```bash
-bash --version
-uname -a
-sed --version 2>/dev/null || true
-```
-
-修复方向：
-
-- 尽量使用跨平台写法。
-- 复杂文本处理交给 Go、Python 或专门工具。
-- 在 README 中声明脚本支持的系统。
-
-### 9.6 调试脚本
-
-临时开启调试：
-
-```bash
-bash -x scripts/check.sh
-```
-
-脚本内部局部调试：
-
-```bash
-set -x
-# commands
-set +x
-```
-
-注意：不要在处理密码、Token、Kubeconfig 时开启 `set -x`，否则敏感信息可能进入日志。
-
-## 10. 生产环境注意事项
-
-Shell 脚本进入生产环境后，风险会明显放大。
-
-必须注意：
-
-- 脚本开头使用 `set -Eeuo pipefail`，但要理解它的边界。
-- 所有变量引用尽量使用双引号，例如 `"$ROOT_DIR"`。
-- 删除文件前必须校验路径，避免空变量导致误删。
-- 不要使用 `eval` 执行用户输入。
-- 不要在日志中打印密码、Token、Secret、Kubeconfig。
-- CI 中不要用 `set -x` 包裹敏感命令。
-- 生产脚本要有清晰日志和退出码。
-- 关键脚本要经过代码审查和 ShellCheck 检查。
-- 脚本应该幂等，重复执行不能造成不可控结果。
-- 部署脚本必须有回滚方案。
-- 跨平台脚本要明确支持范围，不要假设 macOS、Linux、BusyBox 工具行为完全一致。
-- 对 Kubernetes 生产操作，脚本必须显式指定 kube-context、namespace 和目标资源，避免误操作集群。
-
-推荐在 CI 中增加：
-
-```bash
-shellcheck scripts/*.sh
-```
-
-如果暂时没有安装 ShellCheck，也至少执行：
-
-```bash
-bash -n scripts/dev.sh
-bash -n scripts/check.sh
-bash -n scripts/clean.sh
-```
-
-`bash -n` 只检查语法，不执行脚本。
-
-如果团队使用 GitHub Actions，可以新增 `.github/workflows/scripts-check.yml`：
-
-```yaml
+```yaml title=".github/workflows/scripts-check.yml"
 name: scripts-check
 
 on:
   pull_request:
+    paths:
+      - "scripts/**"
+      - ".github/workflows/scripts-check.yml"
   push:
     branches:
       - main
+    paths:
+      - "scripts/**"
+      - ".github/workflows/scripts-check.yml"
 
 jobs:
-  scripts:
+  shell:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
 
       - name: Check Bash syntax
@@ -1413,13 +1031,10 @@ jobs:
           bash -n scripts/clean.sh
 
       - name: Install ShellCheck
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y shellcheck
+        run: sudo apt-get update && sudo apt-get install -y shellcheck
 
       - name: Run ShellCheck
-        run: |
-          shellcheck scripts/*.sh
+        run: shellcheck scripts/*.sh
 ```
 
 关键字段说明：
@@ -1428,160 +1043,516 @@ jobs:
 |---|---|
 | `pull_request` | PR 创建或更新时执行检查 |
 | `push.branches` | 推送到 `main` 时执行检查 |
-| `runs-on` | 指定运行环境，这里使用 Ubuntu |
-| `actions/checkout@v4` | 拉取仓库代码 |
-| `bash -n` | 检查脚本语法，不执行脚本 |
-| `shellcheck scripts/*.sh` | 使用 ShellCheck 发现常见脚本问题 |
+| `paths` | 只在脚本或工作流变化时触发 |
+| `runs-on` | 使用 Ubuntu Runner |
+| `bash -n` | 只检查 Bash 语法，不执行脚本 |
+| `shellcheck` | 发现未引用变量、危险写法等常见问题 |
 
-为什么要把脚本检查放进 CI：本地能运行不代表团队所有人都能运行。把语法检查和 ShellCheck 固化到 PR 流程后，脚本质量会变成可持续维护的团队约束。
+### 5.5 执行命令
 
-## 11. 本章小项目
+从项目根目录开始：
 
-本篇小项目：**为 Todo 平台编写 `dev.sh`、`check.sh`、`clean.sh` 脚本**。
+```bash
+$ pwd
+$ git status --short --branch
+$ mkdir -p scripts .github/workflows
+```
 
-### 项目目标
+创建 `.env.example`，并确保本地运行时目录和 `.env` 不进入 Git：
 
-你需要完成：
+```bash
+$ printf 'TODO_HOST=127.0.0.1\nTODO_PORT=18080\nTODO_REQUIRE_SHELLCHECK=false\n' > .env.example
+$ touch .gitignore
+$ grep -qxF '.todo-platform/' .gitignore || printf '\n.todo-platform/\n' >> .gitignore
+$ grep -qxF '.env' .gitignore || printf '.env\n' >> .gitignore
+```
 
-- 新增 `scripts/dev.sh`。
-- 新增 `scripts/check.sh`。
-- 新增 `scripts/clean.sh`。
-- 可选新增 `.github/workflows/scripts-check.yml`。
-- 能启动本地 Todo Demo 服务。
-- 能通过 `/healthz` 健康检查。
-- 能清理服务进程和运行时目录。
-- 能通过退出码判断脚本执行结果。
+把 5.4 中的 `dev.sh`、`check.sh`、`clean.sh` 保存到 `scripts/` 目录；如果使用 GitHub Actions，把 `scripts-check.yml` 保存到 `.github/workflows/`。
 
-### 验收清单
+授予执行权限：
 
-| 验收项 | 命令 | 通过标准 |
-|---|---|---|
-| 脚本存在 | `ls scripts/*.sh` | 3 个脚本都存在 |
-| 脚本可执行 | `ls -l scripts/*.sh` | 文件权限包含 `x` |
-| Bash 语法正确 | `bash -n scripts/dev.sh scripts/check.sh scripts/clean.sh` | 返回 `0` |
-| 二进制可构建 | `./scripts/dev.sh` | `.todo-platform/bin/todo-dev-server` 存在 |
-| 服务可启动 | `./scripts/dev.sh` | 输出健康检查地址 |
-| 健康检查通过 | `./scripts/check.sh` | 返回 `0` |
-| 接口可访问 | `curl -fsS http://127.0.0.1:18080/healthz` | 返回成功 |
-| 服务可清理 | `./scripts/clean.sh` | PID 文件被删除或进程停止 |
-| 日志可清理 | `TODO_CLEAN_LOGS=true ./scripts/clean.sh` | 日志目录被删除或为空 |
-| ShellCheck 通过 | `shellcheck scripts/*.sh` | 没有高风险告警 |
-| CI 可接入 | `bash -n scripts/*.sh` 或 GitHub Actions | PR 能执行脚本检查 |
+```bash
+$ chmod +x scripts/dev.sh scripts/check.sh scripts/clean.sh
+$ ls -l scripts/*.sh
+```
 
-### 本篇能力验收标准
+先检查语法：
 
-你完成本篇后，应该能独立通过以下验收：
+```bash
+$ bash -n scripts/dev.sh
+$ bash -n scripts/check.sh
+$ bash -n scripts/clean.sh
+```
 
-- 能写出带 shebang 的 Bash 脚本。
-- 能正确使用变量、参数、条件、循环和函数。
-- 能通过 `exit 0` / `exit 1` 表达成功或失败。
-- 能用 `echo $?` 判断脚本执行结果。
-- 能编写可重复执行的启动、检查、清理脚本。
-- 能用 `go build` 构建本地二进制，并用 PID 文件管理真实服务进程。
-- 能处理常见错误，例如命令缺失、权限不足、端口占用、健康检查失败。
-- 能说明 Shell 脚本中未引用变量、危险删除、命令注入和密钥泄露的风险。
+启动服务：
 
-## 12. 本章练习题
+```bash
+$ ./scripts/dev.sh
+```
+
+检查服务：
+
+```bash
+$ ./scripts/check.sh
+$ curl -fsS http://127.0.0.1:18080/healthz
+$ curl -fsS http://127.0.0.1:18080/todos
+```
+
+测试 `.env` 和环境变量覆盖：
+
+```bash
+$ cp .env.example .env
+$ printf 'TODO_HOST=127.0.0.1\nTODO_PORT=18081\nTODO_REQUIRE_SHELLCHECK=false\n' > .env
+$ ./scripts/clean.sh --all
+$ ./scripts/dev.sh
+$ ./scripts/check.sh
+```
+
+命令行环境变量优先级高于 `.env`：
+
+```bash
+$ ./scripts/clean.sh --all
+$ TODO_PORT=18082 ./scripts/dev.sh
+$ TODO_PORT=18082 ./scripts/check.sh
+```
+
+清理运行时文件：
+
+```bash
+$ ./scripts/clean.sh --logs
+$ ./scripts/clean.sh --all
+```
+
+提交前检查：
+
+```bash
+$ git status --short
+$ git diff -- .gitignore .env.example scripts .github/workflows/scripts-check.yml
+$ git add .gitignore .env.example scripts/dev.sh scripts/check.sh scripts/clean.sh
+```
+
+如果你决定启用 GitHub Actions，再额外添加：
+
+```bash
+$ git add .github/workflows/scripts-check.yml
+```
+
+提交示例：
+
+```bash
+$ git commit -m "chore: add shell automation scripts"
+```
+
+### 5.6 预期输出
+
+`./scripts/dev.sh` 输出类似：
+
+```text
+[dev] building todo dev server
+[dev] starting todo dev server on http://127.0.0.1:18080
+[dev] started: pid=12345
+[dev] health: http://127.0.0.1:18080/healthz
+[dev] todos:  http://127.0.0.1:18080/todos
+[dev] log:    /home/user/workspace/cloud-native-todo-platform/.todo-platform/logs/todo-dev.log
+```
+
+`./scripts/check.sh` 输出类似：
+
+```text
+[check] root: /home/user/workspace/cloud-native-todo-platform
+[check][ok] bash found: /usr/bin/bash
+[check][ok] git found: /usr/bin/git
+[check][ok] go found: /usr/local/go/bin/go
+[check][ok] curl found: /usr/bin/curl
+[check][ok] grep found: /usr/bin/grep
+[check][ok] git repository detected
+[check][ok] .env.example exists
+[check][ok] scripts/dev.sh exists
+[check][ok] scripts/check.sh exists
+[check][ok] scripts/clean.sh exists
+[check][ok] scripts/dev.sh is executable
+[check][ok] scripts/check.sh is executable
+[check][ok] scripts/clean.sh is executable
+[check][ok] .todo-platform/ is ignored
+[check][ok] scripts/dev.sh syntax ok
+[check][ok] scripts/check.sh syntax ok
+[check][ok] scripts/clean.sh syntax ok
+[check][warn] shellcheck not installed; skipped
+[check][ok] health check passed
+[check][ok] all checks passed
+```
+
+`curl -fsS http://127.0.0.1:18080/healthz` 输出类似：
+
+```json
+{"service":"todo-dev-server","status":"ok"}
+```
+
+`./scripts/clean.sh --all` 输出类似：
+
+```text
+[clean] stopping process 12345
+[clean] process 12345 stopped
+[clean] removing logs: /home/user/workspace/cloud-native-todo-platform/.todo-platform/logs
+[clean] removing runtime directory: /home/user/workspace/cloud-native-todo-platform/.todo-platform
+[clean] clean completed
+```
+
+### 5.7 验证方法
+
+从项目根目录执行：
+
+```bash
+$ test -f .env.example
+$ test -x scripts/dev.sh
+$ test -x scripts/check.sh
+$ test -x scripts/clean.sh
+$ grep -qxF '.todo-platform/' .gitignore
+$ grep -qxF '.env' .gitignore
+$ bash -n scripts/dev.sh scripts/check.sh scripts/clean.sh
+$ ./scripts/dev.sh
+$ ./scripts/check.sh
+$ curl -fsS http://127.0.0.1:18080/healthz
+$ ./scripts/clean.sh --all
+```
+
+判断标准：
+
+- 3 个脚本都存在且可执行。
+- `.env.example` 存在，`.env` 和 `.todo-platform/` 已进入 `.gitignore`。
+- `bash -n` 返回 `0`。
+- `./scripts/dev.sh` 能启动服务并生成 PID 文件。
+- `./scripts/check.sh` 返回 `0`，健康检查通过。
+- `curl /healthz` 返回 JSON。
+- `./scripts/clean.sh --all` 能停止进程并清理 `.todo-platform/`。
+
+### 5.8 清理步骤
+
+只清理运行时文件：
+
+```bash
+$ ./scripts/clean.sh --all
+```
+
+保留脚本但删除本地 `.env`：
+
+```bash
+$ rm -f .env
+```
+
+如果你要完全重做本章实验，并且确认当前目录是课程项目根目录：
+
+```bash
+$ pwd
+$ git status --short
+$ rm -rf .todo-platform
+$ rm -f .env
+```
+
+如果脚本文件已经提交到 Git，优先用 Git 管理回退，而不是手工删除：
+
+```bash
+$ git status --short
+$ git restore --staged scripts .env.example .github/workflows/scripts-check.yml
+```
+
+不要在 `/`、`$HOME`、`/tmp` 或不确定目录中复制粘贴 `rm -rf`。真实生产脚本必须像本篇 `safe_rm_dir` 一样限制可删除路径。
+
+## 6. 常见错误与排障
+
+### 错误 1：脚本执行时报 `Permission denied`
+
+- **现象**：
+
+  ```text
+  bash: ./scripts/dev.sh: Permission denied
+  ```
+
+- **原因**：脚本没有执行权限，或者文件位于不支持 Linux 执行权限的挂载目录。
+
+- **排查**：
+
+  ```bash
+  $ ls -l scripts/dev.sh
+  $ stat -c '%a %n' scripts/dev.sh
+  ```
+
+  如果权限里没有 `x`，例如 `-rw-r--r--`，说明当前用户不能直接执行脚本。
+
+- **修复**：
+
+  ```bash
+  $ chmod +x scripts/dev.sh scripts/check.sh scripts/clean.sh
+  ```
+
+- **预防**：脚本创建后立即 `chmod +x`，并在 `check.sh` 中检查 `-x` 权限。提交前用 `git diff --summary` 确认文件模式变化被记录。
+
+### 错误 2：变量写法导致 `command not found`
+
+- **现象**：
+
+  ```text
+  TODO_PORT: command not found
+  ```
+
+- **原因**：Shell 变量赋值时等号两侧有空格，例如 `TODO_PORT = 18080`。Shell 会把 `TODO_PORT` 当成命令执行。
+
+- **排查**：
+
+  ```bash
+  $ bash -n scripts/dev.sh
+  $ grep -n ' = ' scripts/*.sh
+  ```
+
+  `bash -n` 可以检查语法，但有些变量赋值错误只有运行时才暴露。
+
+- **修复**：
+
+  ```bash
+  TODO_PORT=18080
+  ```
+
+- **预防**：变量赋值不加空格，引用变量时使用 `"$TODO_PORT"`。提交前运行 ShellCheck，它会提示很多变量相关问题。
+
+### 错误 3：健康检查失败
+
+- **现象**：
+
+  ```text
+  [check][fail] health check failed; run ./scripts/dev.sh first
+  ```
+
+  或者：
+
+  ```text
+  [check][fail] invalid TODO_PORT: abc
+  ```
+
+- **原因**：服务没有启动、端口不一致、旧进程占用端口，或者 `.env` 中配置了不同的 `TODO_PORT`。如果端口不是数字，`check.sh` 会在请求前直接失败。
+
+- **排查**：
+
+   ```bash
+   $ ./scripts/dev.sh
+   $ ./scripts/check.sh
+   $ curl -v http://127.0.0.1:18080/healthz
+   $ tail -n 50 .todo-platform/logs/todo-dev.log
+   $ cat .env 2>/dev/null || true
+   $ cat .todo-platform/run/todo-dev.addr 2>/dev/null || true
+   ```
+
+  `curl -v` 可以看出连接失败、HTTP 状态码异常，还是返回内容异常。日志中如果出现 `address already in use`，说明端口冲突。`todo-dev.addr` 可以确认当前进程真实监听地址。
+
+- **修复**：
+
+  ```bash
+  $ ./scripts/clean.sh --all
+  $ ./scripts/dev.sh
+  $ ./scripts/check.sh
+  ```
+
+  如果使用了自定义端口，启动和检查必须使用同一个端口：
+
+  ```bash
+  $ TODO_PORT=18081 ./scripts/dev.sh
+  $ TODO_PORT=18081 ./scripts/check.sh
+  ```
+
+- **预防**：把端口写入 `.env`，或者在团队文档中约定默认端口。不要让 `dev.sh` 和 `check.sh` 各自使用不同配置来源。
+
+### 错误 4：脚本在 macOS 可用，在 Linux CI 中失败
+
+- **现象**：
+
+  ```text
+  sed: illegal option -- i
+  ```
+
+  或者：
+
+  ```text
+  grep: invalid option
+  ```
+
+- **原因**：macOS 默认 BSD 工具和 Linux 常见 GNU 工具参数不同，例如 `sed -i`、`stat`、`date` 等命令行为不完全一致。
+
+- **排查**：
+
+  ```bash
+  $ uname -a
+  $ bash --version | head -n 1
+  $ sed --version 2>/dev/null || sed -h 2>&1 | head -n 1
+  ```
+
+  如果命令输出显示 BSD 工具，就要避免使用只有 GNU 版本支持的参数，或写平台分支。
+
+- **修复**：优先使用 POSIX 兼容写法；确实需要平台差异时，用 `case "$(uname -s)"` 分支处理。CI 中明确使用 Ubuntu Runner 时，也要在文档中写清本地兼容范围。
+
+- **预防**：关键脚本在 Linux/WSL2 中验证。跨平台脚本避免依赖 `sed -i`、`readlink -f`、GNU `stat -c` 等差异较大的参数。
+
+### 错误 5：清理脚本误删或泄露敏感信息
+
+- **现象**：
+
+  ```text
+  rm: cannot remove '/important/path': Permission denied
+  ```
+
+  或者 CI 日志中出现：
+
+  ```text
+  TODO_TOKEN=real-token
+  ```
+
+- **原因**：清理路径没有限制，变量为空或拼错时仍执行 `rm -rf`；调试时开启 `set -x` 或打印 `.env`，导致 Token、密码或 kubeconfig 路径进入日志。
+
+- **排查**：
+
+  ```bash
+  $ grep -n 'rm -rf' scripts/*.sh
+  $ grep -n 'set -x\|TOKEN\|PASSWORD\|SECRET' scripts/*.sh .env.example
+  $ git grep -n -E 'TOKEN|PASSWORD|SECRET|BEGIN .*PRIVATE KEY' || true
+  ```
+
+  看到 `rm -rf "$var"` 时，要继续检查变量是否有路径白名单保护。看到敏感字段时，要确认是否只是示例名，还是实际密钥。
+
+- **修复**：给删除函数增加路径限制；真实密钥立刻轮换，不要只从 Git 历史中删除。CI 中不要打印 `.env`，不要对敏感步骤使用 `set -x`。
+
+- **预防**：提交 `.env.example`，忽略 `.env`；启用 secret scanning；清理脚本只允许删除项目运行时目录；危险操作必须经过 PR Review。
+
+## 7. 生产环境注意事项
+
+1. **脚本必须有清晰边界。**
+   Shell 适合编排命令，不适合承载复杂业务逻辑。脚本一旦开始包含复杂数据结构、并发控制、复杂字符串解析或跨平台兼容矩阵，就应该考虑迁移到 Go、Python 或专门工具。生产脚本应保持入口清晰、参数有限、错误输出明确。
+
+2. **退出码是自动化契约。**
+   CI/CD、Makefile、Kubernetes hook 和部署平台通常不会理解日志含义，它们主要依赖退出码判断是否继续执行。生产脚本不能“打印失败但返回 0”，也不能吞掉关键命令失败。允许失败的命令要显式写成 `if ! command; then ... fi`。
+
+3. **删除操作必须防御式设计。**
+   所有 `rm -rf` 都应先校验变量非空、路径在白名单内、目标目录符合预期。生产脚本不要从用户输入直接拼接删除路径，不要在不确定目录下执行递归删除。依赖 PID 文件清理进程时，还要考虑 PID 复用风险，尽量校验进程命令行、可执行文件路径或启动时写入的身份信息。清理逻辑最好支持 dry-run 或至少打印即将删除的路径。
+
+4. **环境变量和密钥要分层管理。**
+   本地可以用 `.env`，但生产环境不应依赖开发者机器上的 `.env`。CI/CD 应使用平台加密变量，Kubernetes 应使用 Secret 或外部 Secret 管理系统。脚本日志不要打印密码、Token、证书、kubeconfig 内容或完整连接串。
+
+5. **脚本也需要代码审查和静态检查。**
+   Shell 脚本经常拥有很高权限，质量要求不应低于 Go 代码。关键脚本应经过 PR/MR Review，执行 `bash -n`、ShellCheck 和最小化集成测试。涉及部署、回滚和清理的脚本，还要在预发环境演练后再进入生产流程。
+
+## 8. 本章小项目
+
+本章小项目：**为 `cloud-native-todo-platform` 建立本地 Shell 自动化入口**。
+
+交付物：
+
+- `.env.example`
+- 更新后的 `.gitignore`
+- `scripts/dev.sh`
+- `scripts/check.sh`
+- `scripts/clean.sh`
+- 可选 `.github/workflows/scripts-check.yml`
+- 由脚本生成的 `cmd/todo-dev-server/main.go`
+
+验收命令：
+
+```bash
+$ test -f .env.example
+$ test -x scripts/dev.sh
+$ test -x scripts/check.sh
+$ test -x scripts/clean.sh
+$ bash -n scripts/dev.sh scripts/check.sh scripts/clean.sh
+$ ./scripts/dev.sh
+$ ./scripts/check.sh
+$ curl -fsS http://127.0.0.1:18080/healthz
+$ ./scripts/clean.sh --all
+```
+
+能力验收标准：
+
+| 能力项 | 验收方式 |
+|---|---|
+| 脚本结构 | 3 个脚本都有 shebang、严格模式、函数和清晰日志 |
+| 启动能力 | `dev.sh` 能构建并启动 Todo HTTP 服务 |
+| 检查能力 | `check.sh` 能检查依赖、权限、语法和健康状态 |
+| 清理能力 | `clean.sh --all` 能停止进程并删除运行时目录 |
+| 环境变量 | `.env.example` 存在，`TODO_PORT` 能改变监听端口 |
+| 退出码 | 成功返回 `0`，失败返回非 `0` |
+| 安全性 | `.env` 和 `.todo-platform/` 不进入 Git，删除路径受限制，清理进程前有身份校验思路 |
+
+## 9. 本章练习题
 
 ### 基础题
 
 1. Shell 和 Bash 有什么区别？
-2. `"$var"` 和 `$var` 有什么区别？
-3. `$?` 表示什么？
-4. `set -euo pipefail` 分别解决什么问题？
-5. 为什么脚本中要使用函数？
+2. 为什么变量赋值不能写成 `PORT = 18080`？
+3. `"$@"` 和 `$@` 有什么区别？
+4. `exit 0` 和 `exit 1` 在 CI/CD 中分别意味着什么？
 
 ### 实操题
 
-1. 给 `dev.sh` 增加 `TODO_HOST` 支持，并验证监听地址变化。
-2. 给 `check.sh` 增加 `shellcheck` 可选检查，如果没有安装只输出 warning。
-3. 给 `clean.sh` 增加 `--all` 参数，用参数控制是否删除 `.todo-platform`。
-4. 编写一个 `scripts/logs.sh`，支持查看最近 50 行日志和搜索错误关键字。
-5. 故意占用 `18080` 端口，观察 `dev.sh` 如何失败，并记录排障过程。
+1. 给 `check.sh` 增加 `--no-health` 参数，只检查依赖和文件，不访问 HTTP 服务。
+2. 给 `dev.sh` 增加 `TODO_LOG_LEVEL` 环境变量，并把值传给 Go 服务。
+3. 编写 `scripts/logs.sh`，支持 `--tail 50` 查看最近 50 行日志。
+4. 故意占用 `18080` 端口，记录 `dev.sh` 的失败输出和排查步骤。
+5. 安装 ShellCheck，修复它对 3 个脚本给出的告警。
+6. 把 `.github/workflows/scripts-check.yml` 加入分支，创建 PR/MR 并观察检查结果。
 
 ### 思考题
 
-1. 为什么 CI/CD 更依赖退出码而不是日志文本？
-2. 什么样的脚本才算幂等？
-3. 为什么生产脚本中不建议使用 `eval`？
-4. Shell 脚本和 Go/Python 程序分别适合解决什么问题？
-5. 如果一个脚本要操作 Kubernetes 生产集群，你会增加哪些安全保护？
+1. 为什么 Shell 脚本适合“编排命令”，但不适合承载复杂业务逻辑？
+2. 为什么 `.env.example` 可以提交，而 `.env` 不应该提交？
+3. 如果 `clean.sh` 要操作 Kubernetes 命名空间，应该增加哪些防误操作保护？
 
-## 13. 本章面试题
+## 10. 本章面试题
 
-### 13.1 Shell 脚本中的退出码有什么作用？
+### 1. Shell 脚本中的退出码有什么作用？
 
-参考答案：
+**一句话结论**：退出码是脚本和自动化系统之间的成功或失败契约。
 
-退出码用于表示命令或脚本是否成功。约定 `0` 表示成功，非 `0` 表示失败。CI/CD、Makefile、Kubernetes hook、部署脚本都会根据退出码决定是否继续执行。一个脚本如果检查失败却返回 `0`，自动化系统会误判为成功。
+**展开解释**：约定 `0` 表示成功，非 `0` 表示失败。CI/CD、Makefile、部署脚本和 Kubernetes hook 都会根据退出码决定是否继续执行。脚本如果发现错误但最后返回 `0`，自动化系统会误判为成功。
 
-### 13.2 为什么 Shell 变量建议加双引号？
+**深入追问**：如果某一步允许失败，不应该依赖 `set -e`，而应显式使用 `if ! command; then ... fi` 记录原因并决定是否退出。
 
-参考答案：
+### 2. 为什么 Shell 变量建议加双引号？
 
-双引号可以避免空格、换行和通配符导致参数被拆分或展开。例如文件名中有空格时，`rm $file` 可能被拆成多个参数，而 `rm "$file"` 会把它作为一个整体。生产脚本中不引用变量是常见风险。
+**一句话结论**：双引号可以避免空格、换行和通配符导致参数被拆分或展开。
 
-### 13.3 `set -euo pipefail` 有什么作用？
+**展开解释**：例如文件名包含空格时，`rm $file` 可能被拆成多个参数，而 `rm "$file"` 会把它作为一个整体。未引用变量是 Shell 脚本中最常见的生产风险之一。
 
-参考答案：
+**深入追问**：即使变量来自可信来源，也建议默认加双引号；只有明确需要单词拆分或通配符展开时才例外。
 
-`set -e` 让命令失败时脚本尽快退出，`set -u` 使用未定义变量时报错，`pipefail` 让管道中任一命令失败都会导致整个管道失败。它能减少错误被吞掉的概率，但不是万能的，复杂条件、允许失败的命令仍需要显式处理。
+### 3. `set -Eeuo pipefail` 解决什么问题？
 
-### 13.4 如何设计一个健康检查脚本？
+**一句话结论**：它让脚本更早暴露失败、未定义变量和管道中的隐藏错误。
 
-参考答案：
+**展开解释**：`-e` 让命令失败时退出，`-E` 让函数中的错误也触发 `ERR` trap，`-u` 使用未定义变量时报错，`pipefail` 让管道中任一命令失败都导致整体失败。这些选项能减少错误被吞掉的概率。
 
-健康检查脚本应该先检查依赖命令是否存在，再检查服务进程或端口，最后发起真实请求，例如 `curl -fsS /healthz`。脚本需要打印清晰日志，并在失败时返回非 `0`。如果用于 CI/CD，还要避免依赖开发者本机状态。
+**深入追问**：严格模式不是万能的。条件判断、允许失败的命令、后台进程和复杂管道仍需要显式处理，否则可能出现误退出或漏报。
 
-### 13.5 Shell 脚本中有哪些常见安全问题？
+### 4. 如何设计一个健康检查脚本？
 
-参考答案：
+**一句话结论**：先检查依赖和配置，再发起真实请求，最后用退出码表达结果。
 
-常见问题包括未引用变量、危险 `rm -rf`、使用 `eval`、把用户输入拼接成命令、日志打印密钥、`set -x` 泄露敏感信息、未校验 kube-context 就操作生产集群。解决方式包括变量加引号、校验路径、避免 eval、最小权限、隐藏敏感输出和代码审查。
+**展开解释**：健康检查脚本应检查必要命令是否存在、脚本权限是否正确、目标地址是否一致，然后用 `curl -fsS /healthz` 验证服务。失败时要输出可排查的信息，例如 URL、日志路径和下一步建议。
 
-### 13.6 如何排查脚本在 CI 中失败但本地成功？
+**深入追问**：用于 CI 的健康检查不应依赖开发者本机状态；用于 Kubernetes 的 readinessProbe 还应检查服务依赖是否可用。
 
-参考答案：
+### 5. Shell 脚本有哪些常见安全问题？
 
-先比较环境差异，包括 Shell 版本、PATH、工作目录、文件权限、操作系统和工具版本。然后在 CI 中打印必要的非敏感诊断信息，例如 `pwd`、`ls -l`、`bash --version`、`command -v go`。不要打印密钥。最后确认脚本是否依赖本地缓存、交互输入或未提交文件。
+**一句话结论**：主要风险是未引用变量、危险删除、命令注入和密钥泄露。
 
-### 13.7 Shell 脚本什么时候不适合继续扩展？
+**展开解释**：未引用变量会导致路径拆分；`rm -rf "$dir"` 如果缺少白名单可能误删；`eval` 或拼接用户输入可能造成命令注入；`set -x` 和 `echo "$TOKEN"` 可能把密钥写入 CI 日志。
 
-参考答案：
+**深入追问**：生产脚本应使用路径白名单、最小权限、secret scanning、ShellCheck 和 PR Review。涉及 kube-context、namespace 或生产集群时，还应增加显式确认和环境保护。
 
-当脚本开始包含复杂数据结构、复杂错误处理、大量字符串解析、并发逻辑或跨平台兼容要求时，应考虑使用 Go、Python 等语言。Shell 适合编排命令和轻量自动化，不适合承载复杂业务逻辑。
+## 11. 本章总结
 
-### 13.8 为什么部署脚本必须可回滚？
+本篇建立了课程项目的 Shell 自动化基础。你学习了 Shell、Bash、shebang、变量、环境变量、位置参数、条件判断、循环、函数、管道、退出码和 `set -Eeuo pipefail`，也理解了 `.env` 管理、幂等性和安全删除的边界。
 
-参考答案：
+项目成果上，你为 `cloud-native-todo-platform` 增加了 `.env.example`、`dev.sh`、`check.sh`、`clean.sh`，并用脚本生成了最小 Go HTTP 服务。现在项目已经具备一键启动、健康检查和清理运行时文件的本地闭环。
 
-生产部署可能失败，失败后需要快速恢复到上一个稳定版本。脚本如果只支持向前部署，不记录版本、不检查结果、不提供回滚路径，会增加故障恢复时间。后续 Helm、Kubernetes 和 GitOps 章节会继续扩展回滚能力。
+能力价值上，你已经不只是会输入命令，而是能把团队共识沉淀成可复用、可审查、可进入 CI 的自动化入口。后续 Go、Docker、Kubernetes 和 Operator 章节都会建立在这个能力之上。
 
-## 14. 本章总结
+## 12. 下一章衔接
 
-本篇完成了阶段一最后一块基础能力：Shell 自动化。
+下一篇进入 **第 7 篇：Go 语言基础与命令行程序 [A]**。本篇的 `dev.sh` 先生成了一个最小 Go HTTP 服务；下一篇会开始正式编写 Go 代码，用命令行方式管理 Todo 数据。
 
-你学习了：
-
-- Shell、Bash、变量、参数和退出码。
-- 条件判断、循环、函数和管道。
-- 文件处理、日志处理和健康检查。
-- `set -Eeuo pipefail` 的作用。
-- 如何编写 `dev.sh`、`check.sh`、`clean.sh`。
-- Shell 脚本中的常见安全风险和生产注意事项。
-
-本篇项目成果是 Todo 平台的本地自动化脚本。后续每一阶段都可以在此基础上继续扩展：Go 阶段增加测试脚本，Docker 阶段增加镜像构建脚本，Kubernetes 阶段增加部署和排障脚本。
-
-## 15. 下一章衔接
-
-下一篇将进入 **Go 语言基础**。
-
-阶段一到这里已经完成：环境、Linux 文件、进程服务、网络排障、Git 协作和 Shell 自动化。接下来课程会开始编写真正的 Todo 业务能力。
-
-第 7 篇会从 Go 基础语法开始，逐步实现命令行版 Todo 管理器。你在本篇编写的脚本会继续发挥作用：
-
-- 用 `check.sh` 检查 Go 是否安装。
-- 用 `dev.sh` 逐步启动 Go 程序。
-- 用 `clean.sh` 清理本地实验产物。
-
-从下一篇开始，课程主线会从“工具链准备”进入“业务代码实现”。
+从第 7 篇开始，你会继续复用本篇脚本能力：用 `check.sh` 检查 Go 工具链，用 `dev.sh` 逐步启动本地程序，用 `clean.sh` 清理实验产物。Shell 自动化会从现在开始成为整个课程项目的固定底座。
