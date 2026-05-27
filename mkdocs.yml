@@ -169,7 +169,7 @@ nav:
       - 2. Linux 文件系统与命令基础 [A]: chapters/stage-01-foundation/02-linux-filesystem.md
       - 3. Linux 进程、服务与软件管理 [A]: chapters/stage-01-foundation/03-linux-process.md
       - 4. Linux 网络基础与排障 [A]: chapters/stage-01-foundation/04-linux-network.md
-      - 5. Git 基础与团队协作: chapters/stage-01-foundation/05-git-basics.md
+      - 5. Git 基础与团队协作 [A]: chapters/stage-01-foundation/05-git-basics.md
       - 6. Shell 脚本与自动化: chapters/stage-01-foundation/06-shell-scripting.md
       - 附录 A. 基础环境作品集验收: chapters/stage-01-foundation/stage-01-acceptance.md
       - 附录 B. 命令速查与排障手册: chapters/stage-01-foundation/stage-01-cheatsheet-troubleshooting.md
