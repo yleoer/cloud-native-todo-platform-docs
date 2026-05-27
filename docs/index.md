@@ -64,7 +64,7 @@ hide:
 
 本课程共 **40 大篇，200 个章节**，分为 7 个学习阶段。
 
-当前已完成 **阶段一：基础环境与工具链**、**阶段二：Go 语言与后端开发**，并已开始 **阶段三：Docker 容器技术**。课程会继续围绕 **Cloud Native Todo Platform** 项目推进容器化交付和容器运行时理解。
+当前已完成 **阶段一：基础环境与工具链**、**阶段二：Go 语言与后端开发** 和 **阶段三：Docker 容器技术**。课程会继续围绕 **Cloud Native Todo Platform** 项目推进 Kubernetes 部署与云原生交付能力。
 
 <details open markdown="1">
 <summary><strong>阶段一：基础环境与工具链（第 1-6 篇 + 出版附录，已完成）</strong></summary>
@@ -99,7 +99,7 @@ hide:
 </details>
 
 <details markdown="1">
-<summary><strong>阶段三：Docker 容器技术（第 14-18 篇，第 14-17 篇已完成）</strong></summary>
+<summary><strong>阶段三：Docker 容器技术（第 14-18 篇，已完成）</strong></summary>
 
 掌握 Docker 使用、Dockerfile 编写、Docker Compose 本地编排、容器原理和运行时机制。
 
@@ -107,7 +107,7 @@ hide:
 - [第 15 篇：Dockerfile 与镜像构建](chapters/stage-03-docker/15-dockerfile.md)
 - [第 16 篇：Docker Compose 本地编排](chapters/stage-03-docker/16-docker-compose.md)
 - [第 17 篇：容器运行原理](chapters/stage-03-docker/17-container-internals.md)
-- 第 18 篇：OCI、containerd、runc 与 CRI
+- [第 18 篇：OCI、containerd、runc 与 CRI](chapters/stage-03-docker/18-container-runtime.md)
 
 </details>
 
@@ -193,6 +193,6 @@ http://127.0.0.1:8000
 
 ## 下一步计划
 
-- 继续补充容器运行原理、OCI、containerd、runc 与 CRI，为 Kubernetes 阶段打基础。
-- 继续完善 Docker 阶段综合验收，让 Todo 平台形成可展示的容器化作品集。
-- 继续推进 Kubernetes 与 Operator 实践内容，将 Todo 平台推进到云原生交付形态。
+- 开始编写 Kubernetes 架构与集群搭建，承接容器运行时和 CRI 知识。
+- 继续推进 Kubernetes 工作负载、网络、存储、安全、Helm 与 Kustomize 实践内容。
+- 继续完善阶段三 Docker 容器技术的综合验收，让 Todo 平台形成可展示的容器化作品集。
