@@ -36,8 +36,8 @@
 从 Go 基础到工程化、net/http、Gin、并发、PostgreSQL、Redis 和后端生产化。
 
 - [第 7 篇：Go 语言基础](docs/chapters/stage-02-go-backend/07-go-basics.md)
-- [第 8 篇：Go 工程化与测试](docs/chapters/stage-02-go-backend/08-go-engineering-testing.md)
-- [第 9 篇：Go net/http 标准库与 HTTP 服务](docs/chapters/stage-02-go-backend/09-go-engineering.md)
+- [第 8 篇：Go 进阶与并发编程](docs/chapters/stage-02-go-backend/08-go-concurrency.md)
+- [第 9 篇：Go net/http 标准库与 HTTP 服务](docs/chapters/stage-02-go-backend/09-go-net-http.md)
 - [第 10 篇：Go Web API 开发](docs/chapters/stage-02-go-backend/10-go-web-api.md)
 - [第 11 篇：数据库与持久化开发](docs/chapters/stage-02-go-backend/11-database.md)
 - [第 12 篇：Redis、缓存与异步任务](docs/chapters/stage-02-go-backend/12-redis-cache.md)
@@ -177,8 +177,8 @@ docs/
 │   │   └── stage-01-cheatsheet-troubleshooting.md # 阶段一附录 B：速查与排障
 │   ├── stage-02-go-backend/    # 阶段二：Go 语言与后端开发
 │   │   ├── 07-go-basics.md          # 第 7 篇：Go 语言基础
-│   │   ├── 08-go-engineering-testing.md # 第 8 篇：Go 工程化与测试
-│   │   ├── 09-go-engineering.md     # 第 9 篇：Go net/http 标准库与 HTTP 服务
+│   │   ├── 08-go-concurrency.md     # 第 8 篇：Go 进阶与并发编程
+│   │   ├── 09-go-net-http.md        # 第 9 篇：Go net/http 标准库与 HTTP 服务
 │   │   ├── 10-go-web-api.md         # 第 10 篇：Go Web API 开发
 │   │   ├── 11-database.md           # 第 11 篇：数据库与持久化开发
 │   │   ├── 12-redis-cache.md        # 第 12 篇：Redis、缓存与异步任务
