@@ -13,7 +13,7 @@
 - 能区分 Secret 的 `Opaque`、`kubernetes.io/tls` 和 `kubernetes.io/dockerconfigjson` 类型。
 - 能解释 ConfigMap / Secret 更新后，Pod 中环境变量和挂载文件的更新行为。
 - 能说明为什么 Kubernetes Secret 不是“自动加密的保险箱”。
-- 能理解 etcd 加密、RBAC、Sealed Secrets、External Secrets 的使用边界。
+- 能理解 etcd 加密、Role-Based Access Control（RBAC）、Sealed Secrets、External Secrets 的使用边界。
 
 ### 1.2 技能目标
 
@@ -31,7 +31,9 @@
 - 第 20 篇：本地 kind 集群 `todo-k8s` 可用。
 - 第 21 篇：`todo-api:v0.1.0` 已部署为 Deployment，且 `todo-workloads` Namespace 存在。
 - 第 22 篇：Todo API 已经可以通过 Service / Ingress / Gateway 访问。
-- 第 14-17 篇：理解 Todo API 的 `TODO_*` 配置、JWT Secret、管理员用户哈希和容器运行方式。
+- 第 14 篇：理解 `TODO_*` 环境变量、JWT Secret、管理员用户哈希和 `hash-password` 子命令。
+- 第 16 篇：本地已经构建 `todo-api:v0.1.0` 镜像。
+- 第 17 篇：理解容器如何通过环境变量读取配置。
 
 本篇命令以 Linux / macOS / WSL2 Bash 为主。Windows 用户建议在 WSL2 Ubuntu 中完成实验；如果使用 PowerShell，请手动创建 YAML 文件，或把 heredoc 改写为 PowerShell here-string。
 
@@ -74,7 +76,7 @@
 第 21 篇：Todo API Deployment + Probe + HPA
 第 22 篇：Service + Ingress + Gateway API
 第 23 篇：ConfigMap + Secret 配置迁移
-第 24 篇：PostgreSQL + PVC 持久化
+第 24 篇：PostgreSQL + PersistentVolumeClaim（PVC）持久化
 ```
 
 第 21 篇为了降低难度，把部分配置直接写在 Deployment 中，并生成了一个本地 Secret。第 23 篇会把这些配置正式拆出来，为后续第 24 篇数据库 DSN、第 27 篇 Helm values、第 28 篇 Kustomize overlay 打好基础。
@@ -88,7 +90,7 @@ ConfigMap 是 Kubernetes 中保存非敏感配置的对象。它适合放：
 - 运行环境，例如 `TODO_ENV=dev`。
 - 监听地址，例如 `TODO_API_ADDR=0.0.0.0:18080`。
 - 日志级别，例如 `TODO_LOG_LEVEL=info`。
-- CORS 白名单、缓存 TTL、功能开关等非敏感参数。
+- Cross-Origin Resource Sharing（CORS）白名单、缓存 TTL、功能开关等非敏感参数。
 - 配置文件内容，例如 `app.json`、`nginx.conf`、`runtime-notes.txt`。
 
 ConfigMap 不适合放密码、Token、私钥、数据库 DSN 中的密码部分。ConfigMap 内容通常会被很多人读取，也经常进入 Git 仓库和审查流程。
@@ -106,7 +108,9 @@ Secret 是 Kubernetes 中保存敏感数据的对象。它适合放：
 
 Secret 的内容默认以 base64 形式存储在对象里。base64 只是编码，不是加密。只要有读取 Secret 的权限，就可以还原原文。
 
-常见 Secret 类型如下：
+常见 Secret 类型如下。
+
+表 23-1 Secret 类型与用途：
 
 | 类型 | 用途 | 本课程使用位置 |
 |---|---|---|
@@ -118,7 +122,7 @@ Secret 的内容默认以 base64 形式存储在对象里。base64 只是编码�
 
 Kubernetes 常见配置注入方式有四类。
 
-表 23-1 配置注入方式对比：
+表 23-2 配置注入方式对比：
 
 | 方式 | 适合场景 | 是否自动进入环境变量 | 更新行为 |
 |---|---|---|---|
@@ -157,7 +161,11 @@ Kubernetes Secret 的安全取决于一整套机制，而不是一个对象类�
 - 密钥轮换：Secret 泄露后如何替换并重启服务。
 - 外部系统：是否使用 Sealed Secrets、External Secrets、Vault 或云厂商 Secret Manager。
 
-本篇会用本地实验 Secret 讲清机制，但生产建议会放在第 7 节集中说明。
+Role-Based Access Control（RBAC）决定谁能通过 API Server 读取 Secret。即使开启了 etcd 静态加密，如果某个用户或 ServiceAccount 有 `get secrets` 权限，它仍然可以通过 Kubernetes API 读到解密后的内容。因此，etcd 加密解决的是“磁盘上如何保存”，RBAC 解决的是“谁能通过 API 读取”，二者不能互相替代。
+
+Sealed Secrets 的典型工作流是：开发者在本地用集群公钥把明文 Secret 加密成 `SealedSecret`，把密文提交到 Git；集群内的 controller 用私钥解密并生成普通 Secret。它解决的是“Git 中不能保存明文 Secret”的问题，但生成后的普通 Secret 仍然要依赖 RBAC、审计和轮换策略保护。External Secrets 则通常从 Vault、云厂商 Secret Manager 等外部密钥系统同步 Secret 到集群。
+
+本篇会用本地实验 Secret 讲清机制，但不会部署 Sealed Secrets controller。生产建议会放在第 7 节集中说明。
 
 ## 4. 原理深入
 
@@ -271,10 +279,10 @@ Kubernetes 不会因为 ConfigMap / Secret 更新而自动重建 Deployment Pod�
 
 | 工具 | 建议版本 | 用途 |
 |---|---|---|
-| Kubernetes | 1.35.x 或课程环境版本 | 运行 Todo API |
+| Kubernetes | 1.36.x | 运行 Todo API |
 | kind | 0.31.x | 本地 Kubernetes 集群 |
-| kubectl | 与集群相邻小版本 | 应用和排查 YAML |
-| Docker | 28.x | 运行 `todo-api:v0.1.0` 生成密码哈希 |
+| kubectl | 1.36.x | 应用和排查 YAML |
+| Docker | 29.x | 运行 `todo-api:v0.1.0` 生成密码哈希 |
 
 确认当前集群与 Namespace：
 
@@ -322,7 +330,7 @@ mkdir -p deployments/k8s-base/environments/prod
 本篇会生成 `todo-api-secret.local.yaml` 作为本地实验 Secret。先确认本地仓库会忽略这类文件，避免误提交到 Git：
 
 ```bash
-grep -q '^deployments/k8s-base/\*.local.yaml$' .gitignore 2>/dev/null || \
+grep -Fq 'deployments/k8s-base/*.local.yaml' .gitignore 2>/dev/null || \
   printf '\ndeployments/k8s-base/*.local.yaml\n' >> .gitignore
 git status --short
 ```
@@ -554,6 +562,8 @@ YAML
 
 ### 5.5 应用配置
 
+以下命令均在项目根目录执行，也就是包含 `deployments/` 目录的 `cloud-native-todo-platform/` 仓库根目录。
+
 先用 server-side dry-run 让 API Server 检查 YAML。这样可以在真正修改集群前提前发现字段拼写、API 版本或对象格式错误：
 
 ```bash
@@ -609,6 +619,8 @@ POD="$(kubectl -n todo-workloads get pod \
 echo "$POD"
 ```
 
+Deployment 配置了 `replicas: 2`，集群里通常会有两个 Running Pod。这里取第一个 Running Pod 做验证即可，本篇配置对两个副本的行为应该一致。如果 `kubectl wait` 超时，先执行 `kubectl -n todo-workloads get pods` 查看状态，再按第 6 节排查。
+
 查看非敏感环境变量：
 
 ```bash
@@ -656,6 +668,8 @@ kubectl -n todo-workloads port-forward service/todo-api 18082:80
 curl -s http://127.0.0.1:18082/healthz
 curl -s http://127.0.0.1:18082/readyz
 ```
+
+验证完成后，在运行 `port-forward` 的终端按 `Ctrl+C` 终止端口转发。
 
 ### 5.7 验证 ConfigMap 文件更新
 
@@ -804,7 +818,34 @@ spec:
 
 本篇不会真的接入私有仓库，第 29 篇 CI/CD 和镜像仓库章节会继续展开。
 
-### 5.11 清理步骤
+### 5.11 验证方法
+
+完成实验后，可以用下面这组命令集中确认结果：
+
+```bash
+kubectl -n todo-workloads get configmap todo-api-config todo-api-config-file
+kubectl -n todo-workloads get secret todo-api-auth
+kubectl -n todo-workloads get deployment todo-api
+kubectl -n todo-workloads wait pod \
+  -l app.kubernetes.io/name=todo-api \
+  --for=condition=Ready \
+  --timeout=180s
+kubectl -n todo-workloads describe deployment todo-api | grep -A6 "Environment Variables from"
+kubectl auth can-i get secrets -n todo-workloads
+```
+
+判断标准：
+
+- `todo-api-config` 和 `todo-api-config-file` 都存在。
+- `todo-api-auth` 存在，`describe secret` 只显示 key 和大小，不直接显示值。
+- `todo-api` Deployment 处于 Ready 状态。
+- `Environment Variables from` 能看到 `todo-api-config` 和 `todo-api-auth`。
+- Pod 内 `TODO_RELEASE` 在 rollout restart 后更新为 `chapter-23-env-updated`。
+- `/healthz` 和 `/readyz` 通过 Service port-forward 返回成功。
+
+预计耗时：90 分钟（动手操作约 60 分钟）。
+
+### 5.12 清理步骤
 
 如果继续学习第 24 篇，建议保留 `todo-workloads`、Todo API Deployment、Service、Ingress 和本篇 ConfigMap / Secret。第 24 篇会继续在这个 Namespace 中加入 PostgreSQL 和 PVC。
 
@@ -910,7 +951,7 @@ kubectl -n todo-workloads get secret
 
 - **现象**：PR 中出现 `todo-api-secret.local.yaml` 或真实 Secret。
 - **原因**：本地实验文件没有被忽略，或团队没有建立 Secret 提交检查。
-- **修复**：立即撤回提交，轮换已泄露密钥，并把本地 Secret 文件加入忽略规则。
+- **修复**：如果尚未 push，先从提交中移除 Secret，再重新提交不含 Secret 的版本；如果已经 push，先轮换密钥，再用 `git revert` 或联系仓库管理员清理历史。已经进入 Git 历史的 Secret 应按泄露处理，因为有权限读取历史的人仍可能拿到原值。
 - **预防**：生产使用 Sealed Secrets、External Secrets 或 CI/CD Secret 注入，不提交明文 Secret。
 
 ## 7. 生产环境注意事项
@@ -928,6 +969,7 @@ kubectl -n todo-workloads get secret
 6. **Secret 轮换要演练。** JWT Secret 泄露后，需要替换 Secret、重启应用、让旧 Token 失效，并通知相关调用方。数据库密码和镜像拉取凭据也要有类似轮换流程。
 
 7. **ConfigMap / Secret 不适合存大文件。** 它们是 Kubernetes API 对象，不是配置文件仓库或对象存储。大体积配置、二进制文件、模型文件应放到镜像、对象存储、PVC 或专门配置系统中。
+   实践中应把单个 ConfigMap / Secret 控制在较小范围内，避免接近 API Server 和 etcd 对单个对象大小的限制。需要保存大文件时，应优先考虑镜像、PersistentVolumeClaim、对象存储或专门配置系统。
 
 8. **稳定配置可以考虑 `immutable: true`。** 对很少变化的 ConfigMap / Secret，设置 immutable 可以减少误改和 kubelet watch 压力。但一旦设置后不能原地修改，只能删除重建，因此不适合频繁变化的运行参数。
 
