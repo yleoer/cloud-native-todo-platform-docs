@@ -28,12 +28,21 @@ cloud-native-todo-platform/
 ├── docker-compose.yml
 ├── go.mod
 ├── go.sum
+├── api/
+│   ├── cmd/
+│   │   ├── todo-api/
+│   │   │   └── main.go
+│   │   └── todo-load/
+│   │       └── main.go
+│   └── internal/
+│       ├── handler/
+│       │   ├── gin/
+│       │   └── http/
+│       ├── model/
+│       ├── repository/
+│       └── service/
 ├── cmd/
-│   ├── todo-api/
-│   │   └── main.go
-│   ├── todo-cli/
-│   │   └── main.go
-│   └── todo-stats/
+│   └── todo-cli/
 │       └── main.go
 ├── configs/
 │   ├── base.json
@@ -42,7 +51,7 @@ cloud-native-todo-platform/
 │   └── prod.json
 ├── docs/
 │   ├── api/
-│   │   └── todo-api-v1.md
+│   │   └── openapi.yaml
 │   └── stage-02-acceptance.md
 ├── internal/
 │   ├── app/
@@ -50,10 +59,8 @@ cloud-native-todo-platform/
 │   ├── cache/
 │   ├── config/
 │   ├── db/
-│   ├── httpapi/
 │   ├── logger/
 │   ├── ratelimit/
-│   ├── stats/
 │   ├── tasks/
 │   └── todo/
 ├── migrations/
@@ -94,9 +101,9 @@ cloud-native-todo-platform/
     go mod tidy
     go fmt ./...
     go test ./...
-    go test -race ./internal/stats ./internal/todo ./internal/httpapi
-    go build ./cmd/todo-cli ./cmd/todo-stats ./cmd/todo-api
-    go run ./cmd/todo-api config-check
+    go test -race ./api/internal/service ./api/internal/handler/gin ./api/internal/handler/http
+    go build ./api/cmd/todo-api ./api/cmd/todo-load
+    go run ./api/cmd/todo-api openapi
     ```
 
 === "Windows PowerShell"
@@ -105,9 +112,9 @@ cloud-native-todo-platform/
     go mod tidy
     go fmt ./...
     go test ./...
-    go test -race ./internal/stats ./internal/todo ./internal/httpapi
-    go build ./cmd/todo-cli ./cmd/todo-stats ./cmd/todo-api
-    go run ./cmd/todo-api config-check
+    go test -race ./api/internal/service ./api/internal/handler/gin ./api/internal/handler/http
+    go build ./api/cmd/todo-api ./api/cmd/todo-load
+    go run ./api/cmd/todo-api openapi
     ```
 
 这条路径主要验证：Go 代码完整、测试能跑、主要命令能构建、基础配置能加载。
@@ -132,7 +139,7 @@ cloud-native-todo-platform/
     export TODO_REDIS_PASSWORD='todo_redis_password'
 
     go test ./...
-    go run ./cmd/todo-api config-check
+    go run ./api/cmd/todo-api openapi
     ```
 
 === "Windows PowerShell"
@@ -151,7 +158,7 @@ cloud-native-todo-platform/
     $env:TODO_REDIS_PASSWORD = 'todo_redis_password'
 
     go test ./...
-    go run ./cmd/todo-api config-check
+    go run ./api/cmd/todo-api openapi
     ```
 
 完整路径会验证 PostgreSQL、Redis、集成测试、迁移文件和外部依赖配置。
@@ -246,21 +253,22 @@ cloud-native-todo-platform/
 ## 已完成成果
 
 - [ ] 第 7 篇：完成 `todo-cli`，支持 Todo 增删改查。
-- [ ] 第 8 篇：完成 `todo-stats`，支持并发统计、超时取消和竞态检测。
-- [ ] 第 9 篇：完成 Go 后端工程骨架、配置、日志、测试和验证入口。
-- [ ] 第 10 篇：完成 Todo API v1、统一响应、健康检查和优雅关闭。
-- [ ] 第 11 篇：完成 PostgreSQL 表设计、迁移、Repository 和集成测试。
-- [ ] 第 12 篇：完成 Redis 缓存、限流和简单异步任务。
-- [ ] 第 13 篇：完成 JWT 鉴权、审计日志、配置分层和生产化命令。
+- [ ] 第 8 篇：完成 Go 后端工程骨架、配置、日志、测试和验证入口。
+- [ ] 第 9 篇：完成标准库 Todo API v1、统一响应、健康检查和优雅关闭。
+- [ ] 第 10 篇：完成 Gin Todo API v2、路由组、中间件和 OpenAPI 文档。
+- [ ] 第 11 篇：完成并发 Todo 统计任务、压测命令、超时取消和竞态检测。
+- [ ] 第 12 篇：完成 PostgreSQL 表设计、迁移、Repository 和集成测试。
+- [ ] 第 13 篇：完成 Redis 缓存、限流和简单异步任务。
+- [ ] 第 14 篇：完成 JWT 鉴权、审计日志、配置分层和生产化命令。
 
 ## 关键验证输出
 
 ```text
 go version:
 go test ./...:
-go test -race ./internal/stats ./internal/todo ./internal/httpapi:
-go build ./cmd/todo-cli ./cmd/todo-stats ./cmd/todo-api:
-go run ./cmd/todo-api config-check:
+go test -race ./api/internal/service ./api/internal/handler/gin ./api/internal/handler/http:
+go build ./api/cmd/todo-api ./api/cmd/todo-load:
+go run ./api/cmd/todo-api openapi:
 curl /healthz:
 curl /api/v1/auth/login:
 ```
@@ -307,7 +315,7 @@ curl /api/v1/auth/login:
 | 现象 | 常见原因 | 处理方式 |
 |---|---|---|
 | `go test ./...` 失败 | 代码块复制不完整、包路径错误、依赖未整理 | 执行 `go mod tidy`，根据失败包逐个定位 |
-| `go test -race` 很慢 | 竞态检测有额外开销 | 只对核心包运行，例如 `internal/stats`、`internal/httpapi` |
+| `go test -race` 很慢 | 竞态检测有额外开销 | 只对核心包运行，例如 `api/internal/service`、`api/internal/handler/gin` |
 | `docker compose up` 失败 | Docker Desktop 未启动、端口冲突、旧容器残留 | 执行 `docker compose ps`、`docker compose logs`、必要时 `docker compose down -v` |
 | PostgreSQL 认证失败 | DSN 中用户名、密码、数据库名与 Compose 不一致 | 对照 `docker-compose.yml` 和 `TODO_DATABASE_DSN` |
 | Redis 连接失败 | Redis 未启动、密码不一致、端口未映射 | 检查 `docker compose logs redis` 和 `TODO_REDIS_PASSWORD` |
@@ -369,9 +377,9 @@ Verification:
 
 ```bash
 go test ./...
-go test -race ./internal/stats ./internal/todo ./internal/httpapi
-go build ./cmd/todo-cli ./cmd/todo-stats ./cmd/todo-api
-go run ./cmd/todo-api config-check
+go test -race ./api/internal/service ./api/internal/handler/gin ./api/internal/handler/http
+go build ./api/cmd/todo-api ./api/cmd/todo-load
+go run ./api/cmd/todo-api openapi
 ```
 ````
 

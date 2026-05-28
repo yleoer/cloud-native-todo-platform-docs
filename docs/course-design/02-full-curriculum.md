@@ -328,9 +328,9 @@ Todo Operator（篇 34-42）
 - 11.1 goroutine 与并发执行：HTTP Server 的每请求一个 goroutine
 - 11.2 channel 通信模型（无缓冲/有缓冲/select 多路复用）
 - 11.3 context 超时、取消与 HTTP 请求链路传递
-- 11.4 sync 包：Mutex、RWMutex、WaitGroup、Once
-- 11.5 并发安全、竞态检测（`go test -race`）与限流思想
-- 11.6 HTTP Server 中的并发模式实战（优雅关闭、连接池、worker pool）
+- 11.4 sync 包：Mutex、RWMutex、WaitGroup
+- 11.5 并发安全与竞态检测（`go test -race`）
+- 11.6 HTTP Server 中的并发模式实战（优雅关闭、worker pool）
 
 **本篇特色项目**
 
