@@ -1,6 +1,6 @@
 # 第 12 篇：数据库与持久化开发 [C]
 
-第 10 篇把 Todo API v2 做成了 Gin 版本，第 11 篇补上了并发统计和压测能力。但到目前为止，Todo 数据仍然存在进程内存里：服务一重启，数据就消失；如果未来部署多个 API 副本，每个副本也会有自己的内存数据。
+第 9 篇用标准库实现了 Todo API v1，第 10 篇把它重构为 Gin 版本，第 11 篇补上了并发统计和压测能力。但到目前为止，Todo 数据仍然存在进程内存里：服务一重启，数据就消失；如果未来部署多个 API 副本，每个副本也会有自己的内存数据。
 
 本篇进入后端服务最核心的生产能力之一：**数据库持久化**。我们会把 Todo API 从内存存储升级为 PostgreSQL 存储，学习表设计、SQL CRUD、索引、事务、数据库迁移、`database/sql` 连接池、pgx 驱动和集成测试。
 
@@ -111,7 +111,7 @@ Todo 数据可以放进 `todos` 表：
 | 1 | learn PostgreSQL | pending | 2026-05-28 10:00:00+00 | 2026-05-28 10:00:00+00 |
 | 2 | write integration test | done | 2026-05-28 10:05:00+00 | 2026-05-28 10:20:00+00 |
 
-数据库不是“更高级的文件”。它提供约束、索引、事务、连接池、权限、备份、恢复和并发控制，是后端服务保存核心数据的基础设施。
+数据库不是“更高级的文件”。它提供约束、索引、事务、连接池、权限、备份、恢复和并发控制，是后端服务保存核心数据的基础设施。关系型数据库常说的核心保证是 ACID（Atomicity 原子性、Consistency 一致性、Isolation 隔离性、Durability 持久性），后面的事务和持久化验证会逐步用到这些概念。
 
 ### 3.2 表设计、字段类型与约束
 
@@ -121,11 +121,11 @@ Todo 数据可以放进 `todos` 表：
 
 | 字段 | 类型 | 说明 |
 |---|---|---|
-| `id` | `BIGSERIAL` | 自增主键 |
+| `id` | `BIGSERIAL`（自增大整数） | 自增主键 |
 | `title` | `TEXT` | Todo 标题 |
 | `status` | `TEXT` | `pending` 或 `done` |
-| `created_at` | `TIMESTAMPTZ` | 创建时间，带时区 |
-| `updated_at` | `TIMESTAMPTZ` | 更新时间，带时区 |
+| `created_at` | `TIMESTAMPTZ`（TIMESTAMP WITH TIME ZONE） | 创建时间，带时区 |
+| `updated_at` | `TIMESTAMPTZ`（TIMESTAMP WITH TIME ZONE） | 更新时间，带时区 |
 
 关键约束示例：
 
@@ -182,7 +182,7 @@ Go 访问数据库常见方式有三类：
 | 方式 | 特点 | 适合场景 |
 |---|---|---|
 | `database/sql` + 驱动 | 标准库抽象，手写 SQL，控制力强 | 学习底层机制、核心业务路径 |
-| GORM | ORM，结构体映射方便，开发快 | 后台管理、CRUD 很多的业务 |
+| GORM | ORM，结构体映射方便，开发快 | 后台管理系统 CRUD、快速原型 |
 | sqlc | 根据 SQL 生成类型安全 Go 代码 | SQL 较复杂、团队重视编译期检查 |
 
 本篇使用 `database/sql` + pgx 驱动。`database/sql` 提供统一接口和连接池，pgx 提供 PostgreSQL 驱动实现。这样你能直接看到 SQL、事务和连接池边界。
@@ -202,7 +202,7 @@ PostgreSQL 默认隔离级别是 `Read Committed`。本篇使用它就足够：�
 
 ### 4.1 接入 PostgreSQL 后的请求链路
 
-图 12-1 展示 API v3 的调用链路：
+图 12-1 Todo API v3 PostgreSQL 持久化请求链路：
 
 ```mermaid
 sequenceDiagram
@@ -292,6 +292,7 @@ api/migrations/
 |---|---|---|
 | Ubuntu | 24.04 LTS | 统一实验环境 |
 | Go | 1.26.x | 编译、测试和运行 |
+| Docker Engine | 29.x | 运行 PostgreSQL 容器 |
 | Docker Compose | v2 | 启动 PostgreSQL |
 | PostgreSQL | 18 | 本地数据库 |
 | curl | Ubuntu 24.04 默认版本 | 验证 API |
@@ -300,6 +301,13 @@ api/migrations/
 
 ```bash
 cd ~/workspace/cloud-native-todo-platform
+```
+
+确认 Docker 可用：
+
+```bash
+docker version
+docker compose version
 ```
 
 确认第 10 篇和第 11 篇文件已存在：
@@ -369,7 +377,7 @@ volumes:
 
 这里把端口绑定到 `127.0.0.1`，表示只允许本机访问。数据库密码写在教学 Compose 文件里是为了本地实验可复现；生产环境应使用 Secret 或受控配置系统。
 
-`PGDATA` 被显式设置到 `/var/lib/postgresql/data/pgdata`，是为了让数据目录稳定落在 `todo-postgres-data` volume 里。PostgreSQL 18 官方镜像的默认数据目录和旧版本不同，教学中显式写出路径可以避免学生误以为挂了 volume，实际数据却写到另一个目录。`postgres:18-alpine` 会跟随 PostgreSQL 18 的最新补丁镜像；如果团队要求完全可复现，可以改成具体补丁标签。
+`PGDATA` 被显式设置到 `/var/lib/postgresql/data/pgdata`，是为了让数据目录稳定落在 `todo-postgres-data` volume 里。PostgreSQL 18 官方镜像的默认数据目录和旧版本不同，教学中显式写出路径可以避免学生误以为挂了 volume，实际数据却写到另一个目录。`postgres:18-alpine` 会跟随 PostgreSQL 18 的最新补丁镜像；如果团队要求完全可复现，可以改成具体补丁标签。第 17 篇会把这个根目录 `docker-compose.yml` 演进为 `deployments/docker-compose/compose.yaml`，纳入 API、PostgreSQL、Redis 和 Traefik 的完整本地编排。
 
 创建 `api/migrations/000001_create_todos.up.sql`：
 
@@ -755,6 +763,8 @@ VALUES ($1, $2)`, todoID, eventType)
 
 这里的核心是事务：`Create`、`Update`、`MarkDone`、`Delete` 都把 Todo 变更和事件写入放在同一个事务里。只要事件写入失败，前面的 Todo 变更也会回滚。
 
+`PostgresRepository` 的编译期断言使用了匿名接口，而不是直接导入 `service.Repository`。这是有意为之：`repository` 是更底层的存储包，直接依赖 `service` 会让依赖方向倒置，并且第 11 篇的 service 包测试会导入 repository，反向导入会造成测试期 import cycle。匿名接口在这里用于验证方法集，同时保持包依赖方向清晰。
+
 创建 `api/internal/repository/postgres_integration_test.go`：
 
 ```go title="api/internal/repository/postgres_integration_test.go"
@@ -872,6 +882,8 @@ func openIntegrationDB(t *testing.T) *sql.DB {
 func resetIntegrationSchema(t *testing.T, db *sql.DB) {
 	t.Helper()
 
+	// NOTE: Keep this DDL in sync with api/migrations/000001_create_todos.up.sql.
+	// A production project should run the same migration tool in tests instead.
 	statements := []string{
 		`DROP TABLE IF EXISTS todo_events`,
 		`DROP TABLE IF EXISTS todos`,
@@ -911,7 +923,7 @@ func resetIntegrationSchema(t *testing.T, db *sql.DB) {
 
 默认 `go test ./api/...` 不会要求本机必须有数据库；没有环境变量时集成测试会跳过。只有显式设置 `TODO_TEST_DATABASE_DSN` 和 `TODO_ALLOW_DATABASE_RESET=true`，测试才会重建测试库中的表。
 
-覆盖 `api/cmd/todo-api/main.go`：
+覆盖 `api/cmd/todo-api/main.go`。本文件会替换第 10、11 篇的同名入口文件，新增 `buildRepository` 函数和数据库/内存双模式切换，其他启动、优雅关闭和 OpenAPI 子命令逻辑保持不变：
 
 ```go title="api/cmd/todo-api/main.go"
 package main
@@ -1024,6 +1036,12 @@ func buildRepository(ctx context.Context, cfg config, logger *slog.Logger) (serv
 
 ### 5.5 执行命令
 
+确认 Go 代理配置。第 7 篇已经设置过 `GOPROXY`，这里再检查一次，避免依赖拉取卡在网络问题上：
+
+```bash
+go env GOPROXY
+```
+
 拉取 PostgreSQL 驱动并整理依赖。本篇固定 pgx 版本，保证同一批学员拿到一致的依赖；日常探索可以使用 latest，但团队项目应提交明确版本：
 
 ```bash
@@ -1044,7 +1062,7 @@ docker compose ps
 docker compose exec postgres pg_isready -U todo -d todo_platform
 ```
 
-执行迁移：
+执行迁移。`-T` 表示不分配伪终端，更适合脚本化执行 SQL 文件：
 
 ```bash
 docker compose exec -T postgres psql -U todo -d todo_platform -f /migrations/000001_create_todos.up.sql
@@ -1291,7 +1309,7 @@ docker compose down -v
 
 ## 7. 生产环境注意事项
 
-1. **迁移必须纳入发布流程**。本篇用 `psql -f` 是为了教学透明，生产环境不要让开发临时手工改库。迁移应有版本、审核、执行日志和回滚方案，并且要区分向前兼容变更和破坏性变更。
+1. **迁移和审计结构必须纳入发布流程**。本篇用 `psql -f` 是为了教学透明，生产环境不要让开发临时手工改库。迁移应有版本、审核、执行日志和回滚方案，并且要区分向前兼容变更和破坏性变更。审计表也要在设计阶段保存必要快照，例如操作者、请求 ID、变更前后值和来源服务，避免主表删除后审计信息失去上下文。
 
 2. **连接池不是越大越好**。API 的 `MaxOpenConns` 要和 PostgreSQL 的最大连接数、API 副本数、查询耗时一起设计。多个 API 副本同时把连接池开得过大，会把数据库连接打满，导致所有服务一起变慢。
 
@@ -1299,11 +1317,7 @@ docker compose down -v
 
 4. **索引要基于查询路径设计**。本篇按 `status` 查询，所以创建 `idx_todos_status`。如果后续按创建时间分页、按用户过滤、按关键词搜索，索引设计也要跟着变化。不要看到慢查询就盲目加索引，先看 `EXPLAIN ANALYZE`。
 
-5. **集成测试必须隔离数据库**。本篇用 `todo_platform_test` 跑会重置 schema 的测试，避免误删开发库。生产团队通常会让 CI 为每次测试创建临时数据库、临时 schema 或容器化数据库实例，测试结束后整体销毁。
-
-6. **审计表要保存必要快照**。本篇 `todo_events` 只保存 `todo_id` 和 `event_type`，是为了聚焦事务。生产审计通常还要保存操作者、请求 ID、变更前后值、发生时间和来源服务，避免主表删除后审计信息失去上下文。
-
-7. **错误信息要分层处理**。服务端日志可以记录数据库错误细节，但 HTTP 响应不要暴露 SQL、表名、连接串或内部结构。Handler 仍然应该返回稳定的业务错误码，例如 `not_found`、`invalid_title`、`internal_error`。
+5. **集成测试和错误信息都要隔离风险**。本篇用 `todo_platform_test` 跑会重置 schema 的测试，避免误删开发库。生产团队通常会让 CI 为每次测试创建临时数据库、临时 schema 或容器化数据库实例，测试结束后整体销毁。服务端日志可以记录数据库错误细节，但 HTTP 响应不要暴露 SQL、表名、连接串或内部结构。
 
 ## 8. 本章小项目
 
@@ -1340,7 +1354,7 @@ docker compose down -v
 
 ### 9.2 实操题
 
-1. 给 `todos` 表增加 `priority` 字段，允许值为 `low`、`normal`、`high`，默认 `normal`。验收标准：迁移 SQL、Repository 查询和集成测试都能通过。
+1. 给 `todos` 表增加 `priority` 字段，允许值为 `low`、`normal`、`high`，默认 `normal`。不要修改已有 `000001` 迁移，新增 `000002_add_todo_priority.up.sql` 和对应 down 迁移。验收标准：迁移 SQL、Repository 查询和集成测试都能通过。
 2. 给列表接口增加按 `created_at DESC` 排序的 Repository 方法。验收标准：插入 3 条 Todo 后，测试能验证最新创建的 Todo 排在前面。
 3. 给 `todo_events` 增加 `request_id` 字段。验收标准：迁移文件包含字段，事件插入 SQL 能写入固定测试值。
 
