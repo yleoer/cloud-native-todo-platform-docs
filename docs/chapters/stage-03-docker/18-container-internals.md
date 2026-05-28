@@ -39,7 +39,7 @@
     `unshare`、`mount`、`chroot`、cgroup 写入等命令需要管理员权限。请只在个人学习机、虚拟机或 WSL2 Ubuntu 中执行，不要在生产服务器、公司共享跳板机或核心环境中练习。
 
 !!! note "关于 cgroup v2 与 cgcreate"
-    课程计划中提到 `cgcreate`，它来自 cgroup-tools，在一些 cgroup v1 环境中常见。现代发行版大多默认使用 cgroup v2，本篇主线使用 `/sys/fs/cgroup` 直接观察和写入 cgroup v2 文件，并在实验中给出 `cgcreate` 的可选对照。
+    一些 Linux 教材会使用 `cgcreate` 管理 cgroup，它来自 cgroup-tools，常见于 cgroup v1 环境。现代发行版大多默认使用 cgroup v2，本篇主线使用 `/sys/fs/cgroup` 直接观察和写入 cgroup v2 文件，并在实验中给出 `cgcreate` 的可选对照。
 
 ## 2. 本章工作场景与真实案例
 
@@ -138,15 +138,15 @@ namespace 负责“看起来像独立环境”。它隔离的是进程能看到�
 
 表 18-1 常见 Linux namespace：
 
-| namespace | 隔离内容 | 容器中的体现 |
-|---|---|---|
-| PID | 进程编号和进程树 | 容器内有自己的 PID 1 |
-| UTS | 主机名和域名 | 容器内 hostname 可不同 |
-| Mount | 挂载点视图 | 容器内看到自己的 rootfs |
-| Network | 网卡、IP、路由、防火墙规则 | 容器有自己的网络栈 |
-| IPC | System V IPC、POSIX message queue | 进程间通信隔离 |
-| User | 用户和用户组 ID 映射 | 容器内 root 可映射到宿主机非 root |
-| Cgroup | cgroup 层级视图 | 进程只能看到部分资源控制信息 |
+| namespace | 全称 | 隔离内容 | 容器中的体现 |
+|---|---|---|---|
+| PID | Process ID | 进程编号和进程树 | 容器内有自己的 PID 1 |
+| UTS | Unix Timesharing System | 主机名和域名 | 容器内 hostname 可不同 |
+| Mount | Mount | 挂载点视图 | 容器内看到自己的 rootfs |
+| Network | Network | 网卡、IP、路由、防火墙规则 | 容器有自己的网络栈 |
+| IPC | Inter-Process Communication | System V IPC、POSIX message queue | 进程间通信隔离 |
+| User | User | 用户和用户组 ID 映射 | 容器内 root 可映射到宿主机非 root |
+| Cgroup | Control Groups | cgroup 层级视图 | 进程只能看到部分资源控制信息 |
 
 namespace 不直接限制资源。它回答的是“能看见什么”。
 
@@ -289,6 +289,8 @@ flowchart TB
 └── PID 12 ps
 ```
 
+注意，示例中的 `todo-api` 在宿主机上可能是 PID 2305，但在容器 PID namespace 内是 PID 1。
+
 这不是因为宿主机进程不存在，而是容器进程所在的 PID namespace 看不到它们。
 
 Network namespace 也是同理。容器内的 `lo`、`eth0`、路由表和 iptables 规则属于容器自己的网络视图。容器访问 `127.0.0.1` 时访问的是自己的回环地址。
@@ -419,6 +421,8 @@ command -v lsns
 command -v findmnt
 command -v ip
 command -v python3
+unshare --help 2>&1 | grep -q mount-proc && echo "mount-proc: ok" || echo "mount-proc: unsupported"
+grep -qw overlay /proc/filesystems && echo "overlay: ok" || echo "overlay: unsupported"
 stat -fc %T /sys/fs/cgroup
 test -f /sys/fs/cgroup/cgroup.controllers && cat /sys/fs/cgroup/cgroup.controllers || true
 ```
@@ -430,6 +434,8 @@ test -f /sys/fs/cgroup/cgroup.controllers && cat /sys/fs/cgroup/cgroup.controlle
 | `docker version` | 能看到 Client 和 Server | 启动 Docker Desktop 或 Docker Engine |
 | `command -v unshare` | 输出命令路径 | 安装 `util-linux` |
 | `command -v ip` | 输出命令路径 | 安装 `iproute2` |
+| `mount-proc: ok` | `unshare` 支持 `--mount-proc` | 升级 util-linux，或在 PID namespace 实验中手动挂载 `/proc` |
+| `overlay: ok` | 内核支持 OverlayFS | 跳过 OverlayFS 手动挂载实验，保留概念学习 |
 | `stat -fc %T /sys/fs/cgroup` | 推荐输出 `cgroup2fs` | 不能手动做 cgroup v2 实验时，使用 Docker 资源限制替代实验 |
 | `cgroup.controllers` | 包含 `cpu`、`memory` 更好 | 缺失 controller 时跳过手动 cgroup，保留 Docker 观察实验 |
 | `python3` | 输出命令路径 | 不做 Python 内存限制实验，或安装 Python 3 |
@@ -504,6 +510,8 @@ for i in range(128):
     time.sleep(0.05)
 PY
 ```
+
+这个脚本最多分配 128 次，每次 1 MiB，总计 128 MiB。后面的 cgroup 实验会把内存限制设为 64 MiB，因此它通常会在接近或略超过 64 MiB 时被内核终止。
 
 创建简化容器脚本：
 
@@ -580,6 +588,7 @@ chmod +x "$LAB/mini-container.sh"
 - `CGROUP` 默认使用 `/sys/fs/cgroup/todo-mini`。
 - `INSIDE_MINI_NS=1` 是防误执行保护，要求脚本必须通过后面的 `unshare` 命令启动。
 - cgroup 写入失败时只输出 `warn` 并继续，避免受限环境中断 namespace 和 rootfs 实验。
+- cgroup 操作必须在 `chroot` 之前完成，因为 `chroot` 后无法访问宿主机的 `/sys/fs/cgroup`。
 - `mount -t proc` 让 chroot 后的进程可以看到自己的 `/proc`。
 - `trap cleanup EXIT` 保证退出时卸载 rootfs 内的 `/proc`。
 - namespace 由启动命令中的 `unshare` 创建，脚本本身只负责 rootfs、cgroup 和 chroot。
@@ -873,6 +882,8 @@ echo "app layer" > image-layers/app/app.txt
 df -T "$LAB"
 ```
 
+OverlayFS 要求 `upperdir` 和 `workdir` 所在文件系统支持 overlay。通常 ext4、xfs 可以满足要求，某些网络文件系统、特殊挂载点或 WSL2 中的 `/mnt/c/...` 可能不支持。
+
 挂载 overlay：
 
 ```bash
@@ -917,8 +928,12 @@ test -x "$LAB/mini-container.sh"
 使用 `unshare` 创建 PID、UTS、Mount namespace，再执行脚本。`INSIDE_MINI_NS=1` 是脚本的防误执行开关：
 
 ```bash
-sudo env LAB="$LAB" INSIDE_MINI_NS=1 unshare --fork --pid --uts --mount --propagation private "$LAB/mini-container.sh"
+sudo env LAB="$LAB" INSIDE_MINI_NS=1 \
+  unshare --fork --pid --uts --mount --propagation private \
+  "$LAB/mini-container.sh"
 ```
+
+`INSIDE_MINI_NS=1` 通过 `env` 传递给脚本，作为防误执行开关。如果直接以 root 执行脚本，脚本会拒绝运行并提示必须通过 `unshare` 启动。
 
 预期现象：
 
@@ -944,6 +959,8 @@ sudo nsenter --target "$DEMO_PID" --uts hostname
 sudo nsenter --target "$DEMO_PID" --pid --mount ps -o pid,ppid,comm
 sudo nsenter --target "$DEMO_PID" --net ip addr
 ```
+
+第二条命令同时进入 PID 和 Mount namespace，是因为 `ps` 需要读取容器内的 `/proc`，而 `/proc` 属于 Mount namespace 管辖。
 
 清理：
 
@@ -1024,7 +1041,9 @@ docker run --rm --memory=64m --cpus=0.5 alpine:3.23 sh -c 'cat /proc/self/cgroup
 stat -fc %T /sys/fs/cgroup
 test -f /sys/fs/cgroup/cgroup.controllers && cat /sys/fs/cgroup/cgroup.controllers || true
 test -x "$LAB/mini-container.sh"
-sudo env LAB="$LAB" INSIDE_MINI_NS=1 unshare --fork --pid --uts --mount --propagation private "$LAB/mini-container.sh"
+sudo env LAB="$LAB" INSIDE_MINI_NS=1 \
+  unshare --fork --pid --uts --mount --propagation private \
+  "$LAB/mini-container.sh"
 ```
 
 验收标准：
@@ -1383,5 +1402,7 @@ findmnt | grep container-lab || echo "no container-lab mounts"
 能力价值上，你已经能解释 OOMKilled、CPU throttling、容器内 PID 1、容器可写层丢失、privileged 风险和镜像分层等真实工作问题，为后续学习 containerd、runc、CRI 和 Kubernetes 运行时打下基础。
 
 ## 12. 下一章衔接
+
+回顾阶段三前四篇的递进：Ch15 手工运行容器，Ch16 构建镜像，Ch17 编排多服务，本篇拆解底层机制。第 19 篇会继续向下拆解 OCI 运行时规范。
 
 第 19 篇会继续向下拆解 Docker 背后的运行时链路：OCI image-spec / runtime-spec、runc、containerd、shim、CRI 和 kubelet。没有本篇的 namespace、cgroup、rootfs 和 OverlayFS 基础，下一篇看到 `runc spec`、`config.json`、containerd snapshot 和 CRI sandbox 时会很难建立对应关系。
