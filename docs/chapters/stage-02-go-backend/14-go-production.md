@@ -2314,6 +2314,8 @@ func slogLevel(level string) slog.Level {
 
 ### 5.5 执行命令
 
+本篇代码量比前几章更大，建议按三段完成：先运行内存模式，确认认证、配置和中间件链路可用；再按需启动 PostgreSQL 与 Redis，验证持久化、缓存和限流仍然保留；最后单独启用 pprof，抓取 goroutine、heap 和 CPU profile。这样即使某个外部依赖暂时不可用，也能先完成生产化主线。
+
 拉取生产化依赖并整理依赖：
 
 ```bash
