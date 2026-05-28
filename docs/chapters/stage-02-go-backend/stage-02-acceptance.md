@@ -2,7 +2,7 @@
 
 阶段二的目标不是只学会几段 Go 语法，而是把 `cloud-native-todo-platform` 推进成一个可运行、可测试、可排障、可展示的后端项目。
 
-完成本附录后，你应该能把第 7-13 篇的成果整理成一份作品集：命令行 Todo 工具、并发统计任务、工程化项目结构、RESTful API、PostgreSQL 持久化、Redis 缓存与限流、JWT 鉴权、配置分层、结构化日志、自动化测试和生产化运行命令。
+完成本附录后，你应该能把第 7-14 篇的成果整理成一份作品集：命令行 Todo 工具、工程化项目结构、标准库 API、Gin API、并发统计任务、PostgreSQL 持久化、Redis 缓存与限流、JWT 鉴权、配置分层、结构化日志、自动化测试和生产化运行命令。
 
 ## 1. 验收目标
 
@@ -73,10 +73,10 @@ cloud-native-todo-platform/
 
 | 工具 | 建议版本 | 说明 |
 |---|---|---|
-| Go | `1.24+` | 课程示例使用 `go 1.24`。使用更新版本时，`go mod tidy` 可能自动调整 `go.mod` 中的 `go` 或 `toolchain` 字段。 |
-| Docker Compose | v2 | 第 11、12 篇用于启动 PostgreSQL 和 Redis。 |
-| PostgreSQL | 16 或更新主版本 | 本地实验可使用 Docker Compose。 |
-| Redis | 7 或更新主版本 | 本地实验可使用 Docker Compose。 |
+| Go | `1.26.x` | 与新版课程 Go 工具链保持一致。 |
+| Docker Compose | v2 | 第 12、13 篇用于启动 PostgreSQL 和 Redis。 |
+| PostgreSQL | 18 | 本地实验可使用 Docker Compose。 |
+| Redis | 8.2 | 本地实验可使用 Docker Compose。 |
 | curl | 任意现代版本 | 用于 API smoke test。 |
 | jq | 可选 | Linux、macOS、WSL2 中可用于解析登录响应。 |
 

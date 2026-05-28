@@ -39,9 +39,10 @@
 - [第 8 篇：Go 工程化与测试](docs/chapters/stage-02-go-backend/08-go-engineering-testing.md)
 - [第 9 篇：Go net/http 标准库与 HTTP 服务](docs/chapters/stage-02-go-backend/09-go-net-http.md)
 - [第 10 篇：Go Web API 开发——Gin 框架](docs/chapters/stage-02-go-backend/10-go-web-api.md)
-- [第 11 篇：数据库与持久化开发](docs/chapters/stage-02-go-backend/11-database.md)
-- [第 12 篇：Redis、缓存与异步任务](docs/chapters/stage-02-go-backend/12-redis-cache.md)
-- [第 13 篇：Go 后端生产化能力](docs/chapters/stage-02-go-backend/13-go-production.md)
+- [第 11 篇：Go 并发编程](docs/chapters/stage-02-go-backend/11-go-concurrency.md)
+- [第 12 篇：数据库与持久化开发](docs/chapters/stage-02-go-backend/12-database.md)
+- [第 13 篇：Redis、缓存与异步任务](docs/chapters/stage-02-go-backend/13-redis-cache.md)
+- [第 14 篇：Go 后端生产化能力](docs/chapters/stage-02-go-backend/14-go-production.md)
 - [附录 A：Go 后端项目综合验收](docs/chapters/stage-02-go-backend/stage-02-acceptance.md)
 
 </details>
@@ -51,11 +52,11 @@
 
 Docker 基础、Dockerfile、Compose、容器原理、OCI、containerd、runc 和 CRI。
 
-- [第 14 篇：Docker 基础](docs/chapters/stage-03-docker/14-docker-basics.md)
-- [第 15 篇：Dockerfile 与镜像构建](docs/chapters/stage-03-docker/15-dockerfile.md)
-- [第 16 篇：Docker Compose 本地编排](docs/chapters/stage-03-docker/16-docker-compose.md)
-- [第 17 篇：容器运行原理](docs/chapters/stage-03-docker/17-container-internals.md)
-- [第 18 篇：OCI、containerd、runc 与 CRI](docs/chapters/stage-03-docker/18-container-runtime.md)
+- [第 15 篇：Docker 基础](docs/chapters/stage-03-docker/15-docker-basics.md)
+- [第 16 篇：Dockerfile 与镜像构建](docs/chapters/stage-03-docker/16-dockerfile.md)
+- [第 17 篇：Docker Compose 本地编排](docs/chapters/stage-03-docker/17-docker-compose.md)
+- [第 18 篇：容器运行原理](docs/chapters/stage-03-docker/18-container-internals.md)
+- [第 19 篇：OCI、containerd、runc 与 CRI](docs/chapters/stage-03-docker/19-oci-containerd-cri.md)
 - [附录 A：Docker 容器技术综合验收](docs/chapters/stage-03-docker/stage-03-acceptance.md)
 - [附录 B：Docker 速查与排障手册](docs/chapters/stage-03-docker/stage-03-cheatsheet-troubleshooting.md)
 
@@ -180,16 +181,17 @@ docs/
 │   │   ├── 08-go-engineering-testing.md # 第 8 篇：Go 工程化与测试
 │   │   ├── 09-go-net-http.md        # 第 9 篇：Go net/http 标准库与 HTTP 服务
 │   │   ├── 10-go-web-api.md         # 第 10 篇：Go Web API 开发——Gin 框架
-│   │   ├── 11-database.md           # 第 11 篇：数据库与持久化开发
-│   │   ├── 12-redis-cache.md        # 第 12 篇：Redis、缓存与异步任务
-│   │   ├── 13-go-production.md      # 第 13 篇：Go 后端生产化能力
+│   │   ├── 11-go-concurrency.md     # 第 11 篇：Go 并发编程
+│   │   ├── 12-database.md           # 第 12 篇：数据库与持久化开发
+│   │   ├── 13-redis-cache.md        # 第 13 篇：Redis、缓存与异步任务
+│   │   ├── 14-go-production.md      # 第 14 篇：Go 后端生产化能力
 │   │   └── stage-02-acceptance.md   # 阶段二附录 A：Go 后端项目综合验收
 │   ├── stage-03-docker/        # 阶段三：容器化能力
-│   │   ├── 14-docker-basics.md      # 第 14 篇：Docker 基础
-│   │   ├── 15-dockerfile.md         # 第 15 篇：Dockerfile 与镜像构建
-│   │   ├── 16-docker-compose.md     # 第 16 篇：Docker Compose 本地编排
-│   │   ├── 17-container-internals.md # 第 17 篇：容器运行原理
-│   │   ├── 18-container-runtime.md   # 第 18 篇：OCI、containerd、runc 与 CRI
+│   │   ├── 15-docker-basics.md      # 第 15 篇：Docker 基础
+│   │   ├── 16-dockerfile.md         # 第 16 篇：Dockerfile 与镜像构建
+│   │   ├── 17-docker-compose.md     # 第 17 篇：Docker Compose 本地编排
+│   │   ├── 18-container-internals.md # 第 18 篇：容器运行原理
+│   │   ├── 19-oci-containerd-cri.md  # 第 19 篇：OCI、containerd、runc 与 CRI
 │   │   ├── stage-03-acceptance.md    # 阶段三附录 A：综合验收
 │   │   └── stage-03-cheatsheet-troubleshooting.md # 阶段三附录 B：速查与排障
 │   └── ...                     # 后续阶段章节（待完成）

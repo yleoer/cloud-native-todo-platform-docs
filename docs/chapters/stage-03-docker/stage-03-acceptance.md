@@ -2,7 +2,7 @@
 
 阶段三的目标不是只会执行几条 `docker run` 命令，而是把 Todo Platform 从“本地 Go 服务”推进为“可构建、可运行、可排障、可交付的容器化服务”。
 
-完成本附录后，你应该能把第 14-18 篇的成果整理成作品集：Docker CLI 运行环境、生产风格 Dockerfile、Compose 本地编排、容器底层观察记录、运行时关系说明和排障复盘。
+完成本附录后，你应该能把第 15-19 篇的成果整理成作品集：Docker CLI 运行环境、生产风格 Dockerfile、Compose 本地编排、容器底层观察记录、运行时关系说明和排障复盘。
 
 ## 1. 验收目标
 
@@ -54,8 +54,8 @@ cloud-native-todo-platform/
 | Docker Compose | v2.20 或更新版本 | 使用 `docker compose`，不是旧版 `docker-compose` |
 | Go 镜像 | `golang:1.26` / `golang:1.26-bookworm` | 与阶段二 Go 后端项目保持当前稳定工具链 |
 | Alpine 镜像 | `alpine:3.23` | 用于轻量命令实验和 rootfs 观察 |
-| PostgreSQL | `postgres:16` | 阶段二数据库能力延续 |
-| Redis | `redis:7` | 阶段二缓存与限流能力延续 |
+| PostgreSQL | `postgres:18` | 阶段二数据库能力延续 |
+| Redis | `redis:8.2` | 阶段二缓存与限流能力延续 |
 | kind | 当前稳定版 | 第 18 篇用于观察 Kubernetes 节点运行时 |
 | kubectl | 与 kind 集群兼容 | 用于部署和查看探针工作负载 |
 
