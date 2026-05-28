@@ -1332,4 +1332,6 @@ docker compose --env-file .env up -d --force-recreate
 
 第 18 篇会进入容器运行原理。我们会基于本篇启动的容器观察 namespace、cgroups、UnionFS、容器进程、挂载点和网络隔离。到那时你会看到：Compose 负责把服务编排起来，但每个容器的底层仍然依赖 Linux 内核能力和 OCI 运行时。
 
+下一篇会比前面几篇更底层：你会接触 `sudo`、`unshare`、cgroup v2、OverlayFS 和 `/proc`。如果你的环境是 macOS 或 Windows PowerShell，不需要硬闯底层命令，按第 18 篇的路线切到 WSL2 Ubuntu / Linux VM，或完成 Docker 替代观察实验即可。
+
 也就是说，第 15 篇让你手动理解容器运行参数，第 16 篇让你构建可交付镜像，第 17 篇让你编排多服务本地环境。第 18 篇开始，我们会把这些现象继续拆开，看清容器为什么“看起来像一台小机器”，但本质上不是虚拟机。
