@@ -32,7 +32,7 @@
 ### 1.2 技能目标
 
 - 能为 Todo API 增加 `/api/v2/auth/login` 登录接口。
-- 能使用 HMAC-SHA256 签发并校验 JWT。
+- 能使用 HMAC-SHA256（Hash-based Message Authentication Code with SHA-256）签发并校验 JWT。
 - 能用中间件保护 Todo CRUD 接口，并保留健康检查和登录接口公开访问。
 - 能输出包含 `request_id`、`user`、`method`、`path`、`status` 的结构化日志和审计日志。
 - 能通过 `configs/base.json`、`configs/dev.json`、`configs/test.json`、`configs/prod.json` 和环境变量加载配置。
@@ -183,7 +183,7 @@ CORS 决定浏览器页面能否跨域调用 API。后端服务不应该默认�
 - `Referrer-Policy: no-referrer`
 - `Content-Security-Policy: default-src 'none'; frame-ancestors 'none'`
 
-Rate Limiting 已在第 13 篇用 Redis 实现，本篇重点是把它纳入生产中间件链路：先做请求 ID 和安全 Header，再做 CORS，再做认证和审计，最后进入业务 Handler。
+Rate Limiting 已在第 13 篇用 Redis 实现，本篇重点是把它纳入生产中间件链路。限流仍然作为 `net/http` middleware 包在 Gin 路由外层，在请求进入 Gin Handler 之前生效；Gin 内部继续负责请求 ID、安全 Header、CORS、认证、审计和业务 Handler。
 
 ### 3.6 服务启动、优雅关闭与运维命令
 
@@ -278,7 +278,7 @@ RequestID -> AccessLog -> Recovery -> Timeout -> BodyLimit -> SecurityHeaders ->
 
 JWT Secret 用来签名 Token，泄露后攻击者可以伪造 Token。生产环境必须使用足够长、随机、可轮换的 Secret。本篇要求至少 32 字节。
 
-用户密码不能明文保存，也不应该用普通 SHA256。普通哈希太快，适合攻击者批量撞库。本篇用 bcrypt 保存密码哈希，并提供 `hash-password` 命令生成哈希。bcrypt 成本参数越高越慢，安全性越好，但登录延迟也越高；本地教学使用默认成本即可。
+用户密码不能明文保存，也不应该用普通 SHA256。普通哈希太快，适合攻击者批量撞库。本篇用 bcrypt（一种面向密码存储的慢哈希算法）保存密码哈希，并提供 `hash-password` 命令生成哈希。bcrypt 成本参数越高越慢，安全性越好，但登录延迟也越高；本地教学使用默认成本即可。
 
 本篇手写一个最小 JWT 实现，是为了让你看清 header、payload、signature、`alg` 校验和过期时间校验之间的关系。真实生产项目通常应优先使用维护良好的 JWT 库，并配合 `kid`、密钥轮换、Token 撤销策略和更完整的安全测试。
 
@@ -752,11 +752,13 @@ func validate(cfg Config) error {
 			return errors.New("auth users must include username and password hash")
 		}
 	}
-	if cfg.Redis.CacheTTL <= 0 {
-		return errors.New("redis cache ttl must be positive")
-	}
-	if cfg.Redis.RateLimitPerMinute <= 0 {
-		return errors.New("redis rate limit must be positive")
+	if cfg.Redis.Addr != "" {
+		if cfg.Redis.CacheTTL <= 0 {
+			return errors.New("redis cache ttl must be positive")
+		}
+		if cfg.Redis.RateLimitPerMinute <= 0 {
+			return errors.New("redis rate limit must be positive")
+		}
 	}
 	return nil
 }
@@ -897,6 +899,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"strconv"
 	"strings"
 	"time"
@@ -967,12 +970,8 @@ func (m *TokenManager) Verify(token string) (Claims, error) {
 	if !hmac.Equal([]byte(expected), []byte(parts[2])) {
 		return Claims{}, ErrInvalidToken
 	}
-	var payload map[string]any
-	data, err := base64.RawURLEncoding.DecodeString(parts[1])
+	payload, err := decodePayload(parts[1])
 	if err != nil {
-		return Claims{}, ErrInvalidToken
-	}
-	if err := json.Unmarshal(data, &payload); err != nil {
 		return Claims{}, ErrInvalidToken
 	}
 	subject, _ := payload["sub"].(string)
@@ -1019,6 +1018,23 @@ func decodeHeader(part string) (map[string]string, error) {
 		return nil, err
 	}
 	return header, nil
+}
+
+func decodePayload(part string) (map[string]any, error) {
+	data, err := base64.RawURLEncoding.DecodeString(part)
+	if err != nil {
+		return nil, err
+	}
+	decoder := json.NewDecoder(strings.NewReader(string(data)))
+	decoder.UseNumber()
+	var payload map[string]any
+	if err := decoder.Decode(&payload); err != nil {
+		return nil, err
+	}
+	if decoder.Decode(&struct{}{}) != io.EOF {
+		return nil, ErrInvalidToken
+	}
+	return payload, nil
 }
 
 func sign(unsigned string, secret []byte) string {
@@ -1206,6 +1222,8 @@ func writeError(c *gin.Context, status int, code, message string) {
 	c.JSON(status, Envelope{Error: &ErrorBody{Code: code, Message: message}})
 }
 
+// writeSafeError is the boundary for user-facing errors. Production projects
+// can add redaction, error-code mapping, or locale handling here.
 func writeSafeError(c *gin.Context, status int, code, message string) {
 	writeError(c, status, code, message)
 }
@@ -1256,6 +1274,8 @@ type requestIDKey struct{}
 var requestSeq uint64
 
 // RequestID attaches a request ID to the response header and request context.
+// Sequential IDs are easy to read in teaching; production systems should use
+// random IDs such as UUID v4 or trace IDs to avoid predictable request IDs.
 func RequestID() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		id := c.GetHeader("X-Request-ID")
@@ -1414,7 +1434,7 @@ func isMutation(method string) bool {
 }
 ```
 
-更新 `api/internal/handler/gin/handler.go`：
+更新 `api/internal/handler/gin/handler.go`。这是第 10 篇以来 `NewRouter` 的首次签名变更：新增 `Options` 参数，用于传入 CORS 允许来源和 Auth 服务。`defaultRequestTimeout` 仍然复用第 10 篇创建的 `api/internal/handler/gin/config.go`。
 
 ```go title="api/internal/handler/gin/handler.go"
 package ginapi
@@ -2240,6 +2260,9 @@ func migrate(cfg appconfig.Config) error {
 	defer db.Close()
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
+	if err := db.PingContext(ctx); err != nil {
+		return fmt.Errorf("connect database: %w", err)
+	}
 	content, err := os.ReadFile("api/migrations/000001_create_todos.up.sql")
 	if err != nil {
 		return err
@@ -2286,7 +2309,7 @@ func slogLevel(level string) slog.Level {
 - 默认命令是 `serve`，兼容直接运行 `./bin/todo-api`。
 - `config-check` 只检查配置，不启动服务，适合 CI/CD。
 - `hash-password` 只输出哈希，不记录明文密码。
-- `migrate` 复用第 12 篇迁移文件。
+- `migrate` 复用第 12 篇迁移文件。本篇的 `migrate` 是教学简化版，只执行 up 迁移文件，不记录迁移版本；生产项目应使用 `golang-migrate`、`goose` 等工具管理版本、回滚和幂等执行。
 - pprof 使用独立端口，并默认关闭。
 
 ### 5.5 执行命令
@@ -2316,6 +2339,8 @@ export TODO_JWT_SECRET=0123456789abcdef0123456789abcdef
 export TODO_AUTH_USERS="admin=$HASH"
 ```
 
+这里的 `TODO_JWT_SECRET` 是本地实验固定值，方便复制验证；生产环境必须使用随机 Secret，并通过部署系统或密钥管理系统注入。
+
 如果你使用 PowerShell：
 
 ```powershell
@@ -2338,6 +2363,12 @@ go run ./api/cmd/todo-api config-check
 go fmt ./api/...
 go test ./api/...
 go build -o bin/todo-api ./api/cmd/todo-api
+```
+
+如果你希望启用完整的 PostgreSQL + Redis 环境，先启动容器；如果不设置 `TODO_DATABASE_DSN` 和 `TODO_REDIS_ADDR`，API 会回退到内存模式，仍然可以完成认证和中间件实验：
+
+```bash
+docker compose up -d postgres redis
 ```
 
 启动 Todo API v5：
@@ -2377,10 +2408,12 @@ curl -i -H "Authorization: Bearer $TOKEN" \
 TODO_PPROF_ENABLED=true ./bin/todo-api serve
 ```
 
-另开终端抓取 goroutine profile：
+另开终端分别抓取 goroutine、heap 和 CPU profile：
 
 ```bash
 go tool pprof -top http://127.0.0.1:18081/debug/pprof/goroutine
+go tool pprof -top http://127.0.0.1:18081/debug/pprof/heap
+go tool pprof -top "http://127.0.0.1:18081/debug/pprof/profile?seconds=5"
 ```
 
 ### 5.6 预期输出
@@ -2415,7 +2448,7 @@ HTTP/1.1 401 Unauthorized
 {"level":"INFO","msg":"audit event","user":"admin","method":"POST","path":"/api/v2/todos","status":201,"request_id":"3"}
 ```
 
-pprof 输出中应能看到 goroutine 相关函数和采样数量。
+pprof 输出中应能看到 goroutine、heap 或 CPU profile 对应的函数和采样数量。
 
 ### 5.7 验证方法
 
