@@ -63,11 +63,11 @@ Docker 基础、Dockerfile、Compose、容器原理、OCI、containerd、runc �
 </details>
 
 <details>
-<summary><strong>阶段四：Kubernetes 应用交付（第 20-28 篇，规划中）</strong></summary>
+<summary><strong>阶段四：Kubernetes 应用交付（第 20-28 篇，当前已发布第 20 篇）</strong></summary>
 
 Kubernetes 架构、工作负载、Service / Ingress / Gateway API、配置、存储、网络、安全、Helm 4 和 Kustomize。
 
-- 第 20 篇：Kubernetes 架构与集群搭建
+- [第 20 篇：Kubernetes 架构与集群搭建](docs/chapters/stage-04-kubernetes/20-k8s-architecture.md)
 - 第 21 篇：Kubernetes 核心工作负载
 - 第 22 篇：Service、Ingress 与流量入口
 - 第 23 篇：ConfigMap、Secret 与配置管理
@@ -163,7 +163,7 @@ mkdocs serve
 
 ## 📖 文档结构
 
-```
+```text
 docs/
 ├── index.md                    # 首页
 ├── chapters/                   # 课程章节
@@ -194,6 +194,8 @@ docs/
 │   │   ├── 19-oci-containerd-cri.md  # 第 19 篇：OCI、containerd、runc 与 CRI
 │   │   ├── stage-03-acceptance.md    # 阶段三附录 A：综合验收
 │   │   └── stage-03-cheatsheet-troubleshooting.md # 阶段三附录 B：速查与排障
+│   ├── stage-04-kubernetes/    # 阶段四：Kubernetes 应用交付
+│   │   └── 20-k8s-architecture.md # 第 20 篇：Kubernetes 架构与集群搭建
 │   └── ...                     # 后续阶段章节（待完成）
 ├── projects/                   # 项目实战
 ├── labs/                       # 实验索引
@@ -280,7 +282,7 @@ GitHub Pages 设置：
 
 DNS 配置：
 
-```
+```text
 类型: CNAME
 主机记录: docs
 记录值: <GitHub用户名>.github.io
