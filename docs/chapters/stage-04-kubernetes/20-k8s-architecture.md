@@ -1,6 +1,8 @@
 # 第 20 篇：Kubernetes 架构与集群搭建 [A]
 
-第 19 篇已经把 Docker、containerd、runc 和 CRI 的关系拆开了。本篇开始进入阶段四 Kubernetes 应用交付：先不急着部署 Todo API 的完整生产形态，而是先回答三个基础问题：
+第 19 篇已经把 Docker、containerd、runc 和 CRI 的关系拆开了。本篇开始进入阶段四 Kubernetes 应用交付：你仍然会用 Docker 承载 kind 节点，但 Pod 容器会由节点内部的 kubelet 通过 CRI 调 containerd 管理。也就是说，操作入口从 `docker run` 变成 `kubectl apply`，底层仍然接续阶段三学过的运行时链路。
+
+先不急着部署 Todo API 的完整生产形态，本篇先回答三个基础问题：
 
 - Kubernetes 到底在管理什么？
 - 一个本地 kind 集群由哪些组件组成？
@@ -35,10 +37,10 @@
 - 第 19 篇：理解 kubelet 通过 CRI 调 containerd，知道 kind 节点内部运行自己的 containerd。
 - 第 1 篇：已经安装 Docker、kubectl 和 kind。
 
-本篇命令以 Linux / macOS / WSL2 Bash 为主。Windows 用户建议在 WSL2 Ubuntu 中执行；如果使用 PowerShell，需要把 Bash 变量写法改为 PowerShell 变量。
+本篇命令以 Linux / macOS / WSL2 Bash 为主。Windows 用户建议在 WSL2 Ubuntu 中执行整篇实验，避免 Bash 变量、管道和重定向写法在 PowerShell 中产生额外差异；如果必须使用 PowerShell，需要把 Bash 变量写法改为 PowerShell 变量。
 
 !!! note "关于 Kubernetes 与 kind 版本"
-    课程蓝图锁定 Kubernetes 1.36.x。当前 kind v0.31.0 默认节点镜像仍是 `kindest/node:v1.35.0@sha256:452d707d4862f52530247495d180205e029056831160e22870e37e3f6c1ac31f`。本篇实验不依赖 1.36 专属 API，因此默认使用 kind 当前稳定节点镜像；如果你本地已经有可用的 1.36.x kind 节点镜像，可以通过 `KIND_NODE_IMAGE` 环境变量覆盖。
+    课程蓝图锁定 Kubernetes 1.36.x，但 kind v0.31.0 官方发布说明中预构建并推荐固定 digest 的默认节点镜像仍是 `kindest/node:v1.35.0@sha256:452d707d4862f52530247495d180205e029056831160e22870e37e3f6c1ac31f`。本篇实验不依赖 1.36 专属 API，因此主线优先使用 kind 官方当前稳定节点镜像，保证读者能复现。出版前如果 kind 官方 release 已提供 1.36.x 预构建节点镜像及 digest，应统一替换；如果你本地已经有可用的 1.36.x kind 节点镜像，也可以通过 `KIND_NODE_IMAGE` 环境变量覆盖。
 
 ## 2. 本章工作场景与真实案例
 
@@ -248,7 +250,7 @@ Kubernetes 排障不能只看对象列表。一个 Pod 的完整线索通常来�
 | kubectl | 1.36.x | 操作 Kubernetes API |
 | kind | 0.31+ | 创建本地 Kubernetes 集群 |
 | kind node image | 默认 `kindest/node:v1.35.0`，可用 `KIND_NODE_IMAGE` 覆盖 | 节点内置控制面、kubelet、containerd |
-| Alpine | `alpine:3.23` | smoke Pod 镜像 |
+| Alpine BusyBox `nc` | `alpine:3.23` | smoke Pod 的临时 HTTP 响应进程 |
 | Todo API 镜像 | `todo-api:v0.1.0` | 后续章节部署对象 |
 
 检查工具：
@@ -299,12 +301,12 @@ kind: Cluster
 apiVersion: kind.x-k8s.io/v1alpha4
 nodes:
   - role: control-plane
-    image: ${KIND_NODE_IMAGE:-kindest/node:v1.35.0@sha256:452d707d4862f52530247495d180205e029056831160e22870e37e3f6c1ac31f} # ← kind v0.31.0 默认节点镜像，可用环境变量覆盖
+    image: kindest/node:v1.35.0@sha256:452d707d4862f52530247495d180205e029056831160e22870e37e3f6c1ac31f # ← kind v0.31.0 默认节点镜像
 YAML
 ```
 
-!!! note "kind 配置里的环境变量"
-    kind 配置文件不会自动展开 `${KIND_NODE_IMAGE}`。下面执行创建集群时会用 `sed` 生成最终文件；如果你不想使用替换命令，也可以直接把 `image:` 改成固定镜像字符串。
+!!! note "为什么先固定节点镜像"
+    kind 配置文件不会自动展开环境变量。为了让主线实验可复制，本篇先把节点镜像写成固定值。出版前或团队内部实验如果需要切到 Kubernetes 1.36.x 节点镜像，可以按 5.5 的可选步骤生成覆盖配置。
 
 创建 Namespace、Pod 和 Service：
 
@@ -333,6 +335,7 @@ spec:
         - |
           echo "smoke server starting"
           while true; do
+            # 这是教学用的最小 HTTP 响应，不是生产 Web 服务器。
             printf 'HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\n\r\nhello from kubernetes\n' | nc -l -p 8080
             echo "served one request"
           done
@@ -403,22 +406,29 @@ MD
 
 ```bash
 KIND_CLUSTER=todo-k8s
-KIND_NODE_IMAGE="${KIND_NODE_IMAGE:-kindest/node:v1.35.0@sha256:452d707d4862f52530247495d180205e029056831160e22870e37e3f6c1ac31f}"
 ```
 
 如果你中途重新打开终端，请重新执行上面的变量设置。
 
-生成最终 kind 配置：
+可选：如果你已经确认有可用的 Kubernetes 1.36.x kind 节点镜像，可以生成覆盖配置。没有特殊需求时跳过这一步，直接使用 `k8s-lab/kind-config.yaml`。
 
 ```bash
-sed "s#\${KIND_NODE_IMAGE:-kindest/node:v1.35.0@sha256:452d707d4862f52530247495d180205e029056831160e22870e37e3f6c1ac31f}#$KIND_NODE_IMAGE#g" \
+KIND_NODE_IMAGE="${KIND_NODE_IMAGE:-kindest/node:v1.35.0@sha256:452d707d4862f52530247495d180205e029056831160e22870e37e3f6c1ac31f}"
+sed "s#kindest/node:v1.35.0@sha256:452d707d4862f52530247495d180205e029056831160e22870e37e3f6c1ac31f#$KIND_NODE_IMAGE#g" \
   k8s-lab/kind-config.yaml > k8s-lab/kind-config.rendered.yaml
+KIND_CONFIG=k8s-lab/kind-config.rendered.yaml
+```
+
+如果没有执行上面的覆盖步骤，使用默认配置：
+
+```bash
+KIND_CONFIG="${KIND_CONFIG:-k8s-lab/kind-config.yaml}"
 ```
 
 创建集群：
 
 ```bash
-kind create cluster --name "$KIND_CLUSTER" --config k8s-lab/kind-config.rendered.yaml
+kind create cluster --name "$KIND_CLUSTER" --config "$KIND_CONFIG"
 ```
 
 确认 `kubectl` 当前 context：
@@ -442,7 +452,10 @@ kubectl -n todo-k8s-lab wait --for=condition=Ready pod/todo-k8s-smoke --timeout=
 kubectl -n todo-k8s-lab get pod,svc -o wide
 kubectl -n todo-k8s-lab describe pod todo-k8s-smoke
 kubectl -n todo-k8s-lab logs todo-k8s-smoke --tail=10
+kubectl -n todo-k8s-lab exec todo-k8s-smoke -- cat /etc/os-release
 ```
+
+`logs` 用来观察容器主进程输出，`exec` 则是在 Pod 已经运行后进入容器执行一次只读检查。生产排障中，优先使用 `logs`、`describe`、`get events` 这类低侵入命令；`exec` 适合临时确认文件、环境变量、DNS 和网络连通性。
 
 使用端口转发从宿主机访问 Service：
 
@@ -518,10 +531,12 @@ hello from kubernetes
 执行以下命令：
 
 ```bash
+NODE="$(docker ps --filter "name=${KIND_CLUSTER}-control-plane" --format '{{.Names}}' | head -n 1)"
 kubectl config current-context
 kubectl get nodes
 kubectl -n todo-k8s-lab get pod todo-k8s-smoke
 kubectl -n todo-k8s-lab get service todo-k8s-smoke
+kubectl -n todo-k8s-lab exec todo-k8s-smoke -- cat /etc/os-release
 docker exec "$NODE" crictl images | grep todo-api
 ```
 
@@ -531,6 +546,7 @@ docker exec "$NODE" crictl images | grep todo-api
 - 节点状态是 `Ready`。
 - `todo-k8s-smoke` Pod 状态是 `Running` 且 `READY` 为 `1/1`。
 - `todo-k8s-smoke` Service 存在，类型是 `ClusterIP`。
+- `kubectl exec` 能进入 smoke Pod 并输出 Alpine 系统信息。
 - 通过 `port-forward` 访问 `http://127.0.0.1:18081` 能看到 `hello from kubernetes`。
 - kind 节点内能看到 `todo-api:v0.1.0` 镜像。
 
@@ -697,6 +713,25 @@ rm -rf k8s-lab
 - **修复**：确认集群名，重新导入镜像，并在本地实验中使用 `imagePullPolicy: IfNotPresent`。
 - **预防**：每次加载镜像都显式写 `--name "$KIND_CLUSTER"`；镜像 tag 统一使用阶段三产物 `todo-api:v0.1.0`。
 
+### 错误 6：Pod 是 `Running`，但 `curl` 访问失败
+
+- **现象**：`kubectl get pod` 显示 `Running`，但 `curl -i http://127.0.0.1:18081` 连接失败、超时，或没有返回 `hello from kubernetes`。
+- **原因**：`port-forward` 没有保持运行；Service selector 没有匹配 Pod label；容器里的临时 `nc` 进程没有正常监听；或者访问了错误的宿主机端口。
+- **排查**：
+
+  ```bash
+  kubectl -n todo-k8s-lab get pod --show-labels
+  kubectl -n todo-k8s-lab get service todo-k8s-smoke -o wide
+  kubectl -n todo-k8s-lab get endpoints todo-k8s-smoke
+  kubectl -n todo-k8s-lab logs todo-k8s-smoke --tail=20
+  kubectl -n todo-k8s-lab describe pod todo-k8s-smoke
+  ```
+
+  `endpoints` 为空时，优先检查 Service 的 `selector` 和 Pod 的 `labels` 是否一致。`logs` 看不到 `smoke server starting` 时，优先检查容器命令是否启动失败。
+
+- **修复**：恢复 `app: todo-k8s-smoke` 标签；重新执行 `kubectl -n todo-k8s-lab port-forward service/todo-k8s-smoke 18081:80`；如果 Pod 命令失败，修正 YAML 后重新 `kubectl apply`。
+- **预防**：不要只用 `Running` 判断业务可用；至少同时检查 Service、Endpoints、日志和一次真实请求。
+
 ## 7. 生产环境注意事项
 
 1. **不要把 kind 当成生产集群。** kind 是学习、CI 和本地验证工具，节点运行在 Docker 容器里，网络、存储、负载均衡和高可用模型都不等同生产 Kubernetes。生产集群需要专门的节点规划、控制面高可用、升级策略、备份恢复和安全基线。
@@ -707,7 +742,11 @@ rm -rf k8s-lab
 
 4. **节点与运行时版本需要统一规划。** Kubernetes、containerd、CNI、CSI、Ingress Controller 和操作系统内核之间有兼容矩阵。升级集群不能只升级 `kubectl`，也不能只换节点镜像；要先验证控制面、节点、运行时、网络和存储插件的兼容性。
 
-5. **调试命令要区分只读和破坏性。** `kubectl get`、`describe`、`logs` 属于常规只读排查；`delete`、`scale`、`rollout undo`、`cordon`、`drain` 会改变集群状态。生产执行前必须确认 context、Namespace、影响范围和回滚路径。
+5. **调试命令要区分只读和破坏性。** `kubectl get`、`describe`、`logs` 属于常规只读排查；`kubectl exec` 虽然常用于临时诊断，但可能进入真实业务容器，应避免执行修改文件、安装软件、清理数据这类改变状态的操作；`delete`、`scale`、`rollout undo`、`cordon`、`drain` 会改变集群状态。生产执行前必须确认 context、Namespace、影响范围和回滚路径。
+
+6. **本篇 Service 只解决集群内访问和本地调试。** `ClusterIP` 是集群内部稳定入口，`port-forward` 是开发者从本机临时访问 Pod 或 Service 的调试手段。生产对外入口通常由 Ingress、Gateway API、Service Mesh 或云厂商负载均衡承载，后续章节会继续展开。
+
+7. **裸 Pod 只适合学习和临时诊断。** 本篇直接创建 Pod，是为了让你看清最小调度单元和 Service 选择器。生产应用通常交给 Deployment、StatefulSet、DaemonSet 或 Job 管理；它们负责副本数、重建、滚动更新、回滚和生命周期策略。第 21 篇会把 `todo-api:v0.1.0` 迁移到 Deployment。
 
 ## 8. 本章小项目
 
@@ -726,6 +765,7 @@ rm -rf k8s-lab
 - `kubectl cluster-info --context kind-todo-k8s` 正常。
 - `kubectl get nodes` 显示节点 `Ready`。
 - `kubectl -n todo-k8s-lab get pod todo-k8s-smoke` 显示 `Running`。
+- `kubectl -n todo-k8s-lab exec todo-k8s-smoke -- cat /etc/os-release` 能输出 Alpine 系统信息。
 - `curl -i http://127.0.0.1:18081` 返回 `hello from kubernetes`。
 - `docker exec "$NODE" crictl images | grep todo-api` 能找到 `todo-api:v0.1.0`。
 
@@ -802,10 +842,10 @@ rm -rf k8s-lab
 
 本章建立了 Kubernetes 的第一层全局视角：控制面通过 API Server、etcd、Scheduler 和 Controller Manager 保存并调谐期望状态；节点通过 kubelet、containerd、kube-proxy 和网络插件真正运行 Pod。你学习了声明式 API、kubeconfig、context、Pod、Service 和 Namespace 的基本概念。
 
-项目成果上，你创建了 `todo-k8s` kind 集群，部署了 `todo-k8s-smoke` 测试应用，验证了 `kubectl get`、`describe`、`logs`、`port-forward` 和 `kind load docker-image`。这说明你的本地环境已经具备阶段四后续实验的基础。
+项目成果上，你创建了 `todo-k8s` kind 集群，部署了 `todo-k8s-smoke` 测试应用，验证了 `kubectl get`、`describe`、`logs`、`exec`、`port-forward` 和 `kind load docker-image`。这说明你的本地环境已经具备阶段四后续实验的基础。
 
 能力价值上，你已经能搭建本地 Kubernetes 实验集群，能解释 `kubectl apply` 后发生了什么，也能用基础命令判断问题在 kubeconfig、API 对象、Pod、Service 还是镜像层。
 
 ## 12. 下一章衔接
 
-第 21 篇会把第 16 篇构建并在本篇导入 kind 的 `todo-api:v0.1.0` 正式部署成 Kubernetes Deployment。你会继续学习 Pod 生命周期、ReplicaSet、滚动更新、回滚、探针和资源限制；如果跳过本篇，下一章遇到 context、Namespace、Service、Pod 状态和 `kubectl describe` 时会很容易迷路。
+第 21 篇会把第 16 篇构建并在本篇导入 kind 的 `todo-api:v0.1.0` 正式部署成 Kubernetes Deployment。你会继续学习 Pod 生命周期、ReplicaSet、滚动更新、回滚、探针和资源限制，理解为什么生产环境不直接管理裸 Pod；第 22 篇会继续展开 Service 的 NodePort、LoadBalancer、Ingress 等对外访问方式。如果跳过本篇，后续遇到 context、Namespace、Service、Pod 状态和 `kubectl describe` 时会很容易迷路。
