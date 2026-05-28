@@ -49,7 +49,7 @@ Docker CLI / kubectl
     `crictl`、`ctr` 和 `nerdctl` 都可以直接影响容器运行时状态。生产环境中可以用它们做只读排查，但不要绕过 kubelet 手动删除 Pod 容器、镜像或 containerd 快照，除非你正在执行经过审批的故障处理流程。
 
 !!! note "关于 kind 版本"
-    课程主线锁定 Kubernetes 1.36.x。本仓库第 1 篇当前用于 smoke test 的 kind 节点镜像示例是 `kindest/node:v1.35.0`，本篇实验关注 CRI、containerd 和 runc 观察链路，不依赖 1.36 专属 API。如果课程版本锁文件已经更新到可用的 1.36.x kind 节点镜像，优先使用你本地锁定的镜像。
+    课程蓝图锁定 Kubernetes 1.36.x。本仓库第 1 篇当前用于 smoke test 的 kind 节点镜像示例是 `kindest/node:v1.35.0`。如果你的环境已有可用的 1.36.x kind 节点镜像，可以通过 `KIND_NODE_IMAGE` 环境变量覆盖。本篇实验关注 CRI、containerd 和 runc 观察链路，不依赖 1.36 专属 API。
 
 ## 2. 本章工作场景与真实案例
 
@@ -320,6 +320,8 @@ docker run --rm alpine:3.23 sh -c 'echo hello'
 
 底层大致会经过：
 
+图 19-1 从 `docker run` 到 Linux 进程：
+
 ```mermaid
 flowchart TB
     CLI["Docker CLI"] --> Engine["Docker Engine API"]
@@ -343,6 +345,8 @@ kubectl apply -f runtime-probe.yaml
 ```
 
 底层链路更长：
+
+图 19-2 从 `kubectl apply` 到容器进程：
 
 ```mermaid
 sequenceDiagram
@@ -648,6 +652,8 @@ KIND_CLUSTER=todo-runtime
 KIND_NODE_IMAGE="${KIND_NODE_IMAGE:-kindest/node:v1.35.0@sha256:452d707d4862f52530247495d180205e029056831160e22870e37e3f6c1ac31f}"
 ```
 
+后续命令依赖这两个变量。如果你中途重新打开终端，请先重新执行本节的变量设置。
+
 如果课程版本锁已经提供了更新的 `KIND_NODE_IMAGE`，这里会优先使用环境变量中的值。创建集群：
 
 ```bash
@@ -691,6 +697,7 @@ kubectl -n todo-runtime logs runtime-probe --tail=5
 kind 的节点本身是一个 Docker 容器。找到它：
 
 ```bash
+echo "KIND_CLUSTER=${KIND_CLUSTER:?not set, run section 5.5.1 first}"
 NODE="$(docker ps --filter "name=${KIND_CLUSTER}-control-plane" --format '{{.Names}}' | head -n 1)"
 echo "$NODE"
 ```
@@ -740,6 +747,8 @@ echo "$POD_ID"
 docker exec "$NODE" crictl inspectp "$POD_ID" | grep -E '"name"|"namespace"|"state"|"podSandboxId"|"runtimeHandler"' | head -n 20
 ```
 
+如果上面的 `grep` 没有输出，先执行 `docker exec "$NODE" crictl inspectp "$POD_ID"` 查看完整 JSON 结构，再根据你当前 crictl 版本中的字段名调整过滤条件。
+
 查看这个 PodSandbox 下的业务容器：
 
 ```bash
@@ -777,7 +786,7 @@ Kubernetes 管理的对象在 `k8s.io` namespace 中。查看 container 对象�
 docker exec "$NODE" ctr -n k8s.io containers ls | grep "$CONTAINER_ID"
 ```
 
-如果这里没有输出，先不要急着判断 containerd 异常。不同运行时版本里，CRI 返回的短 ID 与 `ctr` 展示的完整 ID 可能需要反查。可以先列出相关 container，再根据 Pod 名、容器名或镜像反向确认：
+如果这里没有输出，先不要急着判断 containerd 异常。CRI 返回的容器 ID 可能是 containerd 完整 ID 的前缀，不同运行时版本里的展示格式也可能略有差异。可以先列出相关 container，再根据 Pod 名、容器名或镜像反向确认：
 
 ```bash
 docker exec "$NODE" ctr -n k8s.io containers ls | grep -E 'runtime-probe|alpine|main'
@@ -889,7 +898,7 @@ fi
 打开记录模板，把关键结果填进去：
 
 ```bash
-sed -n '1,120p' runtime-lab/notes/runtime-observation.md
+cat runtime-lab/notes/runtime-observation.md
 ```
 
 建议至少记录：
@@ -951,6 +960,8 @@ docker exec "$NODE" crictl ps --pod "$POD_ID"
 docker exec "$NODE" ctr namespaces ls
 docker exec "$NODE" ctr -n k8s.io tasks ls | grep "$CONTAINER_ID"
 ```
+
+如果中途 Pod 被删除、重建或重新调度过，旧的 `POD_ID` 和 `CONTAINER_ID` 会失效。验证前先重新执行上面三行变量获取命令。
 
 判断标准：
 
@@ -1306,3 +1317,5 @@ kind get clusters
 第 20 篇开始进入阶段四 Kubernetes 应用交付。你会系统学习 Kubernetes 架构、API Server、etcd、Scheduler、Controller Manager、kubelet、kube-proxy、container runtime、kind 集群和 kubectl 基础操作。
 
 本篇的价值会马上显现：当第 20 篇讲 kubelet 时，你已经知道它不是“神秘地启动容器”，而是通过 CRI 调用 containerd；当你看到 Pod 状态、事件、镜像拉取和容器日志时，也能继续向下追到 `crictl` 和 `ctr` 层。阶段三到这里完成了从“会用 Docker”到“理解 Kubernetes 节点运行时”的过渡。
+
+阶段三（第 15-19 篇）到这里全部完成：Ch15 手工运行容器，Ch16 构建镜像，Ch17 Compose 编排，Ch18 拆解容器底层原理，Ch19 理解 OCI / CRI 运行时生态。你已经从“会用 Docker”走到了“理解 Kubernetes 节点内部发生了什么”。

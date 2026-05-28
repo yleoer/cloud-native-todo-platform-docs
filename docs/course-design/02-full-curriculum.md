@@ -26,7 +26,7 @@
 
 学习者在每篇完成一个可独立验收的项目版本，逐步构建完整平台：
 
-```
+```text
 Todo CLI（篇 7）
   │  内存存储，理解 Go 基本语法
   ↓
@@ -551,7 +551,7 @@ Todo Operator（篇 34-42）
 
 **本篇特色项目**
 
-使用 `nerdctl` 和 `crictl` 观察 Todo 平台容器运行状态，对比 Docker 命令与 nerdctl 命令的对应关系。
+使用 `crictl` 和 `ctr` 观察 Todo 平台容器运行状态，并用 `nerdctl` 作为 Docker 风格命令的可选对照。
 
 **本篇能力验收标准**
 

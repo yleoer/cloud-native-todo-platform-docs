@@ -196,7 +196,7 @@ v4.1-final            最终集成（篇 42）
 | 第 16 篇 | Todo API 生产镜像（多阶段+非 root+dive/hadolint 分析） | 镜像 < 20MB，无高危漏洞 |
 | 第 17 篇 | 一条命令启动 Todo Platform 本地环境 | `docker compose up -d` 全服务可用 |
 | 第 18 篇 | 手动模拟容器（unshare + cgroup v2） | 验证命名空间隔离和 cgroup 限制 |
-| 第 19 篇 | crictl/nerdctl 观察容器运行时状态 | 对比 Docker 和 containerd 命令 |
+| 第 19 篇 | crictl/ctr 观察容器运行时状态，nerdctl 可选对照 | 对比 Kubernetes、CRI 和 containerd 视角 |
 | 第 20 篇 | kind 集群搭建 + 第一个测试应用 | `kubectl cluster-info` 正常 |
 | 第 21 篇 | Todo API 部署为 Deployment + 探针 + HPA | 滚动更新 + 自动扩缩 |
 | 第 22 篇 | Service + Traefik Ingress + HTTPS + Gateway API 对比 | HTTPS 访问 Todo API |
