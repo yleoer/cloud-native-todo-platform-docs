@@ -63,12 +63,12 @@ Docker 基础、Dockerfile、Compose、容器原理、OCI、containerd、runc �
 </details>
 
 <details>
-<summary><strong>阶段四：Kubernetes 应用交付（第 20-28 篇，当前已发布第 20 篇）</strong></summary>
+<summary><strong>阶段四：Kubernetes 应用交付（第 20-28 篇，当前已发布第 21 篇）</strong></summary>
 
 Kubernetes 架构、工作负载、Service / Ingress / Gateway API、配置、存储、网络、安全、Helm 4 和 Kustomize。
 
 - [第 20 篇：Kubernetes 架构与集群搭建](docs/chapters/stage-04-kubernetes/20-k8s-architecture.md)
-- 第 21 篇：Kubernetes 核心工作负载
+- [第 21 篇：Kubernetes 核心工作负载](docs/chapters/stage-04-kubernetes/21-k8s-workloads.md)
 - 第 22 篇：Service、Ingress 与流量入口
 - 第 23 篇：ConfigMap、Secret 与配置管理
 - 第 24 篇：Kubernetes 存储
@@ -195,7 +195,8 @@ docs/
 │   │   ├── stage-03-acceptance.md    # 阶段三附录 A：综合验收
 │   │   └── stage-03-cheatsheet-troubleshooting.md # 阶段三附录 B：速查与排障
 │   ├── stage-04-kubernetes/    # 阶段四：Kubernetes 应用交付
-│   │   └── 20-k8s-architecture.md # 第 20 篇：Kubernetes 架构与集群搭建
+│   │   ├── 20-k8s-architecture.md # 第 20 篇：Kubernetes 架构与集群搭建
+│   │   └── 21-k8s-workloads.md    # 第 21 篇：Kubernetes 核心工作负载
 │   └── ...                     # 后续阶段章节（待完成）
 ├── projects/                   # 项目实战
 ├── labs/                       # 实验索引

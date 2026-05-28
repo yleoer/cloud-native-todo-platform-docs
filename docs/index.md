@@ -115,12 +115,12 @@ hide:
 </details>
 
 <details markdown="1">
-<summary><strong>阶段四：Kubernetes 应用交付（第 20-28 篇，当前已发布第 20 篇）</strong></summary>
+<summary><strong>阶段四：Kubernetes 应用交付（第 20-28 篇，当前已发布第 21 篇）</strong></summary>
 
 系统学习 Kubernetes 架构、工作负载、Service / Ingress / Gateway API、配置、存储、网络、安全、Helm 4 和 Kustomize。
 
 - [第 20 篇：Kubernetes 架构与集群搭建](chapters/stage-04-kubernetes/20-k8s-architecture.md)
-- 第 21 篇：Kubernetes 核心工作负载
+- [第 21 篇：Kubernetes 核心工作负载](chapters/stage-04-kubernetes/21-k8s-workloads.md)
 - 第 22 篇：Service、Ingress 与流量入口
 - 第 23 篇：ConfigMap、Secret 与配置管理
 - 第 24 篇：Kubernetes 存储
@@ -178,6 +178,6 @@ http://127.0.0.1:8000
 
 ## 下一步计划
 
-- 按新版设计推进第 21 篇 Kubernetes 核心工作负载，承接本地 kind 集群和 `todo-api:v0.1.0` 镜像。
-- 继续推进 Kubernetes 工作负载、Service / Ingress / Gateway API、配置、存储、网络、安全、Helm 4 与 Kustomize 实践内容。
+- 按新版设计推进第 22 篇 Service、Ingress 与流量入口，承接第 21 篇的 Todo API Deployment 和 ClusterIP Service。
+- 继续推进 Kubernetes Service / Ingress / Gateway API、配置、存储、网络、安全、Helm 4 与 Kustomize 实践内容。
 - 使用阶段三综合验收和排障手册整理 Todo 平台容器化作品集。
