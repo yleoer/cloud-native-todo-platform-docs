@@ -133,6 +133,8 @@ docker build -t hello-dockerfile -f Dockerfile .
 docker run --rm hello-dockerfile
 ```
 
+这个最小例子只用 `CMD` 运行一次性命令。本章最终 Dockerfile 会使用 `ENTRYPOINT + CMD` 组合，让同一个镜像既能运行服务，也能执行迁移、配置检查、OpenAPI 输出等运维命令。
+
 在 Todo API 项目中，Dockerfile 不只是为了运行一个命令，而是要把 Go 编译、测试、配置、迁移脚本、非 root 用户和镜像元数据一起纳入交付流程。
 
 ### 3.2 构建上下文
@@ -235,19 +237,23 @@ docker run --rm todo-api:v0.1.0 openapi
 
 很多基础镜像默认以 root 用户运行。生产容器应尽量使用非 root 用户，避免应用漏洞直接获得容器内高权限。
 
-运行镜像的常见选择如下：
+运行镜像的常见选择如下。
 
-| 运行镜像 | 优点 | 代价 |
-|---|---|---|
-| `golang` | 工具齐全，排障方便 | 体积巨大，不适合生产运行 |
-| `debian:bookworm-slim` | 兼容性好，有包管理生态 | 体积较大，漏洞面更宽 |
-| `alpine` | 小，带 shell | musl 与 glibc 差异，仍有 shell 和包管理器 |
-| `scratch` | 极小 | 没有 shell、证书、用户信息，排障困难 |
-| `distroless` | 小，无 shell，适合生产 | 不能直接进入容器用 shell 排障 |
+表 16-1 常见 Go 服务运行镜像对比：
 
-本篇使用 `gcr.io/distroless/static-debian12:nonroot`，让运行镜像默认更接近生产安全基线。distroless 没有 shell，因此排障更依赖日志、指标、`docker inspect`、镜像分析工具和后续 Kubernetes 的临时调试容器。
+| 运行镜像 | 默认用户 | 优点 | 代价 |
+|---|---|---|---|
+| `golang` | root | 工具齐全，排障方便 | 体积巨大，不适合生产运行 |
+| `debian:bookworm-slim` | root | 兼容性好，有包管理生态 | 体积较大，漏洞面更宽 |
+| `alpine` | root | 小，带 shell | musl 与 glibc 差异，仍有 shell 和包管理器 |
+| `scratch` | 无预置用户 | 极小 | 没有 shell、证书、用户信息，排障困难 |
+| `distroless` | 视标签而定 | 小，无 shell，适合生产 | 不能直接进入容器用 shell 排障 |
+
+本篇使用 `gcr.io/distroless/static-debian12:nonroot`，也就是 distroless 的 `:nonroot` 变体，让运行镜像默认更接近生产安全基线。distroless 没有 shell，因此排障更依赖日志、指标、`docker inspect`、镜像分析工具和后续 Kubernetes 的临时调试容器。
 
 ### 3.8 镜像标签、OCI Label 与 digest
+
+OCI（Open Container Initiative，开放容器标准组织）定义了容器镜像和运行时的通用规范。OCI Label 是写入镜像配置里的标准元数据，digest 是镜像内容摘要，也就是由镜像内容计算出的不可变标识。
 
 镜像标签是人类可读引用：
 
@@ -262,7 +268,7 @@ localhost:5000/todo-api:v0.1.0
 - 语义版本标签，例如 `v0.1.0`。
 - Git commit 标签，例如 `git-a1b2c3d`。
 - OCI Label，例如 `org.opencontainers.image.revision`。
-- 镜像 digest，例如 `sha256:...`，用于不可变追踪。
+- 镜像 digest（内容摘要），例如 `sha256:...`，用于不可变追踪。
 
 标签可以被覆盖，digest 才是镜像内容的不可变标识。后续 Kubernetes 部署和 CI/CD 章节会继续使用这个概念。
 
@@ -365,6 +371,8 @@ flowchart LR
 
 这些工具关注点不同：
 
+表 16-2 镜像构建与分析工具对比：
+
 | 工具 | 主要回答的问题 |
 |---|---|
 | `hadolint` | Dockerfile 写法有没有明显反模式 |
@@ -416,6 +424,8 @@ flowchart LR
 docker version
 docker buildx version
 ```
+
+如果 `docker buildx version` 报 `command not found` 或 Docker 子命令不存在，先执行 `docker build --help` 确认当前 Docker 是否仍能构建镜像；Linux 发行版包管理器安装的 Docker 可能需要单独安装 buildx 插件，Docker Desktop 通常已经内置。
 
 如果已经安装镜像分析工具，可以先记录版本。它们不是最小实验的硬性依赖，但属于本章的进阶能力：
 
@@ -525,6 +535,8 @@ redis-data/
 
 关键字段解释：
 
+表 16-3 `.dockerignore` 规则说明：
+
 | 规则 | 作用 |
 |---|---|
 | `.git` | 避免把 Git 历史传入构建上下文 |
@@ -576,7 +588,7 @@ LABEL org.opencontainers.image.title="Cloud Native Todo API" \
       org.opencontainers.image.version="${VERSION}" \
       org.opencontainers.image.revision="${COMMIT}" \
       org.opencontainers.image.created="${BUILD_DATE}" \
-      org.opencontainers.image.source="https://github.com/yleoer/cloud-native-todo-platform"
+      org.opencontainers.image.source="https://github.com/<your-org>/cloud-native-todo-platform"
 
 WORKDIR /app
 
@@ -601,13 +613,14 @@ CMD ["serve"]
 这份 Dockerfile 有几个关键设计：
 
 - `api/Dockerfile` 使用项目根目录作为构建上下文，所以能 `COPY go.mod go.sum ./`。
-- 构建阶段执行 `go test ./...`，避免测试失败的代码进入镜像。
+- 构建阶段执行 `go test ./...`，避免测试失败的代码进入镜像。它会执行项目全部测试；依赖 PostgreSQL 或 Redis 的集成测试应通过环境变量门控自动跳过（见第 12/13 篇）。如果构建时测试卡住或失败，先检查对应测试是否正确跳过外部依赖。
 - `CGO_ENABLED=0` 生成适合 distroless static 镜像的二进制。
 - 运行阶段只复制二进制、`configs/` 和 `api/migrations/`。
 - `TODO_CONFIG_DIR=/app/configs` 与第 14 篇配置加载规则保持一致。
 - `TODO_API_ADDR=0.0.0.0:18080` 继承第 15 篇容器内监听地址要求。
 - `USER nonroot:nonroot` 避免默认 root 运行。
 - `ENTRYPOINT` 固定二进制，`CMD` 默认执行 `serve`，方便覆盖为 `config-check`、`migrate`、`openapi`。
+- `org.opencontainers.image.source` 中的 `<your-org>` 是占位符，练习时替换成自己的组织、用户名或企业仓库地址。
 
 ### 5.5 执行命令
 
@@ -658,7 +671,7 @@ CMD ["serve"]
       .
     ```
 
-这个命令会完整构建镜像，并在 `--progress=plain` 输出中显示 `load .dockerignore` 和 `transferring context`。如果 `transferring context` 显示几十 MB 甚至几百 MB，通常说明 `.dockerignore` 漏掉了大文件。这里不单独提供“只检查上下文”的伪命令，因为 `docker build` 会执行完整 Dockerfile，单独跑一次会让新手重复等待。
+这个命令会完整构建镜像。如果你想查看构建上下文大小和 `.dockerignore` 是否生效，可以在构建命令中加上 `--progress=plain`，输出里会出现 `load .dockerignore` 和 `transferring context`。如果 `transferring context` 显示几十 MB 甚至几百 MB，通常说明 `.dockerignore` 漏掉了大文件。这里不单独提供“只检查上下文”的伪命令，因为 `docker build` 会执行完整 Dockerfile，单独跑一次会让新手重复等待。
 
 查看镜像列表：
 
@@ -943,7 +956,7 @@ hadolint api/Dockerfile
     Get-Content .\api\Dockerfile -Raw | docker run --rm -i hadolint/hadolint:latest-debian
     ```
 
-这里用 `latest-debian` 只是为了降低本地临时工具镜像的安装门槛，不用于生产工作负载。团队 CI 中应固定 hadolint 版本，避免规则变化导致流水线结果不可预测。
+这里用 `latest-debian` 只是为了降低本地临时工具镜像的安装门槛，不用于生产工作负载。教学场景中临时拉取工具镜像用浮动标签可以接受，因为工具本身不参与应用交付；团队 CI 中应固定 hadolint 版本或 digest，例如固定到团队验证过的 `hadolint/hadolint:<version>-debian`，避免规则升级导致流水线结果不可预测。
 
 使用 `dive` 分析镜像层。已安装本地命令时使用：
 
@@ -1217,7 +1230,7 @@ docker image ls todo-api
   CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/todo-api ./api/cmd/todo-api
   ```
 
-  如果只是 distroless 拉取受阻，可以先让公司代理或镜像仓库缓存该镜像；本地教学也可以临时传入 `--build-arg RUNTIME_IMAGE=debian:bookworm-slim` 验证构建链路，但这会改变非 root 用户和镜像体积，需要同步调整 Dockerfile，不应作为最终生产方案。如果项目确实需要 CGO，改用包含运行库的 `debian:bookworm-slim`，并明确安装所需动态库。
+  如果只是 distroless 拉取受阻，可以先让公司代理或镜像仓库缓存该镜像；本地教学也可以临时传入 `--build-arg RUNTIME_IMAGE=debian:bookworm-slim` 验证构建链路，但这会改变非 root 用户和镜像体积，需要同步调整 Dockerfile。`debian:bookworm-slim` 没有预置 `nonroot` 用户，切换后还要创建用户或调整 `USER` 指令，因此它只适合作为紧急教学绕过方案，不应作为最终生产方案。如果项目确实需要 CGO，改用包含运行库的 `debian:bookworm-slim`，并明确安装所需动态库。
 
 - **预防**：Go 服务进入 distroless static 镜像前，先确认是否有 CGO 依赖。不要把“镜像越小越好”变成机械选择。
 
