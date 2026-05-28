@@ -139,7 +139,7 @@ docker-compose
 
 ### 3.2 `services`
 
-`services` 是 Compose 文件的核心。每个 service 描述一个组件或一次性任务。服务最终会被 Compose 创建为容器，容器名通常包含项目名、服务名和序号。
+`services` 是 Compose 文件的核心。每个 service 描述一个组件或一次性任务。服务最终会被 Compose 创建为容器，容器名通常包含项目名、服务名和序号。在 Compose 网络中，服务名也会自动成为 DNS 名称，例如 `api` 可以直接访问 `postgres:5432` 和 `redis:6379`。
 
 表 17-1 Todo Platform Compose 服务设计：
 
@@ -492,6 +492,7 @@ TODO_JWT_SECRET=0123456789abcdef0123456789abcdef
 在 `deployments/docker-compose/compose.yaml` 中写入：
 
 ```yaml
+# 结构：项目名 → API 环境变量锚点 → 5 个服务 → 网络 → 数据卷
 name: ${COMPOSE_PROJECT_NAME:-todo-platform}
 
 x-api-environment: &api-environment
@@ -636,6 +637,8 @@ volumes:
     printf "\nTODO_AUTH_USERS='admin=%s'\n" "$HASH" >> .env
     docker compose --env-file .env up -d
 
+Windows 用户请参考主文档中的 PowerShell 命令。
+
 ## Verify
 
     docker compose --env-file .env ps
@@ -715,6 +718,8 @@ Add-Content -Path .env -Value "TODO_AUTH_USERS='admin=$hash'"
 docker compose --env-file .env config
 docker compose --env-file .env config --services
 ```
+
+Compose 默认会自动加载当前目录下的 `.env` 文件。本篇显式使用 `--env-file .env`，是为了让配置来源在命令里一眼可见；如果你确认 `.env` 就在当前 Compose 目录，也可以省略这个参数。
 
 启动完整环境：
 
@@ -1271,7 +1276,7 @@ docker compose --env-file .env up -d --force-recreate
 ### 思考题
 
 1. 如果要在 CI 中复用本篇 Compose 文件，你会保留 Traefik 吗？哪些服务可以复用，哪些配置应该覆盖？
-2. 本篇使用 Docker socket 让 Traefik 自动发现服务。生产环境中你会如何降低这类权限风险？
+2. 本篇使用 Docker socket 让 Traefik 自动发现服务。生产环境中你会如何降低这类权限风险？可以结合后续第 26 篇安全上下文和第 41 篇 Operator 权限最小化一起思考。
 
 ## 10. 本章面试题
 
