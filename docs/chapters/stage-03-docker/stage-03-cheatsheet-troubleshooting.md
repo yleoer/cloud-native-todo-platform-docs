@@ -54,7 +54,7 @@
 
 ```bash
 docker pull alpine:3.23
-docker pull golang:1.26
+docker pull golang:1.26-bookworm
 docker image ls
 docker image inspect todo-api:v0.1.0
 docker history todo-api:v0.1.0

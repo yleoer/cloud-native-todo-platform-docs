@@ -958,6 +958,19 @@ hadolint api/Dockerfile
 
 这里用 `latest-debian` 只是为了降低本地临时工具镜像的安装门槛，不用于生产工作负载。教学场景中临时拉取工具镜像用浮动标签可以接受，因为工具本身不参与应用交付；团队 CI 中应固定 hadolint 版本或 digest，例如固定到团队验证过的 `hadolint/hadolint:<version>-debian`，避免规则升级导致流水线结果不可预测。
 
+CI 中可以把工具版本固定成普通环境变量，方便统一升级和审计。例如：
+
+```bash
+HADOLINT_IMAGE="hadolint/hadolint:v2.14.0-debian"
+TRIVY_IMAGE="aquasec/trivy:0.67.2"
+
+docker run --rm -i "$HADOLINT_IMAGE" < api/Dockerfile
+docker save todo-api:v0.1.0 -o todo-api-v0.1.0.tar
+docker run --rm -v "$PWD:/work" "$TRIVY_IMAGE" image --input /work/todo-api-v0.1.0.tar --severity HIGH,CRITICAL
+```
+
+这里的版本号只是示例。真实团队应把工具镜像固定到团队验证过的版本或 digest，并在版本升级 PR 中单独查看规则变化和扫描结果变化。
+
 使用 `dive` 分析镜像层。已安装本地命令时使用：
 
 ```bash
