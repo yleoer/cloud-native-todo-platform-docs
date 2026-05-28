@@ -459,6 +459,18 @@ Todo API 容器会使用这些关键环境变量：
 
 ### 5.5 执行命令
 
+先拉取本篇要用的官方镜像。这样如果网络、镜像名或平台架构有问题，会在启动容器前暴露出来。
+
+```bash
+docker pull postgres:18-alpine
+docker pull redis:8.2-alpine
+docker pull golang:1.26-bookworm
+docker pull alpine:3.23
+docker image ls
+```
+
+如果出现 `no matching manifest`，通常表示当前 CPU 架构没有对应镜像；如果出现 `pull access denied`，通常是镜像名写错、仓库私有或未登录。
+
 先清理可能残留的同名容器，避免名称冲突。
 
 === "Linux / macOS / WSL2"
@@ -539,12 +551,41 @@ docker run -d `
   redis-server --requirepass todo_redis_password --appendonly yes
 ```
 
-确认 PostgreSQL 和 Redis 已经就绪。
+确认 PostgreSQL 和 Redis 已经就绪。首次启动数据库时会初始化数据目录，可能需要等待数秒；下面用重试循环避免新手在初始化未完成时误判为失败。
 
-```bash
-docker exec todo-postgres pg_isready -U todo -d todo_platform
-docker exec todo-redis redis-cli -a todo_redis_password ping
-```
+=== "Linux / macOS / WSL2"
+
+    ```bash
+    for i in $(seq 1 20); do
+      if docker exec todo-postgres pg_isready -U todo -d todo_platform; then
+        break
+      fi
+      sleep 2
+    done
+
+    for i in $(seq 1 20); do
+      if docker exec todo-redis redis-cli -a todo_redis_password ping; then
+        break
+      fi
+      sleep 1
+    done
+    ```
+
+=== "Windows PowerShell"
+
+    ```powershell
+    for ($i = 1; $i -le 20; $i++) {
+      docker exec todo-postgres pg_isready -U todo -d todo_platform
+      if ($LASTEXITCODE -eq 0) { break }
+      Start-Sleep -Seconds 2
+    }
+
+    for ($i = 1; $i -le 20; $i++) {
+      docker exec todo-redis redis-cli -a todo_redis_password ping
+      if ($LASTEXITCODE -eq 0) { break }
+      Start-Sleep -Seconds 1
+    }
+    ```
 
 预期输出：
 
@@ -593,6 +634,50 @@ docker run --rm --network todo-net alpine:3.23 nslookup todo-redis
     ```
 
 第一次执行会下载 Go 依赖，可能需要等待一段时间。`todo-go-mod-cache` 和 `todo-go-build-cache` 会让后续 `go run` 更快。
+
+先执行配置检查。`config-check` 不会启动服务，但能提前发现 Secret 太短、用户配置缺失、配置目录挂载失败等问题。
+
+=== "Linux / macOS / WSL2"
+
+    ```bash
+    docker run --rm \
+      --network todo-net \
+      -v "$PWD:/workspace" \
+      -v todo-go-mod-cache:/go/pkg/mod \
+      -v todo-go-build-cache:/root/.cache/go-build \
+      -w /workspace \
+      -e TODO_ENV=dev \
+      -e TODO_CONFIG_DIR=configs \
+      -e TODO_API_ADDR=0.0.0.0:18080 \
+      -e TODO_DATABASE_DSN='postgres://todo:todo_password@todo-postgres:5432/todo_platform?sslmode=disable' \
+      -e TODO_REDIS_ADDR=todo-redis:6379 \
+      -e TODO_REDIS_PASSWORD=todo_redis_password \
+      -e TODO_JWT_SECRET=0123456789abcdef0123456789abcdef \
+      -e TODO_AUTH_USERS="admin=$HASH" \
+      golang:1.26-bookworm \
+      go run ./api/cmd/todo-api config-check
+    ```
+
+=== "Windows PowerShell"
+
+    ```powershell
+    docker run --rm `
+      --network todo-net `
+      -v "${PWD}:/workspace" `
+      -v todo-go-mod-cache:/go/pkg/mod `
+      -v todo-go-build-cache:/root/.cache/go-build `
+      -w /workspace `
+      -e TODO_ENV=dev `
+      -e TODO_CONFIG_DIR=configs `
+      -e TODO_API_ADDR=0.0.0.0:18080 `
+      -e "TODO_DATABASE_DSN=postgres://todo:todo_password@todo-postgres:5432/todo_platform?sslmode=disable" `
+      -e TODO_REDIS_ADDR=todo-redis:6379 `
+      -e TODO_REDIS_PASSWORD=todo_redis_password `
+      -e TODO_JWT_SECRET=0123456789abcdef0123456789abcdef `
+      -e "TODO_AUTH_USERS=admin=$hash" `
+      golang:1.26-bookworm `
+      go run ./api/cmd/todo-api config-check
+    ```
 
 执行数据库迁移。
 
@@ -912,7 +997,7 @@ docker volume rm todo-postgres-data todo-redis-data todo-go-mod-cache todo-go-bu
   # todo-api 状态是 Exited
   ```
 
-- **原因**：应用启动失败，常见原因是 `TODO_JWT_SECRET` 太短、`TODO_AUTH_USERS` 没设置、配置目录挂载失败，或 Go 依赖下载失败。
+- **原因**：应用启动失败，常见原因是 `TODO_JWT_SECRET` 太短、`TODO_AUTH_USERS` 没设置、配置目录挂载失败、Windows 路径没有挂载进容器，或 Go 依赖下载失败。
 - **排查**：
 
   ```bash
@@ -922,7 +1007,21 @@ docker volume rm todo-postgres-data todo-redis-data todo-go-mod-cache todo-go-bu
 
   重点看日志里是否出现 `TODO_JWT_SECRET must be at least 32 bytes`、`at least one auth user is required`、`no such file or directory`。
 
-- **修复**：按 5.5 重新生成 `HASH`，确认 `TODO_JWT_SECRET` 至少 32 字节，确认命令在项目根目录执行。
+- **排查挂载问题**：如果日志里出现 `stat /workspace/api/cmd/todo-api: no such file or directory`，用轻量容器验证目录是否真的挂载成功：
+
+  ```bash
+  docker run --rm -v "$PWD:/workspace" -w /workspace alpine:3.23 ls
+  ```
+
+  Windows PowerShell 写法：
+
+  ```powershell
+  Get-Location
+  Test-Path .\api\cmd\todo-api
+  docker run --rm -v "${PWD}:/workspace" -w /workspace alpine:3.23 ls
+  ```
+
+- **修复**：按 5.5 重新生成 `HASH`，确认 `TODO_JWT_SECRET` 至少 32 字节，确认命令在项目根目录执行。Windows 用户还要确认 Docker Desktop 已启用 WSL integration 或允许当前磁盘共享；路径包含空格时保留 `-v "${PWD}:/workspace"` 的引号。
 - **预防**：先用一次性 Go 容器执行 `config-check` 或 `migrate`，再启动长期运行的 `todo-api` 容器。
 
 ### 错误 4：API 连不上 PostgreSQL 或 Redis
@@ -964,7 +1063,7 @@ docker volume rm todo-postgres-data todo-redis-data todo-go-mod-cache todo-go-bu
 
 ## 7. 生产环境注意事项
 
-1. **不要把手工 docker run 当成生产发布方式**。本篇手动命令适合学习和本地排障，但生产环境需要 Dockerfile、镜像标签、CI 构建、制品仓库、部署配置、回滚策略和审计记录。手工复制长命令容易漏环境变量、漏 Secret、漏端口限制，也很难追溯谁在什么时候改了运行参数。
+1. **不要把手工 docker run 和 Go 工具链容器当成生产发布方式**。本篇手动命令适合学习和本地排障，`golang:1.26-bookworm` 加源码挂载也便于理解容器运行参数；但生产环境需要 Dockerfile、镜像标签、CI 构建、制品仓库、部署配置、回滚策略和审计记录。生产发布应使用第 16 篇的多阶段 Dockerfile 构建精简镜像，并配置非 root 用户运行。
 
 2. **镜像来源和标签必须可控**。生产不应长期使用 `latest`，也不应随意拉取不可信镜像。团队需要固定镜像标签，必要时固定 digest，并使用漏洞扫描和镜像签名。第 16 篇会继续讲 Dockerfile、镜像体积、非 root 运行、构建缓存和安全扫描。
 
