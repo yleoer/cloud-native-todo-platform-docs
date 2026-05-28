@@ -56,7 +56,7 @@ cloud-native-todo-platform/
 | Alpine 镜像 | `alpine:3.23` | 用于轻量命令实验和 rootfs 观察 |
 | PostgreSQL | `postgres:18` | 阶段二数据库能力延续 |
 | Redis | `redis:8.2` | 阶段二缓存与限流能力延续 |
-| kind | 当前稳定版 | 第 18 篇用于观察 Kubernetes 节点运行时 |
+| kind | 当前稳定版 | 第 19 篇用于观察 Kubernetes 节点运行时 |
 | kubectl | 与 kind 集群兼容 | 用于部署和查看探针工作负载 |
 
 版本不是越新越好，而是要可解释、可复现、处于支持周期内。真实团队需要把这些基线写入 README、CI、镜像构建参数和发布说明。
@@ -128,7 +128,7 @@ kind load docker-image todo-api:v0.1.0 --name todo-runtime
 kubectl get nodes -o wide
 ```
 
-如果你已经完成第 18 篇探针实验，还应该能进入 kind 节点查看 CRI 层状态：
+如果你已经完成第 19 篇运行时探针实验，还应该能进入 kind 节点查看 CRI 层状态：
 
 ```bash
 NODE="$(docker ps --filter name=todo-runtime-control-plane --format '{{.Names}}' | head -n 1)"
