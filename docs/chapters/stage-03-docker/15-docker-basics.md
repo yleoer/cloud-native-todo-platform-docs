@@ -51,7 +51,7 @@ docker version
 docker compose version
 ```
 
-如果你使用 Windows，推荐使用 Docker Desktop + WSL2 后端。后续命令会给出 Linux / macOS / WSL2 和 Windows PowerShell 两套写法。
+本篇不会直接使用 Docker Compose，只在这里提前确认第 17 篇所需工具已经安装。如果你使用 Windows，推荐使用 Docker Desktop + WSL2 后端。后续命令会给出 Linux / macOS / WSL2 和 Windows PowerShell 两套写法。
 
 ## 2. 本章工作场景与真实案例
 
@@ -278,6 +278,8 @@ docker inspect todo-api --format '{{.State.Status}} {{.State.ExitCode}}'
 
 ### 4.1 Docker 基本运行链路
 
+图 15-1 Docker 基本运行链路：
+
 ```mermaid
 flowchart LR
     CLI["docker CLI"] --> Daemon["Docker daemon"]
@@ -304,6 +306,8 @@ flowchart LR
 
 镜像由多层只读层组成，容器启动时会在最上面加一个可写层：
 
+图 15-2 镜像层与容器可写层：
+
 ```text
 容器可写层        <- 容器运行时写入的临时文件
 镜像层 N
@@ -312,7 +316,7 @@ flowchart LR
 基础镜像层
 ```
 
-如果把数据库数据写在容器可写层，删除容器后数据会消失。因此 PostgreSQL 和 Redis 要把数据目录挂载到数据卷。第 18 篇会继续深入镜像层、UnionFS 和 rootfs 的关系。
+如果把数据库数据写在容器可写层，删除容器后数据会消失。因此 PostgreSQL 和 Redis 要把数据目录挂载到数据卷。本篇只建立分层概念，第 18 篇会继续深入 UnionFS、rootfs、Namespace 和 Cgroups 如何共同组成容器隔离。
 
 ### 4.3 端口映射和监听地址
 
@@ -325,6 +329,8 @@ flowchart LR
 ```
 
 端口映射负责把宿主机请求转进容器：
+
+图 15-3 宿主机端口映射到容器监听地址：
 
 ```text
 curl 127.0.0.1:18080
@@ -341,6 +347,8 @@ TODO_API_ADDR=0.0.0.0:18080
 ### 4.4 容器间网络通信
 
 本篇的 API 容器访问数据库和 Redis 的链路是：
+
+图 15-4 Todo API 容器间网络通信：
 
 ```mermaid
 sequenceDiagram
@@ -388,6 +396,7 @@ sequenceDiagram
 | Redis 镜像 | `redis:8.2-alpine` | 缓存、限流和轻量任务 |
 | Alpine 镜像 | `alpine:3.23` | 网络排查工具容器 |
 | curl | 任意现代版本 | 验证 HTTP API |
+| jq | 可选 | Linux / macOS / WSL2 下推荐用来解析登录 JSON |
 
 确认 Docker 可用：
 
@@ -396,7 +405,7 @@ docker version
 docker compose version
 ```
 
-预期能看到 Client 和 Server 两部分版本信息。如果只有 Client，没有 Server，说明 Docker daemon 没有连接成功。
+本篇不会直接使用 Docker Compose，此处提前检查是为了在第 17 篇之前暴露安装问题。预期能看到 Client 和 Server 两部分版本信息。如果只有 Client，没有 Server，说明 Docker daemon 没有连接成功。
 
 ### 5.3 文件目录结构
 
@@ -458,6 +467,8 @@ Todo API 容器会使用这些关键环境变量：
 这里的 Secret 和密码都是本地教学值。真实环境不应把 Secret 写进命令历史、镜像层或公开仓库。
 
 ### 5.5 执行命令
+
+下面命令会为了本地教学直接写入数据库密码、Redis 密码和 JWT Secret。真实项目应通过 Secret 管理系统、CI/CD Secret 或受控环境变量注入，不要把它们留在公开命令历史、镜像层或仓库中。
 
 先拉取本篇要用的官方镜像。这样如果网络、镜像名或平台架构有问题，会在启动容器前暴露出来。
 
@@ -725,6 +736,8 @@ migration applied
 
 启动 Todo API 容器。
 
+与前面的 `hash-password`、`config-check` 和 `migrate` 一样，首次执行 `serve` 也可能下载依赖并编译代码。启动后先查看 `docker logs --tail 80 todo-api`，看到服务监听日志后再执行 `curl` 验证。
+
 === "Linux / macOS / WSL2"
 
     ```bash
@@ -789,11 +802,37 @@ curl -i http://127.0.0.1:18080/readyz
 
 === "Linux / macOS / WSL2"
 
+    如果已经安装 `jq`，优先使用结构化 JSON 解析方式提取 Token：
+
+    ```bash
+    TOKEN=$(curl -s -H 'Content-Type: application/json' \
+      -d '{"username":"admin","password":"change-me-123"}' \
+      http://127.0.0.1:18080/api/v2/auth/login | jq -r '.data.token')
+
+    echo "$TOKEN"
+    ```
+
+    如果没有安装 `jq`，可以临时使用 `sed`。这个写法假设 API 返回紧凑 JSON，后续如果响应格式变成多行或字段层级调整，应改回 `jq` 或直接查看登录响应。
+
     ```bash
     TOKEN=$(curl -s -H 'Content-Type: application/json' \
       -d '{"username":"admin","password":"change-me-123"}' \
       http://127.0.0.1:18080/api/v2/auth/login | sed -n 's/.*"token":"\([^"]*\)".*/\1/p')
 
+    echo "$TOKEN"
+    ```
+
+    如果 `echo "$TOKEN"` 没有输出，不要继续创建 Todo，先直接查看登录响应：
+
+    ```bash
+    curl -i -H 'Content-Type: application/json' \
+      -d '{"username":"admin","password":"change-me-123"}' \
+      http://127.0.0.1:18080/api/v2/auth/login
+    ```
+
+    Token 有值后再创建 Todo：
+
+    ```bash
     curl -i -H "Authorization: Bearer $TOKEN" \
       -H 'Content-Type: application/json' \
       -d '{"title":"run todo api with docker"}' \
@@ -895,10 +934,14 @@ docker exec todo-redis redis-cli -a todo_redis_password ping
 验证 API 容器通过容器名访问依赖：
 
 ```bash
+docker exec todo-api getent hosts todo-postgres
+docker exec todo-api getent hosts todo-redis
+docker exec todo-api bash -lc ': </dev/tcp/todo-postgres/5432 && echo postgres-ok'
+docker exec todo-api bash -lc ': </dev/tcp/todo-redis/6379 && echo redis-ok'
 docker logs --tail 120 todo-api
 ```
 
-如果日志里没有数据库连接错误、Redis 连接错误，并且 `/readyz` 返回 `200`，说明依赖链路正常。
+如果 `getent hosts` 能解析出 IP，两个 TCP 探测能输出 `postgres-ok` 和 `redis-ok`，日志里没有数据库连接错误、Redis 连接错误，并且 `/readyz` 返回 `200`，说明依赖链路正常。
 
 验证宿主机只能通过映射端口访问：
 
@@ -1045,6 +1088,19 @@ docker volume rm todo-postgres-data todo-redis-data todo-go-mod-cache todo-go-bu
 - **修复**：确保三个容器都使用 `--network todo-net`；`TODO_DATABASE_DSN` 使用 `todo-postgres:5432`；`TODO_REDIS_ADDR` 使用 `todo-redis:6379`。
 - **预防**：记住宿主机访问用映射端口，容器间访问用容器名和内部端口。
 
+**补充排查：登录成功但后续请求返回 401**
+
+如果登录接口看起来成功，但创建 Todo 返回 `401 Unauthorized`，先检查本地变量是否真的拿到了 Token：
+
+```bash
+echo "$TOKEN"
+curl -i -H 'Content-Type: application/json' \
+  -d '{"username":"admin","password":"change-me-123"}' \
+  http://127.0.0.1:18080/api/v2/auth/login
+```
+
+`TOKEN` 为空时，常见原因是 `sed` 没匹配到登录响应，或者登录接口实际返回了错误 JSON。优先安装 `jq` 并使用 `jq -r '.data.token'`；没有 `jq` 时，先查看完整登录响应，再调整提取命令。
+
 ### 错误 5：删除容器后数据不见了
 
 - **现象**：重新创建 PostgreSQL 容器后，Todo 数据或迁移表不见了。
@@ -1094,6 +1150,7 @@ docker volume rm todo-postgres-data todo-redis-data todo-go-mod-cache todo-go-bu
 - `docker network inspect todo-net` 中能看到三个容器。
 - `docker volume ls` 中能看到 PostgreSQL 和 Redis 数据卷。
 - 你能解释为什么 `TODO_DATABASE_DSN` 使用 `todo-postgres:5432`，不是 `127.0.0.1:15432`。
+- 你能解释为什么容器内 API 要监听 `0.0.0.0:18080`，不是只监听 `127.0.0.1:18080`。
 
 ## 9. 本章练习题
 
