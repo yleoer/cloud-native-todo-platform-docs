@@ -114,6 +114,8 @@ cloud-native-todo-platform/
 
 这里没有直接复用第 7 篇的 `internal/todo`，是因为 CLI 和 API 是两个不同入口：CLI 关注命令行参数和终端输出，API 关注 HTTP 契约、状态码和 JSON 响应。两者的业务模型、Repository 思路和错误处理习惯是一致的，但 API 需要单独形成后续 Gin、数据库和 Kubernetes 部署都能复用的目录边界。
 
+第 8 篇创建过根目录下的 `cmd/todo-api`、`internal/app`、`internal/config` 和 `internal/logger`，那一版的重点是让你先理解“入口、配置、日志、业务、测试”这些工程化边界。从本篇开始，课程把后端服务主线收拢到 `api/` 目录：`api/cmd/todo-api` 会成为真正监听端口的服务入口，`api/internal/...` 会承接后续 Handler、Service、Repository、数据库、Redis 和生产化配置。也就是说，第 8 篇的物理目录不再继续扩展，但它建立的工程化概念会在 `api/` 结构里延续。
+
 ## 3. 核心概念
 
 ### 3.1 Handler 与 HandlerFunc

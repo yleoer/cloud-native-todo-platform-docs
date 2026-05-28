@@ -186,7 +186,7 @@ end
 return 0
 ```
 
-本篇不会把分布式锁接入 Todo API v4 的业务代码，因为当前项目主线是缓存、限流和轻量异步任务；但你需要知道 Redis 锁的正确边界，避免把 `SETNX` 当成万能锁。
+本篇不会把分布式锁接入 Todo API v4 的业务代码，因为当前项目主线是缓存、限流和轻量异步任务；但你需要知道 Redis 锁的正确边界，避免把 `SETNX` 当成万能锁。换句话说，13.4 的“分布式锁”在本章是概念和风险训练，不是必须落入 Todo API 的功能点；真正的项目实现会把精力放在计数器限流和 Redis List 任务上。
 
 限流是为了保护系统在异常流量下仍然可控。本篇实现固定窗口限流：
 
@@ -471,8 +471,9 @@ import (
 )
 
 // cachedBackend mirrors service.Repository without importing service.
-// Importing service from repository would create an import cycle in tests that
-// already verify service behavior with repository implementations.
+// Importing service from repository would invert the dependency direction:
+// service depends on repository implementations in tests, while repository
+// should stay below service in the package graph.
 type cachedBackend interface {
 	List(ctx context.Context, status model.Status) ([]model.Todo, error)
 	Get(ctx context.Context, id int) (model.Todo, error)
@@ -624,6 +625,8 @@ func listCacheKey(status model.Status) string {
 	return "todo:cache:list:" + string(status)
 }
 ```
+
+这里没有写成 `var _ service.Repository = (*CachedRepository)(nil)`，是为了保持 `repository` 包不反向依赖 `service` 包。第 12 篇的 `PostgresRepository` 也采用同样策略：用一个和 `service.Repository` 方法集一致的本地接口做编译期断言，既能检查方法是否完整，又能避免包依赖方向倒置。
 
 缓存失败时，本篇选择记录日志并继续访问真实 Repository。因为 Redis 在这里是加速层，不是事实来源。写操作成功后，`afterWrite` 会用一个 2 秒超时的 `WithoutCancel` 上下文删除缓存并投递任务。`context.WithoutCancel` 会创建一个不继承父 context 取消信号的新 context，确保即使客户端刚好断开连接，缓存失效和任务投递仍然会执行，但不会超过 2 秒超时限制。
 

@@ -89,6 +89,15 @@ cloud-native-todo-platform/
 
 不要把版本差异理解成“教程错误”。真实工作中，工具链版本需要在 README、CI 和容器镜像里固定或说明。
 
+出版前或团队交付前，可以用下面的命令确认本阶段使用的 Go 依赖版本真实存在：
+
+```bash
+go list -m -versions github.com/gin-gonic/gin
+go list -m -versions github.com/jackc/pgx/v5
+go list -m -versions github.com/redis/go-redis/v9
+go list -m -versions golang.org/x/crypto
+```
+
 ## 4. 两档验收路径
 
 ### 4.1 最小验收路径
@@ -170,27 +179,27 @@ cloud-native-todo-platform/
 === "Linux / macOS / WSL2"
 
     ```bash
-    HASH=$(TODO_CONFIG_DIR=configs TODO_ENV=dev go run ./cmd/todo-api hash-password "change-me-123")
+    HASH=$(TODO_CONFIG_DIR=configs TODO_ENV=dev go run ./api/cmd/todo-api hash-password "change-me-123")
 
     export TODO_CONFIG_DIR=configs
     export TODO_ENV=dev
     export TODO_JWT_SECRET=0123456789abcdef0123456789abcdef
     export TODO_AUTH_USERS="admin=$HASH"
 
-    go run ./cmd/todo-api serve
+    go run ./api/cmd/todo-api serve
     ```
 
 === "Windows PowerShell"
 
     ```powershell
-    $hash = go run ./cmd/todo-api hash-password "change-me-123"
+    $hash = go run ./api/cmd/todo-api hash-password "change-me-123"
 
     $env:TODO_CONFIG_DIR = 'configs'
     $env:TODO_ENV = 'dev'
     $env:TODO_JWT_SECRET = '0123456789abcdef0123456789abcdef'
     $env:TODO_AUTH_USERS = "admin=$hash"
 
-    go run ./cmd/todo-api serve
+    go run ./api/cmd/todo-api serve
     ```
 
 另开终端验证 API：
@@ -198,37 +207,37 @@ cloud-native-todo-platform/
 === "Linux / macOS / WSL2"
 
     ```bash
-    curl -i http://127.0.0.1:8080/healthz
+    curl -i http://127.0.0.1:18080/healthz
 
-    curl -i http://127.0.0.1:8080/api/v1/todos
+    curl -i http://127.0.0.1:18080/api/v2/todos
 
     TOKEN=$(curl -s -H "Content-Type: application/json" \
       -d '{"username":"admin","password":"change-me-123"}' \
-      http://127.0.0.1:8080/api/v1/auth/login | jq -r '.data.token')
+      http://127.0.0.1:18080/api/v2/auth/login | jq -r '.data.token')
 
     curl -i -H "Authorization: Bearer $TOKEN" \
       -H "Content-Type: application/json" \
       -d '{"title":"stage 02 acceptance"}' \
-      http://127.0.0.1:8080/api/v1/todos
+      http://127.0.0.1:18080/api/v2/todos
     ```
 
 === "Windows PowerShell"
 
     ```powershell
-    curl.exe -i http://127.0.0.1:8080/healthz
+    curl.exe -i http://127.0.0.1:18080/healthz
 
-    curl.exe -i http://127.0.0.1:8080/api/v1/todos
+    curl.exe -i http://127.0.0.1:18080/api/v2/todos
 
-    $login = curl.exe -s -H "Content-Type: application/json" -d "{\"username\":\"admin\",\"password\":\"change-me-123\"}" http://127.0.0.1:8080/api/v1/auth/login | ConvertFrom-Json
+    $login = curl.exe -s -H "Content-Type: application/json" -d "{\"username\":\"admin\",\"password\":\"change-me-123\"}" http://127.0.0.1:18080/api/v2/auth/login | ConvertFrom-Json
     $token = $login.data.token
 
-    curl.exe -i -H "Authorization: Bearer $token" -H "Content-Type: application/json" -d "{\"title\":\"stage 02 acceptance\"}" http://127.0.0.1:8080/api/v1/todos
+    curl.exe -i -H "Authorization: Bearer $token" -H "Content-Type: application/json" -d "{\"title\":\"stage 02 acceptance\"}" http://127.0.0.1:18080/api/v2/todos
     ```
 
 预期结果：
 
 - `/healthz` 返回 `200 OK`。
-- 无 Token 访问 `/api/v1/todos` 返回 `401 Unauthorized`。
+- 无 Token 访问 `/api/v2/todos` 返回 `401 Unauthorized`。
 - 登录成功后能拿到 JWT。
 - 带 Token 创建 Todo 返回 `201 Created`。
 - 服务日志中包含 `request_id`、`status`、`method` 和 `path`。
@@ -270,7 +279,7 @@ go test -race ./api/internal/service ./api/internal/handler/gin ./api/internal/h
 go build ./api/cmd/todo-api ./api/cmd/todo-load:
 go run ./api/cmd/todo-api openapi:
 curl /healthz:
-curl /api/v1/auth/login:
+curl /api/v2/auth/login:
 ```
 
 ## 排障复盘
