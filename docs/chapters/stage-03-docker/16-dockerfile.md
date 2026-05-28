@@ -405,9 +405,10 @@ flowchart LR
 | Registry 镜像 | `registry:2` | 本地推送实验 |
 | curl | 任意现代版本 | 验证 HTTP API |
 | jq | 可选 | Linux / macOS / WSL2 下解析登录 JSON |
-| hadolint | 可选 | 检查 Dockerfile |
-| dive | 可选 | 分析镜像层和文件 |
-| trivy 或 Docker Scout | 可选 | 漏洞扫描 |
+| hadolint | 当前稳定版 | 可选，检查 Dockerfile |
+| dive | 当前稳定版 | 可选，分析镜像层和文件 |
+| Trivy | 当前稳定版 | 可选，漏洞扫描 |
+| Docker Scout | 随 Docker Desktop / CLI 提供 | 可选，漏洞扫描 |
 
 确认 Docker 和 buildx 可用：
 
@@ -415,6 +416,28 @@ flowchart LR
 docker version
 docker buildx version
 ```
+
+如果已经安装镜像分析工具，可以先记录版本。它们不是最小实验的硬性依赖，但属于本章的进阶能力：
+
+=== "Linux / macOS / WSL2"
+
+    ```bash
+    hadolint --version || true
+    dive --version || true
+    trivy --version || true
+    docker scout version || true
+    ```
+
+=== "Windows PowerShell"
+
+    ```powershell
+    if (Get-Command hadolint -ErrorAction SilentlyContinue) { hadolint --version } else { "hadolint not installed" }
+    if (Get-Command dive -ErrorAction SilentlyContinue) { dive --version } else { "dive not installed" }
+    if (Get-Command trivy -ErrorAction SilentlyContinue) { trivy --version } else { "trivy not installed" }
+    docker scout version
+    ```
+
+如果输出 `not installed`，说明该工具尚未安装。你仍然可以完成最小镜像构建实验；后面的 hadolint、dive、Trivy 和 Docker Scout 属于进阶验证。
 
 确认当前目录是项目根目录：
 
@@ -573,6 +596,8 @@ ENTRYPOINT ["/app/todo-api"]
 CMD ["serve"]
 ```
 
+`# syntax=docker/dockerfile:1.7` 用来固定本章使用的 Dockerfile frontend 版本，保证 `RUN --mount=type=cache` 行为稳定可复现。真实团队也可以使用 `# syntax=docker/dockerfile:1` 跟随 Dockerfile 1.x 稳定线，但 CI 中应保持团队统一，避免不同构建环境解析规则不一致。
+
 这份 Dockerfile 有几个关键设计：
 
 - `api/Dockerfile` 使用项目根目录作为构建上下文，所以能 `COPY go.mod go.sum ./`。
@@ -586,13 +611,7 @@ CMD ["serve"]
 
 ### 5.5 执行命令
 
-先查看构建上下文大小。构建时如果这里显示几百 MB 或更大，说明 `.dockerignore` 可能漏掉了大文件：
-
-```bash
-docker build -f api/Dockerfile -t todo-api:context-check --progress=plain .
-```
-
-如果只是想先看构建日志，不想保留这个标签，可以稍后删除 `todo-api:context-check`。正式构建前设置版本变量。
+正式构建前先设置版本变量：
 
 === "Linux / macOS / WSL2"
 
@@ -638,6 +657,8 @@ docker build -f api/Dockerfile -t todo-api:context-check --progress=plain .
       -t "todo-api:git-$COMMIT" `
       .
     ```
+
+这个命令会完整构建镜像，并在 `--progress=plain` 输出中显示 `load .dockerignore` 和 `transferring context`。如果 `transferring context` 显示几十 MB 甚至几百 MB，通常说明 `.dockerignore` 漏掉了大文件。这里不单独提供“只检查上下文”的伪命令，因为 `docker build` 会执行完整 Dockerfile，单独跑一次会让新手重复等待。
 
 查看镜像列表：
 
@@ -946,6 +967,8 @@ docker scout cves todo-api:v0.1.0
 
 扫描结果可能包含基础镜像或依赖库的漏洞。学习阶段重点不是追求“永远 0 漏洞”，而是能读懂扫描报告、区分严重等级、定位来源，并知道需要升级基础镜像、依赖库或等待上游修复。
 
+如果你还没有安装 hadolint、dive、Trivy 或 Docker Scout，可以先完成前面的构建、运行和 API 验证，再把这些命令记录为“待补充进阶验证”。最小验收不应因为本地缺少分析工具而中断。
+
 启动本地 registry，演示推送镜像：
 
 ```bash
@@ -1026,6 +1049,8 @@ v0.1.0: digest: sha256:... size: ...
 
 ### 5.7 验证方法
 
+#### 5.7.1 最小验证
+
 验证 Dockerfile 和 `.dockerignore` 已创建：
 
 ```bash
@@ -1087,7 +1112,9 @@ docker image rm localhost:5000/todo-api:v0.1.0
 docker pull localhost:5000/todo-api:v0.1.0
 ```
 
-验收时至少记录以下信息：
+#### 5.7.2 进阶验证
+
+进阶验证用于证明你不仅能构建镜像，还能分析镜像质量。已安装工具时记录以下信息：
 
 - `docker image ls todo-api` 的镜像大小。
 - `docker image inspect` 中的 `Config.User`、`Entrypoint`、`Cmd`、OCI Label。
@@ -1120,7 +1147,6 @@ docker volume rm todo-postgres-data todo-redis-data
 
 ```bash
 docker image rm todo-api:v0.1.0
-docker image rm todo-api:context-check
 docker image rm localhost:5000/todo-api:v0.1.0
 ```
 
@@ -1165,23 +1191,25 @@ docker image ls todo-api
 
 - **预防**：记住 `-f api/Dockerfile` 指定 Dockerfile 路径，最后的 `.` 指定构建上下文。两者不是同一个概念。
 
-### 错误 2：distroless 容器启动时报 `no such file or directory`
+### 错误 2：distroless 镜像拉取失败或容器启动失败
 
 - **现象**：
 
   ```text
+  failed to solve: gcr.io/distroless/static-debian12:nonroot: failed to resolve source metadata
   exec /app/todo-api: no such file or directory
   ```
 
-- **原因**：文件可能真的没复制进去，也可能是二进制依赖动态链接器或系统库，而 distroless static 镜像里没有这些依赖。
+- **原因**：第一类问题是网络、代理或公司镜像策略导致无法拉取 `gcr.io/distroless/static-debian12:nonroot`。第二类问题是文件可能真的没复制进去，也可能是二进制依赖动态链接器或系统库，而 distroless static 镜像里没有这些依赖。
 - **排查**：
 
   ```bash
+  docker pull gcr.io/distroless/static-debian12:nonroot
   docker image inspect todo-api:v0.1.0 --format '{{.Config.Entrypoint}}'
   docker history todo-api:v0.1.0
   ```
 
-  如果 Dockerfile 中没有 `CGO_ENABLED=0`，要重点怀疑动态链接问题。
+  如果 `docker pull` 失败，先处理网络、代理或公司镜像缓存；如果镜像能拉取但容器启动失败，并且 Dockerfile 中没有 `CGO_ENABLED=0`，要重点怀疑动态链接问题。
 
 - **修复**：确保构建命令包含：
 
@@ -1189,7 +1217,7 @@ docker image ls todo-api
   CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/todo-api ./api/cmd/todo-api
   ```
 
-  如果项目确实需要 CGO，改用包含运行库的 `debian:bookworm-slim`，并明确安装所需动态库。
+  如果只是 distroless 拉取受阻，可以先让公司代理或镜像仓库缓存该镜像；本地教学也可以临时传入 `--build-arg RUNTIME_IMAGE=debian:bookworm-slim` 验证构建链路，但这会改变非 root 用户和镜像体积，需要同步调整 Dockerfile，不应作为最终生产方案。如果项目确实需要 CGO，改用包含运行库的 `debian:bookworm-slim`，并明确安装所需动态库。
 
 - **预防**：Go 服务进入 distroless static 镜像前，先确认是否有 CGO 依赖。不要把“镜像越小越好”变成机械选择。
 
@@ -1309,7 +1337,7 @@ docker image ls todo-api
 - 本地 registry 镜像 `localhost:5000/todo-api:v0.1.0`。
 - 一份镜像构建记录，可以放入应用仓库 `docs/docker/chapter-16-image-build-record.md`。
 
-验收标准：
+最小验收标准：
 
 - `docker build -f api/Dockerfile -t todo-api:v0.1.0 .` 构建成功。
 - `docker image inspect todo-api:v0.1.0 --format '{{.Config.User}}'` 输出 `nonroot:nonroot`。
@@ -1317,10 +1345,15 @@ docker image ls todo-api
 - `docker run --rm ... todo-api:v0.1.0 config-check` 能通过配置检查。
 - `docker run -d --name todo-api ... todo-api:v0.1.0` 后 `/healthz` 返回 `200 OK`。
 - 登录接口能返回 JWT，带 Token 创建 Todo 返回 `201 Created`。
+- 你能解释为什么 Dockerfile 在 `api/` 目录，而构建上下文仍然使用项目根目录。
+
+进阶验收标准：
+
 - `hadolint api/Dockerfile` 无严重问题，或你能解释并记录每个告警的处理决定。
+- `docker history todo-api:v0.1.0` 或 `dive todo-api:v0.1.0` 的层分析结果已记录。
 - `trivy image --severity HIGH,CRITICAL todo-api:v0.1.0` 或 Docker Scout 扫描结果已记录。
 - `docker push localhost:5000/todo-api:v0.1.0` 成功，并能重新 `docker pull`。
-- 你能解释为什么 Dockerfile 在 `api/` 目录，而构建上下文仍然使用项目根目录。
+- 你能说明本地教学工具可以临时使用浮动标签，但 CI 中应固定工具版本或 digest。
 
 构建记录模板：
 
