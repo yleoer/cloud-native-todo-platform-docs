@@ -8,3 +8,5 @@ cli/todo-cli/bin/
 coverage.out
 .claude
 .idea
+deployments/k8s-base/*.local.yaml
+deployments/k8s-base/tls/
