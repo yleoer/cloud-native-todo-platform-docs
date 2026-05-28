@@ -77,7 +77,7 @@
 第 22 篇：Service + Ingress + Gateway API
 第 23 篇：ConfigMap + Secret 配置迁移
 第 24 篇：PostgreSQL + PVC 持久化
-第 25 篇：Kubernetes 网络、域名解析、容器网络接口和网络策略
+第 25 篇：Kubernetes 网络、域名解析、容器网络接口（Container Network Interface，CNI）和网络策略
 ```
 
 本篇产出的 PostgreSQL Service、StatefulSet、PVC 和数据库 Secret 会被后续章节继续使用：第 25 篇会从 Domain Name System（DNS，域名系统）和网络路径解释 API 如何访问 `todo-postgres`；第 27 篇会把这些 YAML 模板化到 Helm；第 28 篇会用 Kustomize 管理不同环境的存储差异。
@@ -282,10 +282,13 @@ kubectl get nodes
 ```text
 kind-todo-k8s
 Client Version: v1.36.x
+...
 Server Version: v1.36.x
 NAME                     STATUS   ROLES           AGE   VERSION
 todo-k8s-control-plane   Ready    control-plane   ...   v1.36.x
 ```
+
+不同平台的 `kubectl version` 可能额外输出 `Kustomize Version` 等行，上面的 `...` 表示省略了非关键版本信息。
 
 确认 kind 集群存在默认 StorageClass。PVC 后续会依赖它动态创建 PV：
 
@@ -399,6 +402,8 @@ kubectl -n todo-workloads create secret generic todo-api-database \
   --dry-run=client -o yaml > deployments/k8s-base/todo-api-database-secret.local.yaml
 ```
 
+这里的 `sslmode=disable` 只适合本地 kind 教学实验。生产环境应为 PostgreSQL 配置 TLS 证书，并使用 `sslmode=verify-full` 或团队安全基线要求的等同选项。
+
 创建 PostgreSQL Service。一个 Headless Service 提供 StatefulSet 稳定身份，一个普通 ClusterIP Service 给 Todo API 访问：
 
 ```bash
@@ -510,7 +515,7 @@ spec:
               mountPath: /var/lib/postgresql/data # ← PVC 挂载到 PostgreSQL 数据根目录
   volumeClaimTemplates:
     - metadata:
-        name: postgres-data
+        name: postgres-data # ← 自动生成的 PVC 名为 postgres-data-todo-postgres-0
         labels:
           app.kubernetes.io/name: todo-postgres
           app.kubernetes.io/part-of: todo-platform
@@ -745,6 +750,8 @@ curl -i \
   http://127.0.0.1:18082/api/v2/todos
 ```
 
+这里用 `sed` 简化提取单行 JSON 中的 `token`。如果你安装了 `jq`，可以把第一段命令中的 `sed -n ...` 替换为 `jq -r '.token'`，解析 JSON 会更可靠。
+
 也可以直接从 PostgreSQL 查询这条 Todo：
 
 ```bash
@@ -777,7 +784,9 @@ curl -s \
   http://127.0.0.1:18082/api/v2/todos | grep "persist through Kubernetes PVC"
 ```
 
-做一次最小备份与恢复验证。这里把当前数据库导出到本地临时 SQL 文件，再恢复到同一个 PostgreSQL 实例里的检查库。这个实验不是生产备份方案，但能让你看到“备份文件能否恢复”比“备份命令是否执行成功”更重要：
+做一次最小备份与恢复验证。`pg_dump` 生成的是逻辑备份，也就是 SQL 文本格式，适合小数据量教学验证。生产大数据量场景通常还需要配合 `pg_basebackup` 做物理备份，并持续归档 WAL。
+
+这里把当前数据库导出到本地临时 SQL 文件，再恢复到同一个 PostgreSQL 实例里的检查库。这个实验不是生产备份方案，但能让你看到“备份文件能否恢复”比“备份命令是否执行成功”更重要：
 
 ```bash
 kubectl -n todo-workloads exec todo-postgres-0 -- \
@@ -1059,9 +1068,9 @@ kubectl -n todo-workloads delete pvc postgres-data-todo-postgres-0 --ignore-not-
 
 ## 7. 生产环境注意事项
 
-1. **PVC 持久化不是数据库高可用。** PVC 解决的是 Pod 重建后数据目录还在，不解决数据库主从复制、自动故障切换、跨可用区容灾和误操作恢复。生产 PostgreSQL 优先考虑托管数据库或成熟 Operator；如果自建，必须补齐备份、复制、监控、升级和演练。
+1. **PVC 持久化不是数据库高可用。** PVC 解决的是 Pod 重建后数据目录还在，不解决数据库主从复制、自动故障切换、跨可用区容灾和误操作恢复。生产 PostgreSQL 优先考虑托管数据库或成熟 Operator。确需自建时，必须补齐备份、复制、监控、升级和演练。
 
-2. **备份恢复要按业务目标设计。** 团队需要明确恢复点目标（Recovery Point Objective，RPO）和恢复时间目标（Recovery Time Objective，RTO）。只看到备份任务成功不够，必须定期恢复到新实例并校验表结构、数据量和关键业务查询。数据库迁移前也要准备回滚或前滚策略。
+2. **备份恢复要按业务目标设计。** 团队需要明确恢复点目标（Recovery Point Objective，RPO）和恢复时间目标（Recovery Time Objective，RTO）。只看到备份任务成功不够，还必须定期恢复到新实例，并校验表结构、数据量和关键业务查询。数据库迁移前也要准备回滚或前滚策略。
 
 3. **StorageClass 和 ReclaimPolicy 影响数据生命周期。** 教学环境常用 `Delete`，删除 PVC 后底层数据也可能被删。生产环境要明确哪些存储类允许删除、哪些 PV 需要 `Retain`，并通过权限、审批和策略工具限制误删 PVC。
 
@@ -1175,6 +1184,6 @@ kubectl -n todo-workloads delete pvc postgres-data-todo-postgres-0 --ignore-not-
 
 ## 12. 下一章衔接
 
-第 25 篇会进入 Kubernetes 网络原理，解释 Pod、Service、DNS、Container Network Interface（CNI，容器网络接口）、kube-proxy 和 NetworkPolicy 如何共同完成集群通信。本篇的 `todo-api -> todo-postgres` 访问链路会成为下一章的真实案例：如果 DNS 解析失败、Service 没有 Endpoints 或网络策略拦截，Todo API 就无法连接数据库。
+第 25 篇会进入 Kubernetes 网络原理，解释 Pod、Service、DNS、CNI、kube-proxy 和 NetworkPolicy 如何共同完成集群通信。本篇的 `todo-api -> todo-postgres` 访问链路会成为下一章的真实案例：如果 DNS 解析失败、Service 没有 Endpoints 或网络策略拦截，Todo API 就无法连接数据库。
 
 如果跳过本篇，下一章看到 `todo-postgres.todo-workloads.svc.cluster.local`、Service Endpoints 和 Pod 网络排障时会缺少真实业务上下文。第 24 篇先把“谁访问谁、数据在哪里”搭起来，第 25 篇再解释“网络为什么能通、哪里会不通”。
