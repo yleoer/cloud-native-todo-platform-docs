@@ -24,13 +24,18 @@
 ```text
 cloud-native-todo-platform/
 ├── .dockerignore
-├── Dockerfile
-├── compose.yaml
+├── api/
+│   ├── Dockerfile
+│   ├── cmd/
+│   │   └── todo-api/
+│   └── migrations/
+├── deployments/
+│   └── docker-compose/
+│       ├── compose.yaml
+│       ├── .env.example
+│       └── README.md
 ├── README.md
-├── cmd/
-│   └── todo-api/
 ├── configs/
-├── migrations/
 ├── docs/
 │   ├── docker/
 │   │   ├── stage-03-acceptance.md
@@ -52,14 +57,27 @@ cloud-native-todo-platform/
 |---|---|---|
 | Docker | Docker Desktop 或 Docker Engine 当前稳定版 | 需要支持 Compose v2 和 BuildKit |
 | Docker Compose | v2.20 或更新版本 | 使用 `docker compose`，不是旧版 `docker-compose` |
-| Go 镜像 | `golang:1.26` / `golang:1.26-bookworm` | 与阶段二 Go 后端项目保持当前稳定工具链 |
+| Go 镜像 | `golang:1.26-bookworm` | 与阶段二 Go 后端项目保持当前稳定工具链，固定 Debian 变体便于复现构建环境 |
 | Alpine 镜像 | `alpine:3.23` | 用于轻量命令实验和 rootfs 观察 |
-| PostgreSQL | `postgres:18` | 阶段二数据库能力延续 |
-| Redis | `redis:8.2` | 阶段二缓存与限流能力延续 |
-| kind | 当前稳定版 | 第 19 篇用于观察 Kubernetes 节点运行时 |
+| PostgreSQL | `postgres:18-alpine` | 阶段二数据库能力延续，与第 15 / 17 篇一致 |
+| Redis | `redis:8.2-alpine` | 阶段二缓存与限流能力延续，与第 15 / 17 篇一致 |
+| kind | 0.31+ | 第 19 篇用于观察 Kubernetes 节点运行时 |
 | kubectl | 与 kind 集群兼容 | 用于部署和查看探针工作负载 |
 
 版本不是越新越好，而是要可解释、可复现、处于支持周期内。真实团队需要把这些基线写入 README、CI、镜像构建参数和发布说明。
+
+### 3.1 出版验证矩阵
+
+阶段三包含普通 Docker 实验，也包含 Linux namespace、cgroup、OverlayFS 和 kind 节点运行时观察。出版前建议按下面矩阵做一次交叉验证：
+
+| 环境 | 必须验证 | 注意事项 |
+|---|---|---|
+| Ubuntu 24.04 / Linux VM | 第 15-19 篇主线实验、`unshare`、cgroup v2、OverlayFS、kind 运行时观察 | 只在个人学习机或临时 VM 中执行底层实验，不在生产节点或共享跳板机执行 |
+| WSL2 Ubuntu + Docker Desktop | 第 15-19 篇主线实验，大部分第 18 篇底层观察 | OverlayFS 实验优先放在 `$HOME` 下，不放在 `/mnt/c/...` |
+| macOS + Docker Desktop | 第 15-17 篇、kind 主线、第 19 篇运行时观察 | macOS 原生 shell 不直接支持 Linux namespace / cgroup / OverlayFS 手动实验，需要 Linux VM |
+| Windows PowerShell + Docker Desktop | 第 15-17 篇 PowerShell 路径 | 第 18 篇和第 19 篇建议切到 WSL2 Ubuntu，避免 Bash 变量、Linux 权限和运行时 socket 差异 |
+
+如果时间有限，至少完成 Ubuntu 24.04 或 WSL2 Ubuntu 的完整主线验收，再用 macOS / Windows 做第 15-17 篇复制粘贴体验检查。
 
 ## 4. 两档验收路径
 
@@ -73,15 +91,17 @@ cloud-native-todo-platform/
     docker version
     docker compose version
 
-    docker build -t todo-api:v0.1.0 .
+    docker build -f api/Dockerfile -t todo-api:v0.1.0 .
     docker image inspect todo-api:v0.1.0 --format '{{.Config.User}}'
     docker run --rm todo-api:v0.1.0 config-check
 
-    docker compose config
-    docker compose up -d
-    docker compose ps
-    curl -i http://127.0.0.1:8080/healthz
-    docker compose logs --tail 80 api
+    cd deployments/docker-compose
+    test -f .env
+    docker compose --env-file .env config
+    docker compose --env-file .env up -d
+    docker compose --env-file .env ps
+    curl -i http://127.0.0.1:18080/healthz
+    docker compose --env-file .env logs --tail 80 api
     ```
 
 === "Windows PowerShell"
@@ -90,15 +110,17 @@ cloud-native-todo-platform/
     docker version
     docker compose version
 
-    docker build -t todo-api:v0.1.0 .
+    docker build -f api/Dockerfile -t todo-api:v0.1.0 .
     docker image inspect todo-api:v0.1.0 --format '{{.Config.User}}'
     docker run --rm todo-api:v0.1.0 config-check
 
-    docker compose config
-    docker compose up -d
-    docker compose ps
-    curl.exe -i http://127.0.0.1:8080/healthz
-    docker compose logs --tail 80 api
+    Set-Location deployments\docker-compose
+    Test-Path .env
+    docker compose --env-file .env config
+    docker compose --env-file .env up -d
+    docker compose --env-file .env ps
+    curl.exe -i http://127.0.0.1:18080/healthz
+    docker compose --env-file .env logs --tail 80 api
     ```
 
 预期结果：
@@ -107,6 +129,7 @@ cloud-native-todo-platform/
 - `todo-api:v0.1.0` 能构建成功。
 - 镜像运行用户不是 root。
 - `config-check` 能执行。
+- 已按第 17 篇创建 `deployments/docker-compose/.env` 并写入 `TODO_AUTH_USERS`。
 - `docker compose config` 能通过配置检查。
 - `docker compose ps` 中 API、PostgreSQL、Redis 处于运行或健康状态。
 - `/healthz` 返回 `200 OK`。
@@ -138,6 +161,8 @@ docker exec -it "$NODE" crictl pods
 ```
 
 进阶验收不要求在 macOS 原生 shell 或 Windows PowerShell 中手动模拟 namespace / cgroup。底层实验应放在 Linux 环境中完成。
+
+出版前还要特别确认：凡是会写入 `/sys/fs/cgroup`、执行 `mount` / `umount`、`chroot`、`nsenter`、`kind delete cluster`、`docker compose down -v` 或 `docker volume rm` 的步骤，都只针对课程实验资源执行，并且正文已经明确说明清理对象和数据删除后果。
 
 ## 5. Dockerfile 验收清单
 
@@ -187,7 +212,7 @@ docker exec -it "$NODE" crictl pods
 ## 构建记录
 
 ```text
-docker build -t todo-api:v0.1.0 .:
+docker build -f api/Dockerfile -t todo-api:v0.1.0 .:
 docker image inspect todo-api:v0.1.0 --format '{{.Config.User}}':
 docker run --rm todo-api:v0.1.0 config-check:
 ```
@@ -195,9 +220,10 @@ docker run --rm todo-api:v0.1.0 config-check:
 ## Compose 运行记录
 
 ```text
-docker compose config:
-docker compose up -d:
-docker compose ps:
+cd deployments/docker-compose:
+docker compose --env-file .env config:
+docker compose --env-file .env up -d:
+docker compose --env-file .env ps:
 curl /healthz:
 ```
 

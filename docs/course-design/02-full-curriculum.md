@@ -527,7 +527,7 @@ Todo Operator（篇 34-42）
 
 **本篇特色项目**
 
-用 Linux 命令（unshare、nsenter、cgcreate）手动模拟容器隔离与资源限制。
+用 Linux 命令（`unshare`、`nsenter`、cgroup v2）手动模拟容器隔离与资源限制，`cgcreate` 作为 cgroup v1 历史对照。
 
 **本篇能力验收标准**
 
@@ -556,6 +556,20 @@ Todo Operator（篇 34-42）
 **本篇能力验收标准**
 
 能说明 Docker、containerd、runc、CRI、Kubernetes 之间的调用关系，能用 crictl 排查容器运行时问题。
+
+---
+
+### 阶段三复习节点：容器化能力检验
+
+在进入 Kubernetes 应用交付阶段之前，请逐项确认以下里程碑：
+
+- [ ] 能用 Docker 手工运行 Todo API、PostgreSQL、Redis，并解释容器网络、端口映射和数据卷（篇 15）
+- [ ] `api/Dockerfile` 能构建 `todo-api:v0.1.0`，镜像使用非 root 用户并通过基础扫描或记录扫描结果（篇 16）
+- [ ] `deployments/docker-compose/compose.yaml` 能一键启动完整本地环境，`http://127.0.0.1:18080/healthz` 返回正常（篇 17）
+- [ ] 能解释 namespace、cgroup、rootfs、OverlayFS 与容器进程模型，并完成 Linux 环境下的底层观察或替代实验（篇 18）
+- [ ] 能画出 `kubectl -> kubelet -> CRI -> containerd -> runc -> kernel` 链路，并用 `crictl` / `ctr` 观察 kind 节点运行时（篇 19）
+
+**阶段产物**：Todo Platform 容器化交付包 —— `todo-api:v0.1.0` 镜像、`deployments/docker-compose/` 本地环境、容器原理观察记录和运行时排障记录，可直接作为阶段四 Kubernetes 部署原材料。
 
 ---
 

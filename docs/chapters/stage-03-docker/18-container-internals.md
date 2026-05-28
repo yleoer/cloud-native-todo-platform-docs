@@ -1143,6 +1143,9 @@ findmnt | grep container-lab || echo "no container-lab mounts"
   ```
 
 - **原因**：系统不是 cgroup v2，cgroup 由 systemd 或 Docker Desktop 托管，当前环境不允许手动创建 cgroup。
+
+  在 WSL2 Ubuntu、Docker Desktop 后端或公司受控开发机中，这通常是预期限制，不代表你的 Docker 环境坏了。很多桌面环境会把 cgroup 层交给 Docker Desktop、systemd 或虚拟化层管理，普通 shell 只能观察，不能随意写入。
+
 - **排查**：
 
   ```bash

@@ -54,7 +54,7 @@
 
 ```bash
 docker pull alpine:3.23
-docker pull golang:1.26
+docker pull golang:1.26-bookworm
 docker image ls
 docker image inspect todo-api:v0.1.0
 docker history todo-api:v0.1.0
@@ -72,28 +72,31 @@ docker image rm todo-api:v0.1.0
 
 ## 4. 构建排障速查
 
+适用环境：第 16 篇镜像构建实验，在应用仓库根目录执行，Dockerfile 位于 `api/Dockerfile`。
+
 基础构建：
 
 ```bash
-docker build -t todo-api:v0.1.0 .
+docker build -f api/Dockerfile -t todo-api:v0.1.0 .
 ```
 
 查看更详细构建输出：
 
 ```bash
-docker build --progress=plain -t todo-api:v0.1.0 .
+docker build --progress=plain -f api/Dockerfile -t todo-api:v0.1.0 .
 ```
 
 绕过缓存排查：
 
 ```bash
-docker build --no-cache -t todo-api:v0.1.0 .
+docker build --no-cache -f api/Dockerfile -t todo-api:v0.1.0 .
 ```
 
 传入版本参数：
 
 ```bash
 docker build \
+  -f api/Dockerfile \
   --build-arg VERSION=v0.1.0 \
   --build-arg COMMIT="$(git rev-parse --short HEAD)" \
   -t todo-api:v0.1.0 .
@@ -103,6 +106,7 @@ Windows PowerShell 写法：
 
 ```powershell
 docker build `
+  -f api/Dockerfile `
   --build-arg VERSION=v0.1.0 `
   --build-arg COMMIT="$(git rev-parse --short HEAD)" `
   -t todo-api:v0.1.0 .
@@ -115,6 +119,8 @@ docker build `
 - Dockerfile 中路径是否和项目目录一致。
 
 ## 5. 容器生命周期速查
+
+适用环境：第 15 篇手工容器或第 16 篇单容器镜像验证，容器名使用 `todo-api`。第 17 篇 Compose 环境请优先使用第 8 节的 `docker compose ps/logs/exec/restart`。
 
 ```bash
 docker run --name todo-api -d todo-api:v0.1.0
@@ -151,6 +157,8 @@ docker inspect todo-api --format '{{.State.Status}} {{.State.ExitCode}} {{.State
 
 ## 6. 端口与网络排障
 
+适用环境：第 15 篇手工环境默认网络名是 `todo-net`，依赖容器名是 `todo-postgres` 和 `todo-redis`。第 17 篇 Compose 环境使用服务名 `postgres`、`redis`，网络由 Compose 自动创建；由于 API 镜像可能是 distroless，网络调试优先使用临时 Alpine 容器或直接进入 `postgres` / `redis` 服务。
+
 查看端口映射：
 
 ```bash
@@ -173,6 +181,15 @@ docker run --rm --network todo-net alpine:3.23 nslookup todo-postgres
 docker run --rm --network todo-net alpine:3.23 nslookup todo-redis
 ```
 
+Compose 环境中测试服务名：
+
+```bash
+docker run --rm --network todo-platform_todo-net alpine:3.23 nslookup postgres
+docker run --rm --network todo-platform_todo-net alpine:3.23 nslookup redis
+docker compose exec postgres pg_isready -U todo -d todo_platform
+docker compose exec redis redis-cli -a todo_redis_password PING
+```
+
 常见现象：
 
 | 现象 | 优先判断 | 修复方向 |
@@ -186,6 +203,8 @@ docker run --rm --network todo-net alpine:3.23 nslookup todo-redis
     本地实验可以把 API 端口映射到 `127.0.0.1`。生产环境中，数据库、Redis、管理端口不应直接暴露到公网。
 
 ## 7. 数据卷排障
+
+适用环境：第 15 篇手工环境使用 `todo-postgres-data`、`todo-redis-data` 和容器名 `todo-postgres`、`todo-redis`。第 17 篇 Compose 环境请用 `docker compose exec postgres ...` 查看数据库，用 `docker compose config --volumes` 或 `docker volume ls` 确认 Compose 创建的数据卷名。
 
 查看 volume：
 
@@ -208,6 +227,8 @@ docker exec -it todo-postgres psql -U todo -d todo_platform -c '\dt'
     `docker compose down -v`、`docker volume rm`、`docker system prune --volumes` 会删除数据卷。生产和共享环境中执行前必须确认影响范围和备份。
 
 ## 8. Compose 速查
+
+适用环境：第 17 篇 Docker Compose 本地环境，在 `deployments/docker-compose/` 目录或显式指定 Compose 文件时执行。
 
 配置检查：
 
