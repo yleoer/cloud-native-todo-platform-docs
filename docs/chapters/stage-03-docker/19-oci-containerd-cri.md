@@ -208,6 +208,8 @@ bundle/
 }
 ```
 
+`ociVersion` 示例用于说明字段位置和语义。真实环境中请以当前 `runc spec` 或运行时生成的 `config.json` 为准，不要为了手写示例而强行固定旧版本号。
+
 你在第 18 篇写的 `mini-container.sh`，本质上是在手工模拟 runtime-spec 中的一部分：设置 namespace、挂载 `/proc`、切换 rootfs、写入 cgroup。真正的运行时会把这些动作做得更完整、更安全、更可审计。
 
 ### 3.4 runc：低层 OCI runtime
@@ -471,11 +473,13 @@ ctr -n k8s.io content ls / snapshots ls
 | Docker Engine | 29.x | 承载 kind 节点容器，构建 / 保存本地镜像 |
 | kubectl | 1.36.x | 访问 kind 集群 |
 | kind | 0.31+ | 创建本地 Kubernetes 节点 |
-| kind node image | 课程锁定版本，默认示例为 `kindest/node:v1.35.0` | 节点内置 kubelet、containerd、crictl、ctr |
-| containerd | 2.3.x LTS | 节点容器内部运行时 |
-| crictl | 与节点 Kubernetes 版本匹配 | CRI 调试 |
+| kind node image | 课程锁定版本，当前示例为 `kindest/node:v1.35.0` | 节点内置 kubelet、containerd、crictl、ctr |
+| containerd | 课程基线为 2.3.x LTS；kind 节点以自检输出为准 | 节点容器内部运行时 |
+| crictl | 与节点 Kubernetes / CRI 版本匹配 | CRI 调试 |
 | nerdctl | 2.3.x，可选 | 用 Docker 风格命令操作 containerd |
 | Alpine | `alpine:3.23` | 轻量探针容器 |
+
+这里要区分“课程基线”和“实验节点实际版本”：课程蓝图把 containerd 锁定为 2.3.x LTS，但 kind 节点镜像会内置自己的 containerd、runc 和 crictl 版本。实验是否可执行以节点内自检结果为准，生产版本规划再按课程基线或团队基线统一升级。
 
 环境自检：
 
@@ -484,6 +488,7 @@ docker version
 kubectl version --client
 kind version
 docker info --format '{{.ServerVersion}}'
+command -v tree || echo "tree not installed; use find runtime-lab -maxdepth 2 -print instead"
 ```
 
 可选检查 `nerdctl`：
@@ -499,6 +504,7 @@ command -v nerdctl && nerdctl version || echo "nerdctl not installed; optional s
 | `docker version` | Client 和 Server 都可用 | 启动 Docker Desktop 或 Docker Engine |
 | `kubectl version --client` | 输出客户端版本 | 回到第 1 篇安装 kubectl |
 | `kind version` | 输出 kind 版本 | 回到第 1 篇安装 kind |
+| `command -v tree` | 输出命令路径 | 安装 `tree`，或用 `find` 替代目录展示 |
 | `nerdctl version` | 可选输出版本 | 不影响主线实验，只跳过 5.5.8 |
 
 ### 5.3 文件目录结构
@@ -508,6 +514,12 @@ command -v nerdctl && nerdctl version || echo "nerdctl not installed; optional s
 ```bash
 mkdir -p runtime-lab/k8s runtime-lab/notes
 tree runtime-lab
+```
+
+如果你的环境没有安装 `tree`，可以用下面的命令替代：
+
+```bash
+find runtime-lab -maxdepth 2 -print
 ```
 
 预期目录：
@@ -689,9 +701,23 @@ echo "$NODE"
 docker exec "$NODE" crictl version
 docker exec "$NODE" ctr version
 docker exec "$NODE" runc --version || true
+docker exec "$NODE" containerd --version || true
+docker exec "$NODE" ctr plugins ls | grep -E 'cri|snapshot' || true
 ```
 
-这里的 `docker exec` 进入的是外层 kind 节点容器；`crictl` 和 `ctr` 操作的是节点容器内部的 containerd。
+这里的 `docker exec` 进入的是外层 kind 节点容器；`crictl` 和 `ctr` 操作的是节点容器内部的 containerd。记录这些输出时，不要机械追求和课程蓝图的 containerd 2.3.x 完全一致；kind 节点镜像内置版本能正常提供 CRI、snapshotter 和 runc 调用链即可。本篇关心的是运行时观察方法，生产版本升级会在集群节点规划中统一处理。
+
+工具层级可以这样记：
+
+| 工具 | 观察层级 | 典型命令 | 本篇定位 |
+|---|---|---|---|
+| `kubectl` | Kubernetes API | `kubectl describe pod` | 看声明式对象、事件和 Pod 状态 |
+| `crictl` | CRI | `crictl pods`、`crictl ps`、`crictl logs` | 看 kubelet 交给运行时后的 PodSandbox 和容器 |
+| `ctr` | containerd | `ctr -n k8s.io tasks ls` | 看 containerd 的 image、container、task、snapshot |
+| `runc` | OCI runtime | `runc --version`、`runc spec` | 理解底层执行器，本篇不把它作为主线操作入口 |
+| `nerdctl` | containerd 用户体验 | `nerdctl run`、`nerdctl ps` | 可选对照 Docker 风格命令，不替代 `crictl` 排查 Kubernetes Pod |
+
+本篇不手动执行 `runc run`，原因是手写 OCI bundle、网络、挂载和 cgroup 配置会把实验重点从“理解 Kubernetes 运行时链路”转移到“手工组装低层容器”。你只需要通过 `runc --version` 确认底层执行器存在，再通过后面的 `ctr -n k8s.io containers info "$CONTAINER_ID"` 观察运行时生成的 OCI spec 关键字段即可。真正手工运行 runc 更适合放到专门的运行时源码或安全沙箱课程中。
 
 #### 5.5.4 用 crictl 观察 CRI 层
 
@@ -749,6 +775,12 @@ Kubernetes 管理的对象在 `k8s.io` namespace 中。查看 container 对象�
 
 ```bash
 docker exec "$NODE" ctr -n k8s.io containers ls | grep "$CONTAINER_ID"
+```
+
+如果这里没有输出，先不要急着判断 containerd 异常。不同运行时版本里，CRI 返回的短 ID 与 `ctr` 展示的完整 ID 可能需要反查。可以先列出相关 container，再根据 Pod 名、容器名或镜像反向确认：
+
+```bash
+docker exec "$NODE" ctr -n k8s.io containers ls | grep -E 'runtime-probe|alpine|main'
 ```
 
 查看 task，也就是真正运行中的进程：
@@ -825,7 +857,19 @@ docker exec "$NODE" ctr -n k8s.io images ls | grep todo-api
 
 #### 5.5.8 可选：用 nerdctl 对照 Docker 风格命令
 
-`nerdctl` 是 containerd 的 Docker 兼容风格 CLI。如果本机已经安装并且能访问本机 containerd，可以做一个不依赖 CNI 的最小实验：
+本篇主线用 `crictl` 和 `ctr` 观察 kind 节点内部的 Kubernetes 运行时。`nerdctl` 是 containerd 的 Docker 兼容风格 CLI，适合帮助你把熟悉的 Docker 命令迁移到 containerd 语境中，但它不是 Kubernetes 节点排障的首选入口。
+
+表 19-4 Docker、nerdctl、crictl、ctr 常见命令对照：
+
+| 目标 | Docker | nerdctl | crictl | ctr |
+|---|---|---|---|---|
+| 查看运行中容器 | `docker ps` | `nerdctl ps` | `crictl ps` | `ctr -n k8s.io tasks ls` |
+| 查看镜像 | `docker images` | `nerdctl images` | `crictl images` | `ctr -n k8s.io images ls` |
+| 查看日志 | `docker logs <id>` | `nerdctl logs <id>` | `crictl logs <id>` | 通常不直接用 `ctr` 看日志 |
+| 启动容器 | `docker run ...` | `nerdctl run ...` | 不用于手工启动业务容器 | `ctr run ...`，偏底层调试 |
+| Kubernetes 节点排障 | 不适合 kind 节点内部 Pod | 可选辅助 | 推荐入口 | 底层补充观察 |
+
+如果本机已经安装 `nerdctl` 并且能访问本机 containerd，可以做一个不依赖 CNI 的最小实验：
 
 ```bash
 if command -v nerdctl >/dev/null 2>&1; then
@@ -1081,10 +1125,12 @@ kind get clusters
   ```bash
   docker exec "$NODE" crictl info
   docker exec "$NODE" ls -l /run/containerd/containerd.sock
-  docker exec "$NODE" systemctl status containerd --no-pager || true
+  docker exec "$NODE" ctr version
+  docker exec "$NODE" ps -ef | grep '[c]ontainerd'
+  docker exec "$NODE" ctr plugins ls | grep -E 'cri|snapshot' || true
   ```
 
-  在 kind 节点内，`/run/containerd/containerd.sock` 应该存在，`crictl info` 应能返回运行时信息。
+  在 kind 节点内，`/run/containerd/containerd.sock` 应该存在，`crictl info` 应能返回运行时信息，进程列表中应能看到 containerd。kind 节点容器不一定适合用常规 systemd 服务状态命令判断运行时状态，所以优先使用 `crictl`、`ctr` 和进程列表。
 
 - **修复**：使用本篇命令形式进入 kind 节点执行：
 
@@ -1136,6 +1182,8 @@ kind get clusters
 ## 7. 生产环境注意事项
 
 1. **不要绕过 kubelet 管理生产 Pod 容器。** 生产节点上可以用 `crictl ps`、`crictl logs`、`ctr -n k8s.io tasks ls` 做只读观察，但不要随意执行 `crictl rm`、`ctr tasks kill`、`ctr snapshots rm`。这些操作会绕过 Kubernetes 控制面，造成 kubelet 状态、运行时状态和业务预期不一致。真正需要强制清理时，应先记录事件、确认影响范围，并纳入故障处理流程。
+
+   常用只读排障命令可以包括：`crictl ps`、`crictl pods`、`crictl images`、`crictl logs <id>`、`crictl inspect <id>`、`ctr -n k8s.io containers ls`、`ctr -n k8s.io tasks ls`、`ctr -n k8s.io images ls`。高风险命令包括 `crictl rm`、`crictl rmp`、`ctr tasks kill`、`ctr containers rm`、`ctr snapshots rm` 和直接删除运行时目录。生产上执行高风险命令前必须确认 kubelet 状态、业务影响和回滚方案。
 
 2. **运行时版本必须和 Kubernetes CRI 要求匹配。** Kubernetes v1.26 以后要求运行时支持 CRI v1。升级 Kubernetes 前，要检查 containerd / CRI-O 版本、配置文件、systemd unit 和 kubelet `--container-runtime-endpoint`。节点升级不是只替换 kubelet 二进制，还要验证 runtime API、CNI、镜像仓库认证、日志路径和 cgroup 驱动。
 
@@ -1249,7 +1297,7 @@ kind get clusters
 
 本章把阶段三 Docker 学习收束到容器运行时生态。你已经看到：Docker 是开发体验入口，containerd 是主流运行时守护进程，runc 是 OCI 低层执行器，CRI 是 kubelet 与运行时之间的标准接口。
 
-概念上，你理解了 OCI image-spec、runtime-spec、manifest、config、layer、digest、runtime bundle、PodSandbox、containerd namespace、container、task、snapshot 和 shim。实践上，你创建了 kind 集群，部署了 `runtime-probe` Pod，并用 `kubectl`、`crictl`、`ctr` 从三层观察同一个容器。
+概念上，你理解了 OCI image-spec、runtime-spec、manifest、config、layer、digest、runtime bundle、PodSandbox、containerd namespace、container、task、snapshot 和 shim。实践上，你创建了 kind 集群，部署了 `runtime-probe` Pod，并用 `kubectl`、`crictl`、`ctr` 从三层观察同一个容器。本篇主线是 CRI 和 containerd 观察，`nerdctl` 用作 Docker 风格命令的可选对照工具。
 
 项目成果上，你完成了 `runtime-lab`，并能把第 16 篇的 `todo-api:v0.1.0` 镜像导入 kind 节点 containerd。这为第 20 篇正式进入 Kubernetes 架构打好了运行时基础。
 
