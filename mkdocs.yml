@@ -199,7 +199,7 @@ nav:
       - 21. Kubernetes 核心工作负载: chapters/stage-04-kubernetes/21-k8s-workloads.md
       - 22. Service、Ingress 与流量入口: chapters/stage-04-kubernetes/22-k8s-service-ingress.md
       - 23. ConfigMap、Secret 与配置管理: chapters/stage-04-kubernetes/23-k8s-config-secret.md
-  #     - 24. Kubernetes 存储: chapters/stage-04-kubernetes/24-k8s-storage.md
+      - 24. Kubernetes 存储: chapters/stage-04-kubernetes/24-k8s-storage.md
   #     - 25. Kubernetes 网络原理: chapters/stage-04-kubernetes/25-k8s-networking.md
   #     - 26. Kubernetes 安全: chapters/stage-04-kubernetes/26-k8s-security.md
   #     - 27. Helm 4 包管理: chapters/stage-04-kubernetes/27-helm4.md
