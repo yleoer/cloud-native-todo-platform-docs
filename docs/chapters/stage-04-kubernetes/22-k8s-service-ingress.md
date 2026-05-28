@@ -28,10 +28,10 @@
 开始本篇前，请确认你已经完成：
 
 - 第 20 篇：本地 kind 集群 `todo-k8s` 可用。
-- 第 21 篇：`todo-workloads` Namespace 中已经有 `todo-api` Deployment 和 ClusterIP Service。
+- 第 21 篇：`todo-workloads` Namespace 中已经有 `todo-api` Deployment 和 ClusterIP Service，且 Pod 处于 Ready 状态。
 - 本机有 `kubectl`、`kind`、`docker`、`openssl`。如果使用 Windows，建议在 WSL2 Ubuntu 中完成本章所有命令。
 
-本篇继续使用第 21 篇的内存模式 Todo API。第 24 篇才会把 PostgreSQL 和 PVC 迁移进 Kubernetes。
+本篇继续使用第 21 篇的内存模式 Todo API。第 24 篇才会把 PostgreSQL 和 PVC 迁移进 Kubernetes。如果你的 Todo API Pod 在无数据库时无法 Ready，请先回到第 21 篇确认内存模式配置已经生效，再继续本篇入口层实验。
 
 ## 2. 本章工作场景与真实案例
 
@@ -155,6 +155,8 @@ TLS 终止表示 HTTPS 连接在入口层被解密，入口层再用 HTTP 或 HT
   -> Pod 18080
 ```
 
+图 22-3 TLS 终止链路。
+
 自签名证书只适合本地实验，浏览器和 `curl` 默认不会信任它，所以本篇验证命令会使用 `curl -k`。生产环境应使用企业 CA 或 cert-manager / ACME 自动签发和轮换证书。
 
 ### 3.5 Gateway API：更清晰的入口模型
@@ -205,6 +207,8 @@ sequenceDiagram
     EPS->>Pod: forward to :18080
 ```
 
+图 22-4 Service 流量到达 Pod（DNS -> ClusterIP -> EndpointSlice -> Pod）。
+
 readinessProbe 很关键：Pod 未 Ready 时不应进入 EndpointSlice。入口层如果返回 502，先看 Service 和 EndpointSlice，通常比盯着 Ingress YAML 更快。
 
 ### 4.2 NodePort 与 LoadBalancer 的边界
@@ -236,6 +240,8 @@ sequenceDiagram
     T->>SVC: match rule and backend service
     SVC->>Pod: forward request
 ```
+
+图 22-5 Ingress Controller 工作流程（Watch -> 生成配置 -> TLS 终止 -> 转发）。
 
 如果 Controller 没有安装、IngressClass 不匹配、TLS Secret 不存在，Ingress 对象可能存在，但入口访问仍然失败。
 
@@ -585,7 +591,6 @@ metadata:
     app.kubernetes.io/part-of: todo-platform
   annotations:
     traefik.ingress.kubernetes.io/router.entrypoints: websecure
-    traefik.ingress.kubernetes.io/router.tls: "true"
 spec:
   ingressClassName: traefik # ← 绑定到 traefik IngressClass
   tls:
@@ -667,10 +672,11 @@ YAML
 
 ### 5.5 执行命令
 
-确认第 21 篇服务可用：
+确认第 21 篇服务可用。后续 Ingress 和 Gateway API 都依赖 Ready 端点；如果 Pod 不是 Running/Ready，或者 EndpointSlice 输出为空，请先回到第 21 篇排查内存模式、Probe 和 ClusterIP Service：
 
 ```bash
 kubectl config use-context kind-todo-k8s
+kubectl -n todo-workloads get pods -l app.kubernetes.io/name=todo-api
 kubectl -n todo-workloads rollout status deployment/todo-api --timeout=180s
 kubectl -n todo-workloads get svc todo-api
 kubectl -n todo-workloads get endpointslices -l kubernetes.io/service-name=todo-api
@@ -708,20 +714,20 @@ kubectl get gatewayclass
 kubectl -n todo-workloads get ingress,gateway,httproute
 ```
 
-启动 Traefik 本地端口转发。这个命令会占用当前终端：
+启动 Traefik 本地端口转发。这个命令会占用当前终端。如果第 17 篇 Docker Compose 环境仍在运行，Traefik Dashboard 可能已经占用 `18090`；可以先停止 Compose 环境，或临时删掉下面命令中的 `18090:8080`，只保留主线需要的 `18088:80 18443:443`：
 
 ```bash
 kubectl -n traefik port-forward svc/traefik 18088:80 18443:443 18090:8080
 ```
 
-打开另一个终端验证 Ingress HTTPS：
+打开另一个终端验证 Ingress HTTPS。`--resolve` 会让 `curl` 把 `todo.localhost:18443` 直接解析到 `127.0.0.1`，确保请求经过上面的 `port-forward` 到达 Traefik：
 
 ```bash
 curl -k -i --resolve todo.localhost:18443:127.0.0.1 \
   https://todo.localhost:18443/readyz
 ```
 
-验证 Gateway API HTTPS：
+验证 Gateway API HTTPS。这里同样使用 `--resolve` 绕过本机 DNS 配置，只测试入口链路本身：
 
 ```bash
 curl -k -i --resolve todo-gateway.localhost:18443:127.0.0.1 \
@@ -732,6 +738,12 @@ curl -k -i --resolve todo-gateway.localhost:18443:127.0.0.1 \
 
 ```bash
 curl -s http://127.0.0.1:18090/api/http/routers | head
+```
+
+输出会是一段 JSON 路由列表，能看到 Traefik 已经加载 Ingress 或 Gateway 生成的路由：
+
+```text
+[{"entryPoints":["websecure"],"service":"todo-workloads-todo-api-80",...}]
 ```
 
 ### 5.6 预期输出
