@@ -521,6 +521,11 @@ if [[ "$(id -u)" -ne 0 ]]; then
   exit 1
 fi
 
+if [[ "${INSIDE_MINI_NS:-}" != "1" ]]; then
+  echo "refuse to run directly; start it through unshare with INSIDE_MINI_NS=1"
+  exit 1
+fi
+
 if [[ ! -x "$ROOTFS/bin/sh" ]]; then
   echo "rootfs is missing or invalid: $ROOTFS"
   exit 1
@@ -529,10 +534,21 @@ fi
 mkdir -p "$ROOTFS/proc"
 
 if [[ -f /sys/fs/cgroup/cgroup.controllers ]]; then
-  mkdir -p "$CGROUP"
-  echo 67108864 > "$CGROUP/memory.max" 2>/dev/null || true
-  echo "50000 100000" > "$CGROUP/cpu.max" 2>/dev/null || true
-  echo $$ > "$CGROUP/cgroup.procs" 2>/dev/null || true
+  if mkdir -p "$CGROUP" 2>/dev/null; then
+    if [[ -f "$CGROUP/memory.max" ]]; then
+      echo 67108864 > "$CGROUP/memory.max" 2>/dev/null || echo "warn: cannot write memory.max"
+    else
+      echo "warn: memory controller is not available in $CGROUP"
+    fi
+    if [[ -f "$CGROUP/cpu.max" ]]; then
+      echo "50000 100000" > "$CGROUP/cpu.max" 2>/dev/null || echo "warn: cannot write cpu.max"
+    else
+      echo "warn: cpu controller is not available in $CGROUP"
+    fi
+    echo $$ > "$CGROUP/cgroup.procs" 2>/dev/null || echo "warn: cannot move process into $CGROUP"
+  else
+    echo "warn: cannot create $CGROUP; continue without manual cgroup limit"
+  fi
 fi
 
 cleanup() {
@@ -562,11 +578,21 @@ chmod +x "$LAB/mini-container.sh"
 
 - `ROOTFS` 指向从 Alpine 导出的根文件系统。
 - `CGROUP` 默认使用 `/sys/fs/cgroup/todo-mini`。
+- `INSIDE_MINI_NS=1` 是防误执行保护，要求脚本必须通过后面的 `unshare` 命令启动。
+- cgroup 写入失败时只输出 `warn` 并继续，避免受限环境中断 namespace 和 rootfs 实验。
 - `mount -t proc` 让 chroot 后的进程可以看到自己的 `/proc`。
 - `trap cleanup EXIT` 保证退出时卸载 rootfs 内的 `/proc`。
 - namespace 由启动命令中的 `unshare` 创建，脚本本身只负责 rootfs、cgroup 和 chroot。
 
 ### 5.5 执行命令
+
+建议按下面的路线执行。先完成必做项，再根据你的 Linux 环境能力选择进阶项：
+
+| 路线 | 实验 | 适合情况 |
+|---|---|---|
+| 必做 | 观察真实容器、UTS/PID namespace、rootfs、Docker 资源限制 | 所有 Linux / WSL2 Ubuntu 学习者 |
+| 进阶 | 手动 cgroup v2、OverlayFS、`mini-container.sh`、`nsenter` | 有 sudo 权限、内核和文件系统支持较完整 |
+| 可跳过 | `cgcreate` cgroup v1 对照 | 只有老实验机或需要理解历史工具时再做 |
 
 #### 5.5.1 观察 Todo API 容器
 
@@ -575,6 +601,7 @@ chmod +x "$LAB/mini-container.sh"
 ```bash
 test -f deployments/docker-compose/compose.yaml
 cd deployments/docker-compose
+test -f .env
 docker compose --env-file .env up -d
 docker compose --env-file .env ps
 ```
@@ -769,20 +796,23 @@ stat -fc %T /sys/fs/cgroup
 test -f /sys/fs/cgroup/cgroup.controllers && cat /sys/fs/cgroup/cgroup.controllers || true
 ```
 
-如果不是 `cgroup2fs`，或者当前系统不允许手动写 `/sys/fs/cgroup`，跳到 5.5.8 使用 Docker 替代实验。
+如果不是 `cgroup2fs`，或者当前系统不允许手动写 `/sys/fs/cgroup`，跳到 5.5.8 使用 Docker 替代实验。即使系统是 cgroup v2，具体 controller 也可能没有委派给当前环境，下面会先检查文件是否存在。
 
 创建实验 cgroup：
 
 ```bash
 CG=/sys/fs/cgroup/todo-lab
 sudo mkdir -p "$CG"
-echo 67108864 | sudo tee "$CG/memory.max"
-echo "50000 100000" | sudo tee "$CG/cpu.max"
+test -f "$CG/memory.max" || echo "memory controller is not available"
+test -f "$CG/cpu.max" || echo "cpu controller is not available"
+test -f "$CG/memory.max" && echo 67108864 | sudo tee "$CG/memory.max"
+test -f "$CG/cpu.max" && echo "50000 100000" | sudo tee "$CG/cpu.max"
 ```
 
 运行内存分配实验：
 
 ```bash
+test -f "$CG/cgroup.procs"
 env CG="$CG" LAB="$LAB" bash -c 'echo $$ | sudo tee "$CG/cgroup.procs" >/dev/null; python3 "$LAB/allocate-memory.py"'
 ```
 
@@ -795,7 +825,7 @@ sudo cat "$CG/cpu.stat"
 
 如果 Python 进程被 `Killed`，这通常是触发内存限制的预期结果。
 
-可选：如果你的实验机是 cgroup v1 且安装了 cgroup-tools，可以用 `cgcreate` 做对照：
+历史对照：如果你的实验机是 cgroup v1 且安装了 cgroup-tools，可以用 `cgcreate` 理解早期 cgroup 工具链。本节不是现代主线，命令不可用时直接跳过。
 
 ```bash
 command -v cgcreate || echo "cgroup-tools is not installed"
@@ -884,10 +914,10 @@ test -x "$LAB/rootfs/bin/sh"
 test -x "$LAB/mini-container.sh"
 ```
 
-使用 `unshare` 创建 PID、UTS、Mount namespace，再执行脚本：
+使用 `unshare` 创建 PID、UTS、Mount namespace，再执行脚本。`INSIDE_MINI_NS=1` 是脚本的防误执行开关：
 
 ```bash
-sudo env LAB="$LAB" unshare --fork --pid --uts --mount --propagation private "$LAB/mini-container.sh"
+sudo env LAB="$LAB" INSIDE_MINI_NS=1 unshare --fork --pid --uts --mount --propagation private "$LAB/mini-container.sh"
 ```
 
 预期现象：
@@ -994,7 +1024,7 @@ docker run --rm --memory=64m --cpus=0.5 alpine:3.23 sh -c 'cat /proc/self/cgroup
 stat -fc %T /sys/fs/cgroup
 test -f /sys/fs/cgroup/cgroup.controllers && cat /sys/fs/cgroup/cgroup.controllers || true
 test -x "$LAB/mini-container.sh"
-sudo env LAB="$LAB" unshare --fork --pid --uts --mount --propagation private "$LAB/mini-container.sh"
+sudo env LAB="$LAB" INSIDE_MINI_NS=1 unshare --fork --pid --uts --mount --propagation private "$LAB/mini-container.sh"
 ```
 
 验收标准：
@@ -1271,7 +1301,7 @@ findmnt | grep container-lab || echo "no container-lab mounts"
 - 能导出 Alpine rootfs 并 `chroot` 进入。
 - 能完成 OverlayFS lower / upper / merged 实验。
 - 能运行 `mini-container.sh`。
-- 能解释 `mini-container.sh` 不是完整容器运行时，还缺少哪些能力。
+- 能解释 `mini-container.sh` 不是完整容器运行时，还缺少 OCI spec、`pivot_root`、User namespace 映射、capabilities、seccomp、网络配置和生命周期管理等能力。
 
 ## 9. 本章练习题
 
