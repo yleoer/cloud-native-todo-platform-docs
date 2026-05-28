@@ -2,7 +2,7 @@
 
 第 10 篇已经把 Todo API v2 重构为 Gin 框架版本。到这里，服务已经能处理 HTTP 请求、返回 JSON、生成 OpenAPI 文档，也有中间件负责 request ID、日志、panic 恢复、请求超时和请求体大小限制。
 
-本篇进入 Go 后端绕不开的一块能力：**并发编程**。我们不会把 goroutine、channel、context 当成孤立语法点来背，而是放进 HTTP 服务场景里理解：一个服务为什么天然会并发？请求取消后后台任务为什么也要停？多个 goroutine 共享状态时为什么会有竞态？怎样用 worker pool 控制并发数量？
+本篇进入 Go 后端绕不开的一块能力：**并发编程**。我们不会把 goroutine（Go 协程）、channel（通道）、context.Context（上下文对象）当成孤立语法点来背，而是放进 HTTP 服务场景里理解：一个服务为什么天然会并发？请求取消后后台任务为什么也要停？多个 goroutine 共享状态时为什么会有竞态？怎样用 worker pool（工作池）控制并发数量？
 
 本篇属于 **C 类：实践/开发章**。你会在第 10 篇 Gin API 的基础上新增并发 Todo 统计任务执行器，并编写一个并发压测命令，最终用 `go test -race` 验证统计逻辑没有数据竞争。
 
@@ -11,9 +11,9 @@
 - 11.1 goroutine 与并发执行：HTTP Server 的每请求一个 goroutine
 - 11.2 channel 通信模型（无缓冲/有缓冲/select 多路复用）
 - 11.3 context 超时、取消与 HTTP 请求链路传递
-- 11.4 sync 包：Mutex、RWMutex、WaitGroup、Once
-- 11.5 并发安全、竞态检测（`go test -race`）与限流思想
-- 11.6 HTTP Server 中的并发模式实战（优雅关闭、连接池、worker pool）
+- 11.4 sync 包：Mutex、RWMutex、WaitGroup
+- 11.5 并发安全与竞态检测（`go test -race`）
+- 11.6 HTTP Server 中的并发模式实战（优雅关闭、worker pool）
 
 本篇特色项目是：**并发 Todo 统计任务执行器 + API 并发压测命令**。
 
@@ -97,7 +97,7 @@ cloud-native-todo-platform/
 
 ### 3.1 goroutine
 
-goroutine 是 Go 管理的轻量并发执行单元。启动 goroutine 很简单：
+goroutine（Go 协程）是 Go 管理的轻量并发执行单元。启动 goroutine 很简单：
 
 ```go
 go func() {
@@ -111,7 +111,7 @@ HTTP Server 本身已经并发处理请求，所以 Handler 内部再开 gorouti
 
 ### 3.2 channel
 
-channel 是 goroutine 之间传递数据的管道。worker pool 常用两个 channel：
+channel（通道）是 goroutine 之间传递数据的管道。worker pool（工作池）常用两个 channel：
 
 ```go
 jobs := make(chan model.Todo)
@@ -136,7 +136,7 @@ case <-ctx.Done():
 
 ### 3.4 context
 
-`context.Context` 用来传递请求生命周期、超时和取消信号。第 10 篇 Gin Handler 调用 service 时已经使用：
+`context.Context`（上下文对象）用来传递请求生命周期、超时和取消信号。第 10 篇 Gin Handler 调用 service 时已经使用：
 
 ```go
 ctx := c.Request.Context()
@@ -146,20 +146,19 @@ ctx := c.Request.Context()
 
 ### 3.5 sync 包
 
-`sync` 包解决共享状态协作问题：
+`sync` 包（synchronization，同步包）解决共享状态协作问题：
 
 | 类型 | 用途 | 本篇用法 |
 |---|---|---|
 | `sync.WaitGroup` | 等待一组 goroutine 结束 | 等待所有 worker 完成 |
 | `sync.Mutex` | 保护读写共享变量 | 适合写多读少场景 |
 | `sync.RWMutex` | 多读单写锁 | 保护最新统计快照 |
-| `sync.Once` | 确保逻辑只执行一次 | 常用于初始化 |
 
 本篇的统计快照会被 `Refresh` 写入，也会被 `Latest` 读取，所以用 `sync.RWMutex` 表达“读多写少”的意图。
 
 ### 3.6 竞态检测
 
-数据竞争是多个 goroutine 同时访问同一块内存，并且至少一个是写操作，且没有同步保护。Go 自带 race detector：
+data race（数据竞争）是多个 goroutine 同时访问同一块内存，并且至少一个是写操作，且没有同步保护。它和 race condition（竞态条件）不是一回事：后者可能是业务时序错误，即使没有内存数据竞争也会发生。Go 自带 race detector（竞态检测器）：
 
 ```bash
 go test -race ./api/...
@@ -219,6 +218,8 @@ Todos -> jobs channel -> worker 1
 - worker 从 `jobs` 接收任务时也监听 `ctx.Done()`。
 
 只在最外层检查一次 context 不够。并发程序中任何可能阻塞的位置，都应该思考取消信号是否能让它退出。
+
+当 worker 收到 `ctx.Done()` 后会直接返回，不再发送局部统计结果。这个选择是刻意的：调用方已经取消请求，部分统计结果不再有业务价值，尽快退出比凑齐一个不完整结果更重要。
 
 ### 4.4 锁的边界
 
@@ -861,7 +862,7 @@ rm -f bin/todo-load
 
 - **预防**：把 `build-essential` 放进实验环境准备清单；CI 中也要使用支持 cgo 的 Go 构建镜像。
 
-### 错误 3：测试卡住不退出
+### 错误 3：goroutine 未正确退出，导致测试卡住或取消无效
 
 - **现象**：
 
@@ -869,15 +870,18 @@ rm -f bin/todo-load
   panic: test timed out after 30s
   ```
 
-- **原因**：某个 goroutine 卡在 channel 发送或接收上，通常是没有关闭 channel，或者取消后 producer / worker 没有退出。
-- **排查**：给测试加超时，观察卡在哪一步：
+  或者请求超时后，CPU 仍然持续升高，日志显示后台任务还在跑。
+
+- **原因**：某个 goroutine 卡在 channel 发送或接收上，通常是没有关闭 channel，或者 producer / worker 没有在阻塞点监听 `ctx.Done()`。
+- **排查**：给测试加超时，观察卡在哪一步，并确认 producer 和 worker 都包含取消分支：
 
   ```bash
   go test ./api/internal/service -run TestStatsService -count=1 -timeout=5s
+  grep -n "ctx.Done" api/internal/service/stats_service.go
   ```
 
-- **修复**：确保 producer 完成后 `close(jobs)`，所有 worker 退出后 `close(partials)`，阻塞位置监听 `ctx.Done()`。
-- **预防**：每个 channel 都要能回答“谁发送、谁关闭、谁接收”。
+- **修复**：确保 producer 完成后 `close(jobs)`，所有 worker 退出后 `close(partials)`，并在 channel 发送、接收和长耗时循环中加入 `select`，让取消信号能打断等待。
+- **预防**：每个 channel 都要能回答“谁发送、谁关闭、谁接收”；凡是可能阻塞的并发代码，都要考虑 context 取消路径。
 
 ### 错误 4：压测命令全部失败
 
@@ -904,22 +908,7 @@ rm -f bin/todo-load
 
 - **预防**：压测前先用单个 `curl` 验证目标接口。
 
-### 错误 5：context 取消没有生效
-
-- **现象**：请求超时后，CPU 仍然持续升高，或日志显示后台任务还在跑。
-- **原因**：goroutine 内部没有监听 `ctx.Done()`，或者只在入口检查了一次 context。
-- **排查**：搜索统计任务中可能阻塞的位置：
-
-  ```bash
-  grep -n "ctx.Done" api/internal/service/stats_service.go
-  ```
-
-  producer 和 worker 的 `select` 都应该包含 `ctx.Done()` 分支。
-
-- **修复**：在 channel 发送、接收和长耗时循环中加入 `select`，让取消信号能打断等待。
-- **预防**：凡是可能阻塞的并发代码，都要考虑 context 取消路径。
-
-### 错误 6：worker 数量过大导致机器变慢
+### 错误 5：worker 数量过大导致机器变慢
 
 - **现象**：压测或统计时 CPU 飙高，本地终端明显卡顿。
 - **原因**：并发数设置过大，超过本机 CPU、内存或服务处理能力。
@@ -979,7 +968,7 @@ rm -f bin/todo-load
 
 1. 给 `Stats` 增加 `CompletionRate` 字段，表示已完成 Todo 占总数的比例。验收标准：空列表时为 `0`，有数据时计算正确，`go test -race ./api/internal/service` 通过。
 2. 给 `todo-load` 增加 `-method` 参数，支持压测 `GET` 和 `POST`。验收标准：`-method GET` 行为保持不变，非法 method 返回错误；如果选择 `POST`，需要同步处理请求体和 `Content-Type`。
-3. 给 `StatsService` 增加 Benchmark。验收标准：能执行 `go test ./api/internal/service -bench . -benchmem`，并解释 `ns/op` 和 `allocs/op`。
+3. 给 `StatsService` 增加 Benchmark。可以参考单元测试中的数据准备方式，编写 `BenchmarkStatsServiceRefresh`，在循环中调用 `Refresh(context.Background())`。验收标准：能执行 `go test ./api/internal/service -bench . -benchmem`，并解释 `ns/op` 和 `allocs/op`。
 
 ### 9.3 思考题
 
@@ -1032,7 +1021,9 @@ rm -f bin/todo-load
 
 本篇你把 Go 并发能力放进了 Todo API 的真实后端场景：理解了 HTTP Server 的并发请求模型，使用 worker pool、channel、context、WaitGroup 和 RWMutex 实现并发统计任务，并用 `go test -race` 验证无数据竞争。你还编写了 `todo-load` 命令，能用固定请求数和并发数对 API 做基础压测。
 
-项目成果上，Todo Platform 现在不只是能处理 HTTP 请求，还具备了可验证的并发任务能力和基础压测工具。能力价值上，你已经能开始判断并发代码是否可控、是否会泄漏、是否有竞态、是否能在真实服务里长期运行。
+项目成果上，Todo Platform 现在不只是能处理 HTTP 请求，还具备了可验证的并发任务能力和基础压测工具。StatsService 展示了一个常见后端模式：先用有限 worker 并行处理任务，再由主 goroutine 汇总结果，最后只用一把锁保护对外共享的快照。这个模式比“哪里慢就开 goroutine”更可靠，也更容易测试。
+
+能力价值上，你已经能开始判断并发代码是否可控、是否会泄漏、是否有竞态、是否能在真实服务里长期运行。进入第 12 篇后，这些能力会直接迁移到 PostgreSQL 连接池、查询超时、事务边界和并发请求排障中。
 
 ## 12. 下一章衔接
 
