@@ -89,6 +89,15 @@ cloud-native-todo-platform/
 
 不要把版本差异理解成“教程错误”。真实工作中，工具链版本需要在 README、CI 和容器镜像里固定或说明。
 
+出版前或团队交付前，可以用下面的命令确认本阶段使用的 Go 依赖版本真实存在：
+
+```bash
+go list -m -versions github.com/gin-gonic/gin
+go list -m -versions github.com/jackc/pgx/v5
+go list -m -versions github.com/redis/go-redis/v9
+go list -m -versions golang.org/x/crypto
+```
+
 ## 4. 两档验收路径
 
 ### 4.1 最小验收路径
