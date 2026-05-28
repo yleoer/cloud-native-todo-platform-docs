@@ -12,7 +12,7 @@
 
 ## 🎯 学习路径
 
-新版课程设计为 **6 个学习阶段、42 大篇、约 230 章**。当前站点已发布阶段一至阶段三的现有课程内容；后续会按新版设计继续推进 Kubernetes、生产工程和 Operator 能力。
+新版课程设计为 **6 个学习阶段、42 大篇、约 230 章**。当前站点已发布阶段一至阶段三，以及阶段四第 20-22 篇；后续会按新版设计继续推进 Kubernetes、生产工程和 Operator 能力。
 
 <details open>
 <summary><strong>阶段一：基础能力（第 1-6 篇，已发布）</strong></summary>
@@ -63,13 +63,13 @@ Docker 基础、Dockerfile、Compose、容器原理、OCI、containerd、runc �
 </details>
 
 <details>
-<summary><strong>阶段四：Kubernetes 应用交付（第 20-28 篇，当前已发布第 21 篇）</strong></summary>
+<summary><strong>阶段四：Kubernetes 应用交付（第 20-28 篇，当前已发布第 22 篇）</strong></summary>
 
 Kubernetes 架构、工作负载、Service / Ingress / Gateway API、配置、存储、网络、安全、Helm 4 和 Kustomize。
 
 - [第 20 篇：Kubernetes 架构与集群搭建](docs/chapters/stage-04-kubernetes/20-k8s-architecture.md)
 - [第 21 篇：Kubernetes 核心工作负载](docs/chapters/stage-04-kubernetes/21-k8s-workloads.md)
-- 第 22 篇：Service、Ingress 与流量入口
+- [第 22 篇：Service、Ingress 与流量入口](docs/chapters/stage-04-kubernetes/22-k8s-service-ingress.md)
 - 第 23 篇：ConfigMap、Secret 与配置管理
 - 第 24 篇：Kubernetes 存储
 - 第 25 篇：Kubernetes 网络原理
@@ -196,7 +196,8 @@ docs/
 │   │   └── stage-03-cheatsheet-troubleshooting.md # 阶段三附录 B：速查与排障
 │   ├── stage-04-kubernetes/    # 阶段四：Kubernetes 应用交付
 │   │   ├── 20-k8s-architecture.md # 第 20 篇：Kubernetes 架构与集群搭建
-│   │   └── 21-k8s-workloads.md    # 第 21 篇：Kubernetes 核心工作负载
+│   │   ├── 21-k8s-workloads.md    # 第 21 篇：Kubernetes 核心工作负载
+│   │   └── 22-k8s-service-ingress.md # 第 22 篇：Service、Ingress 与流量入口
 │   └── ...                     # 后续阶段章节（待完成）
 ├── projects/                   # 项目实战
 ├── labs/                       # 实验索引

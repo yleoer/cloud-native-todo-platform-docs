@@ -64,7 +64,7 @@ hide:
 
 本课程共 **42 大篇，约 230 个章节**，分为 6 个学习阶段。
 
-新版设计路线已更新为 **6 个阶段**。当前站点已发布阶段一至阶段三的现有课程内容；后续会按新版设计继续推进 Kubernetes、生产工程和 Operator 能力。
+新版设计路线已更新为 **6 个阶段**。当前站点已发布阶段一至阶段三，以及阶段四第 20-22 篇；后续会按新版设计继续推进 Kubernetes、生产工程和 Operator 能力。
 
 <details open markdown="1">
 <summary><strong>阶段一：基础能力（第 1-6 篇，已发布）</strong></summary>
@@ -115,13 +115,13 @@ hide:
 </details>
 
 <details markdown="1">
-<summary><strong>阶段四：Kubernetes 应用交付（第 20-28 篇，当前已发布第 21 篇）</strong></summary>
+<summary><strong>阶段四：Kubernetes 应用交付（第 20-28 篇，当前已发布第 22 篇）</strong></summary>
 
 系统学习 Kubernetes 架构、工作负载、Service / Ingress / Gateway API、配置、存储、网络、安全、Helm 4 和 Kustomize。
 
 - [第 20 篇：Kubernetes 架构与集群搭建](chapters/stage-04-kubernetes/20-k8s-architecture.md)
 - [第 21 篇：Kubernetes 核心工作负载](chapters/stage-04-kubernetes/21-k8s-workloads.md)
-- 第 22 篇：Service、Ingress 与流量入口
+- [第 22 篇：Service、Ingress 与流量入口](chapters/stage-04-kubernetes/22-k8s-service-ingress.md)
 - 第 23 篇：ConfigMap、Secret 与配置管理
 - 第 24 篇：Kubernetes 存储
 - 第 25 篇：Kubernetes 网络原理
@@ -178,6 +178,6 @@ http://127.0.0.1:8000
 
 ## 下一步计划
 
-- 按新版设计推进第 22 篇 Service、Ingress 与流量入口，承接第 21 篇的 Todo API Deployment 和 ClusterIP Service。
-- 继续推进 Kubernetes Service / Ingress / Gateway API、配置、存储、网络、安全、Helm 4 与 Kustomize 实践内容。
+- 按新版设计推进第 23 篇 ConfigMap、Secret 与配置管理，承接第 22 篇的入口层配置。
+- 继续推进 Kubernetes 配置、存储、网络、安全、Helm 4 与 Kustomize 实践内容。
 - 使用阶段三综合验收和排障手册整理 Todo 平台容器化作品集。
