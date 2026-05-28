@@ -2,7 +2,7 @@
 
 第 12 篇已经把 Todo API v3 接入 PostgreSQL，让 Todo 数据具备持久化能力。数据库适合保存权威数据，但真实后端服务还会遇到另外一类问题：某些查询太频繁、异常客户端请求太密、部分统计刷新不应该阻塞用户请求。
 
-本篇引入 Redis。Redis 是内存型数据结构服务，常用于缓存、计数器、限流、分布式锁和轻量任务队列。我们不会把 Redis 当成“更快的数据库”，而是把它放在 PostgreSQL 前面和请求链路旁边：PostgreSQL 仍然是事实来源，Redis 负责加速读取、保护接口和承接可重算的异步任务。
+本篇引入 Redis。Redis 是内存型数据结构服务（data structure server），常用于缓存、计数器、限流、分布式锁和轻量任务队列。我们不会把 Redis 当成“更快的数据库”，而是把它放在 PostgreSQL 前面和请求链路旁边：PostgreSQL 仍然是事实来源，Redis 负责加速读取、保护接口和承接可重算的异步任务。
 
 本篇属于 **C 类：实践/开发章**。本篇特色项目是：**为 Todo API v4 增加 Redis 缓存、接口限流和异步统计任务**。
 
@@ -22,7 +22,7 @@
 
 - 能说明 Redis 和 PostgreSQL 的职责边界。
 - 能解释 Redis String、Hash、List、Set、Sorted Set 的典型用途。
-- 能设计缓存 Key、TTL 和缓存失效策略。
+- 能设计缓存 Key、TTL（Time To Live，过期时间）和缓存失效策略。
 - 能区分缓存穿透、缓存击穿和缓存雪崩。
 - 能解释 Redis 分布式锁、固定窗口限流的实现方式和边界。
 - 能说明 Redis List 做任务队列的可靠性限制。
@@ -33,7 +33,7 @@
 - 能使用 `redis-cli` 验证 Redis 常用命令。
 - 能使用 `go-redis` 初始化 Redis 客户端并复用连接池。
 - 能用 Cache-Aside 模式为 Todo 列表增加缓存。
-- 能用 Redis 计数器和 Lua 脚本实现固定窗口限流。
+- 能用 Redis 计数器和 Lua（Redis 内置脚本语言）脚本实现固定窗口限流。
 - 能用 Redis List 实现简单异步统计刷新任务。
 
 本篇结束时，你至少应该能成功执行：
@@ -161,6 +161,8 @@ Cache-Aside 也叫旁路缓存，是后端最常见的缓存模式。
 
 本篇会给缓存 TTL 加随机抖动，避免大量列表缓存同时过期。
 
+布隆过滤器是一种概率型数据结构，可以快速判断某个值“一定不存在”或“可能存在”；互斥重建则是用锁保证热点 Key 失效时只有一个请求回源数据库。
+
 ### 3.5 计数器、分布式锁与固定窗口限流
 
 Redis String 不只可以保存字符串，也可以做原子计数器。`INCR` 会在 Redis 单线程命令执行模型下原子递增 Key 的值，因此非常适合做访问次数、失败次数和限流窗口计数。
@@ -175,7 +177,16 @@ SET todo:lock:stats <unique-token> NX PX 30000
 - `PX 30000` 表示锁自动过期，避免持锁进程崩溃后永久占用。
 - `<unique-token>` 是当前持锁者身份，释放锁时必须校验 token。
 
-释放锁不能简单执行 `DEL todo:lock:stats`，否则可能误删别人刚拿到的新锁。生产中通常用 Lua 脚本完成“比较 token + 删除 Key”的原子操作。本篇不会实现分布式锁，因为 Todo API v4 的核心目标是缓存、限流和轻量异步任务；但你需要知道 Redis 锁的正确边界，避免把 `SETNX` 当成万能锁。
+释放锁不能简单执行 `DEL todo:lock:stats`，否则可能误删别人刚拿到的新锁。生产中通常用 Lua 脚本完成“比较 token + 删除 Key”的原子操作：
+
+```text
+if redis.call("GET", KEYS[1]) == ARGV[1] then
+  return redis.call("DEL", KEYS[1])
+end
+return 0
+```
+
+本篇不会把分布式锁接入 Todo API v4 的业务代码，因为当前项目主线是缓存、限流和轻量异步任务；但你需要知道 Redis 锁的正确边界，避免把 `SETNX` 当成万能锁。
 
 限流是为了保护系统在异常流量下仍然可控。本篇实现固定窗口限流：
 
@@ -189,7 +200,7 @@ todo:ratelimit:<client-ip>:<minute-window>
 
 ### 3.6 Redis List 简单任务队列
 
-Redis List 可以做轻量队列：
+Redis List 可以做轻量队列。`LPUSH`（Left Push，左侧推入）负责生产任务，`BRPOP`（Blocking Right Pop，阻塞式右侧弹出）负责消费任务：
 
 ```text
 LPUSH todo:tasks refresh_stats
@@ -239,7 +250,7 @@ sequenceDiagram
     Worker->>Svc: Refresh stats
 ```
 
-限流发生在业务逻辑之前，缓存发生在 Repository 外层，异步任务发生在写操作之后。三者各管一段链路，不互相替代。
+限流发生在业务逻辑之前，缓存发生在 Repository 外层，异步任务发生在写操作之后。图里的 Redis 和 Redis Queue 是逻辑角色拆分，实际可以是同一个 Redis 实例里的不同 Key。三者各管一段链路，不互相替代。
 
 ### 4.2 Redis 客户端也要复用
 
@@ -302,6 +313,14 @@ Redis 限流中间件有两种故障策略：
 
 ```bash
 cd ~/workspace/cloud-native-todo-platform
+```
+
+确认 Docker、Compose 和 Go 模块代理可用：
+
+```bash
+docker version
+docker compose version
+go env GOPROXY
 ```
 
 确认第 12 篇文件已存在：
@@ -386,7 +405,7 @@ volumes:
   todo-redis-data:
 ```
 
-这里仍然把端口绑定到 `127.0.0.1`，避免本地实验服务暴露到外部网络。Redis 密码写在 Compose 文件中是教学简化；生产环境应使用 Secret。
+这里仍然把端口绑定到 `127.0.0.1`，避免本地实验服务暴露到外部网络。`--appendonly yes` 启用 AOF（Append Only File，追加式日志文件）持久化，Redis 重启后可以从日志恢复数据。Redis 密码写在 Compose 文件中是教学简化；生产环境应使用 Secret。
 
 创建 `api/internal/cache/redis.go`：
 
@@ -451,6 +470,9 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
+// cachedBackend mirrors service.Repository without importing service.
+// Importing service from repository would create an import cycle in tests that
+// already verify service behavior with repository implementations.
 type cachedBackend interface {
 	List(ctx context.Context, status model.Status) ([]model.Todo, error)
 	Get(ctx context.Context, id int) (model.Todo, error)
@@ -603,7 +625,7 @@ func listCacheKey(status model.Status) string {
 }
 ```
 
-缓存失败时，本篇选择记录日志并继续访问真实 Repository。因为 Redis 在这里是加速层，不是事实来源。写操作成功后，`afterWrite` 会用一个 2 秒超时的 `WithoutCancel` 上下文删除缓存并投递任务，避免客户端刚好断开导致数据库已经写成功、缓存却来不及失效。
+缓存失败时，本篇选择记录日志并继续访问真实 Repository。因为 Redis 在这里是加速层，不是事实来源。写操作成功后，`afterWrite` 会用一个 2 秒超时的 `WithoutCancel` 上下文删除缓存并投递任务。`context.WithoutCancel` 会创建一个不继承父 context 取消信号的新 context，确保即使客户端刚好断开连接，缓存失效和任务投递仍然会执行，但不会超过 2 秒超时限制。
 
 创建 `api/internal/ratelimit/redis_limiter.go`：
 
@@ -680,7 +702,7 @@ func (l *FixedWindowLimiter) key(subject string) string {
 }
 ```
 
-Lua 脚本让 `INCR` 和 `PEXPIRE` 在 Redis 内部一次执行完。这样既保留固定窗口算法的易懂性，也避免计数 Key 因中途失败而没有过期时间。
+Lua 脚本让 `INCR` 和 `PEXPIRE` 在 Redis 内部一次执行完。这样既保留固定窗口算法的易懂性，也避免计数 Key 因中途失败而没有过期时间。`key()` 方法会把 IP 地址或用户标识中的特殊字符替换成 `_`，避免破坏 Redis Key 的命名约定。
 
 创建 `api/internal/middleware/ratelimit.go`：
 
@@ -738,7 +760,7 @@ func clientIP(r *http.Request) string {
 }
 ```
 
-这里用 net/http middleware 包住 Gin router，避免修改第 10 篇的 Gin Handler 结构。后续第 14 篇做生产化中间件时，会继续整理认证、CORS、日志和限流的组合方式。
+这里用 net/http middleware 包住 Gin router，避免修改第 10 篇的 Gin Handler 结构。限流放在标准库 `http.Handler` 层，意味着请求进入 Gin 路由之前就会被保护，并且这段逻辑不会绑定到某个 Web 框架。后续第 14 篇做生产化中间件时，会继续整理认证、CORS、日志和限流的组合方式。
 
 创建 `api/internal/tasks/redis_queue.go`：
 
@@ -1042,6 +1064,8 @@ docker compose ps
 docker compose exec redis redis-cli -a todo_redis_password ping
 ```
 
+`-a` 会把密码放在命令行参数中，本地实验可接受；生产环境更推荐使用 `REDISCLI_AUTH` 环境变量、交互式认证或更完整的密钥管理方案。
+
 预期输出：
 
 ```text
@@ -1119,7 +1143,7 @@ curl -i http://127.0.0.1:18080/api/v2/todos
 curl -i http://127.0.0.1:18080/api/v2/todos
 ```
 
-第 4 次附近应看到 `429 Too Many Requests`。
+第 4 次附近应看到 `429 Too Many Requests`。如果之前在同一分钟内已经发过请求，计数器可能已有残留值，429 会更早出现；等一分钟让窗口过期后再试即可。
 
 查看任务队列：
 
@@ -1347,7 +1371,7 @@ docker compose down -v
 ### 9.2 实操题
 
 1. 把 Todo 列表缓存 TTL 从 `30s` 改成 `2m`，并用 `TTL` 命令观察变化。
-2. 增加单个 Todo 缓存 Key：`todo:cache:item:<id>`。验收标准：连续 GET 同一个 Todo 时第二次命中缓存，Update/Delete 后缓存被删除。
+2. 增加单个 Todo 缓存 Key：`todo:cache:item:<id>`。验收标准：连续 GET 同一个 Todo 时第二次命中缓存，Update/Delete 后缓存被删除；可用 `docker compose exec redis redis-cli -a todo_redis_password GET todo:cache:item:<id>` 验证缓存内容。
 3. 给缓存 TTL 增加 0 到 10 秒随机抖动。验收标准：连续写入多个缓存 Key 时，TTL 不完全相同。
 4. 新增任务类型 `cleanup_done_todos`。验收标准：worker 能识别该任务并记录日志，不影响 `refresh_stats`。
 
