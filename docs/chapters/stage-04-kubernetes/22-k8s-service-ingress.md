@@ -272,10 +272,12 @@ HTTPRoute：这个应用的哪些 Host/Path 转发到哪个 Service
 | Kubernetes API Server | Ch20 默认 `v1.35.0`，可覆盖到 1.36.x | 本地集群 |
 | kubectl | 1.36.x | 操作 Kubernetes API |
 | kind | 0.31+ | 本地集群 |
-| Traefik | `v3.6.15` | Ingress / Gateway Controller，锁定 3.6.x 最新补丁版本 |
+| Traefik | `v3.6.17` | Ingress / Gateway Controller，锁定 3.6.x 最新补丁版本 |
 | Gateway API CRDs | `v1.4.0` 标准通道 | 与 Traefik 3.6 Gateway Provider 对齐 |
 | OpenSSL | 3.x 或系统自带版本 | 生成本地自签名证书 |
 | Todo API | `todo-api:v0.1.0` | 后端服务 |
+
+阶段四最终 Kubernetes 版本以第 20 篇统一后的集群版本为准。`kubectl` 客户端通常允许与 API Server 相差一个次版本，但课程出版前应把第 20-28 篇统一到同一条版本基线。Traefik 本篇锁定 `3.6.x` 最新补丁线，所以 Gateway API CRDs 固定为 Traefik 3.6 文档支持的 `v1.4.0`；如果后续升级到 Traefik 3.7.x，需要同步评估 Gateway API `v1.5.x` CRDs。
 
 确认环境：
 
@@ -308,7 +310,8 @@ deployments/k8s-base
 ├── traefik-controller.yaml
 ├── todo-api-tls.local.yaml
 ├── todo-api-ingress.yaml
-├── todo-api-gateway.yaml
+├── traefik-gateway-platform.yaml
+├── todo-api-httproute.yaml
 ├── tls
 │   ├── openssl-todo-localhost.cnf
 │   ├── todo.localhost.crt
@@ -316,9 +319,16 @@ deployments/k8s-base
 └── README.md
 ```
 
-`todo-api-tls.local.yaml` 和 `tls/` 下的私钥文件只用于本地实验，不应提交到公开仓库。真实项目应使用 cert-manager、云证书服务或企业 CA。
+`todo-api-tls.local.yaml` 和 `tls/` 下的私钥文件只用于本地实验，不应提交到公开仓库。真实项目应使用 cert-manager、云证书服务或企业 CA。建议在应用仓库的 `.gitignore` 中加入：
+
+```text
+deployments/k8s-base/*.local.yaml
+deployments/k8s-base/tls/
+```
 
 ### 5.4 完整代码或配置
+
+以下命令按 bash / WSL2 Ubuntu 编写。Windows PowerShell 用户建议在 WSL2 中执行；如果必须使用 PowerShell，请手动创建同名文件并复制 YAML 内容，或把 heredoc 改写成 PowerShell here-string。
 
 创建 NodePort 对比 Service：
 
@@ -385,7 +395,7 @@ cat > deployments/k8s-base/traefik-controller.yaml <<'YAML'
 # 1. Namespace / ServiceAccount：隔离入口控制器运行身份
 # 2. ClusterRole / Binding：允许 Traefik 读取 Namespace、Ingress、Gateway、Service、EndpointSlice、Secret
 # 3. IngressClass：让 Ingress 通过 ingressClassName: traefik 绑定到本控制器
-# 4. Deployment：运行 Traefik v3.6.15，启用 kubernetesIngress 和 kubernetesGateway provider
+# 4. Deployment：运行 Traefik v3.6.17，启用 kubernetesIngress 和 kubernetesGateway provider
 # 5. Service：暴露 Traefik 的 web、websecure、dashboard 端口，供 port-forward 使用
 apiVersion: v1
 kind: Namespace
@@ -465,7 +475,7 @@ spec:
       serviceAccountName: traefik
       containers:
         - name: traefik
-          image: traefik:v3.6.15
+          image: traefik:v3.6.17
           imagePullPolicy: IfNotPresent
           args:
             - --entrypoints.web.address=:80
@@ -596,10 +606,10 @@ spec:
 YAML
 ```
 
-创建 Gateway API 对照配置：
+创建 Gateway API 的平台入口资源。`GatewayClass` 是集群级资源，通常由平台团队维护；`Gateway` 声明本 Namespace 可用的 HTTPS 入口：
 
 ```bash
-cat > deployments/k8s-base/todo-api-gateway.yaml <<'YAML'
+cat > deployments/k8s-base/traefik-gateway-platform.yaml <<'YAML'
 apiVersion: gateway.networking.k8s.io/v1
 kind: GatewayClass
 metadata:
@@ -626,7 +636,13 @@ spec:
       allowedRoutes:
         namespaces:
           from: Same # ← 本章只允许同 Namespace 的 HTTPRoute 绑定
----
+YAML
+```
+
+创建应用团队提交的 `HTTPRoute`。它只描述 Todo API 的 Host、Path 和后端 Service，不再负责创建集群级入口类别：
+
+```bash
+cat > deployments/k8s-base/todo-api-httproute.yaml <<'YAML'
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
@@ -670,6 +686,8 @@ kubectl -n todo-workloads get svc todo-api todo-api-nodeport todo-api-loadbalanc
 
 在 kind 中看到 `todo-api-loadbalancer` 的 `EXTERNAL-IP` 为 `<pending>` 是正常现象；这说明集群没有云负载均衡实现。
 
+NodePort 在 kind 中也只是让集群节点监听 `30082`。如果第 20 篇创建 kind 集群时没有配置 `extraPortMappings`，宿主机不能稳定地通过 `127.0.0.1:30082` 直接访问它。本篇保留 NodePort 和 LoadBalancer 是为了观察资源行为，真正的入口验证走 Traefik 的 `port-forward`。
+
 安装 Gateway API CRDs 和 Traefik：
 
 ```bash
@@ -684,7 +702,8 @@ kubectl get ingressclass
 ```bash
 kubectl apply -f deployments/k8s-base/todo-api-tls.local.yaml
 kubectl apply -f deployments/k8s-base/todo-api-ingress.yaml
-kubectl apply -f deployments/k8s-base/todo-api-gateway.yaml
+kubectl apply -f deployments/k8s-base/traefik-gateway-platform.yaml
+kubectl apply -f deployments/k8s-base/todo-api-httproute.yaml
 kubectl get gatewayclass
 kubectl -n todo-workloads get ingress,gateway,httproute
 ```
@@ -709,7 +728,7 @@ curl -k -i --resolve todo-gateway.localhost:18443:127.0.0.1 \
   https://todo-gateway.localhost:18443/readyz
 ```
 
-查看 Traefik Dashboard。它只通过本地 port-forward 临时访问，不要在生产中无认证暴露：
+可选：查看 Traefik Dashboard API。本文为了本地观察开启了 `--api.insecure=true`，这会让 Dashboard/API 在 Traefik Service 的 `8080` 端口上无认证可访问；它只适合本地临时实验，生产环境必须关闭或放在认证、授权和内网访问控制之后：
 
 ```bash
 curl -s http://127.0.0.1:18090/api/http/routers | head
@@ -782,14 +801,19 @@ kubectl -n traefik logs deployment/traefik --tail=80
 如果要继续第 23 篇，可以保留 `todo-workloads`、Todo API Deployment 和 Service，只清理入口对比资源：
 
 ```bash
-kubectl delete -f deployments/k8s-base/todo-api-gateway.yaml --ignore-not-found
+kubectl -n todo-workloads delete -f deployments/k8s-base/todo-api-httproute.yaml --ignore-not-found
+kubectl -n todo-workloads delete gateway todo-api --ignore-not-found
 kubectl -n todo-workloads delete -f deployments/k8s-base/todo-api-ingress.yaml --ignore-not-found
 kubectl -n todo-workloads delete -f deployments/k8s-base/todo-api-tls.local.yaml --ignore-not-found
 kubectl -n todo-workloads delete -f deployments/k8s-base/todo-api-loadbalancer.yaml --ignore-not-found
 kubectl -n todo-workloads delete -f deployments/k8s-base/todo-api-nodeport.yaml --ignore-not-found
 ```
 
-`todo-api-gateway.yaml` 中包含集群级的 `GatewayClass`，所以清理时不要给这条命令加 `-n`。
+如果你也要删除集群级 `GatewayClass`，再单独执行下面这条命令。共享集群里不要删除别人正在使用的 `GatewayClass`：
+
+```bash
+kubectl delete gatewayclass traefik --ignore-not-found
+```
 
 如果要完整清理 Traefik 和 Gateway API：
 
@@ -938,7 +962,8 @@ kubectl delete --ignore-not-found -f https://github.com/kubernetes-sigs/gateway-
 - `deployments/k8s-base/traefik-controller.yaml`
 - `deployments/k8s-base/todo-api-tls.local.yaml`（本地生成，不提交公开仓库）
 - `deployments/k8s-base/todo-api-ingress.yaml`
-- `deployments/k8s-base/todo-api-gateway.yaml`
+- `deployments/k8s-base/traefik-gateway-platform.yaml`
+- `deployments/k8s-base/todo-api-httproute.yaml`
 - `deployments/k8s-base/tls/`（本地证书和私钥，不提交公开仓库）
 
 主线验收：
