@@ -12,7 +12,7 @@
 - 能说明 Container Network Interface（CNI，容器网络接口）插件在 Pod 网络中的职责。
 - 能描述 CoreDNS 如何把 Service 名称解析为集群内访问地址。
 - 能解释 kube-proxy iptables 模式下 Service 转发的大致链路。
-- 能说明 kube-proxy IPVS 模式为什么在 Kubernetes 1.36 中不再作为本课程实操对象。
+- 能说明 kube-proxy IPVS 模式的 deprecated 状态，以及 nftables 为什么是新集群更推荐的演进方向。
 - 能解释 NetworkPolicy 的默认放行、默认拒绝、入口流量和出口流量边界。
 
 ### 1.2 技能目标
@@ -82,6 +82,15 @@ Kubernetes 网络故障经常看起来像“应用坏了”，但根因可能在
 ```
 
 本篇会把第 24 篇留下的 `todo-api -> todo-postgres` 访问链路作为主案例：允许授权客户端访问 Todo API，只允许 Todo API 访问 PostgreSQL，拒绝其它 Namespace 直接访问数据库。
+
+访问矩阵先写清楚，后面再把它翻译成 NetworkPolicy：
+
+| 来源 | 目标 | 预期 |
+|---|---|---|
+| `todo-clients/allowed-client` | `todo-api:80` | 允许 |
+| `todo-denied/denied-client` | `todo-api:80` | 拒绝 |
+| `todo-clients/allowed-client` | `todo-postgres:5432` | 拒绝 |
+| `todo-workloads/todo-api` | `todo-postgres:5432` | 允许 |
 
 ## 3. 核心概念
 
@@ -170,11 +179,11 @@ Destination NAT（DNAT，目标地址转换）意味着客户端看起来访问�
 
 ### 3.6 kube-proxy IPVS 模式为什么只了解
 
-IP Virtual Server（IPVS，IP 虚拟服务器）曾经是 kube-proxy 的一种高性能实现方式，很多旧集群仍然使用。课程计划锁定 Kubernetes 1.36，本篇不再把 IPVS 作为实操路径；你只需要知道旧集群排障中可能会看到 `ipvsadm`、虚拟服务和真实服务器这类概念。
+IP Virtual Server（IPVS，IP 虚拟服务器）曾经是 kube-proxy 的一种高性能实现方式，很多旧集群仍然使用。Kubernetes 官方文档从 v1.35 起已经把 IPVS proxy mode 标记为 deprecated，并明确推荐用 nftables 作为更现代的替代方向。本篇不再把 IPVS 作为实操路径；你只需要知道旧集群排障中可能会看到 `ipvsadm`、虚拟服务和真实服务器这类概念。
 
-如果你接手旧集群，看到 kube-proxy 配置里还有 `mode: ipvs`，排障时要查该集群的 Kubernetes 版本、发行版文档和升级计划。本课程后续默认使用 Kubernetes 1.36 的网络基线讲解。
+如果你接手旧集群，看到 kube-proxy 配置里还有 `mode: ipvs`，排障时要查该集群的 Kubernetes 版本、发行版文档和升级计划。不要简单把它理解成“已经从所有集群消失”，更准确的说法是：它已经进入弃用路径，新建集群不应优先选择它。
 
-本章不要求也不建议在 Kubernetes 1.36 实验集群中配置或验证 IPVS。这里保留 IPVS 背景，是为了让你接手旧集群时能听懂历史排障语言。
+本章不要求也不建议在实验集群中配置或验证 IPVS。这里保留 IPVS 背景，是为了让你接手旧集群时能听懂历史排障语言，并知道新集群应优先关注 iptables / nftables 这类当前主线模式。
 
 ### 3.7 NetworkPolicy
 
@@ -299,18 +308,20 @@ NetworkPolicy 是 Namespace 内对象。它不能跨 Namespace “保护所有�
 | 项目 | 版本 | 说明 |
 |---|---|---|
 | Kubernetes 课程基线 | 1.36.x | 课程计划锁定版本；本章网络策略实验不依赖 1.36 专属特性 |
-| kubectl | 1.36.x | 与课程基线一致；访问 1.35.1 临时实验集群仍在相邻小版本兼容范围内 |
+| kubectl | 1.36.x | 与课程基线一致；访问 1.35.0 临时实验集群仍在相邻小版本兼容范围内 |
 | kind | 0.31.x | 创建临时网络实验集群 |
 | Docker Engine | 29.x | 运行 kind 节点和加载镜像 |
-| kind 节点镜像 | `kindest/node:v1.35.1` | 2026-05-28 已验证可用；临时实验集群实际 Kubernetes 版本为 1.35.1 |
+| kind 节点镜像 | `kindest/node:v1.35.0@sha256:452d707d4862f52530247495d180205e029056831160e22870e37e3f6c1ac31f` | kind 0.31.0 官方 release 推荐镜像；临时实验集群实际 Kubernetes 版本为 1.35.0 |
 | Calico | 3.32.0 | 提供 CNI 和 NetworkPolicy 执行能力 |
 | Alpine | 3.23 | 运行轻量 HTTP / TCP 测试容器，2026-05-28 已验证 tag 可用 |
 
 本篇使用临时集群 `todo-network-lab`。如果你已经在第 20-24 篇的主集群 `todo-k8s` 中运行 Todo Platform，不要直接修改主集群 CNI。
 
-课程计划锁定 Kubernetes 1.36，但截至 2026-05-28，Docker Hub 中 `kindest/node:v1.36.0` 尚未发布，`kindest/node` 最新公开标签为 `v1.35.1`。本章实验只验证标准 DNS、Service、kube-proxy 线索和 NetworkPolicy 行为，不依赖 Kubernetes 1.36 专属特性，因此临时使用 `kindest/node:v1.35.1` 作为可执行实验镜像。kind 发布 1.36.x 节点镜像后，应把下面配置中的 `image` 行替换为对应的 1.36.x 官方镜像。
+课程计划锁定 Kubernetes 1.36，但第 25 篇实验只验证标准 DNS、Service、kube-proxy 线索和 NetworkPolicy 行为，不依赖 Kubernetes 1.36 专属特性。为保证可复现，本篇临时使用 kind 0.31.0 官方 release 明确列出的 `kindest/node:v1.35.0` 镜像，并 pin digest。kind 发布 1.36.x 节点镜像后，应把下面配置中的 `image` 行替换为对应的 1.36.x 官方镜像和 digest。
 
 Calico 安装命令会访问 `raw.githubusercontent.com`。发布前已验证 Calico 3.32.0 的 `tigera-operator.yaml` 和 `custom-resources.yaml` 可下载，且官方 custom resources 中仍包含 `APIServer` 自定义资源。如果网络无法访问，请提前从 Calico 官方仓库下载对应 manifest，或使用团队可信镜像源；不要从来源不明的第三方链接复制安装清单。
+
+临时集群会额外占用本机磁盘空间，主要来自 kind 节点镜像、Calico 镜像和 Alpine 镜像，建议预留 2-3 GB。如果本机同时保留多个 kind 集群，实验前可以用 `kind get clusters` 和 `docker system df` 观察空间占用。
 
 确认本地工具版本：
 
@@ -340,10 +351,12 @@ mkdir -p deployments/k8s-network/manifests
 
 ```text
 deployments/k8s-network
+├── calico-custom-resources.yaml
 ├── kind-calico-config.yaml
 └── manifests
     ├── todo-network-app.yaml
     ├── todo-network-clients.yaml
+    ├── todo-network-egress-policy.yaml（可选）
     └── todo-network-policy.yaml
 ```
 
@@ -362,7 +375,7 @@ networking:
   serviceSubnet: "10.96.0.0/16" # ← Kubernetes 默认 Service 网段
 nodes:
   - role: control-plane
-    image: kindest/node:v1.35.1 # ← 2026-05-28 已验证可用；kind 发布 1.36.x 后替换为课程基线镜像
+    image: kindest/node:v1.35.0@sha256:452d707d4862f52530247495d180205e029056831160e22870e37e3f6c1ac31f # ← kind 0.31.0 官方推荐镜像；kind 发布 1.36.x 后替换为课程基线镜像
 YAML
 ```
 
@@ -603,7 +616,7 @@ kubectl config use-context kind-todo-network-lab
 kind load docker-image alpine:3.23 --name todo-network-lab
 ```
 
-安装 Calico 3.32.0。这里使用 Calico operator 安装方式，并为 kind 配置 VXLAN 网络：
+安装 Calico 3.32.0。这里使用 Calico operator 安装方式，并为 kind 配置 VXLAN 网络。Calico 容器镜像会从镜像仓库拉取；如果你的网络受限，可以提前拉取 Calico 相关镜像并用 `kind load docker-image --name todo-network-lab` 导入临时集群，或配置可信镜像代理：
 
 ```bash
 kubectl create -f https://raw.githubusercontent.com/projectcalico/calico/v3.32.0/manifests/tigera-operator.yaml
@@ -629,9 +642,11 @@ spec: {} # ← Calico 3.32.0 官方 custom-resources.yaml 仍包含该 CR
 YAML
 
 kubectl apply -f deployments/k8s-network/calico-custom-resources.yaml
-kubectl -n calico-system wait --for=condition=Available deployment/calico-kube-controllers --timeout=300s
-kubectl -n calico-system wait --for=condition=Ready pod -l k8s-app=calico-node --timeout=300s
+kubectl -n calico-system wait --for=condition=Available deployment/calico-kube-controllers --timeout=600s
+kubectl -n calico-system wait --for=condition=Ready pod -l k8s-app=calico-node --timeout=600s
 ```
+
+如果 wait 命令超时，不要立刻重建集群。先执行 `kubectl -n calico-system get pods` 和 `kubectl -n calico-system describe pod -l k8s-app=calico-node`，确认是镜像拉取慢、节点资源不足，还是 CNI 配置错误。
 
 确认节点和 Calico Pod Ready：
 
@@ -684,13 +699,15 @@ kubectl -n kube-system logs deployment/coredns --tail=20
 kubectl -n kube-system get configmap kube-proxy -o jsonpath='{.data.config\.conf}' | grep -E 'mode:|clusterCIDR:'
 ```
 
+默认 CoreDNS 不一定记录每一次 DNS 查询日志，这里的日志主要用于检查 CoreDNS 是否启动异常、插件加载失败或访问 Kubernetes API 失败。真正验证解析结果，仍以客户端 Pod 内的 `nslookup` 为准。
+
 如果第三条命令没有输出，先查看完整 ConfigMap，确认当前 kind 镜像中的 kube-proxy 配置键名：
 
 ```bash
 kubectl -n kube-system get configmap kube-proxy -o yaml
 ```
 
-进入 kind 节点观察 kube-proxy 维护的 iptables 链。这个命令只用于本地学习，不要在生产节点上随意执行：
+进入 kind 节点观察 kube-proxy 维护的 iptables 链。这个命令只适用于 iptables proxy mode 的本地学习，不要在生产节点上随意执行；如果 kube-proxy 配置显示为 nftables 或其它模式，`KUBE-SVC` 链可能不存在，应改查对应模式的规则：
 
 ```bash
 docker exec todo-network-lab-control-plane sh -c "iptables-save | grep KUBE-SVC | head"
@@ -736,6 +753,48 @@ API_POD=$(kubectl -n todo-workloads get pods \
 kubectl -n todo-workloads exec "$API_POD" -- \
   sh -c 'echo | nc -w 3 todo-postgres.todo-workloads.svc.cluster.local 5432'
 ```
+
+可选：观察 Egress 策略。主线实验用 Ingress 策略保护被访问方，已经能表达“谁可以访问我”。如果你还想观察“我可以访问谁”，可以为 `todo-api` 增加一条出口白名单：允许访问 PostgreSQL 的 5432 端口，并允许访问 CoreDNS 的 53 端口。
+
+```bash
+cat > deployments/k8s-network/manifests/todo-network-egress-policy.yaml <<'YAML'
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: restrict-api-egress
+  namespace: todo-workloads
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: todo-api # ← 只限制 todo-api 的出口流量
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: todo-postgres
+      ports:
+        - protocol: TCP
+          port: 5432
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system # ← Kubernetes 自动给 Namespace 注入该标签，值就是 Namespace 名称
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+YAML
+
+kubectl apply -f deployments/k8s-network/manifests/todo-network-egress-policy.yaml
+```
+
+再次从 Todo API Pod 访问 PostgreSQL，仍应看到 `postgres tcp endpoint`。如果去掉 DNS 放行规则，使用 Service DNS 访问数据库时可能会先卡在名称解析阶段，这就是生产 Egress 策略容易误伤业务的典型原因。
 
 ### 5.6 预期输出
 
@@ -838,7 +897,7 @@ kubectl -n todo-clients exec allowed-client -- \
 kind delete cluster --name todo-network-lab
 ```
 
-切回第 20-24 篇使用的主集群：
+切回第 20-24 篇使用的主集群。如果你在第 20 篇使用了不同的集群名或 context 名称，请把 `kind-todo-k8s` 替换为你的实际 context：
 
 ```bash
 kubectl config use-context kind-todo-k8s
@@ -967,7 +1026,9 @@ rm -rf deployments/k8s-network
 
 4. **CNI 是集群级关键组件。** 更换 CNI、修改 Pod CIDR 或开启高级网络能力会影响全体 Pod。生产变更必须有灰度环境、回滚方案和节点级监控，不能在业务集群中临时试验。
 
-5. **旧集群网络模式要在升级前审计。** 如果旧集群仍使用 kube-proxy IPVS、特殊 CNI 插件或自定义 iptables 规则，升级到新 Kubernetes 版本前要先确认兼容性。不要只升级控制面版本，而忽略节点网络数据面。
+5. **原生 NetworkPolicy 不是所有网络治理能力的全集。** Kubernetes 原生策略只表达 Pod 之间的 L3/L4 允许关系，不负责 HTTP 路径、用户身份、JWT、SQL 权限或审计。Calico、Cilium 等 CNI 可能提供更强的扩展策略，但扩展字段会带来实现绑定，迁移前必须评估兼容性。
+
+6. **旧集群网络模式要在升级前审计。** 如果旧集群仍使用 kube-proxy IPVS、特殊 CNI 插件或自定义 iptables 规则，升级到新 Kubernetes 版本前要先确认兼容性。不要只升级控制面版本，而忽略节点网络数据面。
 
 ## 8. 本章小项目
 
@@ -976,9 +1037,11 @@ rm -rf deployments/k8s-network
 ### 8.1 项目产出
 
 - `deployments/k8s-network/kind-calico-config.yaml`：支持 NetworkPolicy 的临时 kind 集群配置。
+- `deployments/k8s-network/calico-custom-resources.yaml`：Calico operator 的本地实验配置。
 - `deployments/k8s-network/manifests/todo-network-app.yaml`：Todo API 和 PostgreSQL 网络实验对象。
 - `deployments/k8s-network/manifests/todo-network-clients.yaml`：授权与未授权客户端 Namespace。
 - `deployments/k8s-network/manifests/todo-network-policy.yaml`：默认拒绝、允许客户端访问 API、允许 API 访问 PostgreSQL 的策略。
+- `deployments/k8s-network/manifests/todo-network-egress-policy.yaml`：可选进阶出口策略，限制 Todo API 只能访问 PostgreSQL 和 DNS。
 - 一份网络访问矩阵：谁能访问 Todo API，谁能访问 PostgreSQL，谁被拒绝。
 
 ### 8.2 验收标准
@@ -996,7 +1059,7 @@ rm -rf deployments/k8s-network
 
 - 能解释为什么默认 kindnet 集群不适合验证 NetworkPolicy 拒绝效果。
 - 能说明 Service 不通时为什么要同时看 Service、EndpointSlice、Pod label 和 readiness。
-- 能说出 Kubernetes 1.36 下 IPVS 模式在本课程中只做旧集群背景知识的原因。
+- 能说出 IPVS proxy mode deprecated 后，本课程为什么只把它作为旧集群背景知识。
 - 能画出 `todo-client -> todo-api -> todo-postgres` 的访问路径和隔离边界。
 
 ## 9. 本章练习题
@@ -1056,11 +1119,11 @@ rm -rf deployments/k8s-network
 
 ### 面试题 5：kube-proxy iptables 和旧 IPVS 模式有什么区别？
 
-**一句话结论**：iptables 模式通过节点上的规则链做 Service 转发；IPVS 模式曾用 Linux IPVS 做虚拟服务负载均衡，但在本课程的 Kubernetes 1.36 基线中只作为旧集群背景知识。
+**一句话结论**：iptables 模式通过节点上的规则链做 Service 转发；IPVS 模式曾用 Linux IPVS 做虚拟服务负载均衡，但已进入 deprecated 路径，本课程只把它作为旧集群背景知识。
 
-**展开解释**：iptables 模式会把访问 ClusterIP 的流量通过 DNAT 转到后端 Pod。IPVS 模式在旧集群里常用于更高规模的 Service 转发，但排障工具和规则表现不同。学习时要知道两种模式的历史差异，但实操应以当前课程锁定版本为准。
+**展开解释**：iptables 模式会把访问 ClusterIP 的流量通过 DNAT 转到后端 Pod。IPVS 模式在旧集群里常用于更高规模的 Service 转发，但 Kubernetes 官方从 v1.35 起已将 IPVS proxy mode 标记为 deprecated，并推荐 nftables 作为更现代的替代方向。学习时要知道这些模式的历史差异，但实操应以当前课程锁定版本和发行版默认配置为准。
 
-**深入追问**：接手旧集群时，应先看 kube-proxy ConfigMap、节点内核模块和发行版文档，再决定排障工具。升级前要确认旧模式是否仍受支持，以及迁移到新模式会不会影响业务流量。
+**深入追问**：接手旧集群时，应先看 kube-proxy ConfigMap、节点内核模块和发行版文档，再决定排障工具。升级前要确认旧模式是否仍受支持，以及迁移到 iptables / nftables 会不会影响业务流量。
 
 ## 11. 本章总结
 
