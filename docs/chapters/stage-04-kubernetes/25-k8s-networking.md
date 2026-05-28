@@ -298,18 +298,19 @@ NetworkPolicy 是 Namespace 内对象。它不能跨 Namespace “保护所有�
 
 | 项目 | 版本 | 说明 |
 |---|---|---|
-| Kubernetes | 1.36.x | 与课程计划锁定版本一致 |
-| kubectl | 1.36.x | 与集群版本一致 |
+| Kubernetes 课程基线 | 1.36.x | 课程计划锁定版本；本章网络策略实验不依赖 1.36 专属特性 |
+| kubectl | 1.36.x | 与课程基线一致；访问 1.35.1 临时实验集群仍在相邻小版本兼容范围内 |
 | kind | 0.31.x | 创建临时网络实验集群 |
 | Docker Engine | 29.x | 运行 kind 节点和加载镜像 |
-| Calico | 3.32.x | 提供 CNI 和 NetworkPolicy 执行能力 |
-| Alpine | 3.23 | 运行轻量 HTTP / TCP 测试容器 |
+| kind 节点镜像 | `kindest/node:v1.35.1` | 2026-05-28 已验证可用；临时实验集群实际 Kubernetes 版本为 1.35.1 |
+| Calico | 3.32.0 | 提供 CNI 和 NetworkPolicy 执行能力 |
+| Alpine | 3.23 | 运行轻量 HTTP / TCP 测试容器，2026-05-28 已验证 tag 可用 |
 
 本篇使用临时集群 `todo-network-lab`。如果你已经在第 20-24 篇的主集群 `todo-k8s` 中运行 Todo Platform，不要直接修改主集群 CNI。
 
-kind 节点镜像使用 `kindest/node:v1.36.0`，用于对齐课程锁定的 Kubernetes 1.36 基线。如果镜像拉取失败，请查看 kind 对应版本的 release notes，把配置文件中的 `image` 行替换为可用的 1.36.x 节点镜像或官方摘要镜像。不要为了省事换成任意小版本，否则 kube-proxy、API 行为和课程输出可能不一致。
+课程计划锁定 Kubernetes 1.36，但截至 2026-05-28，Docker Hub 中 `kindest/node:v1.36.0` 尚未发布，`kindest/node` 最新公开标签为 `v1.35.1`。本章实验只验证标准 DNS、Service、kube-proxy 线索和 NetworkPolicy 行为，不依赖 Kubernetes 1.36 专属特性，因此临时使用 `kindest/node:v1.35.1` 作为可执行实验镜像。kind 发布 1.36.x 节点镜像后，应把下面配置中的 `image` 行替换为对应的 1.36.x 官方镜像。
 
-Calico 安装命令会访问 `raw.githubusercontent.com`。如果网络无法访问，请提前从 Calico 官方仓库下载对应 manifest，或使用团队可信镜像源；不要从来源不明的第三方链接复制安装清单。
+Calico 安装命令会访问 `raw.githubusercontent.com`。发布前已验证 Calico 3.32.0 的 `tigera-operator.yaml` 和 `custom-resources.yaml` 可下载，且官方 custom resources 中仍包含 `APIServer` 自定义资源。如果网络无法访问，请提前从 Calico 官方仓库下载对应 manifest，或使用团队可信镜像源；不要从来源不明的第三方链接复制安装清单。
 
 确认本地工具版本：
 
@@ -332,13 +333,13 @@ docker pull alpine:3.23
 创建本篇实验目录：
 
 ```bash
-mkdir -p k8s-lab/network/manifests
+mkdir -p deployments/k8s-network/manifests
 ```
 
 本篇完成后，目录结构应类似：
 
 ```text
-k8s-lab/network
+deployments/k8s-network
 ├── kind-calico-config.yaml
 └── manifests
     ├── todo-network-app.yaml
@@ -351,7 +352,7 @@ k8s-lab/network
 创建 kind 配置。这里禁用默认 CNI，让 Calico 接管 Pod 网络：
 
 ```bash
-cat > k8s-lab/network/kind-calico-config.yaml <<'YAML'
+cat > deployments/k8s-network/kind-calico-config.yaml <<'YAML'
 apiVersion: kind.x-k8s.io/v1alpha4
 kind: Cluster
 name: todo-network-lab
@@ -361,14 +362,14 @@ networking:
   serviceSubnet: "10.96.0.0/16" # ← Kubernetes 默认 Service 网段
 nodes:
   - role: control-plane
-    image: kindest/node:v1.36.0 # ← 与课程计划 Kubernetes 1.36 对齐；拉取失败时按 kind release notes 替换为可用 1.36.x 节点镜像
+    image: kindest/node:v1.35.1 # ← 2026-05-28 已验证可用；kind 发布 1.36.x 后替换为课程基线镜像
 YAML
 ```
 
-创建 Todo Platform 网络实验对象。为了聚焦网络，本实验用 Alpine 模拟 Todo API 和 PostgreSQL 端口，不依赖真实业务镜像：
+创建 Todo Platform 网络实验对象。为了聚焦网络，本实验用 Alpine 模拟 Todo API 和 PostgreSQL 端口，不依赖真实业务镜像。这里的 `nc -l` 每次只处理一个连接后退出，再由 `while true` 自动重启；并发测试或重试时偶遇 `Connection refused` 属于模拟服务的短暂重启窗口，重新执行命令即可：
 
 ```bash
-cat > k8s-lab/network/manifests/todo-network-app.yaml <<'YAML'
+cat > deployments/k8s-network/manifests/todo-network-app.yaml <<'YAML'
 # 结构概览：
 # 1. todo-workloads：模拟 Todo Platform 工作负载 Namespace
 # 2. todo-api：监听 18080，模拟 Todo API HTTP 服务
@@ -484,7 +485,7 @@ YAML
 创建两个客户端 Namespace：一个被授权访问 Todo API，一个未授权：
 
 ```bash
-cat > k8s-lab/network/manifests/todo-network-clients.yaml <<'YAML'
+cat > deployments/k8s-network/manifests/todo-network-clients.yaml <<'YAML'
 apiVersion: v1
 kind: Namespace
 metadata:
@@ -534,7 +535,7 @@ YAML
 创建 NetworkPolicy。策略目标是：默认拒绝 `todo-workloads` 中所有 Pod 的入口流量；允许授权客户端访问 `todo-api:18080`；只允许 `todo-api` 访问 `todo-postgres:5432`。
 
 ```bash
-cat > k8s-lab/network/manifests/todo-network-policy.yaml <<'YAML'
+cat > deployments/k8s-network/manifests/todo-network-policy.yaml <<'YAML'
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -592,7 +593,7 @@ YAML
 创建临时网络实验集群：
 
 ```bash
-kind create cluster --name todo-network-lab --config k8s-lab/network/kind-calico-config.yaml
+kind create cluster --name todo-network-lab --config deployments/k8s-network/kind-calico-config.yaml
 kubectl config use-context kind-todo-network-lab
 ```
 
@@ -602,13 +603,13 @@ kubectl config use-context kind-todo-network-lab
 kind load docker-image alpine:3.23 --name todo-network-lab
 ```
 
-安装 Calico 3.32.x。这里使用 Calico operator 安装方式，并为 kind 配置 VXLAN 网络：
+安装 Calico 3.32.0。这里使用 Calico operator 安装方式，并为 kind 配置 VXLAN 网络：
 
 ```bash
 kubectl create -f https://raw.githubusercontent.com/projectcalico/calico/v3.32.0/manifests/tigera-operator.yaml
 kubectl -n tigera-operator wait --for=condition=Available deployment/tigera-operator --timeout=180s
 
-cat > k8s-lab/network/calico-custom-resources.yaml <<'YAML'
+cat > deployments/k8s-network/calico-custom-resources.yaml <<'YAML'
 apiVersion: operator.tigera.io/v1
 kind: Installation
 metadata:
@@ -624,10 +625,10 @@ apiVersion: operator.tigera.io/v1
 kind: APIServer
 metadata:
   name: default
-spec: {}
+spec: {} # ← Calico 3.32.0 官方 custom-resources.yaml 仍包含该 CR
 YAML
 
-kubectl apply -f k8s-lab/network/calico-custom-resources.yaml
+kubectl apply -f deployments/k8s-network/calico-custom-resources.yaml
 kubectl -n calico-system wait --for=condition=Available deployment/calico-kube-controllers --timeout=300s
 kubectl -n calico-system wait --for=condition=Ready pod -l k8s-app=calico-node --timeout=300s
 ```
@@ -642,8 +643,8 @@ kubectl -n calico-system get pods
 部署 Todo Platform 网络实验对象和客户端：
 
 ```bash
-kubectl apply -f k8s-lab/network/manifests/todo-network-app.yaml
-kubectl apply -f k8s-lab/network/manifests/todo-network-clients.yaml
+kubectl apply -f deployments/k8s-network/manifests/todo-network-app.yaml
+kubectl apply -f deployments/k8s-network/manifests/todo-network-clients.yaml
 kubectl -n todo-workloads wait --for=condition=Available deployment/todo-api --timeout=120s
 kubectl -n todo-workloads wait --for=condition=Available deployment/todo-postgres --timeout=120s
 kubectl -n todo-clients wait --for=condition=Ready pod/allowed-client --timeout=120s
@@ -683,6 +684,12 @@ kubectl -n kube-system logs deployment/coredns --tail=20
 kubectl -n kube-system get configmap kube-proxy -o jsonpath='{.data.config\.conf}' | grep -E 'mode:|clusterCIDR:'
 ```
 
+如果第三条命令没有输出，先查看完整 ConfigMap，确认当前 kind 镜像中的 kube-proxy 配置键名：
+
+```bash
+kubectl -n kube-system get configmap kube-proxy -o yaml
+```
+
 进入 kind 节点观察 kube-proxy 维护的 iptables 链。这个命令只用于本地学习，不要在生产节点上随意执行：
 
 ```bash
@@ -692,7 +699,7 @@ docker exec todo-network-lab-control-plane sh -c "iptables-save | grep KUBE-SVC 
 应用 NetworkPolicy：
 
 ```bash
-kubectl apply -f k8s-lab/network/manifests/todo-network-policy.yaml
+kubectl apply -f deployments/k8s-network/manifests/todo-network-policy.yaml
 kubectl -n todo-workloads get networkpolicy
 ```
 
@@ -840,7 +847,7 @@ kubectl config use-context kind-todo-k8s
 如果你只想删除实验目录中的本地文件：
 
 ```bash
-rm -rf k8s-lab/network
+rm -rf deployments/k8s-network
 ```
 
 预计耗时：100 分钟（动手操作约 70 分钟）。
@@ -968,10 +975,10 @@ rm -rf k8s-lab/network
 
 ### 8.1 项目产出
 
-- `k8s-lab/network/kind-calico-config.yaml`：支持 NetworkPolicy 的临时 kind 集群配置。
-- `k8s-lab/network/manifests/todo-network-app.yaml`：Todo API 和 PostgreSQL 网络实验对象。
-- `k8s-lab/network/manifests/todo-network-clients.yaml`：授权与未授权客户端 Namespace。
-- `k8s-lab/network/manifests/todo-network-policy.yaml`：默认拒绝、允许客户端访问 API、允许 API 访问 PostgreSQL 的策略。
+- `deployments/k8s-network/kind-calico-config.yaml`：支持 NetworkPolicy 的临时 kind 集群配置。
+- `deployments/k8s-network/manifests/todo-network-app.yaml`：Todo API 和 PostgreSQL 网络实验对象。
+- `deployments/k8s-network/manifests/todo-network-clients.yaml`：授权与未授权客户端 Namespace。
+- `deployments/k8s-network/manifests/todo-network-policy.yaml`：默认拒绝、允许客户端访问 API、允许 API 访问 PostgreSQL 的策略。
 - 一份网络访问矩阵：谁能访问 Todo API，谁能访问 PostgreSQL，谁被拒绝。
 
 ### 8.2 验收标准
