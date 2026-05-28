@@ -375,7 +375,7 @@ labels:
 - `entrypoints=web`：使用 Traefik 的 `web` 入口。
 - `server.port=18080`：Traefik 访问 API 容器内的 `18080` 端口。
 
-本地实验为了降低访问门槛，使用 `PathPrefix(`/`)`。生产环境应使用明确域名、TLS、认证、限流、访问日志和更严格的路由规则。
+本地实验为了降低访问门槛，使用 `PathPrefix(`/`)`，这样 `http://127.0.0.1:18080/readyz` 和 API 路径都能直接进入 Todo API。真实团队通常会使用 `Host(`todo.localhost`)` 或正式域名作为路由规则，并配合 TLS、认证、限流、访问日志和更严格的路由边界。
 
 ## 5. 手把手实验
 
@@ -412,12 +412,13 @@ docker image inspect todo-api:v0.1.0
 docker build -f api/Dockerfile -t todo-api:v0.1.0 .
 ```
 
-如果你的网络无法拉取 `postgres:18-alpine`、`redis:8.2-alpine` 或 `traefik:v3.6`，先确认 Docker Hub 访问和镜像代理配置。发布课程前应使用以下命令验证标签可拉取：
+如果你的网络无法拉取 `postgres:18-alpine`、`redis:8.2-alpine`、`traefik:v3.6` 或概念示例中的 `alpine:3.23`，先确认 Docker Hub 访问和镜像代理配置。发布课程前应使用以下命令验证标签可拉取：
 
 ```bash
 docker manifest inspect postgres:18-alpine
 docker manifest inspect redis:8.2-alpine
 docker manifest inspect traefik:v3.6
+docker manifest inspect alpine:3.23
 ```
 
 ### 5.3 文件目录结构
@@ -454,6 +455,18 @@ deployments/docker-compose/.env
 
 ### 5.4 完整代码或配置
 
+先创建 Compose 配置目录。Linux / macOS / WSL2：
+
+```bash
+mkdir -p deployments/docker-compose
+```
+
+Windows PowerShell：
+
+```powershell
+New-Item -ItemType Directory -Force deployments\docker-compose
+```
+
 在 `deployments/docker-compose/.env.example` 中写入：
 
 ```text
@@ -474,7 +487,7 @@ REDIS_PORT=16379
 TODO_JWT_SECRET=0123456789abcdef0123456789abcdef
 ```
 
-这个文件不包含 `TODO_AUTH_USERS`，因为管理员密码哈希应该在本地生成后写入 `.env`，不要把真实用户哈希提交到仓库。
+这些密码和 JWT Secret 只服务于本地实验，不应复用到共享环境或生产环境。这个文件不包含 `TODO_AUTH_USERS`，因为管理员密码哈希应该在本地生成后写入 `.env`，不要把真实用户哈希提交到仓库。
 
 在 `deployments/docker-compose/compose.yaml` 中写入：
 
@@ -605,8 +618,9 @@ volumes:
 - PostgreSQL 和 Redis 的 `ports` 都绑定到 `127.0.0.1`，避免暴露到局域网。
 - `migrate` 只等待 PostgreSQL 健康，因为迁移不依赖 Redis。
 - `api` 同时等待 PostgreSQL、Redis 健康，并等待 `migrate` 成功完成。
+- `api.healthcheck` 使用 `config-check` 做轻量配置检查，不等价于完整业务就绪；真正的依赖可用性仍以后面的 `/readyz` 验证为准。
 - `api` 不直接映射宿主机端口，外部请求通过 Traefik 进入。
-- Traefik 挂载 Docker socket 是本地教学便利，生产环境必须替换为更安全的入口管理方式。
+- Traefik 挂载 Docker socket 是本地教学便利，生产环境必须替换为更安全的入口管理方式。Windows 用户请确认 Docker Desktop 使用 Linux containers / WSL2 后端，否则 `/var/run/docker.sock` 挂载方式可能不可用。
 
 在 `deployments/docker-compose/README.md` 中写入：
 
@@ -664,17 +678,15 @@ docker image inspect todo-api:v0.1.0
 docker build -f api/Dockerfile -t todo-api:v0.1.0 .
 ```
 
-创建目录并进入 Compose 目录：
+进入 Compose 目录：
 
 ```bash
-mkdir -p deployments/docker-compose
 cd deployments/docker-compose
 ```
 
 Windows PowerShell：
 
 ```powershell
-New-Item -ItemType Directory -Force deployments\docker-compose
 Set-Location deployments\docker-compose
 ```
 
@@ -695,7 +707,7 @@ Add-Content -Path .env -Value ""
 Add-Content -Path .env -Value "TODO_AUTH_USERS='admin=$hash'"
 ```
 
-这里使用单引号包住 `admin=<hash>`，是为了避免 bcrypt 哈希中的 `$` 被错误解释。`.env` 不要提交到 Git。
+这里使用单引号包住 `admin=<hash>`，是为了避免 bcrypt 哈希中的 `$` 被错误解释。`.env` 不要提交到 Git。后面执行 `docker compose config` 时，输出中的 `$` 可能显示为 `$$`，这是 Compose 为了再次渲染配置而做的转义，不代表容器里拿到的哈希损坏。
 
 检查 Compose 解析结果：
 
@@ -714,6 +726,7 @@ docker compose --env-file .env up -d
 
 ```bash
 docker compose --env-file .env ps
+docker compose --env-file .env ps -a
 ```
 
 查看迁移日志：
@@ -798,6 +811,12 @@ todo-platform-api-1          todo-api:v0.1.0       api        Up ... (healthy)
 todo-platform-traefik-1      traefik:v3.6          traefik    Up ...
 ```
 
+如果默认 `ps` 没有显示已经退出的 `migrate` 容器，请执行：
+
+```bash
+docker compose --env-file .env ps -a
+```
+
 迁移日志应出现成功信息，具体文本以你的实现为准：
 
 ```text
@@ -841,6 +860,7 @@ Content-Type: application/json
 ```bash
 docker compose --env-file .env config --services
 docker compose --env-file .env ps
+docker compose --env-file .env ps -a
 curl -i http://127.0.0.1:18080/readyz
 docker compose --env-file .env exec postgres pg_isready -U todo -d todo_platform
 docker compose --env-file .env exec redis redis-cli -a todo_redis_password ping
@@ -947,7 +967,7 @@ docker compose --env-file .env up -d --force-recreate
   docker compose --env-file .env logs --tail 80 api
   ```
 
-  如果输出里 `TODO_AUTH_USERS` 为空，或哈希被截断，说明 `.env` 写法有问题。
+  如果输出里 `TODO_AUTH_USERS` 为空，或哈希被截断，说明 `.env` 写法有问题。如果 `docker compose config` 里看到 `$2a$10$...` 被显示成 `$$2a$$10$$...`，这是 Compose 的转义显示，通常不是错误。
 
 - **修复**：
 
@@ -1034,7 +1054,7 @@ docker compose --env-file .env up -d --force-recreate
 
   ```bash
   docker compose --env-file .env up -d postgres
-  docker compose --env-file .env run --rm migrate
+  docker compose --env-file .env up --force-recreate migrate
   docker compose --env-file .env up -d api traefik
   ```
 
@@ -1161,7 +1181,7 @@ docker compose --env-file .env up -d --force-recreate
 
 - `docker compose --env-file .env config --services` 输出 5 个服务。
 - `docker compose --env-file .env up -d` 能启动完整环境。
-- `migrate` 成功退出，状态为 `Exited (0)`。
+- `docker compose --env-file .env ps -a` 显示 `migrate` 成功退出，状态为 `Exited (0)`。
 - `curl -i http://127.0.0.1:18080/readyz` 返回 `200 OK`。
 - 登录接口能返回 JWT。
 - 带 Bearer Token 创建 Todo 成功。
