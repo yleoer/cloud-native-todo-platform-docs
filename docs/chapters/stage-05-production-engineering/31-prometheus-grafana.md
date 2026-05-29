@@ -329,7 +329,7 @@ Alerting rules 则基于 PromQL 判断是否触发告警。生产环境里不要
 
 | 工具 | 版本 | 用途 |
 |---|---:|---|
-| Go | 1.25.x | 编译 Todo API 并运行测试 |
+| Go | 1.26.x | 编译 Todo API 并运行测试 |
 | Docker Engine | 29.x | 构建 Todo API 镜像 |
 | kind | v0.31.0 | 运行本地 Kubernetes 集群 |
 | Kubernetes | v1.35.0 | 第 30 篇 `todo-gitops` 集群 |
@@ -345,6 +345,7 @@ pwd
 test -f go.mod
 test -f api/internal/handler/gin/handler.go
 test -d deployments/gitops/envs/dev
+grep '^module ' go.mod
 kubectl config current-context
 kubectl get namespace todo-dev
 kubectl -n todo-dev get deploy,svc,pod
@@ -361,6 +362,8 @@ kind version
 kubectl version --client
 helm version --short
 ```
+
+本篇需要在同一个 kind 集群里同时运行 Argo CD、Todo API、Prometheus、Grafana、Alertmanager、kube-state-metrics 和 node-exporter。建议 Docker Desktop 为 kind 节点预留至少 6GB 内存；如果安装监控栈时大量 Pod 长时间 `Pending` 或 `OOMKilled`，优先检查 Docker Desktop 的资源上限。
 
 ### 5.3 文件目录结构
 
@@ -563,6 +566,8 @@ import (
 )
 ```
 
+这是在已有 import 块中新增 `cloud-native-todo-platform/api/internal/metrics` 这一行，其余 import 保持不变。如果你的 `go.mod` 中 `module` 不是 `cloud-native-todo-platform`，需要把导入路径前缀改成你自己的 module 名。
+
 在 `NewRouter` 中注册 `/metrics`，并把指标中间件放在业务路由之前：
 
 ```go
@@ -577,6 +582,8 @@ router.GET("/readyz", h.readyz)
 router.GET("/openapi.yaml", h.openapi)
 router.POST("/api/v2/auth/login", h.login)
 ```
+
+修改时先找到 `NewRouter` 函数中已有的 `router := gin.New()` 和基础中间件注册位置，只插入 `/metrics` 路由和 `metrics.HTTPMetrics()` 中间件，不要删除原有的健康检查、OpenAPI、登录和受保护 Todo 路由。
 
 `/metrics` 放在 `metrics.HTTPMetrics()` 前面，是为了避免 Prometheus 每次 scrape 都把 `/metrics` 自身计入业务 QPS。业务接口、健康检查和登录接口会被统计；如果你的团队希望统计 scrape 行为，可以把 `/metrics` 移到中间件之后。
 
@@ -683,6 +690,7 @@ YAML
 
 ```bash
 kubectl -n todo-dev get svc todo-platform --show-labels
+kubectl -n todo-dev get svc todo-platform -o jsonpath='{.spec.ports[*].name}{"\n"}'
 ```
 
 然后把 ServiceMonitor 的 `selector.matchLabels` 改成和 Service 一致。
@@ -1043,6 +1051,8 @@ kubectl -n todo-dev rollout status deployment/todo-platform --timeout=180s
 
 如果第 30 篇的 `todo-platform-dev` Application 跟踪的是 `main`，不要为了实验直接推送 `main`。应先按团队流程合并 PR，或在学习环境中把 Application 的 `targetRevision` 临时设置为当前实验分支；否则 Argo CD 看不到这次 `newTag` 变更。
 
+> **警告**：生产和团队协作场景应通过 PR 合并到 Application 跟踪的分支。只有本地学习环境才建议临时修改 `targetRevision` 指向实验分支。
+
 如果你没有继续运行 Argo CD，也可以临时直接应用 dev overlay，但这会绕过第 30 篇的 GitOps 流程，只建议用于本地排错：
 
 ```bash
@@ -1082,6 +1092,22 @@ kubectl -n monitoring get statefulset
 ```
 
 然后用实际名称重新运行 `rollout status`。
+
+如果 10 分钟后仍未 Ready，先看 Pod 状态和事件：
+
+```bash
+kubectl -n monitoring get pods -o wide
+kubectl -n monitoring describe pod -l app.kubernetes.io/name=grafana
+kubectl -n monitoring describe pod -l app.kubernetes.io/name=prometheus
+```
+
+如果看到 `ImagePullBackOff`，优先检查镜像拉取网络；如果看到 `Pending` 或 `OOMKilled`，优先增加 Docker Desktop 分配给 kind 的内存。
+
+确认 Grafana 实际镜像版本，后续 dashboard JSON 导入问题会用到它：
+
+```bash
+kubectl -n monitoring get deployment monitoring-grafana -o jsonpath='{.spec.template.spec.containers[0].image}{"\n"}'
+```
 
 #### 5.5.4 应用 ServiceMonitor、PrometheusRule 和 Dashboard
 
@@ -1136,7 +1162,7 @@ kubectl -n todo-dev run todo-load \
   --command -- sh -c 'while true; do curl -fsS http://todo-platform/healthz >/dev/null; sleep 0.2; done'
 ```
 
-如果本地网络无法从 Docker Hub 拉取 `curlimages/curl`，可以保留前面的 `kubectl port-forward`，在本机另开一个 Bash 终端生成流量：
+如果镜像 tag 不存在，或本地网络无法从 Docker Hub 拉取 `curlimages/curl`，可以保留前面的 `kubectl port-forward`，在本机另开一个 Bash 终端生成流量：
 
 ```bash
 while true; do curl -fsS http://127.0.0.1:18080/healthz >/dev/null; sleep 0.2; done
@@ -1193,6 +1219,12 @@ password: admin
 #### 5.5.7 执行 PromQL 查询
 
 在 Prometheus UI 的 Graph 页面执行以下查询。
+
+先确认第 27 篇 Helm Chart 渲染出的容器名。后面的 CPU 和内存 PromQL 使用 `container="todo-api"` 过滤容器，如果你的输出不是 `todo-api`，需要同步调整 PromQL：
+
+```bash
+kubectl -n todo-dev get deployment todo-platform -o jsonpath='{.spec.template.spec.containers[*].name}{"\n"}'
+```
 
 检查 Prometheus 是否抓到 Todo API：
 
