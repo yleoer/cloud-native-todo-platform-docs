@@ -284,6 +284,8 @@ operator/
 │   │   └── e2e/
 │   │       └── run-kind-e2e.sh
 │   ├── config/
+│   │   └── default/
+│   │       └── kustomization.yaml
 │   ├── dist/
 │   │   └── todo-operator-v0.3.0.yaml
 │   └── Makefile
@@ -297,6 +299,7 @@ operator/
             ├── _helpers.tpl
             ├── certificate.yaml
             ├── deployment.yaml
+            ├── NOTES.txt
             ├── rbac.yaml
             ├── service.yaml
             ├── serviceaccount.yaml
@@ -607,6 +610,8 @@ func eventually(t *testing.T, timeout time.Duration, condition func() bool, mess
 
 这份测试有一个重要细节：`envtest` 不会调度 Pod，所以我们手动修改 Deployment status，把 `ReadyReplicas` 设为期望值，再触发一次 Reconcile。这样可以专注验证 Controller 根据 Deployment 状态回写 `TodoApp.status` 的逻辑。
 
+`record.NewFakeRecorder(20)` 能赋值给第 39 篇 `TodoAppReconciler.Recorder`，是因为 `FakeRecorder` 提供了 `Event` 和 `Eventf` 方法，满足 Reconciler 中自定义的最小 recorder 接口；如果未来把接口改成更多方法，编译会在这一行直接暴露不兼容。Finalizer 这个测试重点验证 Controller 删除路径是否移除了 finalizer；envtest 进程退出后 API server 和 etcd 会一起销毁，测试中创建的 namespace、`TodoApp` 和子资源不会残留到本地集群。
+
 ### 5.6 步骤 5-6：运行代码生成并观察 envtest 输出
 
 先重新生成 DeepCopy、CRD、RBAC 和 Webhook 清单：
@@ -667,6 +672,13 @@ DELETE_CLUSTER="${DELETE_CLUSTER:-false}"
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "${ROOT_DIR}"
 
+for cmd in kubectl docker kind make grep; do
+  if ! command -v "${cmd}" >/dev/null 2>&1; then
+    echo "missing required command: ${cmd}"
+    exit 1
+  fi
+done
+
 cleanup() {
   kubectl delete -f /tmp/todoapp-invalid.yaml --ignore-not-found=true >/dev/null 2>&1 || true
   kubectl delete -f /tmp/todoapp-e2e.yaml --ignore-not-found=true >/dev/null 2>&1 || true
@@ -682,6 +694,7 @@ if ! kind get clusters | grep -qx "${CLUSTER_NAME}"; then
 fi
 
 kubectl config use-context "kind-${CLUSTER_NAME}"
+kubectl cluster-info >/dev/null
 
 make generate
 make manifests
@@ -757,7 +770,11 @@ if kubectl apply -f /tmp/todoapp-invalid.yaml; then
 fi
 
 kubectl delete -f /tmp/todoapp-e2e.yaml
-kubectl wait --for=delete todoapp/todo-e2e --timeout=120s
+if ! kubectl wait --for=delete todoapp/todo-e2e --timeout=120s; then
+  kubectl get todoapp todo-e2e -o yaml || true
+  kubectl logs -n todo-operator-system deploy/todo-operator-controller-manager || true
+  exit 1
+fi
 ```
 
 给脚本增加执行权限：
@@ -782,9 +799,11 @@ deployment "todo-e2e" successfully rolled out
 Ready 2
 ```
 
-脚本中有一行保护逻辑：如果出现 `invalid TodoApp was accepted unexpectedly`，说明非法 `TodoApp` 被接受，脚本会主动 `exit 1`。正常情况下，你会看到 API server 返回 `image must include an explicit non-latest tag` 一类拒绝信息。脚本还通过 `trap cleanup EXIT` 做失败清理：无论中途哪一步失败，都会尽力删除测试 CR、卸载 Operator；只有显式设置 `DELETE_CLUSTER=true` 时才会删除 kind 集群。
+脚本中有一行保护逻辑：如果出现 `invalid TodoApp was accepted unexpectedly`，说明非法 `TodoApp` 被接受，脚本会主动 `exit 1`。正常情况下，你会看到 API server 返回 `image must include an explicit non-latest tag` 一类拒绝信息。脚本还通过 `trap cleanup EXIT` 做失败清理：无论中途哪一步失败，都会尽力删除测试 CR、卸载 Operator；只有显式设置 `DELETE_CLUSTER=true` 时才会删除 kind 集群。如果 `kubectl wait --for=delete` 超时，脚本会先打印 `TodoApp` YAML 和 Controller 日志，帮助判断是否为 Finalizer 卡住。
 
 ### 5.8 步骤 5-7：生成并验证 Kustomize 发布清单
+
+本小节假设你已经完成前面的 kind 集成测试，或者至少已经在当前集群安装了 cert-manager。因为第 39 篇启用了 Webhook 证书资源，最终清单里会包含 `Certificate` 和 `Issuer`。
 
 Kustomize 继续作为 Kubebuilder 项目的清单源头。这里必须把清单中的 manager 镜像固定为本章刚测试过的 `OPERATOR_IMG`，否则发布清单可能仍然引用 Kubebuilder 默认镜像，和集成测试使用的镜像不一致。
 
@@ -795,6 +814,17 @@ mkdir -p dist
 make build-installer IMG="${OPERATOR_IMG}"
 cp dist/install.yaml dist/todo-operator-v0.3.0.yaml
 ```
+
+Kubebuilder 4.x 默认 Makefile 通常包含 `build-installer` target，它会把 `IMG` 写入 manager 镜像并输出 `dist/install.yaml`。如果你的 Makefile 没有这个 target，先查看本地 Makefile，再使用下面的等价思路生成清单：
+
+```bash
+cd config/manager
+kustomize edit set image controller="${OPERATOR_IMG}"
+cd ../..
+kubectl kustomize config/default > dist/todo-operator-v0.3.0.yaml
+```
+
+这种备选方式会修改 `config/manager/kustomization.yaml` 中的镜像替换记录，执行后请用 `git diff` 确认是否需要保留该变更。
 
 确认清单里包含本章镜像 tag：
 
@@ -846,6 +876,8 @@ kubectl delete -f dist/todo-operator-v0.3.0.yaml --ignore-not-found
 Kustomize 发布方式适合开发和审查，因为它直接反映 Kubebuilder 生成结果。缺点是它没有 Helm release 记录，升级和回滚需要自己管理文件版本。因此下一步会整理 Helm 4 Chart。
 
 ### 5.9 步骤 4.4：整理 Helm 4 Chart
+
+Kustomize 适合开发和审查，因为它直接呈现 Kubebuilder 生成清单；Helm 4 更适合发布，因为它有 release 记录、升级命令和回滚命令。接下来把同一组资源整理为 Helm Chart。
 
 从 `operator/kubebuilder/` 创建 Chart 目录：
 
@@ -940,7 +972,7 @@ metadata:
 
 ```bash
 make manifests
-sed -n '1,220p' config/rbac/role.yaml
+cat config/rbac/role.yaml
 ```
 
 Helm Chart 中的 RBAC 应与 `config/rbac/role.yaml` 保持一致。后续如果第 41 篇收敛 RBAC marker，需要同步更新这里的模板，避免“测试用 Kustomize 权限”和“发布用 Helm 权限”不一致。
@@ -1102,6 +1134,8 @@ spec:
 {{- end }}
 ```
 
+这里假设集群默认 DNS 后缀为 `cluster.local`，kind 默认符合这个假设。如果你的企业集群使用了自定义 cluster domain，需要同步调整 `dnsNames` 和 Webhook Service 访问名称。
+
 创建 `../helm/todo-operator/templates/webhooks.yaml`：
 
 ```yaml
@@ -1154,6 +1188,25 @@ webhooks:
 {{- end }}
 ```
 
+创建 `../helm/todo-operator/templates/NOTES.txt`：
+
+```gotemplate
+Todo Operator has been installed.
+
+Release:
+  name: {{ .Release.Name }}
+  namespace: {{ .Release.Namespace }}
+
+Check controller status:
+  kubectl get deployment {{ include "todo-operator.fullname" . }}-controller-manager -n {{ .Release.Namespace }}
+
+Check webhook resources:
+  kubectl get mutatingwebhookconfiguration,validatingwebhookconfiguration | grep {{ include "todo-operator.fullname" . }}
+
+Create a sample TodoApp:
+  kubectl apply -f config/samples/platform_v1alpha1_todoapp.yaml
+```
+
 检查 Chart：
 
 ```bash
@@ -1168,6 +1221,8 @@ helm template todo-operator ../helm/todo-operator -n todo-operator-system --incl
 ```
 
 ### 5.10 步骤 5-7：使用 Helm 安装、升级和回滚
+
+本小节开始模拟版本升级。为了让实验可重复，我们先把同一个本地镜像 retag 成 `v0.3.0-test` 和 `v0.3.1-test`；真实发布时，`v0.3.1` 应该来自新的提交和新的镜像 digest，而不是只改 tag。
 
 确保 cert-manager 已安装：
 
@@ -1244,9 +1299,9 @@ todo-operator:v0.3.0-test
 
 注意：本实验回滚的是 Controller 镜像和 Helm 模板资源。CRD schema 回滚必须单独评估，不要在生产中把 CRD 当作普通 Deployment 一样随意降级。
 
-### 5.11 步骤 7：验证 CRD 升级兼容性
+### 5.11 步骤 7：验证 CRD 升级兼容性并建立发布 checklist
 
-本小节不引入真实 `v1beta1`，而是建立升级前必须跑的检查流程。先保存当前 CRD：
+本小节的目标是建立发布前 checklist，尤其是 CRD 兼容性检查。本章不引入真实 `v1beta1`，而是建立升级前必须跑的检查流程。先保存当前 CRD：
 
 ```bash
 kubectl get crd todoapps.platform.todo.example.com -o yaml > /tmp/todoapps-crd-before.yaml
@@ -1434,7 +1489,7 @@ rm -f /tmp/todoapp-e2e.yaml /tmp/todoapp-invalid.yaml /tmp/todo-operator-chart.y
   CustomResourceDefinition "todoapps.platform.todo.example.com" exists and cannot be imported into the current release
   ```
 
-- **原因**：CRD 可能已经由 Kustomize、`make install` 或旧 Helm release 安装。Helm 对 CRD 的生命周期管理比较谨慎，不应该用普通模板强行覆盖生产 CRD。
+- **原因**：CRD 可能已经由 Kustomize、`make install` 或旧 Helm release 安装。Helm 对 CRD 的生命周期管理比较谨慎：`crds/` 目录中的 CRD 会在安装时先创建，但不会像普通模板一样被 Helm 自动升级或删除，因此不应该用普通模板强行覆盖生产 CRD。
 - **排查**：
 
   ```bash
@@ -1474,7 +1529,7 @@ rm -f /tmp/todoapp-e2e.yaml /tmp/todoapp-invalid.yaml /tmp/todo-operator-chart.y
 
 3. **CRD 升级要独立审查**。CRD 是用户 API 契约，不能和普通 Deployment 一样随意回滚。删除字段、改变类型、收窄枚举、改变默认值都可能破坏已有 GitOps 配置。重大变更应先新增版本、保留旧版本 served，并准备迁移策略。
 
-4. **Webhook 发布要有保护窗口**。`failurePolicy=Fail` 可以保护非法配置，但 Webhook 不可用会阻断写请求。发布前必须确认 Webhook Service endpoints、证书注入、CA bundle 和 readinessProbe。生产中还应设置多副本和 PodDisruptionBudget，第 41 篇会继续展开。
+4. **Webhook 发布要有保护窗口**。`failurePolicy=Fail` 可以保护非法配置，但 Webhook 不可用会阻断写请求。发布前必须确认 Webhook Service endpoints、证书注入、CA bundle 和 readinessProbe；发布后至少观察 15-30 分钟的创建/更新失败率和 API server admission 错误。生产中还应设置多副本和 PodDisruptionBudget，第 41 篇会继续展开。
 
 5. **Helm release 记录不是完整审计**。Helm 能记录模板资源的安装、升级和回滚，但镜像仓库、CRD 迁移、外部证书、集群策略和人工审批也要纳入发布记录。企业环境通常还会把 `helm template` 输出、镜像 digest、测试报告和审批单一起归档。
 
