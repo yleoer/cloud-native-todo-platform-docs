@@ -11,3 +11,6 @@ coverage.out
 deployments/k8s-base/*.local.yaml
 deployments/k8s-security/*.local.yaml
 deployments/k8s-base/tls/
+deployments/helm/**/*.local.yaml
+deployments/helm/**/charts/*.tgz
+deployments/helm/packages/

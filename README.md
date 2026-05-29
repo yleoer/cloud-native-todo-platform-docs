@@ -12,7 +12,7 @@
 
 ## 🎯 学习路径
 
-新版课程设计为 **6 个学习阶段、42 大篇、约 230 章**。当前站点已发布阶段一至阶段三，以及阶段四第 20-22 篇；后续会按新版设计继续推进 Kubernetes、生产工程和 Operator 能力。
+新版课程设计为 **6 个学习阶段、42 大篇、约 230 章**。当前站点已发布阶段一至阶段三，以及阶段四第 20-27 篇；后续会按新版设计继续推进 Kubernetes、生产工程和 Operator 能力。
 
 <details open>
 <summary><strong>阶段一：基础能力（第 1-6 篇，已发布）</strong></summary>
@@ -63,7 +63,7 @@ Docker 基础、Dockerfile、Compose、容器原理、OCI、containerd、runc �
 </details>
 
 <details>
-<summary><strong>阶段四：Kubernetes 应用交付（第 20-28 篇，当前已发布第 26 篇）</strong></summary>
+<summary><strong>阶段四：Kubernetes 应用交付（第 20-28 篇，当前已发布第 27 篇）</strong></summary>
 
 Kubernetes 架构、工作负载、Service / Ingress / Gateway API、配置、存储、网络、安全、Helm 4 和 Kustomize。
 
@@ -74,7 +74,7 @@ Kubernetes 架构、工作负载、Service / Ingress / Gateway API、配置、�
 - [第 24 篇：Kubernetes 存储](docs/chapters/stage-04-kubernetes/24-k8s-storage.md)
 - [第 25 篇：Kubernetes 网络原理](docs/chapters/stage-04-kubernetes/25-k8s-networking.md)
 - [第 26 篇：Kubernetes 安全](docs/chapters/stage-04-kubernetes/26-k8s-security.md)
-- 第 27 篇：Helm 4 包管理
+- [第 27 篇：Helm 4 包管理](docs/chapters/stage-04-kubernetes/27-helm4.md)
 - 第 28 篇：Kustomize 多环境配置管理
 
 </details>
