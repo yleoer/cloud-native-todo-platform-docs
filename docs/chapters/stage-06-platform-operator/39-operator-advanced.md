@@ -193,6 +193,17 @@ v1alpha1
 
 本篇不会完整实现 conversion webhook，因为第 40 篇会进入测试、发布和升级。但本篇会讲清楚多版本设计原则，避免你把 `v1alpha1` 当成永远不会变的最终 API。
 
+表 39-3 TodoApp 多版本演进示例
+
+| 字段 | `v1alpha1` | `v1beta1` 设计 | 是否需要转换 |
+|---|---|---|---|
+| 镜像 | `spec.image: string` | `spec.image.repository` + `spec.image.tag` | 需要 conversion webhook |
+| 副本数 | `spec.replicas: integer` | 保持 `spec.replicas` | 不需要 |
+| 端口 | `spec.port: integer` | 保持 `spec.port`，但增加命名端口 | 视字段结构而定 |
+| 资源限制 | 无 | `spec.resources.requests/limits` | 可通过默认值补齐 |
+
+本篇小项目的验收重点仍是 `v1alpha1` 生命周期机制，但学习者需要能说清楚：如果下一篇或生产版本把 `spec.image` 拆成结构体，旧 YAML 不能直接失效，必须提供版本转换或至少提供清晰迁移路径。
+
 ## 4. 原理深入
 
 ### 4.1 删除流程：OwnerReference 与 Finalizer 如何协作
@@ -280,7 +291,7 @@ flowchart TD
 
 本章继续使用第 38 篇工具链。后续命令默认在 Bash 环境中执行，并且当前目录是 `<project-root>/operator/kubebuilder/`。
 
-表 39-3 本章实验工具版本
+表 39-4 本章实验工具版本
 
 | 工具 | 建议版本 | 用途 |
 |---|---|---|
@@ -313,6 +324,14 @@ kubectl version --client
 kind version
 kubebuilder version
 ```
+
+本篇需要 Kubernetes 1.36.x。后续创建 kind 集群时固定使用课程节点镜像：
+
+```bash
+export KIND_NODE_IMAGE=kindest/node:v1.36.0
+```
+
+如果课程环境提供了更新的 1.36.x patch 镜像，可以替换为对应 tag，但必须在实验记录中写明实际使用的完整镜像名，避免“kind 默认版本”带来的不可复现问题。
 
 如果 `kubebuilder` 或 `kind` 缺失，请回到第 38 篇的安装步骤补齐。
 
@@ -633,7 +652,7 @@ if err = webhookv1alpha1.SetupTodoAppWebhookWithManager(mgr); err != nil {
 
 本小节继续完成实验步骤 4：实现 Controller 高级机制。
 
-编辑 `internal/controller/todoapp_controller.go`，替换为下面的完整内容：
+编辑 `internal/controller/todoapp_controller.go`，替换为下面的完整内容。这个文件较长，阅读时按四组理解：`Reconcile` 主流程、`reconcileDelete` 删除路径、`desiredDeployment` / `desiredService` 期望资源构造、`updateStatus` / `recordEvent` 辅助函数。实际复制时仍建议一次替换完整文件，避免 import 和 helper 函数遗漏。
 
 ```go
 /*
@@ -681,6 +700,20 @@ type recordEventRecorder interface {
 	Eventf(object runtime.Object, eventtype, reason, messageFmt string, args ...interface{})
 }
 
+func (r *TodoAppReconciler) recordEvent(object runtime.Object, eventtype, reason, message string) {
+	if r.Recorder == nil {
+		return
+	}
+	r.Recorder.Event(object, eventtype, reason, message)
+}
+
+func (r *TodoAppReconciler) recordEventf(object runtime.Object, eventtype, reason, messageFmt string, args ...interface{}) {
+	if r.Recorder == nil {
+		return
+	}
+	r.Recorder.Eventf(object, eventtype, reason, messageFmt, args...)
+}
+
 // +kubebuilder:rbac:groups=platform.todo.example.com,resources=todoapps,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=platform.todo.example.com,resources=todoapps/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=platform.todo.example.com,resources=todoapps/finalizers,verbs=update
@@ -705,20 +738,30 @@ func (r *TodoAppReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		if err := r.Update(ctx, &todo); err != nil {
 			return ctrl.Result{}, err
 		}
-		r.Recorder.Event(&todo, corev1.EventTypeNormal, "FinalizerAdded", "Added cleanup finalizer")
+		r.recordEvent(&todo, corev1.EventTypeNormal, "FinalizerAdded", "Added cleanup finalizer")
 		return ctrl.Result{Requeue: true}, nil
 	}
 
-	deployment := r.desiredDeployment(&todo)
+	deployment, err := r.desiredDeployment(&todo)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
 	if err := r.reconcileDeployment(ctx, deployment); err != nil {
-		r.Recorder.Eventf(&todo, corev1.EventTypeWarning, "DeploymentReconcileFailed", "Failed to reconcile Deployment: %v", err)
+		if todo.Status.Phase != platformv1alpha1.TodoAppPhaseError {
+			r.recordEventf(&todo, corev1.EventTypeWarning, "DeploymentReconcileFailed", "Failed to reconcile Deployment: %v", err)
+		}
 		_ = r.updateStatus(ctx, &todo, 0, platformv1alpha1.TodoAppPhaseError, "Ready", v1.ConditionFalse, "DeploymentReconcileFailed", err.Error())
 		return ctrl.Result{}, err
 	}
 
-	service := r.desiredService(&todo)
+	service, err := r.desiredService(&todo)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
 	if err := r.reconcileService(ctx, service); err != nil {
-		r.Recorder.Eventf(&todo, corev1.EventTypeWarning, "ServiceReconcileFailed", "Failed to reconcile Service: %v", err)
+		if todo.Status.Phase != platformv1alpha1.TodoAppPhaseError {
+			r.recordEventf(&todo, corev1.EventTypeWarning, "ServiceReconcileFailed", "Failed to reconcile Service: %v", err)
+		}
 		_ = r.updateStatus(ctx, &todo, 0, platformv1alpha1.TodoAppPhaseError, "Ready", v1.ConditionFalse, "ServiceReconcileFailed", err.Error())
 		return ctrl.Result{}, err
 	}
@@ -731,10 +774,13 @@ func (r *TodoAppReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	desiredReplicas := todo.Spec.ReplicasOrDefault()
 	if readyReplicas == desiredReplicas {
+		wasReady := todo.Status.Phase == platformv1alpha1.TodoAppPhaseReady && todo.Status.ReadyReplicas == readyReplicas
 		if err := r.updateStatus(ctx, &todo, readyReplicas, platformv1alpha1.TodoAppPhaseReady, "Ready", v1.ConditionTrue, "DeploymentReady", "All desired replicas are ready"); err != nil {
 			return ctrl.Result{}, err
 		}
-		r.Recorder.Event(&todo, corev1.EventTypeNormal, "Ready", "TodoApp is ready")
+		if !wasReady {
+			r.recordEvent(&todo, corev1.EventTypeNormal, "Ready", "TodoApp is ready")
+		}
 		return ctrl.Result{}, nil
 	}
 
@@ -751,11 +797,15 @@ func (r *TodoAppReconciler) reconcileDelete(ctx context.Context, todo *platformv
 		return ctrl.Result{}, nil
 	}
 
+	if todo.Status.Phase != platformv1alpha1.TodoAppPhaseDeleting {
+		r.recordEvent(todo, corev1.EventTypeNormal, "Deleting", "Running finalizer cleanup")
+	}
 	_ = r.updateStatus(ctx, todo, todo.Status.ReadyReplicas, platformv1alpha1.TodoAppPhaseDeleting, "Deleting", v1.ConditionTrue, "FinalizerRunning", "Running deletion cleanup")
-	r.Recorder.Event(todo, corev1.EventTypeNormal, "Deleting", "Running finalizer cleanup")
 
 	if err := r.cleanupExternalResources(ctx, todo); err != nil {
-		r.Recorder.Eventf(todo, corev1.EventTypeWarning, "CleanupFailed", "Finalizer cleanup failed: %v", err)
+		if todo.Status.Phase != platformv1alpha1.TodoAppPhaseError {
+			r.recordEventf(todo, corev1.EventTypeWarning, "CleanupFailed", "Finalizer cleanup failed: %v", err)
+		}
 		_ = r.updateStatus(ctx, todo, todo.Status.ReadyReplicas, platformv1alpha1.TodoAppPhaseError, "Deleting", v1.ConditionTrue, "CleanupFailed", err.Error())
 		return ctrl.Result{RequeueAfter: 15 * time.Second}, err
 	}
@@ -765,7 +815,7 @@ func (r *TodoAppReconciler) reconcileDelete(ctx context.Context, todo *platformv
 		return ctrl.Result{}, err
 	}
 
-	r.Recorder.Event(todo, corev1.EventTypeNormal, "Deleted", "Finalizer cleanup completed")
+	r.recordEvent(todo, corev1.EventTypeNormal, "Deleted", "Finalizer cleanup completed")
 	return ctrl.Result{}, nil
 }
 
@@ -775,7 +825,7 @@ func (r *TodoAppReconciler) cleanupExternalResources(ctx context.Context, todo *
 	return nil
 }
 
-func (r *TodoAppReconciler) desiredDeployment(todo *platformv1alpha1.TodoApp) *appsv1.Deployment {
+func (r *TodoAppReconciler) desiredDeployment(todo *platformv1alpha1.TodoApp) (*appsv1.Deployment, error) {
 	replicas := todo.Spec.ReplicasOrDefault()
 	labels := labelsForTodoApp(todo.Name)
 
@@ -815,11 +865,13 @@ func (r *TodoAppReconciler) desiredDeployment(todo *platformv1alpha1.TodoApp) *a
 		},
 	}
 
-	_ = controllerutil.SetControllerReference(todo, deployment, r.Scheme)
-	return deployment
+	if err := controllerutil.SetControllerReference(todo, deployment, r.Scheme); err != nil {
+		return nil, err
+	}
+	return deployment, nil
 }
 
-func (r *TodoAppReconciler) desiredService(todo *platformv1alpha1.TodoApp) *corev1.Service {
+func (r *TodoAppReconciler) desiredService(todo *platformv1alpha1.TodoApp) (*corev1.Service, error) {
 	labels := labelsForTodoApp(todo.Name)
 	service := &corev1.Service{
 		ObjectMeta: v1.ObjectMeta{
@@ -840,8 +892,10 @@ func (r *TodoAppReconciler) desiredService(todo *platformv1alpha1.TodoApp) *core
 		},
 	}
 
-	_ = controllerutil.SetControllerReference(todo, service, r.Scheme)
-	return service
+	if err := controllerutil.SetControllerReference(todo, service, r.Scheme); err != nil {
+		return nil, err
+	}
+	return service, nil
 }
 
 func (r *TodoAppReconciler) reconcileDeployment(ctx context.Context, desired *appsv1.Deployment) error {
@@ -964,12 +1018,14 @@ func (r *TodoAppReconciler) SetupWithManager(mgr ctrl.Manager) error {
 }
 ```
 
-这个 Reconciler 有四个新增重点：
+这个 Reconciler 有几个新增重点：
 
 - `todoapps/finalizers` RBAC marker 允许 Controller 更新 finalizer。
 - `events` RBAC marker 允许 Controller 写 Kubernetes Event。
 - `reconcileDelete` 专门处理删除路径，清理成功后才移除 finalizer。
 - `updateStatus` 使用 `SetStatusCondition` 更新同一类 Condition，避免无限追加历史状态。
+- `recordEvent` 和 `recordEventf` 对 `Recorder` 做 nil 保护，方便第 40 篇 envtest 构造 Reconciler。
+- Ready、Deleting 和失败事件只在状态变化时记录，避免每次 Reconcile 都制造重复事件。
 
 还需要确认 `cmd/main.go` 创建 Reconciler 时注入 Event Recorder。关键片段如下：
 
@@ -1019,8 +1075,21 @@ Webhook 必须能被 API server 访问，因此本章不使用本地 `make run` 
 创建或复用 kind 集群：
 
 ```bash
-kind create cluster --name todo-operator
+kind create cluster --name todo-operator --image "${KIND_NODE_IMAGE}"
 kubectl config use-context kind-todo-operator
+```
+
+确认服务端版本：
+
+```bash
+kubectl version
+```
+
+预期输出中服务端版本应为 `v1.36.x`。如果不是，先删除集群并使用正确的 `KIND_NODE_IMAGE` 重新创建：
+
+```bash
+kind delete cluster --name todo-operator
+kind create cluster --name todo-operator --image "${KIND_NODE_IMAGE}"
 ```
 
 安装 cert-manager：
@@ -1035,7 +1104,15 @@ kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/
 kubectl wait --for=condition=Available deployment --all -n cert-manager --timeout=180s
 ```
 
-打开 `config/default/kustomization.yaml`，确认 Webhook 和 cert-manager 相关配置已经取消注释。关键内容应包含：
+打开 `config/default/kustomization.yaml`，启用 Webhook 和 cert-manager 相关配置。Kubebuilder 默认会把这些内容以注释形式生成出来，本章必须至少完成四处启用。
+
+先定位生成的注释块：
+
+```bash
+grep -nE "WEBHOOK|CERTMANAGER|manager_webhook_patch|webhookcainjection_patch" config/default/kustomization.yaml
+```
+
+第一处：`resources` 中必须包含 `../webhook` 和 `../certmanager`：
 
 ```yaml
 resources:
@@ -1044,10 +1121,19 @@ resources:
   - ../manager
   - ../webhook
   - ../certmanager
+```
 
+第二处：`patches` 中必须包含 manager webhook volume patch 和 webhook CA injection patch：
+
+```yaml
 patches:
   - path: manager_webhook_patch.yaml
+  - path: webhookcainjection_patch.yaml
+```
 
+第三处：如果生成文件包含 cert-manager 证书替换块，需要启用 `replacements`，让证书 DNS 名称和 Webhook Service 对齐。关键片段如下：
+
+```yaml
 replacements:
   - source:
       kind: Service
@@ -1067,7 +1153,23 @@ replacements:
           index: 0
 ```
 
-不同 Kubebuilder 版本的 `kustomization.yaml` 片段可能略有差异。判断标准不是逐字相同，而是 `config/default` 最终能渲染出 `MutatingWebhookConfiguration`、`ValidatingWebhookConfiguration`、`Certificate`、`Issuer` 和带 webhook volume 的 manager Deployment。
+第四处：确认 `config/default` 最终能渲染出 Webhook、证书和带 webhook volume 的 manager Deployment：
+
+```bash
+kubectl kustomize config/default | grep -E "kind: (MutatingWebhookConfiguration|ValidatingWebhookConfiguration|Certificate|Issuer|Deployment)"
+```
+
+预期输出至少包含：
+
+```text
+kind: MutatingWebhookConfiguration
+kind: ValidatingWebhookConfiguration
+kind: Certificate
+kind: Issuer
+kind: Deployment
+```
+
+不同 Kubebuilder 版本的 `kustomization.yaml` 片段可能略有差异。判断标准不是逐字相同，而是 `config/default` 最终能渲染出 `MutatingWebhookConfiguration`、`ValidatingWebhookConfiguration`、`Certificate`、`Issuer`，并且 manager Deployment 中包含 webhook 证书 volume 和 `--webhook-cert-path` 相关配置。
 
 构建本地 Operator 镜像：
 
@@ -1091,6 +1193,20 @@ make deploy IMG=todo-operator:v0.2.0-lifecycle
 
 ```bash
 kubectl wait --for=condition=Available deployment/todo-operator-controller-manager -n todo-operator-system --timeout=180s
+```
+
+检查证书、Service 和 endpoints：
+
+```bash
+kubectl get certificate,issuer -n todo-operator-system
+kubectl get svc,endpoints -n todo-operator-system
+```
+
+判断标准：
+
+```text
+Certificate READY=True
+webhook-service endpoints 不为空
 ```
 
 查看 Webhook 配置：
@@ -1290,7 +1406,15 @@ No resources found in default namespace.
 
 本小节继续完成实验步骤 7：了解 Kubernetes 1.36 的 CEL-based 默认值策略。
 
-> **可选实验**：如果你的集群 API server 支持 `admissionregistration.k8s.io/v1` 中的 `MutatingAdmissionPolicy`，可以执行本小节。旧集群或未启用该 API 的集群会提示找不到资源类型，这不是本章主实验失败。
+> **可选实验**：如果你的集群 API server 支持 `admissionregistration.k8s.io/v1` 中的 `MutatingAdmissionPolicy`，可以执行本小节。旧集群或未启用该 API 的集群会提示找不到资源类型，这不是本章主实验失败。由于本章主实验已经使用 Mutating Webhook 为 `TodoApp` 填默认值，本小节重点验证 API 支持和策略写法，不要求同时观察两套默认值机制叠加后的效果。
+
+先确认 API 是否存在：
+
+```bash
+kubectl api-resources | grep -i mutatingadmission
+```
+
+如果没有输出，直接跳过本小节。
 
 创建目录：
 
@@ -1332,7 +1456,13 @@ spec:
     namespaceSelector: {}
 ```
 
-应用策略：
+先检查清单语法：
+
+```bash
+kubectl apply --dry-run=server -f config/mutating-policy/todoapp-default-port.yaml
+```
+
+确认无误后应用策略：
 
 ```bash
 kubectl apply -f config/mutating-policy/todoapp-default-port.yaml
@@ -1490,12 +1620,13 @@ kind delete cluster --name todo-operator
 - **排查**：
 
   ```bash
+  kubectl version
   kubectl api-resources | grep -i mutatingadmission
   ```
 
-  没有输出说明当前集群不支持本可选能力。
+  先确认 Server Version 是否为 `v1.36.x`，再看 `api-resources` 是否有输出。没有输出说明当前集群不支持本可选能力。
 
-- **修复**：跳过可选实验，继续使用 Mutating Webhook；或者升级到课程锁定的 Kubernetes 1.36.x 环境。
+- **修复**：跳过可选实验，继续使用 Mutating Webhook；或者删除 kind 集群后使用 `kindest/node:v1.36.0` 重新创建课程锁定环境。
 - **预防**：生产上线前明确集群版本矩阵，不要在多版本集群中默认启用新 API。
 
 ## 7. 生产环境注意事项
@@ -1522,6 +1653,7 @@ kind delete cluster --name todo-operator
 - 为 `TodoApp` 增加校验 Webhook：拒绝 `latest` 镜像、超出范围的副本数和非法端口。
 - 为 Reconciler 增加 Finalizer：删除前执行幂等清理函数。
 - 为 Reconciler 增加 Event 和 Conditions：能通过 `kubectl describe` 和 `kubectl get -o yaml` 判断状态。
+- 为 `TodoApp` 写出 `v1alpha1 -> v1beta1` 字段演进表，说明哪些字段需要 conversion webhook。
 - 可选增加 `MutatingAdmissionPolicy` 示例，用于理解 Kubernetes 1.36 的 CEL-based 准入能力。
 
 ### 8.2 验收标准
@@ -1534,6 +1666,7 @@ kind delete cluster --name todo-operator
 - 删除 `TodoApp` 时能观察到 finalizer，然后对象最终被清理。
 - `kubectl describe todoapp` 能看到关键 Event。
 - `kubectl get todoapp -o yaml` 能看到 `Ready` 或 `Deleting` Condition。
+- 能解释 `spec.image` 从字符串拆分为结构体时为什么需要 conversion webhook。
 
 ### 8.3 建议提交内容
 
