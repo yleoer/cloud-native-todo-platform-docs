@@ -64,7 +64,7 @@ hide:
 
 本课程共 **42 大篇，约 230 个章节**，分为 6 个学习阶段。
 
-新版设计路线已更新为 **6 个阶段**。当前站点已发布阶段一至阶段四；后续会按新版设计继续推进生产工程和 Operator 能力。
+新版设计路线已更新为 **6 个阶段**。当前站点已发布阶段一至阶段五，并已进入阶段六平台工程与 Operator 能力。
 
 <details open markdown="1">
 <summary><strong>阶段一：基础能力（第 1-6 篇，已发布）</strong></summary>
@@ -147,11 +147,11 @@ hide:
 </details>
 
 <details markdown="1">
-<summary><strong>阶段六：平台工程与 Operator 能力（第 34-42 篇，规划中）</strong></summary>
+<summary><strong>阶段六：平台工程与 Operator 能力（第 34-42 篇，更新中）</strong></summary>
 
 深入 Kubernetes API Machinery、CRD、手写 Controller、Kubebuilder、Webhook、Finalizer、Operator 测试发布、生产实践和最终集成。
 
-- 第 34 篇：Kubernetes API 扩展机制
+- [第 34 篇：Kubernetes API 扩展机制 [B]](chapters/stage-06-platform-operator/34-k8s-api-extension.md)
 - 第 35 篇：CRD 设计与实践
 - 第 36 篇：Controller 机制：Informer 与 Workqueue
 - 第 37 篇：手写简化版 Controller
@@ -180,6 +180,6 @@ http://127.0.0.1:8000
 
 ## 下一步计划
 
-- 进入第 34 篇 Kubernetes API 扩展机制，开始阶段六平台工程与 Operator 能力。
-- 使用阶段五产物整理 Todo Platform CI/CD、GitOps、可观测性与排障作品集。
-- 复盘第 29-33 篇，把交付、监控、日志、Trace 和生产排障串成一套团队 runbook。
+- 进入第 35 篇 CRD 设计与实践，把 `TodoApp` API 模型落成正式 CRD。
+- 延续阶段五产物，整理 Todo Platform CI/CD、GitOps、可观测性与排障作品集。
+- 复盘第 34 篇的 GVK、GVR、spec/status 与 Conditions，为 Controller 设计做准备。
