@@ -138,7 +138,7 @@ hide:
 建立 CI/CD、GitOps、Prometheus / Grafana、Loki、OpenTelemetry 和 Kubernetes 生产排障能力。
 
 - [第 29 篇：CI/CD 自动化交付](chapters/stage-05-production-engineering/29-cicd.md)
-- 第 30 篇：GitOps 与 Argo CD
+- [第 30 篇：GitOps 与 Argo CD](chapters/stage-05-production-engineering/30-gitops-argocd.md)
 - 第 31 篇：Prometheus 与 Grafana 监控
 - 第 32 篇：日志与 OpenTelemetry 链路追踪
 - 第 33 篇：Kubernetes 生产排障
@@ -179,6 +179,6 @@ http://127.0.0.1:8000
 
 ## 下一步计划
 
-- 进入第 29 篇 CI/CD 自动化交付，把测试、镜像构建、Helm / Kustomize 渲染和 server-side dry-run 串入流水线。
-- 继续推进 GitOps、可观测性和 Kubernetes 生产排障能力。
-- 使用阶段四产物整理 Todo Platform on Kubernetes 作品集。
+- 进入第 31 篇 Prometheus 与 Grafana 监控，把 Todo Platform 的 QPS、延迟、错误率和资源使用纳入可观测体系。
+- 继续推进日志、链路追踪和 Kubernetes 生产排障能力。
+- 使用阶段五产物整理 Todo Platform CI/CD 与 GitOps 作品集。
