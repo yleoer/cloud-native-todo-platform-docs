@@ -108,6 +108,8 @@ spec:
 | `metadata` | 名称、namespace、label、annotation、resourceVersion 等通用元数据 |
 | `spec` | 用户希望系统达到的状态 |
 
+`status` 字段也属于 Kubernetes 对象的常见组成部分，它记录系统观察到的实际状态。本篇会在 3.6 节专门展开 `spec`、`status` 和 Conditions 的边界。
+
 官方 Kubernetes API 概念文档把 resource type、kind、collection、subresource 区分得很清楚：resource type 是 URL 中使用的复数资源名，例如 `pods`；kind 是对象 schema 的名称，例如 `Pod`；collection 是同类对象列表；subresource 是对象下面的子接口，例如 `status` 或 `scale`。
 
 在本项目中，未来的 `TodoApp` 也会遵守同样结构：
@@ -131,6 +133,7 @@ GVK 用来描述“这个对象是什么类型”。
 | Pod | core group | v1 | Pod | `v1` |
 | Deployment | apps | v1 | Deployment | `apps/v1` |
 | Ingress | networking.k8s.io | v1 | Ingress | `networking.k8s.io/v1` |
+| ServiceMonitor | monitoring.coreos.com | v1 | ServiceMonitor | `monitoring.coreos.com/v1` |
 | TodoApp | platform.todo.example.com | v1alpha1 | TodoApp | `platform.todo.example.com/v1alpha1` |
 
 注意 core group 比较特殊，`Pod` 的 `apiVersion` 写 `v1`，而不是 `/v1` 或 `core/v1`。
@@ -430,7 +433,7 @@ pwd
 test -d deployments/gitops/envs/dev
 kubectl config current-context
 kubectl get namespace todo-dev
-kubectl -n todo-dev get deployment todo-platform
+kubectl -n todo-dev get deployment todo-platform --ignore-not-found
 kubectl version --client
 jq --version
 ```
@@ -439,19 +442,44 @@ jq --version
 
 ```bash
 kubectl create namespace todo-dev --dry-run=client -o yaml | kubectl apply -f -
-kubectl -n todo-dev create deployment todo-platform --image=nginx:1.29 --replicas=2
-kubectl -n todo-dev rollout status deployment/todo-platform
+if ! kubectl -n todo-dev get deployment todo-platform >/dev/null 2>&1; then
+  kubectl -n todo-dev get deployment todo-api-shape-demo >/dev/null 2>&1 \
+    || kubectl -n todo-dev create deployment todo-api-shape-demo --image=nginx:1.28 --replicas=2
+  kubectl -n todo-dev rollout status deployment/todo-api-shape-demo
+fi
 ```
 
 PowerShell 等价命令如下：
 
 ```powershell
 kubectl create namespace todo-dev --dry-run=client -o yaml | kubectl apply -f -
-kubectl -n todo-dev create deployment todo-platform --image=nginx:1.29 --replicas=2
-kubectl -n todo-dev rollout status deployment/todo-platform
+if (-not (kubectl -n todo-dev get deployment todo-platform --ignore-not-found)) {
+  if (-not (kubectl -n todo-dev get deployment todo-api-shape-demo --ignore-not-found)) {
+    kubectl -n todo-dev create deployment todo-api-shape-demo --image=nginx:1.28 --replicas=2
+  }
+  kubectl -n todo-dev rollout status deployment/todo-api-shape-demo
+}
 ```
 
-这条临时路径只用于本篇观察 API 形状。它不会替代阶段五的真实 Todo Platform 环境。
+这条临时路径只用于本篇观察 API 形状。它不会替代阶段五的真实 Todo Platform 环境。如果 `todo-platform` 已经存在，说明你很可能正在使用阶段五环境，请直接使用真实 Deployment；如果不存在，再创建 `todo-api-shape-demo` 作为临时对象。
+
+为了让后续命令可复用，可以先设置观察对象名称：
+
+```bash
+export OBSERVE_DEPLOYMENT=todo-platform
+kubectl -n todo-dev get deployment todo-platform >/dev/null 2>&1 || export OBSERVE_DEPLOYMENT=todo-api-shape-demo
+echo "$OBSERVE_DEPLOYMENT"
+```
+
+PowerShell：
+
+```powershell
+$OBSERVE_DEPLOYMENT = "todo-platform"
+if (-not (kubectl -n todo-dev get deployment todo-platform --ignore-not-found)) {
+  $OBSERVE_DEPLOYMENT = "todo-api-shape-demo"
+}
+$OBSERVE_DEPLOYMENT
+```
 
 ### 5.3 文件目录结构
 
@@ -697,6 +725,8 @@ PowerShell：
 | `url` | `status` | 最终可访问地址可能受 Ingress、Gateway 或 DNS 状态影响 |
 | `conditions` | `status` | 面向排障、告警和 UI 的结构化状态结论 |
 
+其中 `resources.profile: small` 是平台 API 的有意抽象。用户只选择 `small`、`medium`、`large` 这样的业务规格，未来 Controller 再把它映射为具体的 `resources.requests` 和 `resources.limits`。这样既能降低业务方理解成本，也能让平台团队统一管理资源配额策略。
+
 ### 5.5 执行命令
 
 #### 5.5.1 探查 API groups 与 versions
@@ -743,7 +773,14 @@ customresourcedefinitions   crd,crds   apiextensions.k8s.io/v1   false   CustomR
 从内置 Deployment 对象读取 GVK：
 
 ```bash
-kubectl -n todo-dev get deployment todo-platform \
+kubectl -n todo-dev get deployment "$OBSERVE_DEPLOYMENT" \
+  -o jsonpath='{.apiVersion}{" "}{.kind}{"\n"}'
+```
+
+PowerShell：
+
+```powershell
+kubectl -n todo-dev get deployment $OBSERVE_DEPLOYMENT `
   -o jsonpath='{.apiVersion}{" "}{.kind}{"\n"}'
 ```
 
@@ -793,25 +830,48 @@ kubectl get --raw /apis/apps/v1 \
 查看 Deployment 的期望副本和实际副本：
 
 ```bash
-kubectl -n todo-dev get deployment todo-platform \
+kubectl -n todo-dev get deployment "$OBSERVE_DEPLOYMENT" \
+  -o jsonpath='spec.replicas={.spec.replicas} status.readyReplicas={.status.readyReplicas}{"\n"}'
+```
+
+PowerShell：
+
+```powershell
+kubectl -n todo-dev get deployment $OBSERVE_DEPLOYMENT `
   -o jsonpath='spec.replicas={.spec.replicas} status.readyReplicas={.status.readyReplicas}{"\n"}'
 ```
 
 查看 Conditions：
 
 ```bash
-kubectl -n todo-dev get deployment todo-platform \
+kubectl -n todo-dev get deployment "$OBSERVE_DEPLOYMENT" \
+  -o json | jq '.status.conditions[] | {type, status, reason, message}'
+```
+
+PowerShell：
+
+```powershell
+kubectl -n todo-dev get deployment $OBSERVE_DEPLOYMENT `
   -o json | jq '.status.conditions[] | {type, status, reason, message}'
 ```
 
 查看 status subresource：
 
 ```bash
-kubectl get --raw /apis/apps/v1/namespaces/todo-dev/deployments/todo-platform/status \
+kubectl get --raw "/apis/apps/v1/namespaces/todo-dev/deployments/${OBSERVE_DEPLOYMENT}/status" \
+  | jq '{apiVersion, kind, status}'
+```
+
+PowerShell：
+
+```powershell
+kubectl get --raw "/apis/apps/v1/namespaces/todo-dev/deployments/$OBSERVE_DEPLOYMENT/status" `
   | jq '{apiVersion, kind, status}'
 ```
 
 判断标准：你能看到用户写入的 `spec.replicas`，也能看到 Controller 回写的 `status.readyReplicas` 和 `status.conditions`。
+
+把这个观察迁移到 `TodoApp` 上，就是本章 API 设计的核心问题：用户在 `spec` 里应该写哪些期望，Controller 又应该在 `status` 里回写哪些观察结果？后面的模型检查会围绕这条边界展开。
 
 #### 5.5.5 使用 kubectl explain 理解 schema
 
@@ -937,14 +997,14 @@ kubectl api-resources --api-group=apiextensions.k8s.io | Select-String 'customre
 **第二层：能区分 GVK 与 GVR**
 
 ```bash
-kubectl -n todo-dev get deployment todo-platform -o jsonpath='{.apiVersion}{" "}{.kind}{"\n"}'
+kubectl -n todo-dev get deployment "$OBSERVE_DEPLOYMENT" -o jsonpath='{.apiVersion}{" "}{.kind}{"\n"}'
 kubectl api-resources --api-group=apps | grep '^deployments'
 ```
 
 PowerShell：
 
 ```powershell
-kubectl -n todo-dev get deployment todo-platform -o jsonpath='{.apiVersion}{" "}{.kind}{"\n"}'
+kubectl -n todo-dev get deployment $OBSERVE_DEPLOYMENT -o jsonpath='{.apiVersion}{" "}{.kind}{"\n"}'
 kubectl api-resources --api-group=apps | Select-String '^deployments'
 ```
 
@@ -953,7 +1013,7 @@ kubectl api-resources --api-group=apps | Select-String '^deployments'
 **第三层：能读取 spec 与 status**
 
 ```bash
-kubectl -n todo-dev get deployment todo-platform \
+kubectl -n todo-dev get deployment "$OBSERVE_DEPLOYMENT" \
   -o jsonpath='spec={.spec.replicas} status={.status.readyReplicas}{"\n"}'
 ```
 
@@ -1006,7 +1066,7 @@ Remove-Item -Recurse -Force operator/api-model
 如果你在实验环境节创建了临时 nginx Deployment，请删除它：
 
 ```bash
-kubectl -n todo-dev delete deployment todo-platform --ignore-not-found
+kubectl -n todo-dev delete deployment todo-api-shape-demo --ignore-not-found
 ```
 
 如果 `todo-dev` namespace 也是你为本篇临时创建的，并且里面没有其他课程资源，可以再删除 namespace：
@@ -1023,7 +1083,7 @@ kubectl -n todo-dev delete deployment api-shape-demo --ignore-not-found
 
 ## 6. 常见错误与排障
 
-### 错误 1：把 Kind 写成复数 resource
+### 错误 1：把 Kind 写成复数 resource（对应 3.2-3.3 节）
 
 - **现象**：
 
@@ -1042,7 +1102,7 @@ kubectl -n todo-dev delete deployment api-shape-demo --ignore-not-found
 - **修复**：YAML 中使用 `kind: Deployment`；RBAC、API path、GVR 里才使用 `deployments`。
 - **预防**：记住一句话：YAML 看 GVK，URL/RBAC 看 GVR。
 
-### 错误 2：CRD 未安装就 apply 自定义资源
+### 错误 2：CRD 未安装就 apply 自定义资源（对应 5.5.6 节）
 
 - **现象**：
 
@@ -1061,7 +1121,7 @@ kubectl -n todo-dev delete deployment api-shape-demo --ignore-not-found
 - **修复**：第 35 篇先安装 `todoapps.platform.todo.example.com` CRD，再 apply `TodoApp` 实例。
 - **预防**：GitOps 或 Helm 发布 CRD 时，先应用 CRD，再应用 CR 实例。
 
-### 错误 3：已经安装 CRD，导致本篇 dry-run 不再报错
+### 错误 3：已经安装 CRD，导致本篇 dry-run 不再报错（对应 5.5.6 节）
 
 - **现象**：执行 `kubectl apply --dry-run=server -f operator/api-model/todoapp-example.yaml` 时没有出现 `no matches for kind`。
 - **原因**：集群中已经存在 `todoapps.platform.todo.example.com` CRD，API server 已经认识 `TodoApp`。
@@ -1075,7 +1135,7 @@ kubectl -n todo-dev delete deployment api-shape-demo --ignore-not-found
 - **修复**：如果是个人临时集群，可以在确认无业务数据后清理测试 CRD；如果是共享集群，不要删除，改为观察“安装 CRD 后 discovery 会出现 TodoApp”的现象。
 - **预防**：每篇实验前确认当前集群状态，尤其是 CRD、namespace 和测试对象是否来自前一轮实验。
 
-### 错误 4：把运行结果写进 spec
+### 错误 4：把运行结果写进 spec（对应 3.6 与 5.5.7 节）
 
 - **现象**：`spec` 中出现 `readyReplicas`、`urlReady`、`lastError`、`observedGeneration` 这类运行结果。
 - **原因**：没有区分用户期望和系统观察值。
@@ -1088,7 +1148,7 @@ kubectl -n todo-dev delete deployment api-shape-demo --ignore-not-found
 - **修复**：把运行结果移到 `status`，并由 Controller 回写。
 - **预防**：设计字段时先问“这个字段是用户想要的，还是系统观察到的？”
 
-### 错误 5：以为 CRD 会自动创建业务资源
+### 错误 5：以为 CRD 会自动创建业务资源（对应 3.5 与 4.5 节）
 
 - **现象**：安装 CRD 并创建 `TodoApp` 后，没有 Deployment、Service 或 Ingress 出现。
 - **原因**：CRD 只扩展 API 类型，不包含自动化逻辑；Controller 尚未部署。
@@ -1103,7 +1163,7 @@ kubectl -n todo-dev delete deployment api-shape-demo --ignore-not-found
 - **修复**：第 37-38 篇部署 Controller，让它 Watch `TodoApp` 并调谐子资源。
 - **预防**：文档中明确区分 CRD、CR、Controller、Operator。
 
-### 错误 6：status 设计成一段不可解析文本
+### 错误 6：status 设计成一段不可解析文本（对应 3.6 节）
 
 - **现象**：
 
@@ -1117,7 +1177,7 @@ kubectl -n todo-dev delete deployment api-shape-demo --ignore-not-found
 - **修复**：使用 Conditions 表达状态，包含 `type`、`status`、`reason`、`message`、`lastTransitionTime`。
 - **预防**：把第 33 篇的排障视角前置到 API 设计阶段。
 
-### 错误 7：在 PowerShell 中直接复制 Bash heredoc
+### 错误 7：在 PowerShell 中使用了 Bash heredoc 语法（对应 5.4 节）
 
 - **现象**：复制 `cat <<'YAML'` 后 PowerShell 报语法错误。
 - **原因**：heredoc 是 Bash 语法，PowerShell 使用 here-string，也就是 `@' ... '@`。
