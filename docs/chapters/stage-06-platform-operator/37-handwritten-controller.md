@@ -322,7 +322,7 @@ kind get clusters
 docker version
 ```
 
-如果你的 kind 集群名称不是 `todo-gitops`，后文 `kind load docker-image --name todo-gitops` 要替换成自己的集群名。
+如果 `kind get clusters` 输出为空，请先按前文创建 kind 集群。若集群名称不是 `todo-gitops`，后文 `kind load docker-image --name todo-gitops` 要替换成自己的集群名。
 
 ### 5.3 文件目录结构
 
@@ -359,7 +359,19 @@ operator/
 
 ### 5.4 完整代码或配置
 
-下面的 here-doc 写文件方式适用于 Linux、macOS、Git Bash 和 WSL。PowerShell 用户可以用编辑器创建同名文件，或使用 PowerShell here-string，文件内容保持一致。
+下面的 here-doc 写文件方式适用于 Linux、macOS、Git Bash 和 WSL。PowerShell 用户可以用编辑器创建同名文件，或使用 PowerShell here-string，文件内容保持一致；如果本机装了 Git Bash 或 WSL，直接在其中执行 here-doc 命令会更省事。
+
+本节会创建 7 个文件：
+
+| 文件 | 作用 |
+|---|---|
+| `operator/handwritten/go.mod` | Go 模块与 client-go 依赖 |
+| `operator/handwritten/main.go` | 构建 kubeconfig、dynamic client、informer 和启动流程 |
+| `operator/handwritten/controller.go` | 事件入队、worker、Reconcile 与 status patch |
+| `operator/handwritten/Dockerfile` | 构建可部署到集群的 Controller 镜像 |
+| `operator/handwritten/manifests/rbac.yaml` | ServiceAccount、Role、RoleBinding |
+| `operator/handwritten/manifests/deployment.yaml` | Controller Deployment |
+| `operator/handwritten/samples/todoapp.yaml` | 用于触发 Reconcile 的样例 CR |
 
 #### 5.4.1 go.mod
 
@@ -383,13 +395,14 @@ EOF
 - `v0.36.1` 对应 Kubernetes 1.36 客户端库。
 - 如果你的集群仍是 v1.35.x，也可以使用 `v0.35.x`；本篇为了和新计划文档的 1.36 基线对齐，统一使用 `v0.36.1`。
 - client-go 版本号使用 `v0.xx.y`，不是 `v1.xx.y`，这是 Kubernetes Go 模块的长期约定。
+- `go.sum` 会在后面的 `go mod tidy` 中生成；构建 Docker 镜像前必须先完成本地编译检查。
 
 #### 5.4.2 main.go
 
 创建 `operator/handwritten/main.go`：
 
 ```bash
-cat > operator/handwritten/main.go <<'GO'
+cat > operator/handwritten/main.go <<'EOF'
 package main
 
 import (
@@ -474,7 +487,7 @@ func defaultKubeconfig() string {
 	}
 	return ""
 }
-GO
+EOF
 ```
 
 关键点：
@@ -488,7 +501,7 @@ GO
 创建 `operator/handwritten/controller.go`：
 
 ```bash
-cat > operator/handwritten/controller.go <<'GO'
+cat > operator/handwritten/controller.go <<'EOF'
 package main
 
 import (
@@ -496,7 +509,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"reflect"
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -505,7 +517,6 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
@@ -562,7 +573,7 @@ func (c *Controller) Run(ctx context.Context, workers int) {
 	defer c.queue.ShutDown()
 
 	for i := 0; i < workers; i++ {
-		go wait.UntilWithContext(ctx, c.runWorker, time.Second)
+		go c.runWorker(ctx)
 	}
 
 	<-ctx.Done()
@@ -629,6 +640,7 @@ func (c *Controller) reconcile(ctx context.Context, key string) error {
 	image, _, _ := unstructured.NestedString(app.Object, "spec", "image")
 	replicas, found, _ := unstructured.NestedInt64(app.Object, "spec", "replicas")
 	if !found || replicas == 0 {
+		// Normal requests are protected by the CRD schema. This keeps the controller defensive.
 		replicas = 2
 	}
 
@@ -652,6 +664,7 @@ func (c *Controller) reconcile(ctx context.Context, key string) error {
 	}
 
 	if image == "" {
+		// Normal requests are rejected by required + minLength schema validation.
 		conditions = []any{
 			map[string]any{
 				"type":               "Degraded",
@@ -713,6 +726,7 @@ func conditionLastTransitionTime(app *unstructured.Unstructured, conditionType, 
 	return metav1.Now().Format(time.RFC3339)
 }
 
+// statusObserved compares each field this controller owns before writing status.
 func statusObserved(app *unstructured.Unstructured, status map[string]any) bool {
 	desiredObserved, ok := status["observedGeneration"].(int64)
 	if !ok {
@@ -740,9 +754,63 @@ func statusObserved(app *unstructured.Unstructured, status map[string]any) bool 
 	if !found {
 		return false
 	}
-	return reflect.DeepEqual(currentConditions, desiredConditions)
+	return conditionsObserved(currentConditions, desiredConditions)
 }
-GO
+
+func conditionsObserved(currentConditions []any, desiredConditions []any) bool {
+	if len(currentConditions) != len(desiredConditions) {
+		return false
+	}
+	for _, desiredItem := range desiredConditions {
+		desired, ok := desiredItem.(map[string]any)
+		if !ok || !conditionObserved(currentConditions, desired) {
+			return false
+		}
+	}
+	return true
+}
+
+func conditionObserved(currentConditions []any, desired map[string]any) bool {
+	desiredType, ok := desired["type"].(string)
+	if !ok {
+		return false
+	}
+	for _, item := range currentConditions {
+		current, ok := item.(map[string]any)
+		if !ok || current["type"] != desiredType {
+			continue
+		}
+		for _, field := range []string{"type", "status", "reason", "message", "lastTransitionTime"} {
+			if current[field] != desired[field] {
+				return false
+			}
+		}
+		desiredObserved, ok := desired["observedGeneration"].(int64)
+		if !ok {
+			return false
+		}
+		currentObserved, ok := int64Value(current["observedGeneration"])
+		return ok && currentObserved == desiredObserved
+	}
+	return false
+}
+
+func int64Value(value any) (int64, bool) {
+	switch typed := value.(type) {
+	case int64:
+		return typed, true
+	case int:
+		return int64(typed), true
+	case int32:
+		return int64(typed), true
+	case float64:
+		if typed == float64(int64(typed)) {
+			return int64(typed), true
+		}
+	}
+	return 0, false
+}
+EOF
 ```
 
 关键点：
@@ -751,7 +819,7 @@ GO
 - `processNextWorkItem` 中成功后必须 `Forget`，失败后使用 `AddRateLimited`。
 - `reconcile` 使用 `informer.GetIndexer().GetByKey(key)` 读取缓存中的当前对象。
 - status patch 的最后一个参数是 `"status"`，表示写入 `/status` 子资源。
-- `statusObserved` 会在写入前比较当前 status，避免无变化 patch；`lastTransitionTime` 只在 condition 状态转换时刷新。
+- `statusObserved` 会在写入前逐字段比较当前 status，避免无变化 patch；`lastTransitionTime` 只在 condition 状态转换时刷新。
 - 本篇不写 `Available=True`，因为还没有真实创建 Deployment；这是有意为之。
 
 #### 5.4.4 Dockerfile
@@ -766,6 +834,7 @@ WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download
 
+# Copying the whole module keeps the Dockerfile valid if later lessons add internal packages.
 COPY . .
 RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/todo-handwritten-controller .
 
@@ -917,12 +986,13 @@ YAML
 #### 5.5.1 准备命名空间和 CRD
 
 ```bash
+ls operator/crds/base/todoapps.platform.todo.example.com.yaml
 kubectl create namespace todo-dev --dry-run=client -o yaml | kubectl apply -f -
 kubectl apply --server-side -f operator/crds/base
 kubectl wait --for=condition=Established crd/todoapps.platform.todo.example.com --timeout=60s
 ```
 
-如果你还没有第 35 篇生成的 `operator/crds/base`，请先回到第 35 篇完成 CRD 文件创建。Controller 必须在 CRD 安装后才能 Watch `TodoApp`。
+如果你还没有第 35 篇生成的 `operator/crds/base`，请先回到第 35 篇完成 CRD 文件创建。Controller 必须在 CRD 安装后才能 Watch `TodoApp`。这里对整个 `operator/crds/base` 执行 apply 会同时安装 `TodoDatabase` 和 `TodoCache` CRD，不会影响本篇实验。
 
 #### 5.5.2 本地编译检查
 
@@ -937,6 +1007,12 @@ cd ../..
 ```
 
 这些命令分别完成依赖解析、格式化、基础编译测试、静态检查和二进制构建。`go test ./...` 即使没有测试文件，也会编译包并发现 API 使用错误；`go vet ./...` 能提前发现一部分格式化、结构体标签和 API 误用问题。
+
+如果 `go mod tidy` 下载依赖较慢，可以临时设置 Go 代理后重试：
+
+```bash
+go env -w GOPROXY=https://proxy.golang.org,direct
+```
 
 #### 5.5.3 本地运行 Controller
 
@@ -956,9 +1032,11 @@ kubectl -n todo-dev get todoapp todo-platform -o jsonpath='{.status.observedGene
 kubectl -n todo-dev get todoapp todo-platform -o jsonpath='{.status.conditions[*].reason}{"\n"}'
 ```
 
-本地运行方式最适合调试，因为日志直接显示在终端里。`go run . --namespace=todo-dev` 会持续 Watch API server，不会像一次性命令那样自动退出；看到 status 回写后，可以按 `Ctrl+C` 停止 Controller。
+本地运行方式最适合调试，因为日志直接显示在终端里。`go run . --namespace=todo-dev` 会持续 Watch API server，不会像一次性命令那样自动退出；看到 status 回写后，可以按 `Ctrl+C` 停止 Controller。本地运行会使用当前 kubeconfig 访问集群，只适合开发调试；生产 Controller 应部署在集群内，并使用受限的 ServiceAccount。
 
 #### 5.5.4 构建镜像并加载到 kind
+
+请先完成 5.5.2 节的 `go mod tidy`，确保 `operator/handwritten/go.sum` 已生成，否则 Dockerfile 中的 `COPY go.mod go.sum ./` 会找不到 `go.sum`。
 
 ```bash
 docker build -t todo-handwritten-controller:v0.1.0 operator/handwritten
@@ -1030,7 +1108,7 @@ todo-platform   todo-api:v0.1.2-observability  3          0       False       2m
 Reconciled WorkloadNotCreated
 ```
 
-`Available=False` 是预期结果，因为本篇还没有创建真正的 Deployment。真正工作负载会在第 38 篇由 Kubebuilder Controller 创建。
+**`Available=False` 是预期结果**，因为本篇还没有创建真正的 Deployment。真正工作负载会在第 38 篇由 Kubebuilder Controller 创建。
 
 ### 5.7 验证方法
 
@@ -1116,6 +1194,8 @@ kubectl -n todo-dev delete todoapp todo-platform --ignore-not-found
 
 ### 错误 1：CRD 未安装，Informer 无法 List
 
+对应实验环节：5.5.1。
+
 - **现象**：
 
   ```text
@@ -1144,6 +1224,8 @@ kubectl -n todo-dev delete todoapp todo-platform --ignore-not-found
 
 ### 错误 2：RBAC 缺少 todoapps/status 权限
 
+对应实验环节：5.4.5、5.5.5、5.7 第五层。
+
 - **现象**：
 
   ```text
@@ -1169,6 +1251,8 @@ kubectl -n todo-dev delete todoapp todo-platform --ignore-not-found
 - **预防**：为主资源和 status 子资源分别写 RBAC；不要用 `resources: ["*"]` 掩盖权限边界。
 
 ### 错误 3：GVR 写成 kind 或单数
+
+对应实验环节：5.4.2、5.4.3。
 
 - **现象**：
 
@@ -1196,6 +1280,8 @@ kubectl -n todo-dev delete todoapp todo-platform --ignore-not-found
 - **预防**：写 dynamic client 前先用 `kubectl api-resources` 查 GVR；YAML `kind` 和 API path `resource` 不要混用。
 
 ### 错误 4：镜像加载到错误 kind 集群
+
+对应实验环节：5.5.4、5.5.5。
 
 - **现象**：
 
@@ -1226,6 +1312,8 @@ kubectl -n todo-dev delete todoapp todo-platform --ignore-not-found
 - **预防**：每次改 Controller 镜像后重新 build、load、rollout restart；在多 kind 集群环境中明确 `--name`。
 
 ### 错误 5：status patch 触发重复 Reconcile
+
+对应实验环节：5.4.3、5.5.6。
 
 - **现象**：没有修改 `spec`，日志里仍然反复出现同一个对象的 `enqueue` 和 `reconciled`。
 
