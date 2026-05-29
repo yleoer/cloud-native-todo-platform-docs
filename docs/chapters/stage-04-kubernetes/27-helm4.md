@@ -13,7 +13,7 @@
 - 能说明 `templates/`、`values.yaml`、`_helpers.tpl`、`NOTES.txt` 和 `.helmignore` 的职责。
 - 能理解 Helm 模板渲染时 `.Values`、`.Release`、`.Chart` 和 `.Capabilities` 的数据来源。
 - 能描述 `helm install`、`helm upgrade`、`helm rollback` 如何改变 release revision。
-- 能说明 Chart 依赖、`Chart.lock`、本地 subchart 和 OCI registry 发布之间的关系。
+- 能说明 Chart 依赖、`Chart.lock`、本地 subchart 和 OCI（Open Container Initiative，开放容器标准）registry 发布之间的关系。
 - 能理解 Helm 4 中 `--dry-run=client`、`--dry-run=server`、`--rollback-on-failure`、`values.schema.json` 和 OCI digest 安装的意义。
 
 ### 1.2 技能目标
@@ -130,6 +130,17 @@ Helm 有四个最核心的名词：
 
 一个 Chart 可以安装很多次，每次安装都形成一个 release。例如同一个 `todo-platform` Chart 可以安装成 `todo-dev`、`todo-test`、`todo-prod` 三个 release，分别使用不同 values。
 
+如果你之前用过 Helm 3，Helm 4 最需要重新确认的是 CLI 标志语义。下表中的 Helm 4 行为已用本课程基线 Helm `v4.2.0` 的 `helm install --help` 和 `helm upgrade --help` 核验过：
+
+| 功能 | Helm 3 常见写法 | Helm 4 推荐写法 |
+| --- | --- | --- |
+| 失败回滚 | `--atomic` | `--rollback-on-failure` |
+| 等待资源 Ready | `--wait` | `--wait=watcher` 或单独 `--wait` |
+| dry-run | `--dry-run` | `--dry-run=client` / `--dry-run=server` |
+| OCI 登录 | 有些脚本会写完整 URL | `helm registry login ghcr.io`，只写 registry 域名 |
+
+Helm 4 中 `--wait` 是带策略的标志：省略 `--wait` 时默认只等待 hook；写 `--wait` 或 `--wait=watcher` 时使用 watcher 策略；写 `--wait=legacy` 时使用旧等待逻辑。`--rollback-on-failure` 会在失败时回滚，并默认启用 watcher 等待策略。
+
 ### 3.2 Chart 目录结构与 `Chart.yaml`
 
 Helm Chart 是一个固定结构的目录。最小结构如下：
@@ -212,7 +223,7 @@ helm upgrade todo-platform ./deployments/helm/todo-platform \
   -f values.local.yaml
 ```
 
-这里 `values.local.yaml` 会覆盖前两个文件中的同名字段。
+这里显式写 `-f values.yaml` 只是为了演示覆盖顺序。实际安装本 Chart 时，Chart 内置的 `values.yaml` 会自动加载，不需要手动传入。`values.local.yaml` 会覆盖前两个文件中的同名字段。
 
 ### 3.4 模板、内置对象和 helper
 
@@ -412,7 +423,7 @@ flowchart TD
 | 工具 | 建议版本 | 用途 |
 | --- | --- | --- |
 | Helm | v4.2.x | Chart 渲染、安装、升级、回滚和打包 |
-| Kubernetes | v1.36.x，v1.25+ 可完成主线 | 运行 Todo API Helm release |
+| Kubernetes | v1.35.0（kind 实际版本），v1.25+ 可完成主线 | 运行 Todo API Helm release |
 | kubectl | 与集群小版本相近 | 查看和验证资源 |
 | kind | v0.30+ | 本地 Kubernetes 集群 |
 | Docker | 29.x | 构建和加载 `todo-api:v0.1.0` 镜像 |
@@ -645,7 +656,7 @@ nameOverride: ""
 fullnameOverride: ""
 
 replicaCount: 2
-revisionHistoryLimit: 5
+revisionHistoryLimit: 5 # ← 保留最近 5 个 ReplicaSet 历史，便于排查和回滚。
 
 image:
   repository: todo-api
@@ -657,14 +668,14 @@ imagePullSecrets: []
 serviceAccount:
   create: true
   name: ""
-  automountToken: false
+  automountToken: false # ← Todo API 不调用 Kubernetes API，默认不挂载 ServiceAccount token。
 
 rbac:
   create: true
 
 config:
   env: dev
-  apiAddr: "0.0.0.0:18080"
+  apiAddr: "0.0.0.0:18080" # ← 容器内监听地址，Service 会转发到这个端口。
   logLevel: debug
   corsAllowedOrigins: "https://todo.localhost:18443,https://todo-gateway.localhost:18443"
   pprofEnabled: "false"
@@ -685,7 +696,7 @@ auth:
 
 podSecurityContext:
   runAsNonRoot: true
-  runAsUser: 10001
+  runAsUser: 10001 # ← 继承第 26 篇非 root 安全基线。
   runAsGroup: 10001
   fsGroup: 10001
   seccompProfile:
@@ -693,7 +704,7 @@ podSecurityContext:
 
 containerSecurityContext:
   allowPrivilegeEscalation: false
-  readOnlyRootFilesystem: true
+  readOnlyRootFilesystem: true # ← 根文件系统只读，临时写入通过 /tmp emptyDir 承接。
   capabilities:
     drop:
       - ALL
@@ -701,7 +712,7 @@ containerSecurityContext:
 service:
   type: ClusterIP
   port: 80
-  targetPort: 18080
+  targetPort: 18080 # ← 对应 Todo API 容器内的 TODO_API_ADDR 端口。
 
 resources:
   requests:
@@ -872,6 +883,8 @@ YAML
 
 创建 ConfigMap 模板：
 
+本篇没有把 PostgreSQL 纳入 Helm Chart 第一版，因此这里故意不设置 `TODO_DATABASE_DSN`。第 12 篇和第 21 篇已经说明过：Todo API 未设置 `TODO_DATABASE_DSN` 时会使用内存 Repository；设置后才切换到 PostgreSQL Repository。这个选择让本篇实验聚焦 Helm 生命周期，而不是数据库连接。
+
 ```bash
 cat > deployments/helm/todo-platform/templates/configmap.yaml <<'YAML'
 apiVersion: v1
@@ -887,6 +900,7 @@ data:
   TODO_CORS_ALLOWED_ORIGINS: {{ .Values.config.corsAllowedOrigins | quote }}
   TODO_PPROF_ENABLED: {{ .Values.config.pprofEnabled | quote }}
   TODO_RELEASE: {{ .Values.config.release | quote }}
+  # 本篇故意不设置 TODO_DATABASE_DSN；未设置时 Todo API 使用内存 Repository。
 YAML
 ```
 
@@ -998,8 +1012,8 @@ spec:
   strategy:
     type: RollingUpdate
     rollingUpdate:
-      maxSurge: 1
-      maxUnavailable: 0
+      maxSurge: 1 # ← 升级时允许额外创建 1 个新 Pod。
+      maxUnavailable: 0 # ← 升级期间至少保持旧 Pod 可用。
   template:
     metadata:
       labels:
@@ -1008,7 +1022,7 @@ spec:
     spec:
       serviceAccountName: {{ include "todo-platform.serviceAccountName" . }}
       automountServiceAccountToken: {{ .Values.serviceAccount.automountToken }}
-      terminationGracePeriodSeconds: 30
+      terminationGracePeriodSeconds: 30 # ← 给应用 30 秒处理优雅退出。
       securityContext:
 {{ toYaml .Values.podSecurityContext | nindent 8 }}
       {{- with .Values.imagePullSecrets }}
@@ -1061,7 +1075,7 @@ spec:
           {{- end }}
       volumes:
         - name: tmp
-          emptyDir: {}
+          emptyDir: {} # ← 配合 readOnlyRootFilesystem，为 /tmp 提供可写空间。
       {{- if .Values.runtimeConfig.enabled }}
         - name: runtime-config
           configMap:
@@ -1159,11 +1173,12 @@ metadata:
 {{ include "todo-platform.labels" . | nindent 4 }}
   annotations:
     "helm.sh/hook": test
+    "helm.sh/hook-delete-policy": hook-succeeded
 spec:
   restartPolicy: Never
   containers:
     - name: wget
-      image: busybox:1.37
+      image: alpine:3.23
       command:
         - wget
       args:
@@ -1199,6 +1214,8 @@ EOF
 生成本地 values。`values.local.yaml` 包含本地实验 Secret，不要提交到 Git。
 
 这里要提前记住一个安全边界：Helm dry-run、`helm get manifest`、release 记录和 CI 日志都可能出现渲染后的 Secret。下面的固定 JWT Secret 和本地管理员哈希只服务于实验；生产环境应设置 `auth.create=false` 和 `auth.existingSecret`，让 External Secrets、Sealed Secrets、Vault、云密钥服务或平台流水线单独创建真实 Secret。
+
+`hash-password` 子命令来自第 14 篇，并在第 16 篇镜像构建实验中验证过。如果下面命令提示找不到镜像或子命令，请先回到第 16 篇重新构建 `todo-api:v0.1.0`。PowerShell 用户应使用 `$HASH = docker run --rm todo-api:v0.1.0 hash-password "change-me-123"`，并用 PowerShell here-string 创建 `values.local.yaml`。
 
 ```bash
 HASH=$(docker run --rm todo-api:v0.1.0 hash-password "change-me-123")
@@ -1257,7 +1274,7 @@ helm install todo-platform deployments/helm/todo-platform \
   --dry-run=server
 ```
 
-确认无误后安装 release：
+确认无误后安装 release。`--wait=watcher` 是 Helm 4 的等待策略写法，已经用 Helm `v4.2.0` help 输出核验；Helm 3 时代常见的布尔型 `--wait` 心智模型不要直接套用到这里：
 
 ```bash
 helm install todo-platform deployments/helm/todo-platform \
@@ -1274,6 +1291,8 @@ helm install todo-platform deployments/helm/todo-platform \
 ```bash
 helm status todo-platform -n todo-helm-lab
 helm history todo-platform -n todo-helm-lab
+helm get values todo-platform -n todo-helm-lab
+helm get manifest todo-platform -n todo-helm-lab | head -30
 
 kubectl -n todo-helm-lab get deploy,svc,cm,secret,sa,role,rolebinding,networkpolicy
 kubectl -n todo-helm-lab rollout status deployment/todo-platform --timeout=180s
@@ -1300,7 +1319,7 @@ curl -fsS http://127.0.0.1:18084/readyz
 helm test todo-platform -n todo-helm-lab --logs
 ```
 
-升级 release，把副本数改为 3，并更新发布标识。生产发布建议加上 `--rollback-on-failure`，让 Helm 在升级失败时回滚到上一个成功 release；本地实验也可以直接使用这个参数熟悉 Helm 4 的新命名：
+升级 release，把副本数改为 3，并更新发布标识。`--rollback-on-failure` 是 Helm 4 中更直白的失败回滚标志，用来替代 Helm 3 脚本中常见的 `--atomic` 表达；本地实验也可以直接使用这个参数熟悉 Helm 4 的新命名：
 
 ```bash
 helm upgrade todo-platform deployments/helm/todo-platform \
@@ -1728,8 +1747,7 @@ flowchart TD
 
 1. 把 `hpa.enabled` 改为 `true`，执行 `helm upgrade`，验证 HPA 对象是否出现；如果集群没有 metrics-server，观察 HPA 指标为空时的提示。
 2. 把 `cache.enabled` 改为 `true`，执行 `helm upgrade`，验证本地 subchart 生成的 ConfigMap 是否出现。
-3. 给 Chart 增加 `values-test.yaml`，设置 `replicaCount: 1`、`config.env: test` 和 `config.release: chapter-27-test`，用 `helm template` 验证输出。
-4. 故意执行 `helm template todo-platform deployments/helm/todo-platform --set replicaCount=zero`，观察 `values.schema.json` 拦截错误，再改回合法整数。
+3. 给 Chart 增加 `values-test.yaml`，设置 `replicaCount: 1`、`config.env: test` 和 `config.release: chapter-27-test`；再故意把 `replicaCount` 写成字符串，观察 `values.schema.json` 拦截错误，修复后用 `helm template` 验证输出。
 
 ### 9.3 思考题
 
@@ -1770,21 +1788,13 @@ flowchart TD
 
 **深入追问**：生产发布中，数据库迁移应尽量向前兼容；危险迁移需要备份、演练、灰度和独立回滚方案，不能只依赖 `helm rollback`。
 
-### 面试题 5：Chart 依赖和 OCI registry 解决什么问题？
+### 面试题 5：Chart 依赖、OCI registry 和 Helm 4 迁移要点分别是什么？
 
-**一句话结论**：Chart 依赖解决复用和组合问题，OCI registry 解决 Chart 包的分发和权限管理问题。
+**一句话结论**：Chart 依赖解决复用和组合问题，OCI registry 解决 Chart 包分发和权限管理问题，Helm 4 迁移重点关注 CLI 标志、server-side dry-run、等待策略、registry 登录格式和 digest 安装。
 
-**展开解释**：父 Chart 可以通过 `dependencies` 引用 subchart，并用 `Chart.lock` 锁定版本。打包后的 `.tgz` 可以放在传统 Helm repository，也可以推送到 OCI registry，和容器镜像使用相似的仓库权限、tag 和 digest 机制。
+**展开解释**：父 Chart 可以通过 `dependencies` 引用 subchart，并用 `Chart.lock` 锁定版本。打包后的 `.tgz` 可以放在传统 Helm repository，也可以推送到 OCI registry，和容器镜像使用相似的仓库权限、tag 和 digest 机制。Helm 4 推荐用 `--rollback-on-failure` 表达失败回滚，`--dry-run=server` 明确要求连接 API Server，`--wait=watcher` 使用新的等待策略，`helm registry login` 只写 registry 域名；Chart 本身仍可继续使用 `apiVersion: v2`。
 
-**深入追问**：依赖必须固定版本，不要让生产发布依赖“最新版本”。OCI 安装时如果能使用 digest，可以进一步减少同名 tag 被替换的风险。
-
-### 面试题 6：Helm 4 相比 Helm 3，发布脚本最需要关注哪些变化？
-
-**一句话结论**：重点关注 CLI 参数命名、server-side dry-run、wait 策略、OCI 登录格式和 digest 安装。
-
-**展开解释**：Helm 4 推荐用 `--rollback-on-failure` 表达失败回滚，`--dry-run=server` 明确要求连接 API Server，`--wait=watcher` 使用新的等待策略，`helm registry login` 只写 registry 域名。Chart 本身仍可继续使用 `apiVersion: v2`，所以多数现有 Chart 不需要因为 Helm 4 立即重写。
-
-**深入追问**：迁移生产流水线时，不能只替换命令名；还要验证 release 历史、Secret 暴露、依赖构建、OCI 凭证和准入控制行为，确保 CI 与真实集群策略一致。
+**深入追问**：依赖必须固定版本，不要让生产发布依赖“最新版本”。OCI 安装时如果能使用 digest，可以进一步减少同名 tag 被替换的风险。迁移生产流水线时，不能只替换命令名；还要验证 release 历史、Secret 暴露、依赖构建、OCI 凭证和准入控制行为，确保 CI 与真实集群策略一致。
 
 ## 11. 本章总结
 
@@ -1795,3 +1805,5 @@ flowchart TD
 ## 12. 下一章衔接
 
 第 28 篇会进入 Kustomize 多环境配置管理。我们会继续使用 Todo Platform，学习如何用 base 和 overlay 管理 dev、test、prod 的差异，并讨论 Helm values 与 Kustomize overlay 的边界：什么时候应该在 Chart 内暴露参数，什么时候应该在环境层做补丁。
+
+本篇没有把 PSA Namespace 标签、Ingress/TLS 和 PostgreSQL 纳入 Helm Chart 第一版；下一篇会继续判断这些差异应该通过 Helm values 暴露，还是由 Kustomize overlay 在环境层补齐。
