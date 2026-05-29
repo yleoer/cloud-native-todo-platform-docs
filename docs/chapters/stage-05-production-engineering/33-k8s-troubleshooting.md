@@ -1,4 +1,4 @@
-# 第 33 篇：Kubernetes 生产排障
+# 第 33 篇：Kubernetes 生产排障 [C]
 
 ## 1. 本章学习目标
 
@@ -6,7 +6,8 @@
 
 - 能解释生产排障中“症状、范围、最近变更、证据、修复、复盘”的闭环流程。
 - 能区分 Pod Phase、Container State、Pod Condition、Event 和日志各自表达的信息。
-- 能说明 `Pending`、`CrashLoopBackOff`、`ImagePullBackOff`、`OOMKilled`、CPU Throttling、Service endpoints 为空、DNS 解析失败、PVC 绑定失败的典型原因。
+- 能说明 `Pending`、`CrashLoopBackOff`、`ImagePullBackOff`、`OOMKilled` 和 CPU Throttling 的典型原因。
+- 能说明 Service endpoints 为空、DNS 解析失败和 PVC 绑定失败的典型原因。
 - 能对比 `kubectl describe`、`kubectl logs`、`kubectl top`、Prometheus、Loki、Tempo、k9s、stern、`kubectl debug` 在排障链路中的定位。
 - 能说明 GitOps 环境中直接修改集群对象为什么会产生 drift，以及如何用 Argo CD 恢复期望状态。
 
@@ -129,12 +130,12 @@ DNS 排障要分两层：
 
 ```bash
 kubectl get pods -A | grep -i traefik
-kubectl -n traefik get pod
+kubectl -n traefik get pods -l app.kubernetes.io/name=traefik
 kubectl -n traefik logs deployment/traefik --tail=100
 kubectl -n todo-dev get ingress,httproute
 ```
 
-如果你的入口控制器 namespace 不是 `traefik`，先用第一条命令确认实际 namespace，再替换后续命令。
+如果你的入口控制器 namespace 不是 `traefik`，先用第一条命令确认实际 namespace，再替换后续命令。如果 Helm Chart 使用了不同 label，可以先执行 `kubectl -n traefik get pods --show-labels` 确认 selector。
 
 ### 3.5 PVC、PV 与 StorageClass
 
@@ -257,6 +258,8 @@ kubectl -n todo-dev set image deployment/todo-platform todo-api=todo-api:v0.1.2-
 ### 5.1 实验目标
 
 在 `todo-dev` 中完成一组安全的故障注入与恢复演练：模拟 `Pending`、`ImagePullBackOff`、`CrashLoopBackOff`、`OOMKilled`、Service endpoints 为空、DNS 配置错误、PVC 绑定失败，并按标准流程定位和修复。
+
+本篇沿用前序章节的 Todo Platform dev 环境。若 `TODO_DATABASE_DSN` 为空，Todo API 使用内存 Repository；本篇故障注入只修改 Kubernetes 对象和演练资源，不依赖 PostgreSQL，也不会验证持久化数据能力。
 
 预计耗时：120 分钟（动手操作约 90 分钟）。
 
@@ -577,6 +580,7 @@ kubectl -n todo-dev delete service todo-broken-service --ignore-not-found
 kubectl -n todo-dev delete pod todo-pvc-demo --ignore-not-found
 kubectl -n todo-dev delete pvc todo-trouble-data --ignore-not-found
 kubectl -n todo-dev delete pod todo-dns-client --ignore-not-found
+kubectl -n todo-dev delete networkpolicy allow-dns-egress --ignore-not-found
 kubectl -n todo-dev delete pod todo-oom-demo --ignore-not-found
 
 echo "troubleshooting resources cleaned"
@@ -586,6 +590,8 @@ chmod +x troubleshooting/k8s/99-cleanup.sh
 ```
 
 ### 5.5 执行命令
+
+每个演练都先确认故障确实生效，再进入排查。生产排障也一样：不要只凭告警标题下结论，先用状态、Event、日志或指标确认当前症状。
 
 #### 5.5.1 建立健康基线
 
@@ -602,7 +608,7 @@ kubectl -n todo-dev get endpointslice -l kubernetes.io/service-name=todo-platfor
 打开本地访问：
 
 ```bash
-kubectl -n todo-dev port-forward service/todo-platform 18080:18080
+kubectl -n todo-dev port-forward service/todo-platform 18080:http
 ```
 
 另一个终端验证健康检查：
@@ -662,6 +668,7 @@ kubectl -n todo-dev delete pod todo-pending-demo
 
 ```bash
 kubectl -n todo-dev set image deployment/todo-platform todo-api=todo-api:not-exist-33
+sleep 3
 kubectl -n todo-dev rollout status deployment/todo-platform --timeout=60s
 ```
 
@@ -710,9 +717,11 @@ kubectl -n todo-dev rollout status deployment/todo-platform --timeout=180s
 
 ```bash
 kubectl -n todo-dev patch deployment todo-platform --type='json' \
-  -p='[{"op":"replace","path":"/spec/template/spec/containers/0/args","value":["not-a-real-command"]}]'
+  -p='[{"op":"add","path":"/spec/template/spec/containers/0/args","value":["not-a-real-command"]}]'
 kubectl -n todo-dev rollout status deployment/todo-platform --timeout=60s
 ```
+
+这里使用 JSON Patch 的 `add` 而不是 `replace`，是为了兼容原始 Deployment 中没有 `args` 字段的情况；如果字段已存在，`add` 会替换该字段的值。
 
 排查：
 
@@ -792,6 +801,8 @@ kubectl -n todo-dev delete pod todo-oom-demo
 ```
 
 生产修复要先确认是内存泄漏、突发流量、缓存配置不当，还是 limit 设置过低。不要只把 limit 盲目调大。
+
+本演练使用 `restartPolicy: Always`，所以 OOM 后 Pod 会被 kubelet 反复重启。生产中的一次性 Job 可能使用 `Never` 或 `OnFailure`，此时 OOM 后的重试和告警方式要结合 Job 的 backoff 策略一起判断。
 
 #### 5.5.6 演练五：Service endpoints 为空
 
@@ -1032,6 +1043,8 @@ k9s -n todo-dev
 | 输入 `:pvc` | 查看 PVC |
 | 输入 `:events` | 查看事件流 |
 
+不同版本的 k9s 快捷键可能略有差异，按 `?` 可以查看当前版本的快捷键列表。
+
 k9s 是提速工具，不是唯一入口。正式复盘中仍要把关键 `kubectl` 命令和输出记录下来，方便团队复现。
 
 ### 5.6 预期输出
@@ -1150,7 +1163,7 @@ kubectl -n todo-dev get pod,svc,pvc,networkpolicy | grep -E 'todo-(pending|broke
 
 ## 6. 常见错误与排障
 
-### 错误 1：Pod 一直 Pending
+### 错误 1：Pod 一直 Pending（对应演练一）
 
 - **现象**：
 
@@ -1173,7 +1186,7 @@ kubectl -n todo-dev get pod,svc,pvc,networkpolicy | grep -E 'todo-(pending|broke
 - **修复**：修正调度约束、降低 requests、增加节点容量、补充 toleration 或修复 PVC。
 - **预防**：上线前用 `kubectl describe` 和 `helm template` 检查 requests、node affinity、toleration；为关键 workload 设计合理的资源请求。
 
-### 错误 2：ImagePullBackOff
+### 错误 2：ImagePullBackOff（对应演练二）
 
 - **现象**：
 
@@ -1196,7 +1209,7 @@ kubectl -n todo-dev get pod,svc,pvc,networkpolicy | grep -E 'todo-(pending|broke
 - **修复**：改回存在的镜像 tag；为私有仓库配置 `imagePullSecrets`；kind 本地实验执行 `kind load docker-image`；通过 GitOps overlay 提交正确镜像。
 - **预防**：CI 中构建镜像后记录 digest，部署使用可追踪 tag 或 digest；PR 中渲染 Kustomize/Helm 输出，避免 tag 拼错。
 
-### 错误 3：CrashLoopBackOff
+### 错误 3：CrashLoopBackOff（对应演练三）
 
 - **现象**：
 
@@ -1218,7 +1231,7 @@ kubectl -n todo-dev get pod,svc,pvc,networkpolicy | grep -E 'todo-(pending|broke
 - **修复**：根据日志修复参数、环境变量或配置；必要时临时放宽 startupProbe；如果是发布引入，先回滚到上一版本。
 - **预防**：应用启动前做配置校验；CI 中增加 `go test`、镜像启动冒烟和 Kustomize 渲染检查。
 
-### 错误 4：Service DNS 能解析但请求超时
+### 错误 4：Service DNS 能解析但请求超时（对应演练五、六）
 
 - **现象**：
 
@@ -1244,7 +1257,7 @@ kubectl -n todo-dev get pod,svc,pvc,networkpolicy | grep -E 'todo-(pending|broke
 - **修复**：修正 selector、端口名、readinessProbe 或 NetworkPolicy。
 - **预防**：每次修改 Service selector、Pod label 和端口名时同时验证 EndpointSlice。
 
-### 错误 5：PVC Pending 或 Pod FailedMount
+### 错误 5：PVC Pending 或 Pod FailedMount（对应演练七）
 
 - **现象**：
 
