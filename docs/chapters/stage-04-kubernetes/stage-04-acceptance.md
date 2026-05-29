@@ -90,17 +90,43 @@ docker image inspect todo-api:v0.1.0
 5. 第 24 篇：Todo API 已连接 PostgreSQL，删除 PostgreSQL Pod 后数据仍存在。
 6. 第 25 篇：NetworkPolicy 能阻断未授权客户端，并允许指定客户端访问 Todo API。
 7. 第 26 篇：RBAC 最小权限、Restricted Pod Security、非 root 安全上下文和反例拒绝验证通过。
-8. 第 27 篇：Helm release 可安装、升级、回滚、打包，`helm history` 能看到 revision 变化。
-9. 第 28 篇：dev、test、prod overlay 渲染结果不同，`kubectl apply --dry-run=server -k` 通过。
+8. 第 27-28 篇综合交付：Helm Chart 可安装、升级、回滚和打包；Kustomize dev、test、prod overlay 能复用或渲染 Helm 产物，三套环境输出不同，并且 `kubectl apply --dry-run=server -k` 全部通过。
+
+交付收束验证建议按下面顺序执行：
+
+```bash
+helm lint deployments/helm/todo-platform
+helm template todo-platform deployments/helm/todo-platform \
+  -n todo-helm-lab \
+  -f deployments/helm/todo-platform/values-dev.yaml \
+  -f deployments/helm/todo-platform/values.local.yaml >/tmp/todo-platform-helm.yaml
+
+kubectl apply --dry-run=server -k deployments/kustomize/overlays/dev
+kubectl apply --dry-run=server -k deployments/kustomize/overlays/test
+kubectl apply --dry-run=server -k deployments/kustomize/overlays/prod
+```
+
+判断标准：Helm 渲染无错误，三个 overlay 的 Namespace、replica、资源限制、PSA 标签和配置值符合各自环境预期。这个步骤的意义是把“可打包”和“可多环境交付”合成一条验收链，而不是把第 27 篇和第 28 篇当成互不相关的两个练习。
 
 ## 5. 统一清理清单
 
 阶段四会创建多个 Namespace 和临时文件。完整清理前确认不再需要实验数据：
 
+表 A-1 阶段四 Namespace 用途：
+
+| Namespace / 集群 | 来源章节 | 用途 | 清理注意事项 |
+|---|---|---|---|
+| `todo-workloads` | 第 21-24 篇 | Todo API、Service、ConfigMap、Secret、PostgreSQL 和 PVC 主线资源 | 删除前确认不再需要数据库数据和本地实验 Secret |
+| `traefik` | 第 22 篇 | 入口层 Ingress / Gateway API 控制器资源 | 如果后续仍要验证入口，不要提前删除 Traefik |
+| `todo-network-lab` 集群 | 第 25 篇 | Calico 和 NetworkPolicy 临时实验集群 | 这是独立 kind 集群，清理用 `kind delete cluster --name todo-network-lab` |
+| `todo-security-lab` | 第 26 篇 | RBAC、SecurityContext、PSA 和反例验证 | 独立安全实验 Namespace，可在完成验证后删除 |
+| `todo-helm-lab` | 第 27 篇 | Helm release 生命周期实验 | 删除前可先保留 `helm history`、`helm get manifest` 输出作为作品集记录 |
+| `todo-dev` / `todo-test` / `todo-prod` | 第 28 篇 | Kustomize 三套环境 overlay | 删除前确认没有正在演示的多环境资源 |
+
 ```bash
 kubectl delete namespace todo-dev todo-test todo-prod --ignore-not-found
 kubectl delete namespace todo-helm-lab todo-security-lab todo-network-lab --ignore-not-found
-kubectl delete namespace todo-workloads todo-ingress --ignore-not-found
+kubectl delete namespace todo-workloads traefik --ignore-not-found
 kind delete cluster --name todo-network-lab
 kind delete cluster --name todo-k8s
 ```

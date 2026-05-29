@@ -1186,4 +1186,6 @@ kubectl -n todo-workloads delete pvc postgres-data-todo-postgres-0 --ignore-not-
 
 第 25 篇会进入 Kubernetes 网络原理，解释 Pod、Service、DNS、CNI、kube-proxy 和 NetworkPolicy 如何共同完成集群通信。本篇的 `todo-api -> todo-postgres` 访问链路会成为下一章的真实案例：如果 DNS 解析失败、Service 没有 Endpoints 或网络策略拦截，Todo API 就无法连接数据库。
 
+下一章为了验证 NetworkPolicy 会创建一个临时 kind 集群 `todo-network-lab`，而不是直接改动本篇使用的 `todo-k8s` 主集群。原因是 kind 默认网络插件不执行 NetworkPolicy，需要换成 Calico；把 CNI 实验隔离到临时集群，可以保护本篇已经建立好的 PostgreSQL、PVC 和 Todo API 主线资源。
+
 如果跳过本篇，下一章看到 `todo-postgres.todo-workloads.svc.cluster.local`、Service Endpoints 和 Pod 网络排障时会缺少真实业务上下文。第 24 篇先把“谁访问谁、数据在哪里”搭起来，第 25 篇再解释“网络为什么能通、哪里会不通”。

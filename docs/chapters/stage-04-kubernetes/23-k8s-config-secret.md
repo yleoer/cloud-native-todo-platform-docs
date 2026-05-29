@@ -279,10 +279,12 @@ Kubernetes 不会因为 ConfigMap / Secret 更新而自动重建 Deployment Pod�
 
 | 工具 | 建议版本 | 用途 |
 |---|---|---|
-| Kubernetes | 1.36.x | 运行 Todo API |
+| Kubernetes | kind 实际 v1.35.0，1.36.x 可选覆盖 | 运行 Todo API；本篇不依赖 1.36 专属 API |
 | kind | 0.31.x | 本地 Kubernetes 集群 |
-| kubectl | 1.36.x | 应用和排查 YAML |
+| kubectl | 与 API Server 相差不超过 1 个小版本 | 应用和排查 YAML |
 | Docker | 29.x | 运行 `todo-api:v0.1.0` 生成密码哈希 |
+
+本篇沿用第 20 篇创建的 `todo-k8s` 主集群。默认按 kind 实际 `v1.35.0` 执行即可；如果出版前统一切换到 1.36.x 节点镜像，本篇 ConfigMap / Secret 实验命令不需要结构性调整。
 
 确认当前集群与 Namespace：
 
@@ -382,7 +384,7 @@ data:
 YAML
 ```
 
-生成本地实验 Secret。这里复用第 14 篇的 `hash-password` 子命令，使用本地镜像生成管理员密码哈希：
+生成本地实验 Secret。`hash-password` 子命令来自第 14 篇，并在第 16 篇镜像构建实验中验证过；如果下面命令提示找不到镜像或子命令，请先回到第 16 篇重新构建 `todo-api:v0.1.0`。
 
 ```bash
 HASH=$(docker run --rm todo-api:v0.1.0 hash-password "change-me-123")
