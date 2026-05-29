@@ -2,7 +2,7 @@
 
 第 38 篇已经用 Kubebuilder 完成了 Todo Operator 的最小工程化版本：`TodoApp` 能自动创建 Deployment 和 Service，并把 Ready 副本数写回 status。本篇继续在 `<project-root>/operator/kubebuilder/` 上增强它，让这个 Operator 开始具备生产级生命周期管理能力。
 
-很多团队第一次写 Operator 时会停在“能创建资源”这一层，但生产环境真正难的是“资源什么时候属于谁”“删除前要清理什么”“用户提交的 spec 是否可信”“状态应该如何表达”“错误要不要重试”“API 以后如何升级”。这些问题分别对应 OwnerReference、Finalizer、Admission Webhook、Status Conditions、Event、重试策略和多版本 CRD。
+很多团队第一次写 Operator 时会停在“能创建资源”这一层，但生产环境真正难的是“资源什么时候属于谁”“删除前要清理什么”“用户提交的 spec 是否可信”“状态应该如何表达”“错误要不要重试”“API 以后如何升级”。这些问题分别对应 OwnerReference、Finalizer、Admission Webhook、MutatingAdmissionPolicy、Status Conditions、Event、重试策略和多版本 CRD。
 
 本篇的目标不是把所有高级机制讲成抽象名词，而是把它们落到同一个 Todo Operator 里：创建时默认字段，提交时校验字段，运行时记录事件和状态，删除时执行清理逻辑，并理解未来多版本演进要怎样设计。
 
@@ -24,7 +24,7 @@
 
 - 能在 Kubebuilder 项目中为 `TodoApp` 增加 Finalizer、Event 记录和更细粒度 Conditions。
 - 能使用 `kubebuilder create webhook` 生成默认值注入和字段校验 Webhook，并部署到 kind 集群验证。
-- 能编写一个 CEL-based `MutatingAdmissionPolicy` 示例，理解 Kubernetes 1.36 中策略型默认值的适用边界。
+- （了解）能编写一个 CEL-based `MutatingAdmissionPolicy` 示例，理解 Kubernetes 1.36 中策略型默认值的适用边界。
 - 能排查 Webhook TLS、Service endpoint、Finalizer 卡住、status 冲突和 Admission Policy 不生效等常见问题。
 - 能为 Todo Operator 设计从 `v1alpha1` 演进到 `v1beta1` 的兼容策略。
 
@@ -303,6 +303,8 @@ flowchart TD
 | cert-manager | 1.20.x | 为 Webhook 注入证书 |
 | GNU Make | 4.x | 执行生成、构建、部署命令 |
 
+> **版本兼容提示**：本章按课程计划锁定 cert-manager 1.20.x。真实环境中如果 Kubernetes 1.36 与证书组件出现兼容性问题，先查阅 cert-manager 的 supported releases，再决定是否在实验记录中临时切换到 1.21.x；课程正文仍以锁定版本为准，避免隐式漂移。
+
 确认当前项目：
 
 ```bash
@@ -330,6 +332,8 @@ kubebuilder version
 ```bash
 export KIND_NODE_IMAGE=kindest/node:v1.36.0
 ```
+
+首次创建集群时，kind 会自动拉取 `kindest/node:v1.36.0`，镜像体积较大，网络较慢时可能需要几分钟。如果你在公司网络或国内网络环境中拉取失败，可以先配置 Docker 代理或镜像加速，再手动执行 `docker pull "${KIND_NODE_IMAGE}"`。
 
 如果课程环境提供了更新的 1.36.x patch 镜像，可以替换为对应 tag，但必须在实验记录中写明实际使用的完整镜像名，避免“kind 默认版本”带来的不可复现问题。
 
@@ -393,6 +397,8 @@ cmd/main.go
 ```
 
 不同 Kubebuilder 小版本生成的文件位置可能略有差异。Kubebuilder 4.11.x 默认会生成 `internal/webhook/v1alpha1/todoapp_webhook.go`，同时在 `cmd/main.go` 中增加 Webhook 注册入口；有些版本还会生成额外的 API 辅助文件。如果你的输出不同，以实际生成文件为准，但后续代码逻辑保持一致。
+
+本篇采用 Kubebuilder 4.11.x 官方书中常见的独立 `SetupTodoAppWebhookWithManager` 函数写法。如果你的生成结果是把 `SetupWebhookWithManager` 作为 `TodoApp` 类型方法，也可以保留生成的注册入口，但要确保默认值和校验逻辑仍然注册到同一个 `TodoApp` Webhook 上。
 
 ### 5.5 更新 TodoApp API 类型
 
@@ -635,6 +641,8 @@ func SetupTodoAppWebhookWithManager(mgr ctrl.Manager) error {
 }
 ```
 
+`ValidateUpdate` 对端口变更只返回 warning，不直接拒绝，是一个有意的教学设计：生产中 SRE 可能确实需要调整后端服务端口，本章先让变更可见，再由团队策略决定是否升级为强拒绝。
+
 确认 `cmd/main.go` 中有 Webhook 注册逻辑。Kubebuilder 通常会自动生成，关键片段应类似：
 
 ```go
@@ -653,6 +661,8 @@ if err = webhookv1alpha1.SetupTodoAppWebhookWithManager(mgr); err != nil {
 本小节继续完成实验步骤 4：实现 Controller 高级机制。
 
 编辑 `internal/controller/todoapp_controller.go`，替换为下面的完整内容。这个文件较长，阅读时按四组理解：`Reconcile` 主流程、`reconcileDelete` 删除路径、`desiredDeployment` / `desiredService` 期望资源构造、`updateStatus` / `recordEvent` 辅助函数。实际复制时仍建议一次替换完整文件，避免 import 和 helper 函数遗漏。
+
+和第 38 篇相比，这里有三处刻意变化。第一，Deployment 和 Service 都直接使用 `todo.Name`，方便 OwnerReference、Events 和排障输出围绕同一个对象名关联；第 38 篇的 `{name}-api` 命名适合强调“由主资源派生子资源”，本篇更强调生命周期闭环。第二，Service 固定暴露集群内 `port: 80`，`targetPort` 指向 `TodoApp.spec.port`，让用户声明的是容器监听端口，而 Service 对外入口保持稳定。第三，本篇在部分更新逻辑中用 `reflect.DeepEqual` 比较容器和端口结构，便于教学中看清“期望态整体变化”；生产 Operator 可以进一步收窄字段所有权，避免覆盖别的控制面写入。
 
 ```go
 /*
@@ -849,6 +859,7 @@ func (r *TodoAppReconciler) desiredDeployment(todo *platformv1alpha1.TodoApp) (*
 								{Name: "http", ContainerPort: todo.Spec.PortOrDefault()},
 							},
 							Resources: corev1.ResourceRequirements{
+								// MustParse is safe here because these are course-owned fixed literals.
 								Requests: corev1.ResourceList{
 									corev1.ResourceCPU:    resource.MustParse("50m"),
 									corev1.ResourceMemory: resource.MustParse("64Mi"),
@@ -980,8 +991,7 @@ func (r *TodoAppReconciler) readDeploymentReadyReplicas(ctx context.Context, tod
 }
 
 func (r *TodoAppReconciler) updateStatus(ctx context.Context, todo *platformv1alpha1.TodoApp, readyReplicas int32, phase platformv1alpha1.TodoAppPhase, conditionType string, conditionStatus v1.ConditionStatus, reason string, message string) error {
-	before := todo.Status
-	before.Conditions = append([]v1.Condition(nil), todo.Status.Conditions...)
+	before := todo.DeepCopy().Status
 
 	todo.Status.ObservedGeneration = todo.Generation
 	todo.Status.ReadyReplicas = readyReplicas
@@ -1023,8 +1033,8 @@ func (r *TodoAppReconciler) SetupWithManager(mgr ctrl.Manager) error {
 - `todoapps/finalizers` RBAC marker 允许 Controller 更新 finalizer。
 - `events` RBAC marker 允许 Controller 写 Kubernetes Event。
 - `reconcileDelete` 专门处理删除路径，清理成功后才移除 finalizer。
-- `updateStatus` 使用 `SetStatusCondition` 更新同一类 Condition，避免无限追加历史状态。
-- `recordEvent` 和 `recordEventf` 对 `Recorder` 做 nil 保护，方便第 40 篇 envtest 构造 Reconciler。
+- `updateStatus` 使用 `DeepCopy` 获取 status 快照，再用 `SetStatusCondition` 更新同一类 Condition，避免无限追加历史状态，也避免后续新增 slice 或 map 字段时遗漏深拷贝。
+- `recordEventRecorder` 只声明 `Event` 和 `Eventf` 两个方法，和 `mgr.GetEventRecorderFor("todoapp-controller")` 返回的 recorder 能力对齐；`recordEvent` 和 `recordEventf` 对 `Recorder` 做 nil 保护，方便第 40 篇 envtest 构造 Reconciler。
 - Ready、Deleting 和失败事件只在状态变化时记录，避免每次 Reconcile 都制造重复事件。
 
 还需要确认 `cmd/main.go` 创建 Reconciler 时注入 Event Recorder。关键片段如下：
@@ -1098,13 +1108,25 @@ kind create cluster --name todo-operator --image "${KIND_NODE_IMAGE}"
 kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.20.0/cert-manager.yaml
 ```
 
+如果当前网络无法直接访问 GitHub，可以先把清单下载到本地，再从本地文件安装：
+
+```bash
+curl -L -o cert-manager.yaml https://github.com/cert-manager/cert-manager/releases/download/v1.20.0/cert-manager.yaml
+kubectl apply -f cert-manager.yaml
+```
+
 等待 cert-manager 就绪：
 
 ```bash
-kubectl wait --for=condition=Available deployment --all -n cert-manager --timeout=180s
+kubectl wait --for=condition=Available deployment --all -n cert-manager --timeout=300s
 ```
 
-打开 `config/default/kustomization.yaml`，启用 Webhook 和 cert-manager 相关配置。Kubebuilder 默认会把这些内容以注释形式生成出来，本章必须至少完成四处启用。
+打开 `config/default/kustomization.yaml`，启用 Webhook 和 cert-manager 相关配置。Kubebuilder 默认会把这些内容以注释形式生成出来，本章必须至少完成四处启用：
+
+1. 在 `resources` 中启用 `../webhook` 和 `../certmanager`。
+2. 在 `patches` 中启用 manager webhook volume patch。
+3. 在 `patches` 中启用 webhook CA injection patch。
+4. 在生成文件包含 `replacements` 时，启用证书 DNS 名称替换块。
 
 先定位生成的注释块：
 
@@ -1159,6 +1181,8 @@ replacements:
 kubectl kustomize config/default | grep -E "kind: (MutatingWebhookConfiguration|ValidatingWebhookConfiguration|Certificate|Issuer|Deployment)"
 ```
 
+`kubectl kustomize` 仍是 kubectl 官方子命令；如果你的环境偏好独立二进制，也可以使用 `kustomize build config/default` 得到同样的渲染结果。
+
 预期输出至少包含：
 
 ```text
@@ -1177,10 +1201,22 @@ kind: Deployment
 docker build -t todo-operator:v0.2.0-lifecycle .
 ```
 
+确认本地镜像存在：
+
+```bash
+docker images todo-operator:v0.2.0-lifecycle
+```
+
 把镜像加载到 kind：
 
 ```bash
 kind load docker-image todo-operator:v0.2.0-lifecycle --name todo-operator
+```
+
+确认镜像已进入 kind 节点：
+
+```bash
+docker exec todo-operator-control-plane crictl images | grep todo-operator
 ```
 
 部署 Operator：
@@ -1411,10 +1447,16 @@ No resources found in default namespace.
 先确认 API 是否存在：
 
 ```bash
+kubectl version
 kubectl api-resources | grep -i mutatingadmission
 ```
 
-如果没有输出，直接跳过本小节。
+如果 `kubectl version` 中的 Server Version 不是 `v1.36.x`，或者 `api-resources` 没有输出，直接跳过本小节。不同 Kubernetes 小版本的字段细节可能调整，继续实验前先查看当前集群的 schema：
+
+```bash
+kubectl explain mutatingadmissionpolicy.spec
+kubectl explain mutatingadmissionpolicybinding.spec
+```
 
 创建目录：
 
@@ -1583,8 +1625,10 @@ kind delete cluster --name todo-operator
 - **修复**：优先修复 Controller 或外部清理失败原因。只有确认外部资源已经人工清理后，才可以手动移除 finalizer：
 
   ```bash
-  kubectl patch todoapp todo-platform --type json -p='[{"op":"remove","path":"/metadata/finalizers"}]'
+  kubectl patch todoapp todo-platform --type merge -p '{"metadata":{"finalizers":null}}'
   ```
+
+  这条命令会清空该对象上的全部 finalizers，只能在确认本示例没有其他控制器 finalizer、且外部资源已经清理后使用。
 
 - **预防**：Finalizer 清理函数必须幂等，并为外部 API 调用设置超时、重试和告警。
 
