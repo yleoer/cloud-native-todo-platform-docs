@@ -12,15 +12,15 @@
 - 能区分 Helm 的参数化打包能力与 Kustomize 的声明式环境叠加能力。
 - 能说明 `configMapGenerator` 和 `secretGenerator` 为什么会默认生成带 hash 后缀的对象名。
 - 能理解 `patches`、`images`、`replicas`、`namespace`、`labels` 在 Kustomize 渲染链路中的作用。
-- 能解释为什么 `namespace:` transformer 不会自动修正已经写死的 RoleBinding subject Namespace。
+- 能解释为什么 `namespace:` transformer 不会自动修正已经写死的 RoleBinding subject Namespace，以及 Role `resourceNames` 如何跟随 generator 名称改写。
 - 能描述 Kustomize 在 GitOps、CI/CD 和多环境发布中的常见位置。
 
 ### 1.2 技能目标
 
 - 能从第 27 篇 Helm Chart 渲染出可复用的 Kustomize base。
 - 能为 Todo Platform 创建 `dev`、`test`、`prod` 三套 overlay。
-- 能用 `configMapGenerator` 管理环境配置，用 `secretGenerator` 管理本地实验 Secret。
-- 能用 `replicas`、`images` 和 `patches` 修改副本数、镜像版本、资源限制和 RBAC subject Namespace。
+- 能用 `configMapGenerator` 生成环境配置，用 `secretGenerator` 管理本地实验 Secret。
+- 能用 `replicas`、`images` 和 `patches` 修改副本数、镜像版本、资源限制、RBAC subject Namespace 和 Role `resourceNames`。
 - 能用 `kubectl kustomize`、`kubectl apply -k --dry-run=server` 和 `kubectl apply -k` 验证多环境 YAML。
 - 能排查 Kustomize 路径、patch、generator、Namespace 和 Secret 文件相关错误。
 
@@ -172,7 +172,7 @@ Kustomize 不直接修改 base 文件，而是输出一份新的 YAML 流。这�
 | `secretGenerator` | 生成 Secret | 本地实验生成 `todo-api-auth` |
 | `images` | 替换镜像名、tag 或 digest | 管理 Todo API 镜像版本 |
 | `replicas` | 修改 Deployment 副本数 | dev 1 个，test 2 个，prod 3 个 |
-| `patches` | 对对象做局部修改 | 修正 RoleBinding subject Namespace、调整资源 |
+| `patches` | 对对象做局部修改 | 修正 RoleBinding subject Namespace、Role resourceNames、调整资源 |
 
 这些字段可以理解为一组内置 transformer 和 generator。Kustomize 读取资源后，按规则生成、转换、补丁，最后输出完整 Kubernetes YAML。
 
@@ -251,6 +251,8 @@ subjects:
 ```
 
 Kustomize 不会猜测这段字符串也要跟着环境变化，所以本篇会在每个 overlay 中显式 patch 它。
+
+另一个容易忽略的点是 Role 的 `resourceNames`。第 27 篇 Helm Chart 默认只允许读取 `todo-platform` ConfigMap；本篇 overlay 会让 Deployment 改读 `todo-platform-env-*`。因此 overlay 也要把 Role `resourceNames[0]` patch 成 generator 名称 `todo-platform-env`，Kustomize 再把它自动改写成最终 hash 名称。
 
 ### 3.6 Helm 与 Kustomize 的边界
 
@@ -341,12 +343,12 @@ envFrom:
 
 patch 的价值是“只表达差异”，但 patch 也很容易失控。一个好的 overlay patch 应该满足：
 
-- 只修改一个明确目的，例如资源限制或 RoleBinding subject Namespace。
+- 只修改一个明确目的，例如资源限制、RoleBinding subject Namespace 或 Role `resourceNames`。
 - patch 文件名能说明意图，例如 `patch-deployment-resources.yaml`。
 - 不复制整个 Deployment，否则 overlay 会变成第二套 base。
 - 目标对象唯一，避免一个 patch 同时命中多个对象。
 
-本篇故意把 RoleBinding subject Namespace 作为显式 patch，是为了让你看到 Kustomize 的边界：它理解 Kubernetes 常见字段，但不会替你推断所有字符串语义。
+本篇故意把 RoleBinding subject Namespace 和 Role `resourceNames` 作为显式 patch，是为了让你看到 Kustomize 的边界：它理解 Kubernetes 常见字段，但不会替你推断所有字符串语义。把 `resourceNames` patch 成 generator 名称后，Kustomize 会继续把它改写成带 hash 的最终 ConfigMap 名称。
 
 ### 4.5 多环境配置如何进入 CI/CD
 
@@ -391,7 +393,7 @@ helm version --short
 docker image inspect todo-api:v0.1.0 --format '{{.RepoTags}}'
 ```
 
-如果 `helm` 不在 `PATH` 中，请先回到第 27 篇完成 Helm 4 安装。如果 `todo-api:v0.1.0` 不存在，请回到第 16 篇重新构建镜像，并按第 21 篇方式加载到 kind：
+如果 `helm version --short` 输出 `helm: command not found` 或 `The term 'helm' is not recognized`，说明 Helm 不在 `PATH` 中，请先回到第 27 篇完成 Helm 4 安装。如果 `todo-api:v0.1.0` 不存在，请回到第 16 篇重新构建镜像，并按第 21 篇方式加载到 kind：
 
 ```bash
 kind load docker-image todo-api:v0.1.0 --name todo-k8s
@@ -480,7 +482,7 @@ resources:
 YAML
 ```
 
-创建本地实验 Secret 输入文件。`hash-password` 子命令来自第 14 篇，并在第 16 篇镜像构建实验中验证过：
+创建本地实验 Secret 输入文件。`hash-password` 子命令来自第 14 篇，并在第 16 篇镜像构建实验中验证过。`.secrets/` 只服务本地实验，不要把真实生产密钥放入 GitOps 仓库：
 
 ```bash
 HASH=$(docker run --rm todo-api:v0.1.0 hash-password "change-me-123")
@@ -572,6 +574,15 @@ patches:
     patch: |-
       - op: replace
         path: /spec/template/spec/containers/0/envFrom/0/configMapRef/name
+        value: todo-platform-env
+  - target:
+      group: rbac.authorization.k8s.io
+      version: v1
+      kind: Role
+      name: todo-platform-config-reader
+    patch: |-
+      - op: replace
+        path: /rules/0/resourceNames/0
         value: todo-platform-env
   - target:
       group: rbac.authorization.k8s.io
@@ -672,6 +683,15 @@ patches:
     patch: |-
       - op: replace
         path: /spec/template/spec/containers/0/envFrom/0/configMapRef/name
+        value: todo-platform-env
+  - target:
+      group: rbac.authorization.k8s.io
+      version: v1
+      kind: Role
+      name: todo-platform-config-reader
+    patch: |-
+      - op: replace
+        path: /rules/0/resourceNames/0
         value: todo-platform-env
   - target:
       group: rbac.authorization.k8s.io
@@ -780,6 +800,15 @@ patches:
   - target:
       group: rbac.authorization.k8s.io
       version: v1
+      kind: Role
+      name: todo-platform-config-reader
+    patch: |-
+      - op: replace
+        path: /rules/0/resourceNames/0
+        value: todo-platform-env
+  - target:
+      group: rbac.authorization.k8s.io
+      version: v1
       kind: RoleBinding
       name: todo-platform-read-config
     patch: |-
@@ -816,7 +845,7 @@ grep -n "configMapRef" -A2 /tmp/todo-dev.yaml
 grep -n "secretRef" -A2 /tmp/todo-dev.yaml
 ```
 
-先创建 Namespace，避免 server-side dry-run 因 Namespace 不存在而提前失败：
+先创建 Namespace，避免 server-side dry-run 因 Namespace 不存在而提前失败。`kubectl apply --dry-run=server -k` 会把 overlay 渲染结果发送给 API Server 校验，但 dry-run 不会真的持久化 Namespace；如果 Namespace 尚不存在，后续 namespaced 资源可能会先报 `namespaces "todo-dev" not found`：
 
 ```bash
 kubectl create namespace todo-dev --dry-run=client -o yaml | kubectl apply -f -
@@ -979,6 +1008,25 @@ todo-test
 todo-prod
 ```
 
+验证 Role `resourceNames` 已经跟随环境 ConfigMap hash 改写：
+
+```bash
+kubectl -n todo-dev get role todo-platform-config-reader \
+  -o jsonpath='{.rules[0].resourceNames[0]}{"\n"}'
+kubectl -n todo-test get role todo-platform-config-reader \
+  -o jsonpath='{.rules[0].resourceNames[0]}{"\n"}'
+kubectl -n todo-prod get role todo-platform-config-reader \
+  -o jsonpath='{.rules[0].resourceNames[0]}{"\n"}'
+```
+
+预期分别以环境 ConfigMap 名称开头：
+
+```text
+todo-platform-env-...
+todo-platform-env-...
+todo-platform-env-...
+```
+
 验证 prod Namespace 的 Pod Security 标签：
 
 ```bash
@@ -1096,34 +1144,47 @@ rm -rf deployments/kustomize
 
 - **预防**：想让配置变化触发滚动更新时，优先让 overlay 生成新的环境 ConfigMap，并确认 Deployment 引用的是生成器名称，而不是 base 中固定名对象。
 
-### 错误 3：RoleBinding subject Namespace 仍指向 base
+### 错误 3：RBAC 仍指向 base Namespace 或 base ConfigMap
 
-- **现象**：对象都创建成功，但 RBAC 检查异常，RoleBinding 里 subject 仍然是 `todo-kustomize-base`：
+- **现象**：对象都创建成功，但 RBAC 检查异常。RoleBinding 里 subject 仍然是 `todo-kustomize-base`，或者 Role 仍只允许读取 `todo-platform`：
 
   ```bash
   kubectl -n todo-dev get rolebinding todo-platform-read-config \
     -o jsonpath='{.subjects[0].namespace}{"\n"}'
+  kubectl -n todo-dev get role todo-platform-config-reader \
+    -o jsonpath='{.rules[0].resourceNames[0]}{"\n"}'
   ```
 
   输出：
 
   ```text
   todo-kustomize-base
+  todo-platform
   ```
 
-- **原因**：Kustomize 的 `namespace:` 会改对象的 `metadata.namespace`，但不会自动改写 RoleBinding `subjects[].namespace` 里已经写死的字符串。
+- **原因**：Kustomize 的 `namespace:` 会改对象的 `metadata.namespace`，但不会自动改写 RoleBinding `subjects[].namespace` 里已经写死的字符串。另一方面，overlay 已让 Deployment 引用 `todo-platform-env-*`，Role `resourceNames` 也应该先 patch 成 generator 名称 `todo-platform-env`，再由 Kustomize 改写成最终 hash 名称。
 - **排查**：
 
   ```bash
-  rg -n "/subjects/0/namespace|todo-dev" deployments/kustomize/overlays/dev/kustomization.yaml
+  rg -n "/subjects/0/namespace|/rules/0/resourceNames/0|todo-dev|todo-platform-env" deployments/kustomize/overlays/dev/kustomization.yaml
+  kubectl kustomize deployments/kustomize/overlays/dev | grep -n "subjects\\|resourceNames" -A3
   ```
 
-  如果没有对应 patch，说明 overlay 漏掉了这个修正。
+  如果没有对应 patch，说明 overlay 漏掉了 RBAC 修正。
 
-- **修复**：给每个 overlay 增加 JSON Patch：
+- **修复**：给每个 overlay 增加两个 JSON Patch：
 
   ```yaml
   patches:
+    - target:
+        group: rbac.authorization.k8s.io
+        version: v1
+        kind: Role
+        name: todo-platform-config-reader
+      patch: |-
+        - op: replace
+          path: /rules/0/resourceNames/0
+          value: todo-platform-env
     - target:
         group: rbac.authorization.k8s.io
         version: v1
@@ -1135,7 +1196,7 @@ rm -rf deployments/kustomize
           value: todo-dev
   ```
 
-- **预防**：凡是 base 里有显式 Namespace 字符串，都要检查 Kustomize 是否会自动转换；不确定时用 `kubectl kustomize` 看最终输出。
+- **预防**：凡是 generator 改变了 ConfigMap / Secret 名称，或者 base 里有显式 Namespace 字符串，都要检查 Deployment 引用、Role `resourceNames`、RoleBinding subject、Volume 引用和其他对象引用是否一起被改写。
 
 ### 错误 4：server-side dry-run 提示 Namespace 不存在
 
@@ -1225,10 +1286,10 @@ rm -rf deployments/kustomize
 - 能解释 base 与 overlay 的职责边界。
 - 能从 Helm Chart 生成不含明文 Secret 的 Kustomize base。
 - 能用 `kubectl kustomize` 渲染 dev、test、prod 三套 YAML。
-- 能用 `configMapGenerator` 修改环境配置，并看到 ConfigMap hash 后缀。
+- 能用 `configMapGenerator` 生成环境配置，并看到 ConfigMap hash 后缀。
 - 能用 `secretGenerator` 生成 Secret，并确认 Deployment 引用被改写。
 - 能用 `replicas` 分别设置 dev=1、test=2、prod=3。
-- 能用 `patches` 修正 RoleBinding subject Namespace。
+- 能用 `patches` 修正 RoleBinding subject Namespace 和 Role `resourceNames`。
 - 能用 `kubectl apply --dry-run=server -k` 通过 API Server 校验。
 - 能部署三套环境，并访问至少一套环境的 `/healthz` 和 `/readyz`。
 - 能说明 Kustomize 与 Helm 各自适合解决的问题。
@@ -1241,7 +1302,7 @@ rm -rf deployments/kustomize
 2. `configMapGenerator` 默认追加 hash 后缀解决什么问题？
 3. 为什么本篇关闭 Helm Secret 模板，改用 overlay 的 `secretGenerator`？
 4. `kubectl kustomize` 和 `kubectl apply -k` 的区别是什么？
-5. 为什么 RoleBinding subject Namespace 需要显式 patch？
+5. 为什么 RoleBinding subject Namespace 和 Role `resourceNames` 需要显式 patch？
 
 ### 9.2 实操题
 
