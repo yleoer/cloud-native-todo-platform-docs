@@ -125,6 +125,17 @@ DNS 排障要分两层：
 1. Service 名能不能解析，例如 `todo-platform.todo-dev.svc.cluster.local`。
 2. 解析后能不能连接到目标端口，例如 `http://todo-platform.todo-dev.svc.cluster.local:18080/healthz`。
 
+如果用户看到的是 Ingress 或 Gateway 返回 `502`，排障不要停在 Service。继续检查 Ingress Controller 或 Gateway Controller 的 Pod 和日志。以前面 Traefik 入口为例：
+
+```bash
+kubectl get pods -A | grep -i traefik
+kubectl -n traefik get pod
+kubectl -n traefik logs deployment/traefik --tail=100
+kubectl -n todo-dev get ingress,httproute
+```
+
+如果你的入口控制器 namespace 不是 `traefik`，先用第一条命令确认实际 namespace，再替换后续命令。
+
 ### 3.5 PVC、PV 与 StorageClass
 
 PVC 排障的核心是“请求是否能绑定到可用存储”。PVC `Pending` 时，不要只看 Pod，要看 PVC、StorageClass 和事件。
@@ -255,6 +266,8 @@ kubectl -n todo-dev set image deployment/todo-platform todo-api=todo-api:v0.1.2-
 
 本篇命令默认在 **Cloud Native Todo Platform 应用仓库根目录** 执行，也就是包含 `api/`、`deployments/`、`observability/` 的仓库根目录。
 
+本篇命令默认使用 Bash 语法，例如 here-doc、`tail`、`awk`、`grep` 和 JSON patch 的单引号。Windows 用户建议在 Git Bash 或 WSL 中执行；如果必须使用 PowerShell，请把 `cat > file <<'EOF'` 这类命令改为手工创建文件，或使用 PowerShell 的 here-string。
+
 版本信息在 2026-05-29 查询：
 
 | 工具 | 版本 | 用途 |
@@ -268,6 +281,8 @@ kubectl -n todo-dev set image deployment/todo-platform todo-api=todo-api:v0.1.2-
 | stern | v1.34.0 | 多 Pod 日志追踪 |
 | jq | 1.7.x | 解析 JSON 输出 |
 
+说明：课程蓝图中的 Kubernetes 基线为 1.36.x，本篇继续使用第 30-32 篇已经创建的 kind 集群实际版本 v1.35.0，是为了保持实验环境连续。本篇不使用 Kubernetes 1.36 专属能力；如果你的集群已经升级到 1.36.x，下面命令仍然适用。
+
 确认前置环境：
 
 ```bash
@@ -280,6 +295,21 @@ kubectl get namespace monitoring
 kubectl get namespace observability
 kubectl -n todo-dev get deploy,svc,pod
 kubectl -n argocd get applications.argoproj.io
+argocd app list
+argocd app get todo-platform-dev
+```
+
+如果 `argocd app list` 提示未登录或找不到 Argo CD server，先按第 30 篇方式打开端口转发并登录。终端 A 保持端口转发运行：
+
+```bash
+kubectl -n argocd port-forward service/argocd-server 8080:443
+```
+
+终端 B 登录并确认应用名称：
+
+```bash
+argocd login 127.0.0.1:8080 --insecure
+argocd app get todo-platform-dev
 ```
 
 确认工具版本：
@@ -292,6 +322,23 @@ argocd version --client
 k9s version
 stern --version
 jq --version
+```
+
+确认本篇用到的公共镜像 tag 可以访问：
+
+```bash
+docker manifest inspect registry.k8s.io/pause:3.10 >/dev/null
+docker manifest inspect registry.k8s.io/e2e-test-images/busybox:1.36.1-1 >/dev/null
+docker manifest inspect registry.k8s.io/e2e-test-images/agnhost:2.53 >/dev/null
+docker manifest inspect curlimages/curl:8.16.0 >/dev/null
+docker manifest inspect nicolaka/netshoot:v0.14 >/dev/null
+```
+
+如果网络环境无法访问 Docker Hub 或 `registry.k8s.io`，先从企业镜像代理拉取等价镜像，再加载到 kind 集群，或者把 YAML 中的镜像地址替换为企业内部镜像仓库：
+
+```bash
+docker pull <your-registry>/<image>:<tag>
+kind load docker-image <your-registry>/<image>:<tag> --name todo-gitops
 ```
 
 如果没有安装 `k9s` 或 `stern`，本篇仍可只用 `kubectl` 完成实验；但建议安装，因为生产排障中它们能显著提升查看速度。
@@ -635,7 +682,7 @@ ImagePullBackOff
 Failed to pull image "todo-api:not-exist-33"
 ```
 
-修复：
+修复时首选 GitOps 恢复：
 
 ```bash
 argocd app sync todo-platform-dev --timeout 300
@@ -647,6 +694,15 @@ kubectl -n todo-dev rollout status deployment/todo-platform --timeout=180s
 ```bash
 argocd app list
 ```
+
+如果现场无法立刻完成 Argo CD CLI 登录，可以先用 Kubernetes 回滚作为止血动作：
+
+```bash
+kubectl -n todo-dev rollout undo deployment/todo-platform
+kubectl -n todo-dev rollout status deployment/todo-platform --timeout=180s
+```
+
+止血后仍要回到第 30 篇的 GitOps 流程，完成 `argocd app sync`，确保集群状态和 Git 期望状态一致。
 
 #### 5.5.4 演练三：CrashLoopBackOff
 
@@ -675,12 +731,21 @@ Back-off restarting failed container
 Error exitCode=1
 ```
 
-修复：
+修复时首选 GitOps 恢复：
 
 ```bash
 argocd app sync todo-platform-dev --timeout 300
 kubectl -n todo-dev rollout status deployment/todo-platform --timeout=180s
 ```
+
+如果现场无法立刻完成 Argo CD CLI 登录，可以先执行：
+
+```bash
+kubectl -n todo-dev rollout undo deployment/todo-platform
+kubectl -n todo-dev rollout status deployment/todo-platform --timeout=180s
+```
+
+这只是本地止血，后续仍要完成 Argo CD 登录和同步，避免下一次 GitOps reconciliation 又把集群拉回未确认状态。
 
 如果 Argo CD 自动 self-heal 很快，这个故障可能被自动恢复。这在生产中是好事，说明 GitOps 控制器正在把集群拉回期望状态。
 
@@ -713,6 +778,13 @@ OOMKilled exitCode=137
 container_memory_working_set_bytes{namespace="todo-dev", pod="todo-oom-demo"}
 ```
 
+如果排查的是请求变慢而不是容器退出，还要同时看 CPU 使用和 throttling。CPU throttling 不一定触发重启，但会显著拉高 P95/P99 延迟：
+
+```promql
+rate(container_cpu_usage_seconds_total{namespace="todo-dev", pod="todo-oom-demo"}[5m])
+rate(container_cpu_cfs_throttled_periods_total{namespace="todo-dev", pod="todo-oom-demo"}[5m])
+```
+
 修复：
 
 ```bash
@@ -740,7 +812,7 @@ kubectl -n todo-dev run todo-curl-once \
   --command -- curl -sS --max-time 3 http://todo-broken-service:18080/healthz
 ```
 
-预期输出：
+预期结果是请求失败。不同 CNI、kube-proxy 模式和超时设置下，输出可能是 timeout、connection refused 或 no route to host。示例之一如下：
 
 ```text
 curl: (28) Operation timed out after 3000 milliseconds with 0 bytes received
@@ -755,7 +827,7 @@ kubectl -n todo-dev describe svc todo-broken-service
 kubectl -n todo-dev get endpointslice -l kubernetes.io/service-name=todo-broken-service -o yaml
 ```
 
-判断标准：Service selector 是 `todo-platform-typo`，但 Pod label 是 `todo-platform`，所以 endpoints 为空。
+判断标准：Service selector 是 `todo-platform-typo`，但 Pod label 是 `todo-platform`，所以 EndpointSlice 为空。这里的核心证据不是 curl 的具体报错文本，而是 Service 没有任何后端。
 
 修复：
 
@@ -818,7 +890,9 @@ kubectl -n todo-dev wait --for=condition=Ready pod/todo-dns-client --timeout=120
 kubectl -n todo-dev exec todo-dns-client -- nslookup kubernetes.default.svc.cluster.local
 ```
 
-修复方式二，如果生产中是 NetworkPolicy 出站阻断，应该显式允许 DNS egress。示例策略如下：
+修复方式二，如果生产中是 NetworkPolicy 出站阻断，应该显式允许 DNS egress。注意：NetworkPolicy 只有在 CNI 插件支持并启用策略执行时才会生效；kind 默认的 kindnet 不执行 NetworkPolicy。要验证策略效果，应使用 Calico、Cilium 或云厂商托管 CNI。
+
+示例策略如下：
 
 ```yaml
 apiVersion: networking.k8s.io/v1
@@ -997,6 +1071,15 @@ kubectl -n todo-dev rollout status deployment/todo-platform --timeout=180s
 
 判断标准：Argo CD 应用是 `Synced` 和 `Healthy`，Deployment rollout 成功。
 
+如果 `argocd app get` 失败，先回到 5.2 节完成 Argo CD CLI 登录；如果需要先恢复业务，再执行：
+
+```bash
+kubectl -n todo-dev rollout undo deployment/todo-platform
+kubectl -n todo-dev rollout status deployment/todo-platform --timeout=180s
+```
+
+业务恢复后仍要完成 `argocd app sync todo-platform-dev`，把临时状态收敛回 Git 期望状态。
+
 **第二层：Pod 没有异常状态**
 
 ```bash
@@ -1047,6 +1130,15 @@ kubectl -n observability get pods
 argocd app sync todo-platform-dev --timeout 300
 kubectl -n todo-dev rollout status deployment/todo-platform --timeout=180s
 ```
+
+如果清理现场时 Argo CD CLI 暂时不可用，先执行本地回滚止血：
+
+```bash
+kubectl -n todo-dev rollout undo deployment/todo-platform
+kubectl -n todo-dev rollout status deployment/todo-platform --timeout=180s
+```
+
+随后补做 Argo CD 登录和同步，避免 GitOps 状态长期漂移。
 
 确认无残留：
 
@@ -1134,6 +1226,8 @@ kubectl -n todo-dev get pod,svc,pvc,networkpolicy | grep -E 'todo-(pending|broke
   curl: (28) Operation timed out after 3000 milliseconds with 0 bytes received
   ```
 
+  也可能表现为 `connection refused`、`no route to host` 或 Ingress/Gateway 返回 `502`，具体取决于网络路径和入口控制器。
+
 - **原因**：Service selector 选不中 Pod；Pod readiness 未通过，EndpointSlice 没有 ready endpoint；targetPort 名称不匹配；NetworkPolicy 阻断。
 - **排查**：
 
@@ -1142,9 +1236,10 @@ kubectl -n todo-dev get pod,svc,pvc,networkpolicy | grep -E 'todo-(pending|broke
   kubectl -n todo-dev get endpointslice -l kubernetes.io/service-name=todo-platform -o yaml
   kubectl -n todo-dev get pod -l app.kubernetes.io/name=todo-platform --show-labels
   kubectl -n todo-dev get networkpolicy
+  kubectl get pods -A | grep -i traefik
   ```
 
-  如果 EndpointSlice 为空，先查 selector 和 readiness；如果有 endpoint 但连接失败，再查 NetworkPolicy 和应用监听端口。
+  如果 EndpointSlice 为空，先查 selector 和 readiness；如果有 endpoint 但连接失败，再查 NetworkPolicy 和应用监听端口。如果入口层返回 `502`，继续看 Ingress/Gateway Controller 的日志。
 
 - **修复**：修正 selector、端口名、readinessProbe 或 NetworkPolicy。
 - **预防**：每次修改 Service selector、Pod label 和端口名时同时验证 EndpointSlice。
@@ -1181,7 +1276,7 @@ kubectl -n todo-dev get pod,svc,pvc,networkpolicy | grep -E 'todo-(pending|broke
 
 3. **资源问题不要只靠调大 limit**。OOMKilled、CPU Throttling 和 Pending 可能来自真实流量、代码泄漏、缓存配置、请求突增或资源请求不合理。调大 limit 只是止血手段之一。长期修复要结合 Prometheus 趋势、压测结果、HPA 策略和业务容量模型，避免把问题从一个 Pod 转移到节点层面。
 
-4. **网络排障要区分 DNS、Service、Endpoint 和策略**。DNS 能解析不代表 Service 有后端，Service 有 endpoint 也不代表 NetworkPolicy 放通。生产 runbook 应明确检查顺序：DNS 解析、EndpointSlice、Pod readiness、目标端口、NetworkPolicy、Ingress/Gateway、上游负载均衡。每一层都要有对应命令和判断标准。
+4. **网络排障要区分 DNS、Service、Endpoint 和策略**。DNS 能解析不代表 Service 有后端，Service 有 endpoint 也不代表 NetworkPolicy 放通。NetworkPolicy 是否真的生效取决于 CNI，kind 默认 kindnet 不执行策略，生产验证应使用支持策略的 Calico、Cilium 或云厂商 CNI。生产 runbook 应明确检查顺序：DNS 解析、EndpointSlice、Pod readiness、目标端口、NetworkPolicy、Ingress/Gateway、上游负载均衡。每一层都要有对应命令和判断标准。
 
 5. **存储排障必须保护数据**。PVC、PV、StorageClass 故障常常涉及真实数据。生产中不能为了让 Pod 启动就随意删除 PVC 或重建数据库卷。处理前要确认备份、快照、恢复点、访问模式和绑定关系；删除资源前至少做一次影响确认，并让业务负责人知道可能的数据影响。
 
@@ -1213,6 +1308,22 @@ flowchart TD
     Metrics --> Runbook
     Trace --> Runbook
     Runbook --> Recovery["argocd app sync 恢复"]
+```
+
+建议把每次演练按下面模板写成事故复盘记录。模板不追求长，而是要求证据完整、责任清晰：
+
+```markdown
+## 事故复盘：<标题>
+
+- 时间线：<告警时间、确认时间、止血时间、恢复时间>
+- 影响范围：<namespace、服务、接口、用户比例、持续时间>
+- 用户症状：<502、超时、登录失败、延迟升高等>
+- 检测信号：<告警、Event、日志、指标、Trace 链接>
+- 根因：<直接原因和触发条件>
+- 止血动作：<执行命令、执行人、回滚方式>
+- 永久修复：<代码、YAML、容量、流程或监控修复>
+- 预防措施：<测试、告警、准入、runbook 更新>
+- 负责人和截止时间：<owner / due date>
 ```
 
 ### 8.2 能力验收标准
