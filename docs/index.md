@@ -156,7 +156,7 @@ hide:
 - [第 36 篇：Controller 机制：Informer 与 Workqueue [B]](chapters/stage-06-platform-operator/36-controller-informer-workqueue.md)
 - [第 37 篇：手写简化版 Controller [C]](chapters/stage-06-platform-operator/37-handwritten-controller.md)
 - [第 38 篇：Kubebuilder 入门 [C]](chapters/stage-06-platform-operator/38-kubebuilder.md)
-- 第 39 篇：Operator 高级机制
+- [第 39 篇：Operator 高级机制 [C]](chapters/stage-06-platform-operator/39-operator-advanced.md)
 - 第 40 篇：Operator 测试、发布与升级
 - 第 41 篇：Operator 生产实践
 - 第 42 篇：综合集成与职业能力验收
@@ -180,6 +180,6 @@ http://127.0.0.1:8000
 
 ## 下一步计划
 
-- 进入第 39 篇 Operator 高级机制，在 Kubebuilder 项目中补齐 OwnerReference、Finalizer、Webhook、事件和 Conditions 最佳实践。
-- 等第 37 篇手写简化版 Controller 合并后，对照补充手写 Controller 与 Kubebuilder 版本的差异说明。
-- 延续阶段六产物，逐步把 TodoApp Operator 推进到可测试、可发布、可生产运维的版本。
+- 进入第 40 篇 Operator 测试、发布与升级，为 Webhook、Finalizer、Conditions 和调谐逻辑补齐自动化测试。
+- 把第 39 篇的本地部署流程整理为可重复发布流程：构建 Operator 镜像、生成部署清单、准备 Helm 4 Chart。
+- 延续阶段六产物，逐步把 TodoApp Operator 推进到可发布、可升级、可生产运维的版本。
