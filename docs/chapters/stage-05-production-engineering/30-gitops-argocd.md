@@ -546,6 +546,10 @@ patches:
 YAML
 ```
 
+dev 使用 `TODO_LOG_LEVEL=debug`，是为了让本地排障能看到更多请求与配置细节；prod 会改为 `info`，减少日志量并降低敏感信息暴露概率。本篇仍沿用第 28 篇的内存 Repository 约定：不设置 `TODO_DATABASE_DSN` 时，Todo API 不连接 PostgreSQL。
+
+这里用 JSON patch 把 Deployment 的 `configMapRef.name` 改成生成器基名 `todo-platform-env`。Kustomize 会先应用 patch，再由 name reference transformer 把它改写成带内容哈希的最终 ConfigMap 名称；第 5.5 节会用渲染命令验证这一点。
+
 创建 prod Namespace：
 
 ```bash
@@ -653,6 +657,8 @@ patches:
         value: todo-prod
 YAML
 ```
+
+prod 使用 `TODO_LOG_LEVEL=info` 和 3 个副本，体现生产环境更关注稳定性、日志成本和容量冗余。本篇为了聚焦 GitOps 发布链路，prod 示例仍不接入 PostgreSQL；后续如果把数据库主链路纳入 GitOps，需要同步引入 StatefulSet/Secret/备份恢复策略。
 
 创建 AppProject。这里不用默认 `default` project，而是把 Todo Platform 限定在本章需要的仓库、Namespace 和资源类型内：
 
@@ -786,7 +792,10 @@ kubectl kustomize deployments/gitops/envs/dev > /tmp/todo-gitops-dev.yaml
 kubectl kustomize deployments/gitops/envs/prod > /tmp/todo-gitops-prod.yaml
 grep -n "kind: Deployment" /tmp/todo-gitops-dev.yaml
 grep -n "namespace: todo-prod" /tmp/todo-gitops-prod.yaml
+grep -n "todo-platform-env-" /tmp/todo-gitops-dev.yaml
 ```
+
+最后一行用于确认 `configMapGenerator` 的内容哈希已经生效：输出里既应该有 `ConfigMap/todo-platform-env-...`，也应该看到 Deployment 的 `configMapRef.name` 被重写为同一个带哈希后缀的名称。如果这里没有哈希后缀，说明 Kustomize 版本或 patch 顺序不符合预期，应先停止后续 Argo CD 实验。
 
 创建或复用一个持续运行的 kind 集群。第 29 篇的 CI 集群会随 workflow 销毁，本篇需要保留集群给 Argo CD 持续运行：
 
@@ -795,7 +804,7 @@ kind create cluster --name todo-gitops --image kindest/node:v1.35.0
 kubectl cluster-info --context kind-todo-gitops
 ```
 
-安装 Argo CD。官方 v3.4.3 安装清单需要 server-side apply，避免大型 CRD 在 client-side apply 时触发 annotation 大小限制：
+安装 Argo CD。官方 v3.4.3 安装清单可以使用 server-side apply，避免大型 CRD 在 client-side apply 时触发 annotation 大小限制。v3.4.3 的 install.yaml 中 `argocd-application-controller` 仍是 StatefulSet，因此下面使用 `rollout status statefulset/...` 等待它启动：
 
 ```bash
 ARGOCD_VERSION="v3.4.3"
@@ -806,6 +815,14 @@ kubectl apply -n argocd --server-side --force-conflicts \
 
 kubectl -n argocd rollout status deployment/argocd-server --timeout=300s
 kubectl -n argocd rollout status statefulset/argocd-application-controller --timeout=300s
+```
+
+如果 300 秒后仍未 Ready，先看控制面状态和镜像拉取事件：
+
+```bash
+kubectl -n argocd get pods
+kubectl -n argocd describe pod -l app.kubernetes.io/name=argocd-server
+kubectl -n argocd describe pod -l app.kubernetes.io/name=argocd-application-controller
 ```
 
 安装 Argo CD CLI。不同系统选择对应命令：
@@ -856,6 +873,23 @@ kubectl -n argocd rollout status statefulset/argocd-application-controller --tim
     argocd login localhost:8080 --username admin --password '<PASTE_INITIAL_PASSWORD>' --insecure
     ```
 
+如果 `argocd admin initial-password -n argocd` 没有输出，使用 Kubernetes Secret 作为备选方式读取初始密码：
+
+=== "Linux / macOS / WSL"
+
+    ```bash
+    kubectl -n argocd get secret argocd-initial-admin-secret \
+      -o jsonpath="{.data.password}" | base64 -d
+    echo
+    ```
+
+=== "Windows PowerShell"
+
+    ```powershell
+    $Encoded = kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}"
+    [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($Encoded))
+    ```
+
 登录成功后建议立即修改密码，再删除初始密码 Secret。学习环境可以先跳过；生产环境不能长期保留初始密码入口：
 
 ```bash
@@ -864,12 +898,22 @@ argocd account update-password --current-password '<PASTE_INITIAL_PASSWORD>' --n
 kubectl -n argocd delete secret argocd-initial-admin-secret --ignore-not-found
 ```
 
+生产环境不要把真实密码明文写进 shell history；应优先使用交互式输入、一次性终端或团队规定的密钥管理流程。
+
 如果 Todo API 镜像只存在本机，需要先把镜像加载进 kind 集群。第 29 篇已经把正式镜像推送到 GHCR；如果你还在本地学习阶段，可以继续使用本地 `todo-api:v0.1.0`：
 
 ```bash
 docker image inspect todo-api:v0.1.0
 kind load docker-image todo-api:v0.1.0 --name todo-gitops
 ```
+
+如果 `docker image inspect` 提示 `No such image`，先回到第 16 篇的镜像构建步骤，或在应用仓库根目录重新构建：
+
+```bash
+docker build -t todo-api:v0.1.0 -f api/Dockerfile .
+```
+
+如果你想复用第 29 篇已经推送到 GHCR 的镜像，也可以把 GitOps overlay 中的 `images.newName` 改为 `ghcr.io/<owner>/<repo>/todo-api`，并确保 kind 集群能拉取该镜像。
 
 创建 dev/prod Namespace 和运行时 Secret。这里先用第 14 篇实现的 `hash-password` 子命令生成真实密码 hash，避免占位字符串导致认证逻辑不可用。生产环境应改用 External Secrets、Sealed Secrets、Vault 或云密钥服务：
 
@@ -1004,7 +1048,7 @@ argocd app wait todo-platform-dev --sync --health --timeout 300
 kubectl -n todo-dev get configmap | grep todo-platform-env
 ```
 
-切换到 ApplicationSet 管理 dev/prod。先用 Argo CD 的非级联删除移除单独的 dev Application，但保留已经同步出来的 Kubernetes 资源；随后由 ApplicationSet 重新接管。这里不用 `kubectl delete application --cascade=orphan`，因为 Argo CD 是否级联删除资源取决于 Application finalizer：
+切换到 ApplicationSet 管理 dev/prod。先用 Argo CD 的非级联删除移除单独的 dev Application，但保留已经同步出来的 Kubernetes 资源；随后由 ApplicationSet 重新创建同名 Application 并接管这些资源。`--cascade=false` 会保留已同步的 Kubernetes 对象，只删除 Application CR；默认级联删除会在删除 Application 前清理它管理的对象。这里不要把 `kubectl delete --cascade=orphan` 和 Argo CD CLI 的 `--cascade=false` 混用，它们属于两套不同的删除语义：
 
 ```bash
 argocd app delete todo-platform-dev --cascade=false -y
@@ -1017,6 +1061,8 @@ argocd app sync todo-platform-prod --timeout 300
 argocd app wait todo-platform-dev --sync --health --timeout 300
 argocd app wait todo-platform-prod --sync --health --timeout 300
 ```
+
+ApplicationSet 创建的新 Application 首次同步时，Argo CD 会对比 Git 中的期望状态和集群里已经存在的对象。对象内容一致时通常不会重建业务资源，而是在同步过程中补齐 Argo CD 需要的 tracking metadata，把现有对象纳入新 Application 管理。
 
 ### 5.6 预期输出
 
@@ -1225,9 +1271,11 @@ git push origin HEAD
   argocd app get todo-platform-dev
   grep -n "secretGenerator" -A5 deployments/kustomize/overlays/dev/kustomization.yaml
   grep -n "secretGenerator" -A5 deployments/gitops/envs/dev/kustomization.yaml
+  test -f deployments/kustomize/base/todo-platform-rendered.yaml
+  test -f deployments/gitops/envs/dev/namespace.yaml
   ```
 
-  GitOps overlay 不应包含 `secretGenerator`。
+  GitOps overlay 不应包含 `secretGenerator`。如果 `kubectl kustomize deployments/gitops/envs/dev` 直接报路径错误，优先检查第 28 篇产物 `deployments/kustomize/base/todo-platform-rendered.yaml` 是否存在，以及 `../../../kustomize/base` 是否仍然能从 `deployments/gitops/envs/dev` 指回 base 目录。
 
 - **修复**：让 Application 指向 `deployments/gitops/envs/dev`，并在集群中预创建 `Secret/todo-api-auth`。
 - **预防**：本地实验 Secret、CI 临时 Secret 和 GitOps 生产 Secret 要分开治理。不要把第 28 篇 `.secrets/` 当成 GitOps 方案。
@@ -1309,11 +1357,12 @@ git push origin HEAD
   docker image inspect todo-api:v0.1.0
   ```
 
-  如果镜像是 `todo-api:v0.1.0`，kind 节点需要提前 `kind load docker-image`。如果镜像是 `ghcr.io/...`，检查 registry 访问权限。
+  如果镜像是 `todo-api:v0.1.0`，kind 节点需要提前 `kind load docker-image`。如果 `docker image inspect` 也失败，说明本地镜像尚未构建。如果镜像是 `ghcr.io/...`，检查 registry 访问权限。
 
 - **修复**：
 
   ```bash
+  docker build -t todo-api:v0.1.0 -f api/Dockerfile .
   kind load docker-image todo-api:v0.1.0 --name todo-gitops
   kubectl -n todo-dev rollout restart deployment/todo-platform
   ```
@@ -1332,7 +1381,7 @@ git push origin HEAD
   applications.argoproj.io "todo-platform-dev" already exists
   ```
 
-- **原因**：从单独 Application 切换到 ApplicationSet 时，先前的 `todo-platform-dev` Application 仍然占用同名对象，或者删除时触发了 Argo CD 级联删除，把已经同步出来的 Kubernetes 资源一起删掉。
+- **原因**：从单独 Application 切换到 ApplicationSet 时，先前的 `todo-platform-dev` Application 仍然占用同名对象，或者误用了默认级联删除，把已经同步出来的 Kubernetes 资源一起删掉。
 - **排查**：
 
   ```bash
