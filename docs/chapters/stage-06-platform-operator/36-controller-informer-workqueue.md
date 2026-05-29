@@ -232,7 +232,7 @@ start workers
 process queue
 ```
 
-第 37 篇手写 Controller 会显式调用类似 `WaitForCacheSync` 的逻辑。本篇模拟程序也会保留“先同步、再处理”的思想。
+第 37 篇手写 Controller 会显式调用类似 `WaitForCacheSync` 的逻辑。本篇模拟程序也会用日志标出 cache sync 边界，并在缓存同步后再启动 worker。
 
 ### 4.3 Workqueue 如何去重和重试
 
@@ -287,6 +287,8 @@ Controller 可能只处理一次队列 key。如果 Reconcile 依赖第一条事
 | `Deployment` | 副本状态变化 | owner `TodoApp` key | 回写 `readyReplicas` |
 | `Service` | 服务创建、端口变化 | owner `TodoApp` key | 回写访问端点 |
 | `Ingress` | 域名或地址变化 | owner `TodoApp` key | 回写 URL |
+
+表中的 owner 或关联关系是 Controller 设计占位，不是凭空存在的魔法。真实实现需要通过 ownerReference、约定 label、字段引用或 `spec.databaseRef` / `spec.cacheRef` 这类显式字段建立反向映射；如果一个数据库被多个 `TodoApp` 共享，还需要一对多索引。
 
 第 37 篇先实现最小版本：监听 `TodoApp`，回写 status。第 38 篇用 Kubebuilder 后，再逐步补全 owner reference、secondary watch 和索引。
 
@@ -375,6 +377,8 @@ operator/
 ### 5.4 完整代码或配置
 
 #### 5.4.1 go.mod
+
+下面的 `cat <<EOF` 写文件方式适用于 Linux、macOS、Git Bash 和 WSL。PowerShell 用户可以用编辑器创建同名文件，或用 PowerShell here-string，文件内容保持一致。
 
 创建 `operator/controller-lab/go.mod`：
 
@@ -680,6 +684,9 @@ func main() {
 	}
 
 	var wg sync.WaitGroup
+	fmt.Println("informer: list initial TodoApp objects")
+	time.Sleep(40 * time.Millisecond)
+	fmt.Println("informer: cache synced, start workers")
 	wg.Add(1)
 	go startWorker(1, queue, state, &wg)
 
@@ -708,10 +715,13 @@ GO
 
 这段程序模拟了几件事：
 
+- Informer 先完成初始 List 和 cache sync，再启动 worker。
 - Informer 收到不同资源事件后，只把 `namespace/name` key 放进队列。
 - 同一个 key 多次入队会被去重。
 - Reconcile 失败后按延迟重试。
 - 依赖数据库、缓存和 Deployment 都 Ready 后，最终写出 Available 状态。
+
+为保持输出可读，本程序用 `queue: skip stale retry` 跳过成功后残留的延迟重试，这是教学模拟中的简化。真实生产代码应直接使用 client-go workqueue 或 controller-runtime 队列，并以官方实现的去重、限速和重试语义为准。
 
 #### 5.4.3 Controller 需求分析文档
 
@@ -802,14 +812,16 @@ Get-Content controller-design.md
 运行 `go run .` 后，输出类似下面这样：
 
 ```text
+informer: list initial TodoApp objects
+informer: cache synced, start workers
 event: Added todo-dev/todo-platform kind=TodoApp -> key=todo-dev/todo-platform
 queue: add todo-dev/todo-platform
 worker-1: get todo-dev/todo-platform
 event: Modified todo-dev/todo-platform kind=TodoApp -> key=todo-dev/todo-platform
 queue: mark dirty todo-dev/todo-platform
 reconcile todo-dev/todo-platform: desired replicas=3 generation=2
-worker-1: error todo-dev/todo-platform: dependencies not ready: database=false cache=false
 queue: re-add dirty todo-dev/todo-platform
+worker-1: error todo-dev/todo-platform: dependencies not ready: database=false cache=false
 queue: retry todo-dev/todo-platform after 120ms
 worker-1: get todo-dev/todo-platform
 reconcile todo-dev/todo-platform: desired replicas=3 generation=2
@@ -840,7 +852,7 @@ go run .
 **第二层：队列 key 正确**
 
 ```bash
-go run . | grep '-> key=todo-dev/todo-platform'
+go run . | grep -- '-> key=todo-dev/todo-platform'
 ```
 
 判断标准：`TodoApp`、`TodoDatabase`、`TodoCache`、`Deployment` 事件都能映射到 `todo-dev/todo-platform`。
