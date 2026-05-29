@@ -115,7 +115,7 @@ hide:
 </details>
 
 <details markdown="1">
-<summary><strong>阶段四：Kubernetes 应用交付（第 20-28 篇，当前已发布第 28 篇）</strong></summary>
+<summary><strong>阶段四：Kubernetes 应用交付（第 20-28 篇，当前已发布第 28 篇 + 阶段验收）</strong></summary>
 
 系统学习 Kubernetes 架构、工作负载、Service / Ingress / Gateway API、配置、存储、网络、安全、Helm 4 和 Kustomize。
 
@@ -128,6 +128,7 @@ hide:
 - [第 26 篇：Kubernetes 安全](chapters/stage-04-kubernetes/26-k8s-security.md)
 - [第 27 篇：Helm 4 包管理](chapters/stage-04-kubernetes/27-helm4.md)
 - [第 28 篇：Kustomize 多环境配置管理](chapters/stage-04-kubernetes/28-kustomize.md)
+- [阶段四附录 A：Kubernetes 应用交付综合验收](chapters/stage-04-kubernetes/stage-04-acceptance.md)
 
 </details>
 

@@ -262,8 +262,8 @@ Kubernetes 中更清晰的做法是：
 
 | 项目 | 版本 | 说明 |
 |---|---|---|
-| Kubernetes | 1.36.x | 与课程计划锁定版本一致 |
-| kubectl | 1.36.x | 与集群版本一致 |
+| Kubernetes | kind 实际 v1.35.0，1.36.x 可选覆盖 | 本篇不依赖 1.36 专属 API，按第 20 篇集群版本执行 |
+| kubectl | 与 API Server 相差不超过 1 个小版本 | 用于 apply、logs、exec 和 PVC/StatefulSet 排障 |
 | kind | 0.31.x | 本地 Kubernetes 集群 |
 | Docker Engine | 29.x | 构建与导入本地镜像 |
 | PostgreSQL | 18.x | 使用 `postgres:18-alpine` |
@@ -281,11 +281,11 @@ kubectl get nodes
 
 ```text
 kind-todo-k8s
-Client Version: v1.36.x
+Client Version: v1.35.x
 ...
-Server Version: v1.36.x
+Server Version: v1.35.0
 NAME                     STATUS   ROLES           AGE   VERSION
-todo-k8s-control-plane   Ready    control-plane   ...   v1.36.x
+todo-k8s-control-plane   Ready    control-plane   ...   v1.35.0
 ```
 
 不同平台的 `kubectl version` 可能额外输出 `Kustomize Version` 等行，上面的 `...` 表示省略了非关键版本信息。

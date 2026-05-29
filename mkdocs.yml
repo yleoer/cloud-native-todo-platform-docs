@@ -204,6 +204,7 @@ nav:
       - 26. Kubernetes 安全: chapters/stage-04-kubernetes/26-k8s-security.md
       - 27. Helm 4 包管理: chapters/stage-04-kubernetes/27-helm4.md
       - 28. Kustomize 多环境配置管理: chapters/stage-04-kubernetes/28-kustomize.md
+      - 附录 A. Kubernetes 应用交付综合验收: chapters/stage-04-kubernetes/stage-04-acceptance.md
 
   # - 阶段五 生产工程能力:
   #     - 29. CI/CD 自动化交付: chapters/stage-05-production-engineering/29-cicd.md
