@@ -12,7 +12,7 @@
 
 ## 🎯 学习路径
 
-新版课程设计为 **6 个学习阶段、42 大篇、约 230 章**。当前站点已发布阶段一至阶段四；后续会按新版设计继续推进生产工程和 Operator 能力。
+新版课程设计为 **6 个学习阶段、42 大篇、约 230 章**。当前站点已发布阶段一至阶段五，并已进入阶段六平台工程与 Operator 能力。
 
 <details open>
 <summary><strong>阶段一：基础能力（第 1-6 篇，已发布）</strong></summary>
@@ -95,11 +95,11 @@ CI/CD、GitOps、Prometheus / Grafana、Loki、OpenTelemetry 和 Kubernetes 生�
 </details>
 
 <details>
-<summary><strong>阶段六：平台工程与 Operator 能力（第 34-42 篇，规划中）</strong></summary>
+<summary><strong>阶段六：平台工程与 Operator 能力（第 34-42 篇，更新中）</strong></summary>
 
 Kubernetes API Machinery、CRD、手写 Controller、Kubebuilder、Webhook、Finalizer、Operator 测试发布、生产实践和最终集成。
 
-- 第 34 篇：Kubernetes API 扩展机制
+- [第 34 篇：Kubernetes API 扩展机制 [B]](docs/chapters/stage-06-platform-operator/34-k8s-api-extension.md)
 - 第 35 篇：CRD 设计与实践
 - 第 36 篇：Controller 机制：Informer 与 Workqueue
 - 第 37 篇：手写简化版 Controller
@@ -214,6 +214,8 @@ docs/
 │   │   ├── 32-logging-opentelemetry.md # 第 32 篇：日志与 OpenTelemetry 链路追踪
 │   │   ├── 33-k8s-troubleshooting.md # 第 33 篇：Kubernetes 生产排障
 │   │   └── stage-05-acceptance.md    # 阶段五附录 A：生产工程作品集验收
+│   ├── stage-06-platform-operator/ # 阶段六：平台工程与 Operator 能力
+│   │   └── 34-k8s-api-extension.md  # 第 34 篇：Kubernetes API 扩展机制 [B]
 │   └── ...                     # 后续阶段章节（待完成）
 ├── projects/                   # 项目实战
 ├── labs/                       # 实验索引

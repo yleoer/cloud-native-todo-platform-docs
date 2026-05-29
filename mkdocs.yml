@@ -214,8 +214,10 @@ nav:
       - 33. Kubernetes 生产排障: chapters/stage-05-production-engineering/33-k8s-troubleshooting.md
       - 附录 A. 生产工程作品集验收: chapters/stage-05-production-engineering/stage-05-acceptance.md
 
-  # - 阶段六 平台工程与 Operator:
-  #     - 34. Kubernetes API 扩展机制: chapters/stage-06-platform-operator/34-k8s-api-extension.md
+  - 阶段六 平台工程与 Operator:
+      - 34. Kubernetes API 扩展机制: chapters/stage-06-platform-operator/34-k8s-api-extension.md
+
+  # 阶段六后续章节规划：
   #     - 35. CRD 设计与实践: chapters/stage-06-platform-operator/35-crd-design.md
   #     - 36. Controller 机制：Informer 与 Workqueue: chapters/stage-06-platform-operator/36-controller-informer-workqueue.md
   #     - 37. 手写简化版 Controller: chapters/stage-06-platform-operator/37-handwritten-controller.md
