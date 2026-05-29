@@ -218,10 +218,10 @@ nav:
       - 34. Kubernetes API 扩展机制: chapters/stage-06-platform-operator/34-k8s-api-extension.md
       - 35. CRD 设计与实践: chapters/stage-06-platform-operator/35-crd-design.md
       - 36. Controller 机制：Informer 与 Workqueue: chapters/stage-06-platform-operator/36-controller-informer-workqueue.md
+      - 38. Kubebuilder 入门: chapters/stage-06-platform-operator/38-kubebuilder.md
 
   # 阶段六后续章节规划：
   #     - 37. 手写简化版 Controller: chapters/stage-06-platform-operator/37-handwritten-controller.md
-  #     - 38. Kubebuilder 入门: chapters/stage-06-platform-operator/38-kubebuilder.md
   #     - 39. Operator 高级机制: chapters/stage-06-platform-operator/39-operator-advanced.md
   #     - 40. Operator 测试、发布与升级: chapters/stage-06-platform-operator/40-operator-test-release.md
   #     - 41. Operator 生产实践: chapters/stage-06-platform-operator/41-operator-production.md
