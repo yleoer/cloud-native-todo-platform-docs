@@ -140,7 +140,7 @@ hide:
 - [第 29 篇：CI/CD 自动化交付](chapters/stage-05-production-engineering/29-cicd.md)
 - [第 30 篇：GitOps 与 Argo CD](chapters/stage-05-production-engineering/30-gitops-argocd.md)
 - [第 31 篇：Prometheus 与 Grafana 监控](chapters/stage-05-production-engineering/31-prometheus-grafana.md)
-- 第 32 篇：日志与 OpenTelemetry 链路追踪
+- [第 32 篇：日志与 OpenTelemetry 链路追踪](chapters/stage-05-production-engineering/32-logging-opentelemetry.md)
 - 第 33 篇：Kubernetes 生产排障
 
 </details>
@@ -179,6 +179,6 @@ http://127.0.0.1:8000
 
 ## 下一步计划
 
-- 进入第 32 篇日志与 OpenTelemetry 链路追踪，把指标告警、结构化日志和 Trace 串成完整排障链路。
-- 继续推进 Kubernetes 生产排障能力。
+- 进入第 33 篇 Kubernetes 生产排障，把事件、日志、指标和 Trace 串成真实故障定位流程。
+- 继续完善阶段五生产工程能力。
 - 使用阶段五产物整理 Todo Platform CI/CD、GitOps 与可观测性作品集。
