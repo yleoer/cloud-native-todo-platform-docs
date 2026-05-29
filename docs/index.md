@@ -142,6 +142,7 @@ hide:
 - [第 31 篇：Prometheus 与 Grafana 监控](chapters/stage-05-production-engineering/31-prometheus-grafana.md)
 - [第 32 篇：日志与 OpenTelemetry 链路追踪](chapters/stage-05-production-engineering/32-logging-opentelemetry.md)
 - [第 33 篇：Kubernetes 生产排障](chapters/stage-05-production-engineering/33-k8s-troubleshooting.md)
+- [附录 A：生产工程作品集验收](chapters/stage-05-production-engineering/stage-05-acceptance.md)
 
 </details>
 

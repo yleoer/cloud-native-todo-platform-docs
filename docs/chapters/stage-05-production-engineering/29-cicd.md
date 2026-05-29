@@ -349,6 +349,8 @@ permissions:
 | kubectl | v1.35.0 | server-side dry-run 和部署 |
 | Helm | v4.2.0 | lint、template 和依赖构建 |
 
+说明：课程蓝图中的 Kubernetes 基线为 1.36.x，阶段五为了保持从第 29 篇到第 33 篇的实验连续性，统一使用 kind 节点 v1.35.0。本篇不使用 Kubernetes 1.36 专属能力；如果你的实验环境已经升级到 1.36.x，workflow 和验证命令仍然适用。
+
 确认应用仓库已经具备以下文件。下面命令在应用仓库根目录执行，也就是 `go.mod` 所在目录：
 
 ```bash
@@ -449,6 +451,8 @@ ARG BUILD_DATE
 ```
 
 如果缺失，请在 `api/Dockerfile` 的构建阶段补充对应 `ARG`。没有声明的 build arg 通常不会让 Docker 构建失败，但会被忽略，镜像标签和审计信息就无法进入构建过程。
+
+`docker/build-push-action@v7` 的 `build-args: |` 写法会把多行文本按 Buildx 支持的 `KEY=VALUE` 列表传入。发布前仍建议在一次真实 workflow run 中检查镜像 OCI label，确认 `VERSION`、`COMMIT` 和 `BUILD_DATE` 已进入镜像元数据。
 
 创建 GitHub Actions workflow：
 
@@ -742,6 +746,8 @@ YAML
 | `cache-from/cache-to` | 使用 GitHub Actions cache 加速 Docker Buildx |
 | `kind load docker-image` | 把刚推送的镜像导入临时 kind 节点，避免依赖集群拉取权限 |
 | `ci-dev-image` 临时 overlay | 通过 Kustomize `images` 覆盖 dev overlay 的镜像，不修改已提交的环境目录 |
+
+这里故意使用 Kustomize `images` 字段生成临时 overlay，而不是使用旧资料里常见的 `kubectl set image --local`。`--local` 标志已经从新版本 `kubectl set image` 中移除，继续使用会让 CI 在部署验证阶段失败。
 
 ### 5.5 执行命令
 

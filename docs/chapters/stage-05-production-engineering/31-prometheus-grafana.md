@@ -338,6 +338,8 @@ Alerting rules 则基于 PromQL 判断是否触发告警。生产环境里不要
 | kube-prometheus-stack | 86.0.1 | 安装 Prometheus Operator、Prometheus、Grafana、Alertmanager |
 | prometheus/client_golang | v1.23.2 | Go 服务暴露 Prometheus 指标 |
 
+说明：课程蓝图中的 Kubernetes 基线为 1.36.x，本篇继续使用第 30 篇创建的 kind v1.35.0 集群，是为了保持阶段五实验环境连续。本篇不使用 Kubernetes 1.36 专属能力；如果你的集群已经升级到 1.36.x，下面命令仍然适用。
+
 先确认第 30 篇环境仍然可用：
 
 ```bash
@@ -352,6 +354,8 @@ kubectl -n todo-dev get deploy,svc,pod
 ```
 
 如果 `todo-dev` 不存在，先回到第 30 篇完成 Argo CD 同步。Prometheus 能采集的前提是目标服务已经在集群内运行。
+
+本篇沿用第 30 篇 dev 环境的数据模式：如果 `TODO_DATABASE_DSN` 为空，Todo API 使用内存 Repository；监控实验只验证指标暴露、抓取、查询、面板和告警，不依赖 PostgreSQL。
 
 检查本地工具：
 
@@ -954,6 +958,8 @@ YAML
 #### 5.4.8 允许 Prometheus 跨 namespace 抓取指标
 
 第 27 篇 Helm Chart 已经为 Todo API 创建了 NetworkPolicy，只允许同 namespace 内的 Pod 访问 Todo API。Prometheus 安装在 `monitoring` namespace，如果 CNI 启用了 NetworkPolicy，这条默认策略会阻断 Prometheus 抓取 `/metrics`。因此本篇需要显式增加一条入口放行策略。
+
+注意：NetworkPolicy 是否真正执行取决于 CNI 插件。kind 默认 kindnet 不执行 NetworkPolicy，本地实验主要验证 YAML 结构、selector 和排障路径；如果要验证真实阻断与放行效果，应使用 Calico、Cilium 或云厂商托管 CNI。
 
 创建 `observability/prometheus/todo-allow-prometheus-networkpolicy.yaml`：
 
