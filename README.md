@@ -87,7 +87,7 @@ CI/CD、GitOps、Prometheus / Grafana、Loki、OpenTelemetry 和 Kubernetes 生�
 
 - [第 29 篇：CI/CD 自动化交付](docs/chapters/stage-05-production-engineering/29-cicd.md)
 - [第 30 篇：GitOps 与 Argo CD](docs/chapters/stage-05-production-engineering/30-gitops-argocd.md)
-- 第 31 篇：Prometheus 与 Grafana 监控
+- [第 31 篇：Prometheus 与 Grafana 监控](docs/chapters/stage-05-production-engineering/31-prometheus-grafana.md)
 - 第 32 篇：日志与 OpenTelemetry 链路追踪
 - 第 33 篇：Kubernetes 生产排障
 
