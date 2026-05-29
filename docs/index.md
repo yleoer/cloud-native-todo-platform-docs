@@ -154,7 +154,7 @@ hide:
 - [第 34 篇：Kubernetes API 扩展机制 [B]](chapters/stage-06-platform-operator/34-k8s-api-extension.md)
 - [第 35 篇：CRD 设计与实践 [C]](chapters/stage-06-platform-operator/35-crd-design.md)
 - [第 36 篇：Controller 机制：Informer 与 Workqueue [B]](chapters/stage-06-platform-operator/36-controller-informer-workqueue.md)
-- 第 37 篇：手写简化版 Controller
+- [第 37 篇：手写简化版 Controller [C]](chapters/stage-06-platform-operator/37-handwritten-controller.md)
 - 第 38 篇：Kubebuilder 入门
 - 第 39 篇：Operator 高级机制
 - 第 40 篇：Operator 测试、发布与升级
@@ -180,6 +180,6 @@ http://127.0.0.1:8000
 
 ## 下一步计划
 
-- 进入第 37 篇手写简化版 Controller，把第 36 篇的 Watch、Workqueue 和 Reconcile 设计落到真实 client-go 代码中。
+- 进入第 38 篇 Kubebuilder 入门，用 controller-runtime 重写第 37 篇手写 Controller，并开始自动创建 Deployment 与 Service。
 - 延续阶段五产物，整理 Todo Platform CI/CD、GitOps、可观测性与排障作品集。
-- 复盘第 34-36 篇的 API 模型、CRD schema 与控制循环设计，为手写 Controller 做准备。
+- 复盘第 34-37 篇的 API 模型、CRD schema、控制循环设计和 client-go 手写实现，为 Kubebuilder 做准备。
