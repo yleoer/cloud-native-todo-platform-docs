@@ -276,14 +276,14 @@ HTTPRoute：这个应用的哪些 Host/Path 转发到哪个 Service
 | 工具 | 推荐版本 | 用途 |
 |---|---|---|
 | Kubernetes API Server | Ch20 默认 `v1.35.0`，可覆盖到 1.36.x | 本地集群 |
-| kubectl | 1.36.x | 操作 Kubernetes API |
+| kubectl | v1.35.x 或与 API Server 相差不超过 1 个小版本 | 操作 Kubernetes API |
 | kind | 0.31+ | 本地集群 |
 | Traefik | `v3.6.17` | Ingress / Gateway Controller，锁定 3.6.x 最新补丁版本 |
 | Gateway API CRDs | `v1.4.0` 标准通道 | 与 Traefik 3.6 Gateway Provider 对齐 |
 | OpenSSL | 3.x 或系统自带版本 | 生成本地自签名证书 |
 | Todo API | `todo-api:v0.1.0` | 后端服务 |
 
-阶段四最终 Kubernetes 版本以第 20 篇统一后的集群版本为准。`kubectl` 客户端通常允许与 API Server 相差一个次版本，但课程出版前应把第 20-28 篇统一到同一条版本基线。Traefik 本篇锁定 `3.6.x` 最新补丁线，所以 Gateway API CRDs 固定为 Traefik 3.6 文档支持的 `v1.4.0`；如果后续升级到 Traefik 3.7.x，需要同步评估 Gateway API `v1.5.x` CRDs。
+阶段四最终 Kubernetes 版本以第 20 篇统一后的集群版本为准。主线实验默认按 kind 实际 `v1.35.0` 执行；如果出版前统一切换到 1.36.x 节点镜像，本篇对象和命令无需结构性调整。Traefik 本篇锁定 `3.6.x` 最新补丁线，所以 Gateway API CRDs 固定为 Traefik 3.6 文档支持的 `v1.4.0`；如果后续升级到 Traefik 3.7.x，需要同步评估 Gateway API `v1.5.x` CRDs。
 
 确认环境：
 
@@ -393,7 +393,7 @@ kubectl apply --server-side -f https://github.com/kubernetes-sigs/gateway-api/re
 
 如果网络无法直接访问 GitHub，可以先下载 `standard-install.yaml`，再执行 `kubectl apply --server-side -f standard-install.yaml`。
 
-创建 Traefik Controller。这里不用 Helm，是为了让你看清 Controller 需要哪些 RBAC、监听端口和 provider 开关；第 27 篇会把入口层改造成 Helm Chart 管理：
+创建 Traefik Controller。这里不用 Helm，是为了让你看清 Controller 需要哪些 RBAC、监听端口和 provider 开关；后续交付章节会再讨论入口层如何逐步纳入 Helm Chart 或环境 overlay 管理：
 
 ```bash
 cat > deployments/k8s-base/traefik-controller.yaml <<'YAML'
@@ -714,10 +714,10 @@ kubectl get gatewayclass
 kubectl -n todo-workloads get ingress,gateway,httproute
 ```
 
-启动 Traefik 本地端口转发。这个命令会占用当前终端。如果第 17 篇 Docker Compose 环境仍在运行，Traefik Dashboard 可能已经占用 `18090`；可以先停止 Compose 环境，或临时删掉下面命令中的 `18090:8080`，只保留主线需要的 `18088:80 18443:443`：
+启动 Traefik 本地端口转发。这个命令会占用当前终端。第 17 篇 Docker Compose 已经使用过 `18090`，所以本篇把 Traefik Dashboard API 映射到 `18091`，避免跨阶段端口冲突。主线验证只依赖 `18088:80 18443:443`；Dashboard API 是可选观察入口：
 
 ```bash
-kubectl -n traefik port-forward svc/traefik 18088:80 18443:443 18090:8080
+kubectl -n traefik port-forward svc/traefik 18088:80 18443:443 18091:8080
 ```
 
 打开另一个终端验证 Ingress HTTPS。`--resolve` 会让 `curl` 把 `todo.localhost:18443` 直接解析到 `127.0.0.1`，确保请求经过上面的 `port-forward` 到达 Traefik：
@@ -737,7 +737,7 @@ curl -k -i --resolve todo-gateway.localhost:18443:127.0.0.1 \
 可选：查看 Traefik Dashboard API。本文为了本地观察开启了 `--api.insecure=true`，这会让 Dashboard/API 在 Traefik Service 的 `8080` 端口上无认证可访问；它只适合本地临时实验，生产环境必须关闭或放在认证、授权和内网访问控制之后：
 
 ```bash
-curl -s http://127.0.0.1:18090/api/http/routers | head
+curl -s http://127.0.0.1:18091/api/http/routers | head
 ```
 
 输出会是一段 JSON 路由列表，能看到 Traefik 已经加载 Ingress 或 Gateway 生成的路由：

@@ -77,6 +77,8 @@ runtime-lab/
 
 本篇不会马上把完整 Todo API、PostgreSQL、Redis 全部迁进 Kubernetes。我们先搭建本地集群，部署一个最小 smoke 应用，学会控制面、节点、kubeconfig 和 `kubectl` 基本操作。第 21 篇会正式把 `todo-api:v0.1.0` 变成 Deployment，并继续加入探针、资源限制、滚动更新和回滚。
 
+阶段四一共 9 篇，会沿着一条从“能部署”到“能交付”的路线推进：第 20 篇搭集群，第 21-24 篇完成工作负载、入口、配置和 PostgreSQL 持久化，第 25-26 篇把网络隔离和安全基线补齐，第 27-28 篇再用 Helm 与 Kustomize 收束成可安装、可升级、可多环境发布的交付物。读完这一阶段，你应该能把 Todo Platform 作为一个完整的 Kubernetes 作品集展示出来。
+
 ## 3. 核心概念
 
 ### 3.1 Kubernetes 是什么
@@ -247,7 +249,7 @@ Kubernetes 排障不能只看对象列表。一个 Pod 的完整线索通常来�
 | 工具 | 推荐版本 | 用途 |
 |---|---|---|
 | Docker Engine / Docker Desktop | 29.x 或当前稳定版 | 承载 kind 节点容器 |
-| kubectl | 1.36.x | 操作 Kubernetes API |
+| kubectl | v1.35.x 或与 API Server 相差不超过 1 个小版本 | 操作 Kubernetes API |
 | kind | 0.31+ | 创建本地 Kubernetes 集群 |
 | kind node image | 默认 `kindest/node:v1.35.0`，可用 `KIND_NODE_IMAGE` 覆盖 | 节点内置控制面、kubelet、containerd |
 | Alpine BusyBox `nc` | `alpine:3.23` | smoke Pod 的临时 HTTP 响应进程 |

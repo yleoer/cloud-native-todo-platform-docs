@@ -14,3 +14,5 @@ deployments/k8s-base/tls/
 deployments/helm/**/*.local.yaml
 deployments/helm/**/charts/*.tgz
 deployments/helm/packages/
+deployments/kustomize/overlays/**/.secrets/
+deployments/kustomize/**/*.local.*

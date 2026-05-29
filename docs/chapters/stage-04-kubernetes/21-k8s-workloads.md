@@ -263,12 +263,12 @@ flowchart LR
 | Docker | 29.x 或当前稳定版 | 构建并保存本地镜像 |
 | kind | 0.31+ | 本地 Kubernetes 集群 |
 | Kubernetes API Server | Ch20 默认 `v1.35.0`，可用 `KIND_NODE_IMAGE` 覆盖到 1.36.x | 本地集群控制面 |
-| kubectl | 1.36.x | 操作 Kubernetes 对象；与 1.35 API Server 属于官方允许的 1 个 minor 偏差 |
+| kubectl | v1.35.x 或与 API Server 相差不超过 1 个小版本 | 操作 Kubernetes 对象 |
 | Todo API 镜像 | `todo-api:v0.1.0` | 本篇业务镜像 |
 | Alpine | `alpine:3.23` | Job/HPA 负载示例和 DaemonSet 示例 |
 | metrics-server | `v0.8.1` | HPA 指标来源，可选 |
 
-Ch20 当前默认 kind 节点镜像是 `kindest/node:v1.35.0`，课程蓝图基线是 Kubernetes 1.36.x。本章 YAML 使用的 `apps/v1`、`batch/v1`、`autoscaling/v2` 都不是 1.36 专属 API；`kubectl 1.36.x` 连接 1.35 API Server 符合 Kubernetes 官方版本偏差策略。metrics-server `0.8.x` 官方兼容 Kubernetes `1.31+`，因此可用于本章的 1.35/1.36 实验环境。
+Ch20 当前默认 kind 节点镜像是 `kindest/node:v1.35.0`，本章 YAML 使用的 `apps/v1`、`batch/v1`、`autoscaling/v2` 都不是 1.36 专属 API。如果出版前切换到 Kubernetes 1.36.x kind 节点镜像，本章命令无需改动；日常实验只要保证 `kubectl` 与 API Server 相差不超过 1 个小版本即可。metrics-server `0.8.x` 官方兼容 Kubernetes `1.31+`，因此可用于本章的 1.35/1.36 实验环境。
 
 确认当前环境：
 

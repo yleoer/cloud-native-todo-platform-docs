@@ -64,7 +64,7 @@ hide:
 
 本课程共 **42 大篇，约 230 个章节**，分为 6 个学习阶段。
 
-新版设计路线已更新为 **6 个阶段**。当前站点已发布阶段一至阶段三，以及阶段四第 20-27 篇；后续会按新版设计继续推进 Kubernetes、生产工程和 Operator 能力。
+新版设计路线已更新为 **6 个阶段**。当前站点已发布阶段一至阶段四；后续会按新版设计继续推进生产工程和 Operator 能力。
 
 <details open markdown="1">
 <summary><strong>阶段一：基础能力（第 1-6 篇，已发布）</strong></summary>
@@ -115,7 +115,7 @@ hide:
 </details>
 
 <details markdown="1">
-<summary><strong>阶段四：Kubernetes 应用交付（第 20-28 篇，当前已发布第 27 篇）</strong></summary>
+<summary><strong>阶段四：Kubernetes 应用交付（第 20-28 篇，当前已发布第 28 篇 + 阶段验收）</strong></summary>
 
 系统学习 Kubernetes 架构、工作负载、Service / Ingress / Gateway API、配置、存储、网络、安全、Helm 4 和 Kustomize。
 
@@ -127,7 +127,8 @@ hide:
 - [第 25 篇：Kubernetes 网络原理](chapters/stage-04-kubernetes/25-k8s-networking.md)
 - [第 26 篇：Kubernetes 安全](chapters/stage-04-kubernetes/26-k8s-security.md)
 - [第 27 篇：Helm 4 包管理](chapters/stage-04-kubernetes/27-helm4.md)
-- 第 28 篇：Kustomize 多环境配置管理
+- [第 28 篇：Kustomize 多环境配置管理](chapters/stage-04-kubernetes/28-kustomize.md)
+- [阶段四附录 A：Kubernetes 应用交付综合验收](chapters/stage-04-kubernetes/stage-04-acceptance.md)
 
 </details>
 
@@ -178,6 +179,6 @@ http://127.0.0.1:8000
 
 ## 下一步计划
 
-- 按新版设计推进第 23 篇 ConfigMap、Secret 与配置管理，承接第 22 篇的入口层配置。
-- 继续推进 Kubernetes 配置、存储、网络、安全、Helm 4 与 Kustomize 实践内容。
-- 使用阶段三综合验收和排障手册整理 Todo 平台容器化作品集。
+- 进入第 29 篇 CI/CD 自动化交付，把测试、镜像构建、Helm / Kustomize 渲染和 server-side dry-run 串入流水线。
+- 继续推进 GitOps、可观测性和 Kubernetes 生产排障能力。
+- 使用阶段四产物整理 Todo Platform on Kubernetes 作品集。

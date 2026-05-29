@@ -262,8 +262,8 @@ Kubernetes 中更清晰的做法是：
 
 | 项目 | 版本 | 说明 |
 |---|---|---|
-| Kubernetes | 1.36.x | 与课程计划锁定版本一致 |
-| kubectl | 1.36.x | 与集群版本一致 |
+| Kubernetes | kind 实际 v1.35.0，1.36.x 可选覆盖 | 本篇不依赖 1.36 专属 API，按第 20 篇集群版本执行 |
+| kubectl | 与 API Server 相差不超过 1 个小版本 | 用于 apply、logs、exec 和 PVC/StatefulSet 排障 |
 | kind | 0.31.x | 本地 Kubernetes 集群 |
 | Docker Engine | 29.x | 构建与导入本地镜像 |
 | PostgreSQL | 18.x | 使用 `postgres:18-alpine` |
@@ -281,11 +281,11 @@ kubectl get nodes
 
 ```text
 kind-todo-k8s
-Client Version: v1.36.x
+Client Version: v1.35.x
 ...
-Server Version: v1.36.x
+Server Version: v1.35.0
 NAME                     STATUS   ROLES           AGE   VERSION
-todo-k8s-control-plane   Ready    control-plane   ...   v1.36.x
+todo-k8s-control-plane   Ready    control-plane   ...   v1.35.0
 ```
 
 不同平台的 `kubectl version` 可能额外输出 `Kustomize Version` 等行，上面的 `...` 表示省略了非关键版本信息。
@@ -1185,5 +1185,7 @@ kubectl -n todo-workloads delete pvc postgres-data-todo-postgres-0 --ignore-not-
 ## 12. 下一章衔接
 
 第 25 篇会进入 Kubernetes 网络原理，解释 Pod、Service、DNS、CNI、kube-proxy 和 NetworkPolicy 如何共同完成集群通信。本篇的 `todo-api -> todo-postgres` 访问链路会成为下一章的真实案例：如果 DNS 解析失败、Service 没有 Endpoints 或网络策略拦截，Todo API 就无法连接数据库。
+
+下一章为了验证 NetworkPolicy 会创建一个临时 kind 集群 `todo-network-lab`，而不是直接改动本篇使用的 `todo-k8s` 主集群。原因是 kind 默认网络插件不执行 NetworkPolicy，需要换成 Calico；把 CNI 实验隔离到临时集群，可以保护本篇已经建立好的 PostgreSQL、PVC 和 Todo API 主线资源。
 
 如果跳过本篇，下一章看到 `todo-postgres.todo-workloads.svc.cluster.local`、Service Endpoints 和 Pod 网络排障时会缺少真实业务上下文。第 24 篇先把“谁访问谁、数据在哪里”搭起来，第 25 篇再解释“网络为什么能通、哪里会不通”。

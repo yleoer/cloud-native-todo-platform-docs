@@ -307,17 +307,17 @@ NetworkPolicy 是 Namespace 内对象。它不能跨 Namespace “保护所有�
 
 | 项目 | 版本 | 说明 |
 |---|---|---|
-| Kubernetes 课程基线 | 1.36.x | 课程计划锁定版本；本章网络策略实验不依赖 1.36 专属特性 |
-| kubectl | 1.36.x | 与课程基线一致；访问 1.35.0 临时实验集群仍在相邻小版本兼容范围内 |
+| Kubernetes | 临时集群实际 v1.35.0，1.36.x 可选覆盖 | 本章网络策略实验不依赖 1.36 专属特性 |
+| kubectl | 与 API Server 相差不超过 1 个小版本 | 访问临时实验集群并执行排障命令 |
 | kind | 0.31.x | 创建临时网络实验集群 |
 | Docker Engine | 29.x | 运行 kind 节点和加载镜像 |
 | kind 节点镜像 | `kindest/node:v1.35.0@sha256:452d707d4862f52530247495d180205e029056831160e22870e37e3f6c1ac31f` | kind 0.31.0 官方 release 推荐镜像；临时实验集群实际 Kubernetes 版本为 1.35.0 |
 | Calico | 3.32.0 | 提供 CNI 和 NetworkPolicy 执行能力 |
 | Alpine | 3.23 | 运行轻量 HTTP / TCP 测试容器，2026-05-28 已验证 tag 可用 |
 
-本篇使用临时集群 `todo-network-lab`。如果你已经在第 20-24 篇的主集群 `todo-k8s` 中运行 Todo Platform，不要直接修改主集群 CNI。
+本篇使用临时集群 `todo-network-lab`。如果你已经在第 20-24 篇的主集群 `todo-k8s` 中运行 Todo Platform，不要直接修改主集群 CNI。临时集群里的 Namespace、Pod、Service 和 NetworkPolicy 都只服务本篇实验，删除 `todo-network-lab` 不会影响主集群中的 PostgreSQL、Todo API 或入口资源。
 
-课程计划锁定 Kubernetes 1.36，但第 25 篇实验只验证标准 DNS、Service、kube-proxy 线索和 NetworkPolicy 行为，不依赖 Kubernetes 1.36 专属特性。为保证可复现，本篇临时使用 kind 0.31.0 官方 release 明确列出的 `kindest/node:v1.35.0` 镜像，并 pin digest。kind 发布 1.36.x 节点镜像后，应把下面配置中的 `image` 行替换为对应的 1.36.x 官方镜像和 digest。
+为保证可复现，本篇临时使用 kind 0.31.0 官方 release 明确列出的 `kindest/node:v1.35.0` 镜像，并 pin digest。第 25 篇实验只验证标准 DNS、Service、kube-proxy 线索和 NetworkPolicy 行为，不依赖 Kubernetes 1.36 专属特性。kind 发布 1.36.x 节点镜像后，可以把下面配置中的 `image` 行替换为对应的 1.36.x 官方镜像和 digest。
 
 Calico 安装命令会访问 `raw.githubusercontent.com`。发布前已验证 Calico 3.32.0 的 `tigera-operator.yaml` 和 `custom-resources.yaml` 可下载，且官方 custom resources 中仍包含 `APIServer` 自定义资源。如果网络无法访问，请提前从 Calico 官方仓库下载对应 manifest，或使用团队可信镜像源；不要从来源不明的第三方链接复制安装清单。
 
@@ -1136,5 +1136,7 @@ rm -rf deployments/k8s-network
 ## 12. 下一章衔接
 
 第 26 篇会进入 Kubernetes 安全，讨论 ServiceAccount、Role-Based Access Control（RBAC，基于角色的访问控制）、SecurityContext、Pod Security Standards 和 Secret 安全。本篇解决“哪些 Pod 在网络上可以互相访问”，下一篇会解决“哪些身份在 API 上可以做哪些操作、容器进程以什么权限运行”。
+
+完成本篇后，建议删除临时集群 `todo-network-lab`，并把 `kubectl` context 切回主集群 `kind-todo-k8s`。第 26 篇会在主集群的独立 Namespace 中做安全实验，不需要继续使用本篇的临时 Calico 集群。
 
 如果跳过本篇，下一章学习安全时容易只关注 RBAC，而忽略网络侧的最小访问边界。真实生产环境需要二者配合：RBAC 限制谁能改对象，NetworkPolicy 限制服务之间如何通信。
