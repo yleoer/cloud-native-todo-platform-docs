@@ -154,7 +154,7 @@ hide:
 - [第 34 篇：Kubernetes API 扩展机制 [B]](chapters/stage-06-platform-operator/34-k8s-api-extension.md)
 - [第 35 篇：CRD 设计与实践 [C]](chapters/stage-06-platform-operator/35-crd-design.md)
 - [第 36 篇：Controller 机制：Informer 与 Workqueue [B]](chapters/stage-06-platform-operator/36-controller-informer-workqueue.md)
-- 第 37 篇：手写简化版 Controller
+- [第 37 篇：手写简化版 Controller [C]](chapters/stage-06-platform-operator/37-handwritten-controller.md)
 - [第 38 篇：Kubebuilder 入门 [C]](chapters/stage-06-platform-operator/38-kubebuilder.md)
 - 第 39 篇：Operator 高级机制
 - 第 40 篇：Operator 测试、发布与升级
