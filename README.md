@@ -81,7 +81,7 @@ Kubernetes 架构、工作负载、Service / Ingress / Gateway API、配置、�
 </details>
 
 <details>
-<summary><strong>阶段五：生产工程能力（第 29-33 篇，建设中）</strong></summary>
+<summary><strong>阶段五：生产工程能力（第 29-33 篇）</strong></summary>
 
 CI/CD、GitOps、Prometheus / Grafana、Loki、OpenTelemetry 和 Kubernetes 生产排障。
 
@@ -89,7 +89,7 @@ CI/CD、GitOps、Prometheus / Grafana、Loki、OpenTelemetry 和 Kubernetes 生�
 - [第 30 篇：GitOps 与 Argo CD](docs/chapters/stage-05-production-engineering/30-gitops-argocd.md)
 - [第 31 篇：Prometheus 与 Grafana 监控](docs/chapters/stage-05-production-engineering/31-prometheus-grafana.md)
 - [第 32 篇：日志与 OpenTelemetry 链路追踪](docs/chapters/stage-05-production-engineering/32-logging-opentelemetry.md)
-- 第 33 篇：Kubernetes 生产排障
+- [第 33 篇：Kubernetes 生产排障](docs/chapters/stage-05-production-engineering/33-k8s-troubleshooting.md)
 
 </details>
 
