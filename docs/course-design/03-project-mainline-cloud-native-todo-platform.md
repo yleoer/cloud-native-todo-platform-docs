@@ -267,7 +267,8 @@ cloud-native-todo-platform/
 │   ├── loki/
 │   └── otel/
 ├── operator/                      # ← 篇 34-41
-│   ├── crd/                       # ← 篇 35：CRD YAML 定义
+│   ├── crds/                      # ← 篇 35：CRD YAML 定义
+│   ├── controller-lab/            # ← 篇 36：Controller 控制循环模拟
 │   ├── handwritten/               # ← 篇 37：手写 Controller
 │   │   ├── main.go
 │   │   └── controller.go
@@ -300,6 +301,7 @@ cloud-native-todo-platform/
 | CI/CD（篇 29） | `.github/workflows/` |
 | 可观测性（篇 31-32） | `observability/` |
 | CRD（篇 35） | `operator/crds/` |
+| Controller 机制（篇 36） | `operator/controller-lab/` |
 | 手写 Controller（篇 37） | `operator/handwritten/` |
 | Kubebuilder（篇 38） | `operator/kubebuilder/` |
 | Operator 发布（篇 40） | `operator/helm/` |
