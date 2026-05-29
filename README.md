@@ -100,7 +100,7 @@ CI/CD、GitOps、Prometheus / Grafana、Loki、OpenTelemetry 和 Kubernetes 生�
 Kubernetes API Machinery、CRD、手写 Controller、Kubebuilder、Webhook、Finalizer、Operator 测试发布、生产实践和最终集成。
 
 - [第 34 篇：Kubernetes API 扩展机制 [B]](docs/chapters/stage-06-platform-operator/34-k8s-api-extension.md)
-- 第 35 篇：CRD 设计与实践
+- [第 35 篇：CRD 设计与实践 [C]](docs/chapters/stage-06-platform-operator/35-crd-design.md)
 - 第 36 篇：Controller 机制：Informer 与 Workqueue
 - 第 37 篇：手写简化版 Controller
 - 第 38 篇：Kubebuilder 入门
@@ -215,7 +215,8 @@ docs/
 │   │   ├── 33-k8s-troubleshooting.md # 第 33 篇：Kubernetes 生产排障
 │   │   └── stage-05-acceptance.md    # 阶段五附录 A：生产工程作品集验收
 │   ├── stage-06-platform-operator/ # 阶段六：平台工程与 Operator 能力
-│   │   └── 34-k8s-api-extension.md  # 第 34 篇：Kubernetes API 扩展机制 [B]
+│   │   ├── 34-k8s-api-extension.md  # 第 34 篇：Kubernetes API 扩展机制 [B]
+│   │   └── 35-crd-design.md         # 第 35 篇：CRD 设计与实践 [C]
 │   └── ...                     # 后续阶段章节（待完成）
 ├── projects/                   # 项目实战
 ├── labs/                       # 实验索引
