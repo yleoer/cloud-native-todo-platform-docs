@@ -16,6 +16,16 @@
 
 完成阶段五后，作品集应能证明你不只是“会部署 Kubernetes 应用”，而是能把一个服务接入交付、可观测性、排障和复盘闭环。
 
+阶段五的 Todo API 镜像版本线建议保持递增关系：
+
+| 阶段 | 建议镜像 tag | 含义 |
+|---|---|---|
+| 第 29-30 篇 | `v0.1.0` 或 CI 生成的 `sha-<commit>` | 基础 CI/CD 与 GitOps 发布 |
+| 第 31 篇 | `v0.1.1-metrics` | 接入 Prometheus 指标 |
+| 第 32-33 篇 | `v0.1.2-observability` | 接入日志与 OpenTelemetry Trace，并作为排障基线 |
+
+本地学习可以使用语义化实验 tag；CI/CD 发布应保留 `sha-<commit>` tag 和 digest，避免只依赖会移动的 `latest`。
+
 ## 2. 版本与环境锁定
 
 表 5-A 是阶段五出版版推荐锁定的实验环境。课程蓝图使用 Kubernetes 1.36.x；本阶段为了复用第 30 篇创建的 `todo-gitops` kind 集群，实验统一锁定在 Kubernetes v1.35.0。第 29-33 篇不使用 Kubernetes 1.36 专属能力，如果你的本地环境已升级到 1.36.x，核心命令仍然适用。
@@ -27,9 +37,13 @@
 | Kubernetes | v1.35.0 | 阶段五连续实验环境 |
 | kubectl | v1.35.x | 与实验集群版本保持一致 |
 | Helm | v4.2.x | 安装 Argo CD、Prometheus、Loki、Tempo、Alloy |
+| Argo CD | v3.4.3 | 第 30 篇 GitOps 控制器和 CLI |
 | Argo CD CLI | v3.x | 同步和验证 GitOps 应用 |
 | kube-prometheus-stack | 86.0.1 | 第 31 篇监控栈 |
 | prometheus/client_golang | v1.23.2 | Todo API 指标埋点 |
+| Loki chart | 7.0.0，appVersion 3.6.7 | 第 32 篇日志存储 |
+| Tempo chart | 1.24.4，appVersion 2.9.0 | 第 32 篇 Trace 存储 |
+| Alloy chart | 1.8.2，appVersion v1.16.1 | 第 32 篇日志采集和 OTLP 转发 |
 | k9s | v0.50.18 | 第 33 篇交互式排障工具 |
 | stern | v1.34.0 | 第 33 篇多 Pod 日志追踪 |
 
@@ -67,7 +81,8 @@ NetworkPolicy 的语义由 Kubernetes API 定义，但是否真正执行取决�
 
 | 作品集证据 | 建议内容 |
 |---|---|
-| GitHub Actions | PR 检查通过、测试日志、镜像 tag 和 digest |
+| GitHub Actions | PR 检查通过、workflow run 详情、测试日志、镜像 tag 和 digest |
+| GHCR 镜像列表 | `todo-api` 镜像的 `sha-<commit>`、branch tag、digest 和构建时间 |
 | Argo CD | `todo-platform-dev` Application 的 `Synced` / `Healthy` 截图 |
 | GitOps 目录 | dev/prod overlay、ApplicationSet、Secret 外部化说明 |
 | Prometheus Targets | Todo API target 为 `up` 的截图或输出 |
@@ -116,6 +131,13 @@ argocd app sync todo-platform-dev --timeout 300
 argocd app wait todo-platform-dev --sync --health --timeout 300
 ```
 
+确认当前运行镜像：
+
+```bash
+kubectl -n todo-dev get deployment todo-platform \
+  -o jsonpath='{.spec.template.spec.containers[0].image}{"\n"}'
+```
+
 Prometheus 与 Grafana 验证：
 
 ```bash
@@ -142,7 +164,33 @@ kubectl -n todo-dev rollout status deployment/todo-platform --timeout=180s
 kubectl -n todo-dev get pod,svc,pvc,networkpolicy | grep -E 'todo-(pending|broken|pvc|dns|oom|trouble)' || true
 ```
 
-## 6. 出版前 Checklist
+## 6. 阶段五全链路走查
+
+出版前建议至少执行一次端到端走查，把五篇课程串成同一条证据链。这个走查不要求制造真实事故，但要求每一步都留下截图或命令输出，最终能支撑作品集展示。
+
+1. 在应用仓库提交一个小变更，触发第 29 篇 GitHub Actions workflow。
+2. 确认 workflow 完成测试、扫描、镜像构建和临时 kind 部署验证。
+3. 记录 GHCR 中新镜像的 `sha-<commit>` tag 和 digest。
+4. 按第 30 篇 GitOps 流程更新 dev overlay，并让 Argo CD 同步到 `todo-dev`。
+5. 打开第 31 篇 Grafana dashboard，确认 QPS、错误率、P95/P99 和资源面板有新数据。
+6. 按第 32 篇发起一次带 `X-Request-ID` 的请求，在 Loki 中查到日志并跳转到 Tempo Trace。
+7. 按第 33 篇任选一个轻量故障演练，例如 Service endpoints 为空，完成注入、证据收集、修复和验证。
+8. 用第 33 篇 postmortem 模板写一份简短复盘，说明影响范围、根因、止血动作和预防措施。
+
+走查完成后，至少应保留以下证据：
+
+```text
+GitHub Actions run URL
+GHCR image digest
+Argo CD Synced/Healthy 截图
+Grafana dashboard 截图
+Loki request_id 查询截图
+Tempo Trace 瀑布图截图
+故障演练 kubectl describe / logs / events 输出
+事故复盘文档
+```
+
+## 7. 出版前 Checklist
 
 - 第 29-33 篇均通过 `mkdocs build --strict`。
 - 第 29-33 篇标题均带 `[C]`，且 12 节结构完整。

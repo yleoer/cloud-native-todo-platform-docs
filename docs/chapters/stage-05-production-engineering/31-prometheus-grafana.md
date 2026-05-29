@@ -355,6 +355,8 @@ kubectl -n todo-dev get deploy,svc,pod
 
 如果 `todo-dev` 不存在，先回到第 30 篇完成 Argo CD 同步。Prometheus 能采集的前提是目标服务已经在集群内运行。
 
+本篇沿用第 30 篇 dev 环境的数据模式：如果 `TODO_DATABASE_DSN` 为空，Todo API 使用内存 Repository；监控实验只验证指标暴露、抓取、查询、面板和告警，不依赖 PostgreSQL。
+
 检查本地工具：
 
 ```bash
