@@ -59,7 +59,7 @@ CI/CD 的价值不只是“自动化省时间”，而是把团队约定变成�
 
 ```text
 第 16 篇：api/Dockerfile 多阶段构建
-第 21-24 篇：基础 Kubernetes YAML 和 PostgreSQL 主线
+第 21-24 篇：基础 Kubernetes YAML（内存模式起步，第 24 篇接入 PostgreSQL）
 第 26 篇：RBAC、SecurityContext、Pod Security 安全基线
 第 27 篇：Helm 4 Chart 和 values.schema.json
 第 28 篇：Kustomize dev/test/prod overlay
@@ -222,6 +222,8 @@ install tools -> kind create cluster -> load image -> server-side dry-run -> app
 
 真实团队可以在此基础上增加一个受保护的 `deploy-dev` 或 `deploy-prod` job，部署到共享集群或交给 GitOps 系统同步。
 
+这与计划蓝图里“更新 Deployment 镜像版本”的方向一致，但教学实现刻意选择临时 kind 集群来降低风险：先证明镜像和 Kubernetes 交付物能在干净集群中启动，再把真实集群部署留给受保护 environment 或第 30 篇的 GitOps。
+
 ## 4. 原理深入
 
 ### 4.1 从 Git push 到 Kubernetes 验证的链路
@@ -341,7 +343,7 @@ permissions:
 | Docker Buildx | Docker 官方 `setup-buildx-action@v4` | 构建并缓存镜像 |
 | Docker build-push-action | `docker/build-push-action@v7` | 构建并推送镜像 |
 | GitHub Container Registry | `ghcr.io` | 保存 Todo API 镜像 |
-| actionlint | 当前稳定版 | 本地检查 GitHub Actions 语义错误 |
+| actionlint | v1.7.12 | 本地检查 GitHub Actions 语义错误 |
 | kind | 0.31.0 | 创建临时 Kubernetes 集群 |
 | Kubernetes | kind 节点 v1.35.0 | 部署验证 |
 | kubectl | v1.35.0 | server-side dry-run 和部署 |
@@ -353,22 +355,28 @@ permissions:
 test -f go.mod
 test -f api/Dockerfile
 test -d deployments/helm/todo-platform
+test -d deployments/helm/todo-cache
 test -d deployments/kustomize/overlays/dev
 ```
 
 如果这些文件不存在，请先完成第 8、16、27、28 篇。
 
-还要确认 GitHub 仓库具备执行流水线的基础权限：
+实验前再完成这组检查：
 
-- `Settings -> Actions -> General` 中已允许 GitHub Actions 运行。
-- `Workflow permissions` 允许 workflow 写入 package；如果组织强制只读，需要管理员放开 GHCR 写入，或改用受控 PAT / 环境凭据。
-- 仓库或组织没有禁止创建 GitHub Container Registry package。
-- 仓库名和组织名即使包含大写字母，workflow 也会在推送镜像前统一转成小写，避免 OCI 镜像名不合法。
+- [ ] 应用仓库已经推送到 GitHub。
+- [ ] `Settings -> Actions -> General` 中已允许 GitHub Actions 运行。
+- [ ] `Workflow permissions` 允许 workflow 写入 package；如果组织强制只读，需要管理员放开 GHCR 写入，或改用受控 PAT / 环境凭据。
+- [ ] 仓库或组织没有禁止创建 GitHub Container Registry package。
+- [ ] `api/Dockerfile` 中声明了 workflow 传入的 `ARG VERSION`、`ARG COMMIT` 和 `ARG BUILD_DATE`。
+- [ ] `deployments/helm/todo-platform/Chart.yaml` 存在。
+- [ ] `deployments/helm/todo-cache/` 存在；第 27 篇的 Helm 依赖使用 `file://../todo-cache`，CI runner 需要能在 checkout 后找到这个兄弟目录。
+- [ ] `deployments/kustomize/overlays/dev`、`test`、`prod` 都有 `kustomization.yaml`。
+- [ ] 仓库名和组织名即使包含大写字母，workflow 也会在推送镜像前统一转成小写，避免 OCI 镜像名不合法。
 
-如果本机已经安装 Go，可以先安装 `actionlint`。生产团队应固定版本；本地学习可以先使用当前稳定版：
+如果本机已经安装 Go，可以先安装 `actionlint`。这里固定到 v1.7.12，便于复现本章检查结果：
 
 ```bash
-go install github.com/rhysd/actionlint/cmd/actionlint@latest
+go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
 actionlint -version
 ```
 
@@ -422,6 +430,26 @@ cache:
 YAML
 ```
 
+注意：CI 环境不部署 PostgreSQL，因此这里故意不设置 `TODO_DATABASE_DSN`。Todo API v0.1.0 检测到没有 DSN 时会自动使用内存 Repository，这是第 12 篇建立的行为。部署验证只检查 API 能否启动并响应健康检查，不依赖真实数据库。
+
+`cache.enabled: false` 会跳过第 27 篇示例 Chart 中的 Redis subchart。CI 只需要验证 Todo API 的最小运行实例，缓存依赖会留到更完整的集成环境中验证。
+
+确认 `api/Dockerfile` 声明了 workflow 通过 `build-args` 传入的参数。第 16 篇的 Dockerfile 已经把这些参数写入 OCI 镜像标签：
+
+```bash
+grep -n "^ARG" api/Dockerfile
+```
+
+期望至少看到：
+
+```text
+ARG VERSION
+ARG COMMIT
+ARG BUILD_DATE
+```
+
+如果缺失，请在 `api/Dockerfile` 的构建阶段补充对应 `ARG`。没有声明的 build arg 通常不会让 Docker 构建失败，但会被忽略，镜像标签和审计信息就无法进入构建过程。
+
 创建 GitHub Actions workflow：
 
 ```bash
@@ -467,9 +495,7 @@ jobs:
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: true
-          cache-dependency-path: |
-            go.sum
-            go.mod
+          cache-dependency-path: go.sum
 
       - name: Go vet
         run: go vet ./...
@@ -515,6 +541,7 @@ jobs:
       - name: Prepare Kustomize local secrets
         run: |
           set -euo pipefail
+          # validate job 会渲染 dev/test/prod 三套 overlay，因此三个环境都需要临时 Secret 输入文件。
           for env in dev test prod; do
             mkdir -p "deployments/kustomize/overlays/${env}/.secrets"
             cat > "deployments/kustomize/overlays/${env}/.secrets/todo-api-auth.env" <<'EOF'
@@ -543,6 +570,8 @@ jobs:
 
     outputs:
       image-ref: ${{ steps.image.outputs.image-ref }}
+      image-name: ${{ steps.image.outputs.image-name }}
+      image-tag: ${{ steps.image.outputs.image-tag }}
 
     steps:
       - name: Checkout repository
@@ -574,6 +603,10 @@ jobs:
             type=ref,event=branch
             type=raw,value=latest,enable={{is_default_branch}}
 
+      - name: Capture build time
+        id: build-time
+        run: echo "created=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> "$GITHUB_OUTPUT"
+
       - name: Build and push
         id: build
         uses: docker/build-push-action@v7
@@ -586,14 +619,18 @@ jobs:
           build-args: |
             VERSION=${{ github.ref_name }}
             COMMIT=${{ github.sha }}
-            BUILD_DATE=${{ github.run_id }}
+            BUILD_DATE=${{ steps.build-time.outputs.created }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
       - name: Export image reference
         id: image
         run: |
-          echo "image-ref=${REGISTRY}/${{ steps.image-name.outputs.name }}:sha-${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+          image_name="${REGISTRY}/${{ steps.image-name.outputs.name }}"
+          image_tag="sha-${GITHUB_SHA}"
+          echo "image-name=${image_name}" >> "$GITHUB_OUTPUT"
+          echo "image-tag=${image_tag}" >> "$GITHUB_OUTPUT"
+          echo "image-ref=${image_name}:${image_tag}" >> "$GITHUB_OUTPUT"
           echo "Built digest: ${{ steps.build.outputs.digest }}" >> "$GITHUB_STEP_SUMMARY"
 
   deploy-kind:
@@ -601,7 +638,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 25
     needs: build-image
-    if: github.event_name == 'push' || inputs.deploy == true
+    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.deploy)
     permissions:
       contents: read
       packages: read
@@ -612,6 +649,13 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Install kind, kubectl and Helm
         run: |
@@ -632,26 +676,39 @@ jobs:
       - name: Pull and load image
         run: |
           set -euo pipefail
-          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
           docker pull "${{ needs.build-image.outputs.image-ref }}"
           kind load docker-image "${{ needs.build-image.outputs.image-ref }}" --name todo-ci
 
       - name: Prepare Kustomize local secrets
         run: |
           set -euo pipefail
+          # deploy-kind 只部署 dev overlay，因此这里只需要 dev 的临时 Secret 输入文件。
           mkdir -p deployments/kustomize/overlays/dev/.secrets
           cat > deployments/kustomize/overlays/dev/.secrets/todo-api-auth.env <<'EOF'
           TODO_JWT_SECRET=ci-only-jwt-secret-0123456789abcdef
           TODO_AUTH_USERS=admin=ci-placeholder-hash
           EOF
 
+      - name: Render dev overlay with new image
+        run: |
+          set -euo pipefail
+          mkdir -p deployments/kustomize/overlays/ci-dev-image
+          cat > deployments/kustomize/overlays/ci-dev-image/kustomization.yaml <<'EOF'
+          apiVersion: kustomize.config.k8s.io/v1beta1
+          kind: Kustomization
+          resources:
+            - ../dev
+          images:
+            - name: todo-api
+              newName: ${{ needs.build-image.outputs.image-name }}
+              newTag: ${{ needs.build-image.outputs.image-tag }}
+          EOF
+          kubectl kustomize deployments/kustomize/overlays/ci-dev-image > /tmp/todo-dev-image.yaml
+          grep -n "image:" /tmp/todo-dev-image.yaml
+
       - name: Server-side dry-run
         run: |
           kubectl create namespace todo-dev --dry-run=client -o yaml | kubectl apply -f -
-          kubectl kustomize deployments/kustomize/overlays/dev > /tmp/todo-dev.yaml
-          kubectl set image -f /tmp/todo-dev.yaml \
-            todo-api="${{ needs.build-image.outputs.image-ref }}" \
-            --local -o yaml > /tmp/todo-dev-image.yaml
           kubectl apply --dry-run=server -f /tmp/todo-dev-image.yaml
 
       - name: Apply dev overlay
@@ -681,8 +738,10 @@ YAML
 | `if` | PR 不推镜像，只有 main push 或手动触发才执行构建 / 部署 |
 | `concurrency` | 同一分支只保留一个部署验证，避免旧流水线覆盖新结果 |
 | `Normalize image name` | 把 `OWNER/REPO/todo-api` 转成小写，避免 GHCR 拒绝大写镜像名 |
+| `build-args` | 把分支名、commit SHA 和 UTC 构建时间传给 Dockerfile，写入 OCI 镜像标签 |
 | `cache-from/cache-to` | 使用 GitHub Actions cache 加速 Docker Buildx |
 | `kind load docker-image` | 把刚推送的镜像导入临时 kind 节点，避免依赖集群拉取权限 |
+| `ci-dev-image` 临时 overlay | 通过 Kustomize `images` 覆盖 dev overlay 的镜像，不修改已提交的环境目录 |
 
 ### 5.5 执行命令
 
@@ -786,11 +845,12 @@ GitHub -> Packages -> todo-api
 
 ```text
 kind load docker-image
-kubectl set image
+ci-dev-image
+kubectl apply --dry-run=server
 rollout status deployment/todo-platform
 ```
 
-判断标准：`kubectl set image` 使用的是 `ghcr.io/.../todo-api:sha-<commit>`，Deployment rollout 成功。
+判断标准：临时 `ci-dev-image` overlay 生成的 `/tmp/todo-dev-image.yaml` 使用的是 `ghcr.io/.../todo-api:sha-<commit>`，server-side dry-run 和 Deployment rollout 都成功。
 
 第四层：确认健康检查真的访问了服务。
 
@@ -927,11 +987,12 @@ rm -f .github/workflows/todo-platform-ci-cd.yml
   kubectl -n todo-dev get pods
   kubectl -n todo-dev describe pod -l app.kubernetes.io/name=todo-platform
   kubectl -n todo-dev logs deployment/todo-platform --tail=80
+  grep -n "image:" /tmp/todo-dev-image.yaml
   ```
 
-  如果日志中出现 `ImagePullBackOff`，优先检查 `kind load docker-image` 和 `kubectl set image`。
+  如果日志中出现 `ImagePullBackOff`，优先检查 `kind load docker-image` 和 `/tmp/todo-dev-image.yaml` 中的 `image:` 字段。
 
-- **修复**：确认 `needs.build-image.outputs.image-ref` 是完整 GHCR tag；确认 `kubectl set image` 的容器名是 `todo-api`；必要时在 workflow 中输出 `/tmp/todo-dev-image.yaml` 的 Deployment 片段。
+- **修复**：确认 `needs.build-image.outputs.image-ref` 是完整 GHCR tag；确认临时 `ci-dev-image` overlay 中 `images.name` 的值是 `todo-api`；必要时在 workflow 中输出 `/tmp/todo-dev-image.yaml` 的 Deployment 片段。
 - **预防**：部署验证不要只做 `kubectl apply --dry-run=server`，还要至少等待 rollout 并访问 `/healthz`、`/readyz`。
 
 ## 7. 生产环境注意事项
@@ -1043,7 +1104,7 @@ deploy-prod:
 实操题：
 
 1. 给 workflow 增加 `go test ./... -run Test` 的单独 step，并故意让一个测试失败。验收标准：PR check 失败，且不会进入 `build-image` job。
-2. 把 `deploy-kind` 的 `kubectl set image` 容器名故意改错，观察报错，再恢复。验收标准：能从日志定位容器名和 Deployment 模板不一致。
+2. 把 `deploy-kind` 临时 overlay 里的 `images.name` 故意改错，观察镜像没有被替换时的日志，再恢复。验收标准：能从 `/tmp/todo-dev-image.yaml` 定位 Kustomize 镜像覆盖没有命中。
 3. 为 workflow 增加 `workflow_dispatch` 输入 `environment`，允许选择 `dev` 或 `test` overlay。验收标准：手动触发时能根据输入渲染不同 overlay。
 
 思考题：
@@ -1105,4 +1166,4 @@ deploy-prod:
 
 第 30 篇会进入 GitOps 与 Argo CD。本篇的 CI/CD 流水线已经能测试、构建、推镜像和验证 Kubernetes 交付物；下一篇会进一步回答一个生产问题：**如果不希望 CI 直接持有生产集群写权限，怎样让 Git 成为部署事实来源，并由 Argo CD 自动同步到集群？**
 
-到那时，CI 的职责会收敛为“生成可信制品、更新 Git 中的期望状态”，Argo CD 的职责会变成“持续把集群真实状态调谐到 Git 声明的期望状态”。
+注意，第 30 篇需要一个持续运行的 Kubernetes 集群来承载 Argo CD，而不是本篇 workflow 结束后即销毁的临时 kind 集群。到那时，CI 的职责会收敛为“生成可信制品、更新 Git 中的期望状态”，Argo CD 的职责会变成“持续把集群真实状态调谐到 Git 声明的期望状态”。
