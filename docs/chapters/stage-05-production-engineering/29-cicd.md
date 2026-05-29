@@ -341,6 +341,7 @@ permissions:
 | Docker Buildx | Docker 官方 `setup-buildx-action@v4` | 构建并缓存镜像 |
 | Docker build-push-action | `docker/build-push-action@v7` | 构建并推送镜像 |
 | GitHub Container Registry | `ghcr.io` | 保存 Todo API 镜像 |
+| actionlint | 当前稳定版 | 本地检查 GitHub Actions 语义错误 |
 | kind | 0.31.0 | 创建临时 Kubernetes 集群 |
 | Kubernetes | kind 节点 v1.35.0 | 部署验证 |
 | kubectl | v1.35.0 | server-side dry-run 和部署 |
@@ -356,6 +357,20 @@ test -d deployments/kustomize/overlays/dev
 ```
 
 如果这些文件不存在，请先完成第 8、16、27、28 篇。
+
+还要确认 GitHub 仓库具备执行流水线的基础权限：
+
+- `Settings -> Actions -> General` 中已允许 GitHub Actions 运行。
+- `Workflow permissions` 允许 workflow 写入 package；如果组织强制只读，需要管理员放开 GHCR 写入，或改用受控 PAT / 环境凭据。
+- 仓库或组织没有禁止创建 GitHub Container Registry package。
+- 仓库名和组织名即使包含大写字母，workflow 也会在推送镜像前统一转成小写，避免 OCI 镜像名不合法。
+
+如果本机已经安装 Go，可以先安装 `actionlint`。生产团队应固定版本；本地学习可以先使用当前稳定版：
+
+```bash
+go install github.com/rhysd/actionlint/cmd/actionlint@latest
+actionlint -version
+```
 
 ### 5.3 文件目录结构
 
@@ -536,6 +551,12 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
 
+      - name: Normalize image name
+        id: image-name
+        run: |
+          image_name_lc="$(printf '%s' "${IMAGE_NAME}" | tr '[:upper:]' '[:lower:]')"
+          echo "name=${image_name_lc}" >> "$GITHUB_OUTPUT"
+
       - name: Log in to GHCR
         uses: docker/login-action@v3
         with:
@@ -547,7 +568,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v6
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          images: ${{ env.REGISTRY }}/${{ steps.image-name.outputs.name }}
           tags: |
             type=sha,format=long,prefix=sha-
             type=ref,event=branch
@@ -572,7 +593,7 @@ jobs:
       - name: Export image reference
         id: image
         run: |
-          echo "image-ref=${REGISTRY}/${IMAGE_NAME}:sha-${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+          echo "image-ref=${REGISTRY}/${{ steps.image-name.outputs.name }}:sha-${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
           echo "Built digest: ${{ steps.build.outputs.digest }}" >> "$GITHUB_STEP_SUMMARY"
 
   deploy-kind:
@@ -659,6 +680,7 @@ YAML
 | `needs` | 保证测试通过后才构建镜像，镜像构建成功后才部署验证 |
 | `if` | PR 不推镜像，只有 main push 或手动触发才执行构建 / 部署 |
 | `concurrency` | 同一分支只保留一个部署验证，避免旧流水线覆盖新结果 |
+| `Normalize image name` | 把 `OWNER/REPO/todo-api` 转成小写，避免 GHCR 拒绝大写镜像名 |
 | `cache-from/cache-to` | 使用 GitHub Actions cache 加速 Docker Buildx |
 | `kind load docker-image` | 把刚推送的镜像导入临时 kind 节点，避免依赖集群拉取权限 |
 
@@ -675,6 +697,14 @@ git diff -- .github/workflows/todo-platform-ci-cd.yml
 ```bash
 yq '.jobs | keys' .github/workflows/todo-platform-ci-cd.yml
 ```
+
+如果你本机安装了 `actionlint`，再检查 GitHub Actions 语义：
+
+```bash
+actionlint .github/workflows/todo-platform-ci-cd.yml
+```
+
+`yq` 只能证明 YAML 结构可解析；`actionlint` 会进一步检查 GitHub Actions 表达式、`needs`、`if` 条件和权限字段，更接近真实 PR 运行前的门禁。
 
 提交到功能分支并创建 Pull Request：
 
@@ -867,11 +897,11 @@ rm -f .github/workflows/todo-platform-ci-cd.yml
 - **现象**：
 
   ```text
-  evalsymlink failure on .../.secrets/auth.env
+  evalsymlink failure on .../.secrets/todo-api-auth.env
   no such file or directory
   ```
 
-- **原因**：第 28 篇 overlay 使用 `secretGenerator.envs` 引用 `.secrets/auth.env`，但 CI runner 是干净环境，不会自动拥有本地 Secret 文件。
+- **原因**：第 28 篇 overlay 使用 `secretGenerator.envs` 引用 `.secrets/todo-api-auth.env`，但 CI runner 是干净环境，不会自动拥有本地 Secret 文件。
 - **排查**：
 
   ```bash
@@ -879,7 +909,7 @@ rm -f .github/workflows/todo-platform-ci-cd.yml
   grep -n "Prepare Kustomize local secrets" -A8 .github/workflows/todo-platform-ci-cd.yml
   ```
 
-- **修复**：在 workflow 中生成 CI 专用 `.secrets/auth.env`。不要把真实生产 Secret 提交到 Git。
+- **修复**：在 workflow 中生成 CI 专用 `.secrets/todo-api-auth.env`。不要把真实生产 Secret 提交到 Git。
 - **预防**：所有本地 `.secrets/` 都应在 `.gitignore` 中，CI 用仓库 Secret、环境 Secret 或临时占位值生成。
 
 ### 错误 5：部署验证失败，Pod 一直不 Ready
@@ -915,6 +945,53 @@ rm -f .github/workflows/todo-platform-ci-cd.yml
 4. **生产部署需要 environment、审批和并发控制。** GitHub Actions environment 可以绑定保护规则和环境级 Secret。生产 job 应设置 `environment: prod`、`concurrency`、required reviewers，并保留部署记录。不要允许多个生产部署 job 并发修改同一个 Namespace，否则旧版本可能覆盖新版本。
 
 5. **长期集群凭据要最小化。** 本篇用临时 kind 避免真实 kubeconfig 泄露。生产中优先使用云厂商 OpenID Connect（OIDC）短期凭据、专用 ServiceAccount、最小 RBAC 和审计日志。如果必须使用 kubeconfig Secret，应 base64 保存、限制 environment 访问、定期轮换，并确保日志不会输出 kubeconfig 内容。
+
+如果团队暂时还没有接入云厂商 OIDC，至少要把真实集群部署限制在受保护 environment 中。下面是一个可复制的最小 `deploy-prod` job 骨架，它依赖 `prod` environment 中的 `KUBECONFIG_B64` Secret；后续接入 OIDC 时，可以只替换 `Configure kubeconfig` 这一步：
+
+```yaml
+deploy-prod:
+  name: Deploy to production
+  runs-on: ubuntu-24.04
+  timeout-minutes: 20
+  needs: build-image
+  if: github.ref == 'refs/heads/main'
+  environment: prod
+  permissions:
+    contents: read
+  concurrency:
+    group: todo-platform-prod
+    cancel-in-progress: false
+
+  steps:
+    - name: Checkout repository
+      uses: actions/checkout@v6
+
+    - name: Install kubectl
+      run: |
+        set -euo pipefail
+        curl -fsSLo kubectl "https://dl.k8s.io/release/v1.35.0/bin/linux/amd64/kubectl"
+        sudo install -m 0755 kubectl /usr/local/bin/kubectl
+        kubectl version --client
+
+    - name: Configure kubeconfig
+      env:
+        KUBECONFIG_B64: ${{ secrets.KUBECONFIG_B64 }}
+      run: |
+        set -euo pipefail
+        mkdir -p "${HOME}/.kube"
+        printf '%s' "${KUBECONFIG_B64}" | base64 -d > "${HOME}/.kube/config"
+        chmod 0600 "${HOME}/.kube/config"
+        kubectl config current-context
+
+    - name: Deploy image
+      run: |
+        set -euo pipefail
+        kubectl -n todo-prod set image deployment/todo-platform \
+          todo-api="${{ needs.build-image.outputs.image-ref }}"
+        kubectl -n todo-prod rollout status deployment/todo-platform --timeout=300s
+```
+
+这段配置仍然不是生产最佳终点：它只是把部署权限放进受保护 environment，并要求人工审批。更成熟的方案会用 OIDC 换取短期云凭据，或在第 30 篇改成 GitOps，由 CI 更新 Git 中的镜像 tag / digest，再让 Argo CD 同步到集群。
 
 官方参考文档：
 
