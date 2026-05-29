@@ -399,6 +399,8 @@ Argo CD：同步 Deployment，但不管理 Secret 明文
 | Helm | v4.2.0 | 确认第 27 篇 Chart 依赖和第 28 篇 base 已生成 |
 | Argo CD | v3.4.3 | GitOps 控制器和 CLI |
 
+说明：课程蓝图中的 Kubernetes 基线为 1.36.x，阶段五为了保持从 GitOps 集群创建到后续监控、日志、Trace 和排障实验的连续性，统一使用 kind 节点 v1.35.0。本篇不使用 Kubernetes 1.36 专属能力；如果你的实验环境已经升级到 1.36.x，下面命令仍然适用。
+
 说明：2026-05-29 查询 Argo CD 官方 GitHub Releases，当前最新稳定版本为 v3.4.3。本篇锁定该版本，避免 `stable` 分支随时间变化导致实验不可复现。
 
 开始前请确认你在 Todo Platform 应用仓库根目录，也就是 `go.mod` 所在目录：

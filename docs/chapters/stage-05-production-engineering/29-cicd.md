@@ -349,6 +349,8 @@ permissions:
 | kubectl | v1.35.0 | server-side dry-run 和部署 |
 | Helm | v4.2.0 | lint、template 和依赖构建 |
 
+说明：课程蓝图中的 Kubernetes 基线为 1.36.x，阶段五为了保持从第 29 篇到第 33 篇的实验连续性，统一使用 kind 节点 v1.35.0。本篇不使用 Kubernetes 1.36 专属能力；如果你的实验环境已经升级到 1.36.x，workflow 和验证命令仍然适用。
+
 确认应用仓库已经具备以下文件。下面命令在应用仓库根目录执行，也就是 `go.mod` 所在目录：
 
 ```bash

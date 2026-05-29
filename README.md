@@ -90,6 +90,7 @@ CI/CD、GitOps、Prometheus / Grafana、Loki、OpenTelemetry 和 Kubernetes 生�
 - [第 31 篇：Prometheus 与 Grafana 监控](docs/chapters/stage-05-production-engineering/31-prometheus-grafana.md)
 - [第 32 篇：日志与 OpenTelemetry 链路追踪](docs/chapters/stage-05-production-engineering/32-logging-opentelemetry.md)
 - [第 33 篇：Kubernetes 生产排障](docs/chapters/stage-05-production-engineering/33-k8s-troubleshooting.md)
+- [附录 A：生产工程作品集验收](docs/chapters/stage-05-production-engineering/stage-05-acceptance.md)
 
 </details>
 
@@ -206,6 +207,13 @@ docs/
 │   │   ├── 27-helm4.md               # 第 27 篇：Helm 4 包管理
 │   │   ├── 28-kustomize.md           # 第 28 篇：Kustomize 多环境配置管理
 │   │   └── stage-04-acceptance.md    # 阶段四附录 A：综合验收
+│   ├── stage-05-production-engineering/ # 阶段五：生产工程能力
+│   │   ├── 29-cicd.md                # 第 29 篇：CI/CD 自动化交付
+│   │   ├── 30-gitops-argocd.md       # 第 30 篇：GitOps 与 Argo CD
+│   │   ├── 31-prometheus-grafana.md  # 第 31 篇：Prometheus 与 Grafana 监控
+│   │   ├── 32-logging-opentelemetry.md # 第 32 篇：日志与 OpenTelemetry 链路追踪
+│   │   ├── 33-k8s-troubleshooting.md # 第 33 篇：Kubernetes 生产排障
+│   │   └── stage-05-acceptance.md    # 阶段五附录 A：生产工程作品集验收
 │   └── ...                     # 后续阶段章节（待完成）
 ├── projects/                   # 项目实战
 ├── labs/                       # 实验索引

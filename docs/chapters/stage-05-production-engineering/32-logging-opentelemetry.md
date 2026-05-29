@@ -310,6 +310,8 @@ Loki / Tempo 更偏云原生和标签查询，适合与 Prometheus/Grafana 协�
 | OpenTelemetry Go | v1.44.0 | Go Trace SDK |
 | otelgin | v0.69.0 | Gin 路由自动生成 server span |
 
+说明：课程蓝图中的 Kubernetes 基线为 1.36.x，本篇继续使用第 30-31 篇的 kind v1.35.0 集群，是为了保持监控、日志和 Trace 实验环境连续。本篇不使用 Kubernetes 1.36 专属能力；如果你的集群已经升级到 1.36.x，下面命令仍然适用。
+
 Promtail chart 当前仍能在 Grafana Helm index 中看到，但 Promtail 官方文档已标注 EOL。本篇不会使用 Promtail 部署新实验。
 
 Todo API 仍沿用前面章节的默认运行方式：如果 `TODO_DATABASE_DSN` 为空，服务使用内存 Repository；如果你的环境已经接入 PostgreSQL，本篇的日志和 Trace 接入方式不变，只是 Trace 中会多出数据库调用排障价值。
