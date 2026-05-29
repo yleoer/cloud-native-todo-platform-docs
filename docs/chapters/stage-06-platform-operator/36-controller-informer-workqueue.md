@@ -183,6 +183,21 @@ func Reconcile(ctx context.Context, key string) error
 | Reconciler | 业务调谐函数 | Reconcile |
 | Builder | 声明 Watch 哪些资源 | Informer 和 EventHandler |
 
+controller-runtime 里的业务入口最终仍然是一段 Reconcile 逻辑：
+
+```go
+func (r *TodoAppReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+	var app platformv1alpha1.TodoApp
+	if err := r.Get(ctx, req.NamespacedName, &app); err != nil {
+		return ctrl.Result{}, client.IgnoreNotFound(err)
+	}
+	// ... ensure Deployment, Service, Ingress, then patch status ...
+	return ctrl.Result{}, nil
+}
+```
+
+这段伪代码对应本篇模拟程序里的 `reconcile` 函数。差别是 controller-runtime 已经帮你处理了 Informer、Workqueue、缓存同步、并发 worker 和错误重试。
+
 理解本篇的 Informer 和 Workqueue 后，再看 controller-runtime 就会清楚：它不是魔法，只是把重复样板代码收起来。
 
 ## 4. 原理深入
@@ -233,6 +248,8 @@ process queue
 ```
 
 第 37 篇手写 Controller 会显式调用类似 `WaitForCacheSync` 的逻辑。本篇模拟程序也会用日志标出 cache sync 边界，并在缓存同步后再启动 worker。
+
+另一个容易混淆的词是 resync period。真实 Informer 的 resync 不是重新向 API server 全量 List，而是把本地缓存中的对象周期性送回处理链路，用来定期检查实际状态是否发生漂移。
 
 ### 4.3 Workqueue 如何去重和重试
 
@@ -378,7 +395,7 @@ operator/
 
 #### 5.4.1 go.mod
 
-下面的 `cat <<EOF` 写文件方式适用于 Linux、macOS、Git Bash 和 WSL。PowerShell 用户可以用编辑器创建同名文件，或用 PowerShell here-string，文件内容保持一致。
+下面的 here-doc 写文件方式适用于 Linux、macOS、Git Bash 和 WSL。PowerShell 用户可以用编辑器创建同名文件，或用 PowerShell here-string，文件内容保持一致。
 
 创建 `operator/controller-lab/go.mod`：
 
@@ -438,6 +455,7 @@ func (a TodoApp) Key() string {
 	return a.Namespace + "/" + a.Name
 }
 
+// ClusterState simulates the informer's local cache.
 type ClusterState struct {
 	mu              sync.RWMutex
 	apps            map[string]TodoApp
@@ -503,6 +521,7 @@ func (s *ClusterState) Snapshot(key string) (TodoApp, bool, bool, bool, int) {
 	return app, ok, s.databaseReady[key], s.cacheReady[key], s.deploymentReady[key]
 }
 
+// WorkQueue simulates a rate-limited workqueue with dedupe and dirty tracking.
 type WorkQueue struct {
 	mu         sync.Mutex
 	cond       *sync.Cond
@@ -692,7 +711,10 @@ func main() {
 
 	start := time.Now()
 	for _, event := range events {
-		time.Sleep(event.At - time.Since(start))
+		// Early events may arrive almost together, just like startup watch bursts.
+		if wait := event.At - time.Since(start); wait > 0 {
+			time.Sleep(wait)
+		}
 		key, ok := state.ApplyEvent(event)
 		fmt.Printf("event: %s %s/%s kind=%s -> key=%s\n", event.Type, event.Namespace, event.Name, event.Kind, key)
 		if ok {
@@ -712,6 +734,8 @@ func main() {
 }
 GO
 ```
+
+这里的 `GO` 只是 here-doc 定界符，作用和常见的 `EOF` 一样；用单引号包住定界符可以避免 shell 展开代码里的变量或反斜杠。
 
 这段程序模拟了几件事：
 
@@ -873,9 +897,19 @@ grep -n 'Watch rules\|Reconcile steps\|Required indexes' controller-design.md
 
 判断标准：设计文档包含 Watch、Reconcile 和 Index 三部分。
 
+**第五层：修改参数观察行为**
+
+把 `RetryDelay` 中的上限从 `5` 临时改成 `2`，再运行：
+
+```bash
+go run . | grep 'queue: retry'
+```
+
+判断标准：重试延迟最多增长到 `240ms`，说明队列退避参数会直接影响故障期间的重试频率。验证后把数值改回 `5`。
+
 ### 5.8 清理步骤
 
-如果只想删除实验文件：
+如果当前目录是 `operator/controller-lab`，并且只想删除实验文件：
 
 ```bash
 cd ../..
@@ -959,7 +993,7 @@ Remove-Item -Recurse -Force operator/controller-lab
 
 - **现象**：删除 CR 后对象一直处于 `Terminating`，`metadata.finalizers` 不为空。
 - **原因**：Controller 添加了 finalizer，但删除逻辑失败或没有移除 finalizer。
-- **排查**：
+- **排查**：本章纯 Go 模拟程序不会连接 Kubernetes 集群，下面命令是第 37-38 篇部署真实 Controller 后的前瞻验证：
 
   ```bash
   kubectl -n todo-dev get todoapp todo-platform -o jsonpath='{.metadata.finalizers}{"\n"}'
@@ -980,6 +1014,8 @@ Remove-Item -Recurse -Force operator/controller-lab
 3. **status 是排障接口，不是日志垃圾桶**。Controller 应写清楚 `observedGeneration`、`conditions.type`、`reason`、`message` 和关键 Ready 数字。不要每次循环都写 status，否则会制造额外 update 事件。只有状态真正变化时才 patch。
 
 4. **Finalizer 要有失败恢复方案**。凡是创建外部资源、云资源或跨 namespace 资源的 Controller，都可能需要 finalizer。生产环境必须说明删除卡住时怎么查、怎么重试、怎么人工清理，以及什么情况下可以安全移除 finalizer。
+
+   真实集群中排查 Finalizer 阻塞删除时，先查看对象是否已有 `deletionTimestamp`，再看 `metadata.finalizers` 是否长时间不消失；如果清理外部资源失败，Controller 应通过 `status.conditions`、Event 和日志暴露失败原因。
 
 5. **Controller 自身也要可观测**。至少要暴露 Reconcile 次数、错误次数、队列长度、队列延迟、单次 Reconcile 耗时和 worker 数。阶段五已经建设了 Prometheus/Grafana/Loki/Tempo，后续 Operator 也要接入同一套观测体系。
 
