@@ -53,12 +53,12 @@ kubectl version --client --output=yaml
 
 ```yaml
 clientVersion:
-  gitVersion: v1.34.1
-kustomizeVersion: v5.7.1
+  gitVersion: v1.35.x
+kustomizeVersion: v5.x
 ```
 
 !!! note "为什么本篇使用 `kubectl kustomize`"
-    Kustomize 可以独立安装，也内置在 `kubectl` 中。本篇使用 `kubectl kustomize` 和 `kubectl apply -k`，这样学习者不需要再安装一个新二进制。不同 `kubectl` 小版本内置的 Kustomize 版本可能不同，本篇使用的字段在 Kustomize v5.7.1 中已验证。
+    Kustomize 可以独立安装，也内置在 `kubectl` 中。本篇使用 `kubectl kustomize` 和 `kubectl apply -k`，这样学习者不需要再安装一个新二进制。不同 `kubectl` 小版本内置的 Kustomize 版本可能不同，你的输出可以是 v5.x 的其他小版本；本篇使用的字段已按 Kustomize v5 行为验证。
 
 ## 2. 本章工作场景与真实案例
 
@@ -82,7 +82,7 @@ Kustomize 解决的是“在不改 base 的前提下，对同一组 Kubernetes Y
 
 - 平台工程师维护 Helm Chart，把应用打包成稳定、可复用的发布单元。
 - 环境负责人维护 Kustomize overlay，把 dev、test、prod 的差异放在独立目录中审查。
-- 安全工程师审查 prod overlay 是否开启 Restricted PSA 标签、资源限制和 Secret 外部化。
+- 安全工程师审查 prod overlay 是否开启 Restricted PSA（Pod Security Admission，Pod 安全准入）标签、资源限制和 Secret 外部化。
 - SRE 在 CI 中执行 `kubectl kustomize`、`kubectl apply --dry-run=server -k` 和策略检查。
 - GitOps 控制器只同步某个 overlay，而不是让每个环境手工拼命令。
 
@@ -280,11 +280,15 @@ Kustomize 的输入是一组 YAML 和 `kustomization.yaml`，输出还是 YAML�
 flowchart TD
     K["kustomization.yaml"] --> Load["加载 resources"]
     Load --> Gen["执行 ConfigMap/Secret generators"]
-    Gen --> Trans["执行 namespace、labels、images、replicas transformers"]
-    Trans --> Patch["应用 patches"]
-    Patch --> Output["输出最终 Kubernetes YAML"]
+    Load --> Patch["应用 patches"]
+    Gen --> NameRef["改写生成对象的引用"]
+    Patch --> NameRef
+    NameRef --> Trans["执行 namespace、labels、images、replicas 等转换"]
+    Trans --> Output["输出最终 Kubernetes YAML"]
     Output --> Apply["kubectl apply -k<br/>提交给 API Server"]
 ```
+
+这张图是教学视角的简化链路，真实实现中不同 transformer 的顺序更细。对本篇最关键的是：overlay 先把 Deployment 引用和 Role `resourceNames` patch 成 generator 基础名 `todo-platform-env`，随后 Kustomize 的 name reference 改写会把它们更新为带 hash 的最终 ConfigMap 名称。
 
 `kubectl kustomize` 只做本地渲染；`kubectl apply -k` 会先渲染，再把结果提交给 API Server。两者适合放在 CI 的不同阶段：前者检查生成结果，后者配合 `--dry-run=server` 检查集群 API 和准入策略。
 
@@ -366,7 +370,7 @@ git diff
   └─ kubectl apply --dry-run=server -k overlays/prod
 ```
 
-生产流水线还会增加策略检查，例如禁止 `latest` 镜像、要求资源限制、要求 Restricted PSA 标签、禁止提交明文 Secret、要求变更经过审批。
+生产流水线还会增加策略检查，例如禁止 `latest` 镜像、要求资源限制、要求 Restricted PSA 标签、禁止提交明文 Secret、要求变更经过审批。在 Argo CD 或 Flux 这类 GitOps 系统中，通常让控制器同步某一个 overlay 目录，例如 `deployments/kustomize/overlays/prod`；CI 则在合并前渲染同一个目录，确保 Git 中看到的变更就是集群将要接收的变更。
 
 ## 5. 手把手实验
 
@@ -378,8 +382,8 @@ git diff
 
 | 工具 | 建议版本 | 用途 |
 | --- | --- | --- |
-| kubectl | v1.34.1 或与集群相近 | 内置 Kustomize，执行 `kubectl kustomize` 和 `kubectl apply -k` |
-| Kustomize | kubectl 内置 v5.7.1 | 渲染 base / overlay |
+| kubectl | v1.35.x 或与集群相近 | 内置 Kustomize，执行 `kubectl kustomize` 和 `kubectl apply -k` |
+| Kustomize | kubectl 内置 v5.x | 渲染 base / overlay |
 | Helm | v4.2.x | 从第 27 篇 Chart 生成 base |
 | Kubernetes | kind 实际 v1.35.0，v1.25+ 可完成主线 | 运行 dev/test/prod Namespace |
 | Docker | 29.x | 运行 `todo-api:v0.1.0 hash-password` |
@@ -458,9 +462,13 @@ cache:
 YAML
 ```
 
-更新 Helm 本地依赖，并把 Chart 渲染为 Kustomize base。`--skip-tests` 用来跳过 Helm test Pod，避免把测试 hook 当成常驻资源应用到集群：
+更新 Helm 本地依赖，并把 Chart 渲染为 Kustomize base。第 27 篇已经生成过 `Chart.lock`；如果你跳过了第 27 篇的依赖更新步骤，下面第一行会先补齐锁文件。`--skip-tests` 用来跳过 Helm test Pod，避免把测试 hook 当成常驻资源应用到集群：
 
 ```bash
+if ! test -f deployments/helm/todo-platform/Chart.lock; then
+  helm dependency update deployments/helm/todo-platform
+fi
+
 helm dependency build deployments/helm/todo-platform
 
 helm template todo-platform deployments/helm/todo-platform \
@@ -486,6 +494,7 @@ YAML
 
 ```bash
 HASH=$(docker run --rm todo-api:v0.1.0 hash-password "change-me-123")
+test -n "$HASH"
 
 cat > deployments/kustomize/overlays/dev/.secrets/todo-api-auth.env <<EOF
 TODO_JWT_SECRET=dev-0123456789abcdef0123456789abcdef
@@ -503,13 +512,25 @@ TODO_AUTH_USERS=admin=${HASH}
 EOF
 ```
 
+如果 `docker run` 提示 `Unable to find image 'todo-api:v0.1.0'`，请先回到第 16 篇重新构建镜像；如果提示 `unknown command "hash-password"`，说明镜像不是本课程要求的 Todo API 版本，需要重新构建并加载到 kind 集群。
+
 PowerShell 用户请使用：
 
 ```powershell
 $HASH = docker run --rm todo-api:v0.1.0 hash-password "change-me-123"
+if (-not $HASH) { throw "hash-password failed" }
 ```
 
 再用 here-string 创建三个 `.env` 文件。
+
+确认 `.secrets/` 不会被提交。当前仓库应已有对应规则；如果第一条命令没有输出，请按第 6 节“Secret env 文件缺失或被误提交”的修复方式补充 `.gitignore`：
+
+```bash
+grep -n 'deployments/kustomize/overlays/\*\*/\.secrets/' .gitignore
+git status --short --ignored deployments/kustomize/overlays/dev/.secrets/todo-api-auth.env
+```
+
+接下来三个 overlay 的 `configMapGenerator` 都会显式包含 `TODO_API_ADDR=0.0.0.0:18080`，因为 Deployment 会从环境 ConfigMap 读取运行参数。本篇沿用第 27 篇的教学范围，故意不设置 `TODO_DATABASE_DSN`；第 12 篇已经实现过“未设置 `TODO_DATABASE_DSN` 时使用内存 Repository，设置后切换 PostgreSQL Repository”的启动逻辑。
 
 创建 dev Namespace：
 
@@ -545,6 +566,8 @@ labels:
 configMapGenerator:
   - name: todo-platform-env # ← 使用新名字生成环境配置，保留 hash 后缀以触发滚动更新。
     literals:
+      - TODO_API_ADDR=0.0.0.0:18080
+      # 本篇不设置 TODO_DATABASE_DSN；未设置时 Todo API 使用内存 Repository。
       - TODO_ENV=dev
       - TODO_LOG_LEVEL=debug
       - TODO_CORS_ALLOWED_ORIGINS=https://todo-dev.localhost:18443
@@ -595,6 +618,8 @@ patches:
         value: todo-dev
 YAML
 ```
+
+dev overlay 不额外创建 `patch-deployment-resources.yaml`，它沿用 Helm base 中的默认资源请求和限制。这样 dev 的差异集中在 Namespace、副本数和调试配置上。
 
 创建 test Namespace：
 
@@ -648,11 +673,13 @@ resources:
 labels:
   - pairs:
       app.kubernetes.io/environment: test
-    includeSelectors: false
+    includeSelectors: false # ← 不改 selector，避免未来升级触发不可变字段问题。
 
 configMapGenerator:
   - name: todo-platform-env
     literals:
+      - TODO_API_ADDR=0.0.0.0:18080
+      # 本篇不设置 TODO_DATABASE_DSN；未设置时 Todo API 使用内存 Repository。
       - TODO_ENV=test
       - TODO_LOG_LEVEL=info
       - TODO_CORS_ALLOWED_ORIGINS=https://todo-test.localhost:18443
@@ -761,11 +788,13 @@ resources:
 labels:
   - pairs:
       app.kubernetes.io/environment: prod
-    includeSelectors: false
+    includeSelectors: false # ← 不改 selector，避免未来升级触发不可变字段问题。
 
 configMapGenerator:
   - name: todo-platform-env
     literals:
+      - TODO_API_ADDR=0.0.0.0:18080
+      # 本篇不设置 TODO_DATABASE_DSN；未设置时 Todo API 使用内存 Repository。
       - TODO_ENV=prod
       - TODO_LOG_LEVEL=info
       - TODO_CORS_ALLOWED_ORIGINS=https://todo.example.com
@@ -844,6 +873,8 @@ grep -n "name: todo-api-auth-" /tmp/todo-dev.yaml | head
 grep -n "configMapRef" -A2 /tmp/todo-dev.yaml
 grep -n "secretRef" -A2 /tmp/todo-dev.yaml
 ```
+
+你还会在渲染结果里看到 Helm base 保留下来的原始 `todo-platform` ConfigMap。它来自第 27 篇 Chart，overlay 不会自动删除 base 中已有对象；真正被 Deployment 读取的是 `todo-platform-env-<hash>`。生产仓库如果不想保留这个对象，可以在 overlay 中用 `$patch: delete` 删除，或回到 Helm Chart 层把 ConfigMap 拆成可关闭模板。
 
 先创建 Namespace，避免 server-side dry-run 因 Namespace 不存在而提前失败。`kubectl apply --dry-run=server -k` 会把 overlay 渲染结果发送给 API Server 校验，但 dry-run 不会真的持久化 Namespace；如果 Namespace 尚不存在，后续 namespaced 资源可能会先报 `namespaces "todo-dev" not found`：
 
@@ -989,6 +1020,16 @@ chapter-28-test
 chapter-28-prod
 ```
 
+验证 ConfigMap 数量和引用关系：
+
+```bash
+kubectl -n todo-dev get configmap -o name | grep '^configmap/todo-platform'
+kubectl -n todo-dev get deployment todo-platform \
+  -o jsonpath='{.spec.template.spec.containers[0].envFrom[0].configMapRef.name}{"\n"}'
+```
+
+预期能看到两个 ConfigMap：`configmap/todo-platform` 是 Helm base 残留，`configmap/todo-platform-env-...` 是 Kustomize 生成的环境配置；第二条命令应输出 `todo-platform-env-...`，说明应用实际读取的是环境 ConfigMap。
+
 验证 RoleBinding subject Namespace 已被修正：
 
 ```bash
@@ -1117,7 +1158,7 @@ rm -rf deployments/kustomize
 
   ```bash
   kubectl kustomize deployments/kustomize/overlays/dev | grep -n "configMapRef" -A2
-  rg -n "todo-platform-env|envFrom/0/configMapRef/name" deployments/kustomize/overlays/dev/kustomization.yaml
+  grep -nE "todo-platform-env|envFrom/0/configMapRef/name" deployments/kustomize/overlays/dev/kustomization.yaml
   ```
 
   如果 `configMapRef` 后面仍是 `todo-platform`，说明 Deployment 没有切到环境 ConfigMap。
@@ -1166,8 +1207,8 @@ rm -rf deployments/kustomize
 - **排查**：
 
   ```bash
-  rg -n "/subjects/0/namespace|/rules/0/resourceNames/0|todo-dev|todo-platform-env" deployments/kustomize/overlays/dev/kustomization.yaml
-  kubectl kustomize deployments/kustomize/overlays/dev | grep -n "subjects\\|resourceNames" -A3
+  grep -nE "/subjects/0/namespace|/rules/0/resourceNames/0|todo-dev|todo-platform-env" deployments/kustomize/overlays/dev/kustomization.yaml
+  kubectl kustomize deployments/kustomize/overlays/dev | grep -nE "subjects|resourceNames" -A3
   ```
 
   如果没有对应 patch，说明 overlay 漏掉了 RBAC 修正。
