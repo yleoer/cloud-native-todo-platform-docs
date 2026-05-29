@@ -155,7 +155,7 @@ hide:
 - [第 35 篇：CRD 设计与实践 [C]](chapters/stage-06-platform-operator/35-crd-design.md)
 - [第 36 篇：Controller 机制：Informer 与 Workqueue [B]](chapters/stage-06-platform-operator/36-controller-informer-workqueue.md)
 - [第 37 篇：手写简化版 Controller [C]](chapters/stage-06-platform-operator/37-handwritten-controller.md)
-- 第 38 篇：Kubebuilder 入门
+- [第 38 篇：Kubebuilder 入门 [C]](chapters/stage-06-platform-operator/38-kubebuilder.md)
 - 第 39 篇：Operator 高级机制
 - 第 40 篇：Operator 测试、发布与升级
 - 第 41 篇：Operator 生产实践
@@ -180,6 +180,6 @@ http://127.0.0.1:8000
 
 ## 下一步计划
 
-- 进入第 38 篇 Kubebuilder 入门，用 controller-runtime 重写第 37 篇手写 Controller，并开始自动创建 Deployment 与 Service。
-- 延续阶段五产物，整理 Todo Platform CI/CD、GitOps、可观测性与排障作品集。
-- 复盘第 34-37 篇的 API 模型、CRD schema、控制循环设计和 client-go 手写实现，为 Kubebuilder 做准备。
+- 进入第 39 篇 Operator 高级机制，在 Kubebuilder 项目中补齐 OwnerReference、Finalizer、Webhook、事件和 Conditions 最佳实践。
+- 等第 37 篇手写简化版 Controller 合并后，对照补充手写 Controller 与 Kubebuilder 版本的差异说明。
+- 延续阶段六产物，逐步把 TodoApp Operator 推进到可测试、可发布、可生产运维的版本。
