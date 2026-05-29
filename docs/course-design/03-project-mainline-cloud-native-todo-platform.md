@@ -299,7 +299,7 @@ cloud-native-todo-platform/
 | Kustomize（篇 28） | `deployments/kustomize/` |
 | CI/CD（篇 29） | `.github/workflows/` |
 | 可观测性（篇 31-32） | `observability/` |
-| CRD（篇 35） | `operator/crd/` |
+| CRD（篇 35） | `operator/crds/` |
 | 手写 Controller（篇 37） | `operator/handwritten/` |
 | Kubebuilder（篇 38） | `operator/kubebuilder/` |
 | Operator 发布（篇 40） | `operator/helm/` |

@@ -152,7 +152,7 @@ hide:
 深入 Kubernetes API Machinery、CRD、手写 Controller、Kubebuilder、Webhook、Finalizer、Operator 测试发布、生产实践和最终集成。
 
 - [第 34 篇：Kubernetes API 扩展机制 [B]](chapters/stage-06-platform-operator/34-k8s-api-extension.md)
-- 第 35 篇：CRD 设计与实践
+- [第 35 篇：CRD 设计与实践 [C]](chapters/stage-06-platform-operator/35-crd-design.md)
 - 第 36 篇：Controller 机制：Informer 与 Workqueue
 - 第 37 篇：手写简化版 Controller
 - 第 38 篇：Kubebuilder 入门
@@ -180,6 +180,6 @@ http://127.0.0.1:8000
 
 ## 下一步计划
 
-- 进入第 35 篇 CRD 设计与实践，把 `TodoApp` API 模型落成正式 CRD。
+- 进入第 36 篇 Controller 机制，分析 Todo Operator 的 Watch、Workqueue 和 Reconcile 设计。
 - 延续阶段五产物，整理 Todo Platform CI/CD、GitOps、可观测性与排障作品集。
-- 复盘第 34 篇的 GVK、GVR、spec/status 与 Conditions，为 Controller 设计做准备。
+- 复盘第 34-35 篇的 API 模型与 CRD schema，为手写 Controller 做准备。
