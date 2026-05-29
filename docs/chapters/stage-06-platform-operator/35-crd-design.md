@@ -299,7 +299,7 @@ CRD 版本升级最容易踩坑的地方是把“修改 YAML 文件”误以为�
 
 ```bash
 pwd
-test -d operator/api-model
+test -d operator/api-model || echo "skip: Ch34 api-model not found"
 kubectl config current-context
 kubectl version --client
 kubectl get namespace todo-dev || kubectl create namespace todo-dev
@@ -310,7 +310,7 @@ PowerShell：
 
 ```powershell
 Get-Location
-Test-Path operator/api-model
+if (-not (Test-Path operator/api-model)) { "skip: Ch34 api-model not found" }
 kubectl config current-context
 kubectl version --client
 kubectl get namespace todo-dev
@@ -344,7 +344,7 @@ operator/
 │   │   ├── tododatabases.platform.todo.example.com.yaml
 │   │   └── todocaches.platform.todo.example.com.yaml
 │   └── versions/
-│       └── todoapps-v1beta1-preview.yaml
+│       └── todoapps-versioning-notes.md
 └── samples/
     ├── todoapp.yaml
     ├── tododatabase.yaml
@@ -353,7 +353,7 @@ operator/
 
 ### 5.4 完整代码或配置
 
-下面的文件创建命令使用 Bash heredoc。Windows 用户可以在 Git Bash / WSL 中执行；如果使用 PowerShell，建议用编辑器创建同名文件，并复制对应 YAML 内容。这样可以避免在长 YAML 上重复维护两套几乎相同的 here-string。
+下面的文件创建命令使用 Bash heredoc，适用于 Linux、macOS、Git Bash 和 WSL。Windows 用户如果直接使用 PowerShell，建议用编辑器创建同名文件并复制对应 YAML 内容；PowerShell 不支持 `cat <<'YAML'` 这种 heredoc 语法，长 YAML 也不适合在两套 shell 语法里重复维护。
 
 #### 5.4.1 TodoApp CRD
 
@@ -433,6 +433,9 @@ spec:
                       description: Service port exposed by the Todo API.
                 ingress:
                   type: object
+                  x-kubernetes-validations:
+                    - rule: "!has(self.enabled) || self.enabled == false || has(self.host)"
+                      message: "spec.ingress.host is required when spec.ingress.enabled is true"
                   properties:
                     enabled:
                       type: boolean
@@ -538,6 +541,7 @@ YAML
 - `replicas.minimum` / `maximum` 把副本数限制在教学环境可承受范围内。
 - `resources.profile` 用枚举暴露平台规格，避免业务方直接填写 CPU/memory。
 - `subresources.status: {}` 让 status 写入走 `/status` 子资源。
+- `x-kubernetes-validations` 用 CEL 表达跨字段约束：当 `ingress.enabled=true` 时必须填写 `ingress.host`。OpenAPI schema 擅长类型、枚举和范围校验；这类“字段 A 为真时字段 B 必填”的规则，要用 CEL 或 admission webhook 表达。
 
 #### 5.4.2 TodoDatabase CRD
 
@@ -788,7 +792,7 @@ spec:
                     size:
                       type: string
                       pattern: '^([1-9][0-9]*)(Mi|Gi)$'
-                      default: 1Gi
+                      default: "1Gi"
             status:
               type: object
               properties:
@@ -925,42 +929,40 @@ YAML
 
 #### 5.4.5 版本演进预览
 
-创建 `operator/crds/versions/todoapps-v1beta1-preview.yaml`，这份文件用于阅读和评审，不在主实验中 apply：
+创建 `operator/crds/versions/todoapps-versioning-notes.md`，这份文件只记录版本演进思路，不是可以直接 apply 的 CRD：
 
 ```bash
-cat > operator/crds/versions/todoapps-v1beta1-preview.yaml <<'YAML'
-apiVersion: apiextensions.k8s.io/v1
-kind: CustomResourceDefinition
-metadata:
-  name: todoapps.platform.todo.example.com
-spec:
-  group: platform.todo.example.com
-  scope: Namespaced
-  names:
-    plural: todoapps
-    singular: todoapp
-    kind: TodoApp
-  versions:
-    - name: v1alpha1
-      served: true
-      storage: false
-      deprecated: true
-      deprecationWarning: "platform.todo.example.com/v1alpha1 TodoApp is deprecated; use v1beta1."
-      schema:
-        openAPIV3Schema:
-          type: object
-          x-kubernetes-preserve-unknown-fields: true
-    - name: v1beta1
-      served: true
-      storage: true
-      schema:
-        openAPIV3Schema:
-          type: object
-          x-kubernetes-preserve-unknown-fields: true
-YAML
+cat > operator/crds/versions/todoapps-versioning-notes.md <<'EOF'
+# TodoApp v1beta1 versioning notes
+
+This is a design note, not an applyable CRD manifest.
+
+When TodoApp evolves from v1alpha1 to v1beta1:
+
+- keep v1alpha1 served while existing clients migrate
+- mark v1alpha1 deprecated and provide deprecationWarning
+- add v1beta1 with a full structural OpenAPI schema
+- use conversion webhook if fields are renamed, moved, or transformed
+- change storage version only with a storage migration and rollback plan
+- remove v1alpha1 only after old storedVersions disappear
+
+Illustrative versions shape:
+
+~~~yaml
+versions:
+  - name: v1alpha1
+    served: true
+    storage: false
+    deprecated: true
+    deprecationWarning: "platform.todo.example.com/v1alpha1 TodoApp is deprecated; use v1beta1."
+  - name: v1beta1
+    served: true
+    storage: true
+~~~
+EOF
 ```
 
-这不是本篇推荐的最终升级方式，只是展示 `served`、`storage`、`deprecated` 和 `deprecationWarning` 的位置。真实升级不能用 `x-kubernetes-preserve-unknown-fields` 偷懒放开校验；应该为每个版本定义完整 schema，并在需要时实现 conversion webhook。
+这里故意不生成 `todoapps-v1beta1-preview.yaml`，因为读者很容易把“演示用 CRD”误 apply 到集群里。真实升级不能用 `x-kubernetes-preserve-unknown-fields` 偷懒放开校验；应该为每个版本定义完整 schema，并在需要时实现 conversion webhook。
 
 ### 5.5 执行命令
 
@@ -971,6 +973,14 @@ YAML
 ```bash
 ls operator/crds/base
 ```
+
+先让 API server 做一次 server-side dry-run：
+
+```bash
+kubectl apply --dry-run=server -f operator/crds/base
+```
+
+如果这里已经失败，先修 CRD YAML，不要继续 apply。dry-run 会让 API server 按真实规则校验 CRD 结构，但不会把对象写入集群。
 
 安装三个 CRD：
 
@@ -1015,6 +1025,21 @@ kubectl explain todocache.spec.memoryProfile
 ```
 
 如果 `kubectl explain` 能显示字段说明，说明 CRD 的 OpenAPI schema 已经被 API server 接收。
+
+查看当前存储版本：
+
+```bash
+kubectl get crd todoapps.platform.todo.example.com \
+  -o jsonpath='{.status.storedVersions}{"\n"}'
+```
+
+单版本 CRD 的输出应类似：
+
+```text
+["v1alpha1"]
+```
+
+后续做多版本升级时，只有确认旧版本不再出现在 `status.storedVersions` 里，才能考虑从 CRD 中移除旧版本。
 
 #### 5.5.3 创建自定义资源实例
 
@@ -1101,6 +1126,24 @@ YAML
 
 预期错误包含 `Unsupported value: "tiny"`。
 
+验证 CEL 跨字段校验会拦截缺少 host 的 Ingress：
+
+```bash
+kubectl apply --dry-run=server -f - <<'YAML'
+apiVersion: platform.todo.example.com/v1alpha1
+kind: TodoApp
+metadata:
+  name: invalid-ingress
+  namespace: todo-dev
+spec:
+  image: todo-api:v0.1.2-observability
+  ingress:
+    enabled: true
+YAML
+```
+
+预期错误包含 `spec.ingress.host is required when spec.ingress.enabled is true`。
+
 #### 5.5.5 验证 status subresource
 
 尝试通过主资源 patch 写入 status：
@@ -1113,7 +1156,7 @@ kubectl -n todo-dev get todoapp todo-platform \
   -o jsonpath='{.status.readyReplicas}{"\n"}'
 ```
 
-如果 status subresource 已启用，主资源 patch 不应该更新 `status.readyReplicas`。
+命令可能返回 `todoapp.platform.todo.example.com/todo-platform patched`，但第二条 jsonpath 应该输出空行。如果 status subresource 已启用，主资源 patch 不应该更新 `status.readyReplicas`；真正的状态写入要走 `/status`。
 
 通过 `/status` 子资源模拟 Controller 回写状态：
 
@@ -1203,6 +1246,8 @@ tododatabase.platform.todo.example.com/todo-postgres created
 todocache.platform.todo.example.com/todo-redis created
 ```
 
+如果你重复执行命令，也可能看到 `configured` 或 `unchanged`。这代表对象已经存在或内容没有变化，不是错误。
+
 非法输入 dry-run：
 
 ```text
@@ -1288,7 +1333,13 @@ kubectl -n todo-dev delete tododatabase todo-postgres --ignore-not-found
 kubectl -n todo-dev delete todocache todo-redis --ignore-not-found
 ```
 
-如果你要清理 CRD：
+如果你要清理 CRD，先备份当前 CR 实例：
+
+```bash
+kubectl get todoapp,tododatabase,todocache -n todo-dev -o yaml > todo-cr-backup.yaml
+```
+
+确认备份文件存在后，再删除 CRD：
 
 ```bash
 kubectl delete crd todoapps.platform.todo.example.com --ignore-not-found
@@ -1296,7 +1347,7 @@ kubectl delete crd tododatabases.platform.todo.example.com --ignore-not-found
 kubectl delete crd todocaches.platform.todo.example.com --ignore-not-found
 ```
 
-注意：删除 CRD 会级联删除该类型下的所有 CR 实例。共享集群或后续课程环境中不要随意执行。
+注意：删除 CRD 会级联删除该类型下的所有 CR 实例。共享集群或后续课程环境中不要随意执行，生产环境还应走变更审批、回滚演练和恢复验证。
 
 如果只想删除本地实验文件：
 
@@ -1395,6 +1446,41 @@ Remove-Item -Recurse -Force operator/crds,operator/samples
 - **修复**：如果只是想清理实例，只删除 `todoapp`、`tododatabase`、`todocache`，不要删除 CRD。
 - **预防**：共享集群中把 CRD 删除操作纳入变更审批。
 
+### 错误 6：在 PowerShell 中直接执行 Bash heredoc
+
+- **现象**：
+
+  ```text
+  Missing file specification after redirection operator.
+  ```
+
+- **原因**：PowerShell 不支持 `cat > file <<'YAML'` 这种 Bash heredoc 语法。
+- **排查**：确认当前终端是 PowerShell、Git Bash、WSL 还是 Linux/macOS shell。
+- **修复**：在 Git Bash / WSL 中执行本篇 Bash 命令，或使用编辑器手动创建对应 YAML 文件。
+- **预防**：长 YAML 以文件内容为准，不把 shell 创建方式当成 Kubernetes 语法本身。
+
+### 错误 7：误 apply 版本演进 notes
+
+- **现象**：
+
+  ```text
+  error: no objects passed to apply
+  ```
+
+  或者把自己临时写的 `v1beta1` 预览 CRD apply 后，已有 CRD 版本、schema 或 storage 设置被意外改动。
+
+- **原因**：`operator/crds/versions/todoapps-versioning-notes.md` 是设计说明，不是 Kubernetes 清单。
+- **排查**：
+
+  ```bash
+  file operator/crds/versions/todoapps-versioning-notes.md
+  kubectl get crd todoapps.platform.todo.example.com \
+    -o jsonpath='{.spec.versions[*].name}{" stored="}{.status.storedVersions}{"\n"}'
+  ```
+
+- **修复**：只 apply `operator/crds/base`；如果已经错误修改 CRD，先导出现有 CR，再按团队变更流程恢复 CRD 定义。
+- **预防**：版本升级实验必须单独设计完整 schema、conversion 和迁移计划，不要把 notes 当模板。
+
 ## 7. 生产环境注意事项
 
 1. **CRD schema 是长期 API 契约**。字段一旦进入 GitOps 仓库，就会被 CI、审计、回滚、文档和用户习惯依赖。新增可选字段通常安全；删除字段、修改类型、收窄枚举和改变默认值都可能破坏已有环境。即使当前是 `v1alpha1`，也要记录字段语义和废弃策略。
@@ -1406,6 +1492,12 @@ Remove-Item -Recurse -Force operator/crds,operator/samples
 4. **版本升级不能只改 CRD 文件**。如果 storage version 改变，已有对象不会自动重写成新版本。生产环境要规划 conversion、存储版本迁移、废弃告警和回滚策略。旧版本在从 `spec.versions` 中移除前，必须确认不再存在旧的 storedVersions。
 
 5. **不要用宽松 schema 逃避设计**。`x-kubernetes-preserve-unknown-fields` 或大段自由 map 看似灵活，但会削弱校验、文档、UI、默认值和 Controller 类型安全。平台 API 应该暴露稳定意图，而不是把所有 Helm values 原样塞进 CRD。
+
+6. **删除 CRD 前必须有备份和恢复计划**。删除 CRD 会删除所有同类型 CR，影响范围通常比删除单个 Deployment 大。生产环境至少要先导出 CR、确认 GitOps 源、准备恢复命令，并让业务方知道 API 类型会短暂不可用。
+
+   ```bash
+   kubectl get todoapp,tododatabase,todocache -A -o yaml > todo-cr-backup.yaml
+   ```
 
 官方参考：
 
@@ -1426,7 +1518,7 @@ Remove-Item -Recurse -Force operator/crds,operator/samples
 - `operator/samples/todoapp.yaml`
 - `operator/samples/tododatabase.yaml`
 - `operator/samples/todocache.yaml`
-- `operator/crds/versions/todoapps-v1beta1-preview.yaml`
+- `operator/crds/versions/todoapps-versioning-notes.md`
 
 图 35-2 展示本章产物和后续章节的关系：
 
@@ -1447,6 +1539,7 @@ flowchart TD
 |---|---|
 | CRD 结构 | 能解释 `group`、`names`、`scope`、`versions`、`schema` 的作用 |
 | schema 校验 | 非法 `replicas`、数据库版本、缓存规格会被 server-side dry-run 拒绝 |
+| CEL 校验 | `ingress.enabled=true` 且缺少 `ingress.host` 会被 server-side dry-run 拒绝 |
 | kubectl 操作 | 能 `get`、`describe`、`explain`、`edit`、`delete` 三个自定义资源 |
 | status subresource | 能通过 `--subresource=status` 回写 status，并理解主资源写入会忽略 status |
 | printer columns | `kubectl get todoapp,tododatabase,todocache` 能展示关键列 |
@@ -1468,11 +1561,13 @@ flowchart TD
 2. 给 `TodoDatabase` 增加 `spec.backup.encryption.enabled` 字段。验收标准：字段类型为 boolean，默认值为 true 或 false，并能用 `kubectl explain` 查看。
 3. 创建一个非法 `TodoCache`，把 `replicas` 设置为 5。验收标准：server-side dry-run 被 API server 拒绝。
 4. 用 status subresource 给 `TodoDatabase` 写入 `Degraded` condition。验收标准：`kubectl describe tododatabase todo-postgres` 能看到对应状态。
+5. 删除 `TodoApp.spec.ingress.host`，只保留 `ingress.enabled: true`。验收标准：能解释为什么 OpenAPI 的普通 required 不够用，以及 CEL 规则如何拦截这个输入。
 
 **思考题**
 
 1. 如果 `TodoDatabase.spec.version` 从字符串改成整数，会影响哪些已有用户和工具？
 2. 如果 Controller 只看 `spec`，从不回写 `status.conditions`，SRE 排障会遇到什么问题？
+3. 哪些校验适合放在 OpenAPI schema，哪些适合放在 CEL，哪些必须交给 validating admission webhook？
 
 ## 10. 本章面试题
 
@@ -1490,7 +1585,7 @@ flowchart TD
 
 **展开解释**：类型、必填、枚举、正则、范围和默认值都可以在 schema 中表达。这样 GitOps 同步时就能发现错误，`kubectl explain` 也能生成字段文档。Controller 可以更专注于调谐合法输入。
 
-**深入追问**：什么时候需要 webhook？当校验跨字段、跨资源或依赖外部系统，OpenAPI schema 表达不了时，可以使用 validating admission webhook 或 CEL 规则。
+**深入追问**：OpenAPI、CEL 和 webhook 怎么分工？类型、枚举、范围和简单字段结构优先放 OpenAPI；同一对象内的跨字段关系优先用 CEL；需要查其他资源、访问外部系统或做复杂业务判断时，再使用 validating admission webhook。
 
 ### 面试题 3：status subresource 解决了什么问题？
 
