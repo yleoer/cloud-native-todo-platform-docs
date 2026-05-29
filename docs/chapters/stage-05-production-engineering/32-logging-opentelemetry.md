@@ -121,7 +121,7 @@ flowchart LR
 }
 ```
 
-对 Loki 来说，最重要的不是日志是不是 JSON，而是哪些字段进入 label，哪些字段留在日志正文。`namespace`、`pod`、`container`、`app`、`level` 适合作为 label；`request_id`、`trace_id`、`user` 通常不适合作为 label，因为它们基数太高，会显著增加索引和查询成本。
+对 Loki 来说，最重要的不是日志是不是 JSON，而是哪些字段进入 label，哪些字段留在日志正文。`namespace`、`pod`、`container`、`app`、`level` 适合作为 label；`request_id`、`trace_id`、`user` 通常不适合作为 label，因为它们基数太高，会显著增加索引和查询成本。如果把 `request_id` 做成 label，假设每秒 1000 个不同请求，几分钟内就会产生数十万条日志流，Loki 的内存和索引压力会迅速膨胀。
 
 ### 3.2 Loki、LogQL 与 Grafana
 
@@ -296,7 +296,7 @@ Loki / Tempo 更偏云原生和标签查询，适合与 Prometheus/Grafana 协�
 
 本篇命令默认在 **Cloud Native Todo Platform 应用仓库根目录** 执行，也就是包含 `api/`、`deployments/`、`observability/` 的仓库根目录。
 
-版本信息在 2026-05-29 查询。Loki 上游最新为 `v3.7.2`，Tempo 上游最新为 `v3.0.0`；本实验锁定 Grafana Helm charts 中适合本地 kind 的 chart 版本，实际组件版本以 chart `appVersion` 为准。
+版本信息在 2026-05-29 查询。Loki 上游最新为 `v3.7.2`，Tempo 上游最新为 `v3.0.0`；本实验锁定 Grafana Helm charts 中适合本地 kind 的 chart 版本，实际组件版本以 chart `appVersion` 为准。Tempo chart `1.24.4` 的 `appVersion` 是 `2.9.0`，这里按 chart 打包版本锁定实验稳定性，不直接追上游 `v3.0.0`。
 
 | 工具 | 版本 | 用途 |
 |---|---:|---|
@@ -311,6 +311,8 @@ Loki / Tempo 更偏云原生和标签查询，适合与 Prometheus/Grafana 协�
 | otelgin | v0.69.0 | Gin 路由自动生成 server span |
 
 Promtail chart 当前仍能在 Grafana Helm index 中看到，但 Promtail 官方文档已标注 EOL。本篇不会使用 Promtail 部署新实验。
+
+Todo API 仍沿用前面章节的默认运行方式：如果 `TODO_DATABASE_DSN` 为空，服务使用内存 Repository；如果你的环境已经接入 PostgreSQL，本篇的日志和 Trace 接入方式不变，只是 Trace 中会多出数据库调用排障价值。
 
 先确认前置环境：
 
@@ -336,6 +338,8 @@ docker version --format '{{.Server.Version}}'
 ```
 
 本篇会在同一个 kind 集群中继续增加 Loki、Tempo 和 Alloy。建议 Docker Desktop 为 kind 预留至少 8GB 内存；如果第 31 篇的 Prometheus/Grafana 已经占用较多资源，安装前先关闭不需要的本地应用。
+
+Kubernetes 默认允许跨 namespace 出站流量，所以没有配置 deny-all egress NetworkPolicy 时，`todo-dev` 中的 Todo API 可以访问 `alloy.observability.svc.cluster.local:4317`。如果你的集群启用了 `todo-dev` 的默认拒绝出站策略，需要额外放通 Todo API 到 `observability` namespace 的 TCP `4317`/`4318`。
 
 ### 5.3 文件目录结构
 
@@ -699,7 +703,7 @@ resultsCache:
 YAML
 ```
 
-这份配置只服务本地 kind 实验：单副本、文件系统、无持久化、关闭缓存。生产环境应使用对象存储、持久化、明确保留周期、多副本和容量规划。
+这里的 `commonConfig` 和 `schemaConfig` 是 Loki Helm chart 的 values 键名；chart 渲染后会生成 Loki 运行时配置里的 `common` 和 `schema_config`。这份配置只服务本地 kind 实验：单副本、文件系统、无持久化、关闭缓存。生产环境应使用对象存储、持久化、明确保留周期、多副本和容量规划。
 
 #### 5.4.7 创建 Tempo values
 
@@ -730,9 +734,11 @@ service:
 YAML
 ```
 
-Tempo 默认更适合按 Trace ID 查询。本篇不做复杂 TraceQL 检索，只演示从 Loki 日志中的 `trace_id` 跳转到 Tempo 查看瀑布图。
+Tempo 单体 chart `1.24.4` 中，`reportingEnabled`、`retention` 和 `receivers` 都位于 `tempo` 键下。Tempo 默认更适合按 Trace ID 查询。本篇不做复杂 TraceQL 检索，只演示从 Loki 日志中的 `trace_id` 跳转到 Tempo 查看瀑布图。
 
 #### 5.4.8 创建 Alloy values
+
+这份 River 配置有两条数据流。日志流是 `discovery.kubernetes -> discovery.relabel -> loki.source.kubernetes -> loki.process -> loki.write`；Trace 流是 `otelcol.receiver.otlp -> otelcol.processor.batch -> otelcol.exporter.otlp`。`loki.source.kubernetes` 接收前面 discovery/relabel 生成的 `targets`，再通过 Kubernetes API tail Pod 日志。
 
 创建 `observability/alloy/alloy-values.yaml`：
 
@@ -910,7 +916,7 @@ data:
 YAML
 ```
 
-`$${__value.raw}` 是 Grafana provisioning 中常见写法，用于避免 `$` 被当成环境变量提前替换。最终 Grafana 会把日志里匹配到的 Trace ID 传给 Tempo。
+`$${__value.raw}` 是 Grafana provisioning 中常见写法，用于避免 `$` 被当成环境变量提前替换。`$$` 最终会转义成单个 `$`，也就是把 `${__value.raw}` 交给 Grafana derived field，让它把日志里匹配到的 Trace ID 传给 Tempo。
 
 #### 5.4.10 创建日志 dashboard
 
@@ -1044,6 +1050,25 @@ helm repo add grafana https://grafana.github.io/helm-charts
 helm repo update grafana
 ```
 
+先在本地渲染一次 Helm 模板，提前发现 values 键名、River 语法或 Service 名称变化：
+
+```bash
+helm template loki grafana/loki \
+  --version 7.0.0 \
+  --namespace observability \
+  -f observability/loki/loki-values.yaml >/tmp/loki-rendered.yaml
+
+helm template tempo grafana/tempo \
+  --version 1.24.4 \
+  --namespace observability \
+  -f observability/tempo/tempo-values.yaml >/tmp/tempo-rendered.yaml
+
+helm template alloy grafana/alloy \
+  --version 1.8.2 \
+  --namespace observability \
+  -f observability/alloy/alloy-values.yaml >/tmp/alloy-rendered.yaml
+```
+
 安装 Loki：
 
 ```bash
@@ -1090,6 +1115,15 @@ kubectl -n observability rollout status deployment/tempo --timeout=300s
 
 如果资源名称与 chart 实际渲染结果不同，先用 `kubectl -n observability get deploy,sts,ds` 查看实际名称，再重新执行 rollout 检查。
 
+确认 Loki gateway Service 名称，后续 Alloy 和 Grafana 数据源会使用这个地址：
+
+```bash
+kubectl -n observability get svc loki-gateway
+kubectl -n observability get svc -l app.kubernetes.io/instance=loki
+```
+
+如果没有 `loki-gateway`，以第二条命令看到的实际 gateway Service 为准，替换 Alloy `loki.write` 和 Grafana Loki datasource 中的 URL。
+
 #### 5.5.3 应用 Grafana 数据源和 Dashboard
 
 ```bash
@@ -1104,6 +1138,12 @@ kubectl apply -f observability/grafana/todo-logs-dashboard-configmap.yaml
 ```bash
 kubectl -n monitoring logs deployment/monitoring-grafana -c grafana-sc-datasources --tail=50
 kubectl -n monitoring logs deployment/monitoring-grafana -c grafana-sc-dashboard --tail=50
+```
+
+同时确认第 31 篇安装的 Grafana 镜像版本。如果 dashboard import 提示 `schemaVersion` 不兼容，可以在当前 Grafana UI 中重新导出 dashboard，再把导出的 `schemaVersion` 回写到 ConfigMap。
+
+```bash
+kubectl -n monitoring get deployment monitoring-grafana -o jsonpath='{.spec.template.spec.containers[0].image}{"\n"}'
 ```
 
 #### 5.5.4 构建镜像并同步 dev 环境
@@ -1220,7 +1260,7 @@ TRACE_ID=$(curl -sG 'http://127.0.0.1:3100/loki/api/v1/query_range' \
 echo "${TRACE_ID}"
 ```
 
-注意，`trace_id` 没有被提升成 Loki label，所以不能从 `.data.result[0].stream.trace_id` 读取。`stream` 里只会有 `namespace`、`app`、`pod`、`container`、`level` 这类低基数字段；`request_id` 和 `trace_id` 应留在 JSON 日志正文中，通过 `| json` 或上面的 `fromjson` 解析。
+注意，`trace_id` 没有被提升成 Loki label，所以不能从 `.data.result[0].stream.trace_id` 读取。`stream` 里只会有 `namespace`、`app`、`pod`、`container`、`level` 这类低基数字段；`request_id` 和 `trace_id` 应留在 JSON 日志正文中，通过 `| json` 或上面的 `fromjson` 解析。`fromjson?` 表示把日志行字符串解析为 JSON；后面的 `?` 让解析失败时返回空值，而不是让整个 `jq` 命令直接报错。
 
 实际排障中更推荐在 Grafana Explore 里查询：
 
@@ -1441,11 +1481,13 @@ argocd app sync todo-platform-dev --timeout 300
   {"status":"success","data":{"resultType":"streams","result":[]}}
   ```
 
-- **原因**：Alloy 没有发现 `todo-dev` Pod；relabel 规则没有匹配 label；Loki gateway 地址错误；Todo API 没有产生日志。
+- **原因**：Alloy 没有发现 `todo-dev` Pod；River 配置语法错误导致 Alloy Pod `CrashLoopBackOff`；relabel 规则没有匹配 label；Loki gateway 地址错误；Todo API 没有产生日志。
 - **排查**：
 
   ```bash
   kubectl -n observability logs daemonset/alloy --tail=100
+  kubectl -n observability logs daemonset/alloy --tail=100 | grep -i -E 'error|river|parse'
+  kubectl -n observability get pod -l app.kubernetes.io/name=alloy
   kubectl -n todo-dev get pod -l app.kubernetes.io/name=todo-platform --show-labels
   kubectl -n observability get svc loki-gateway
   kubectl -n todo-dev logs deployment/todo-platform --tail=20
@@ -1453,7 +1495,7 @@ argocd app sync todo-platform-dev --timeout 300
 
   如果 `kubectl logs` 能看到日志，但 Loki 没有，问题多半在 Alloy 发现、relabel 或写入 Loki 的配置。
 
-- **修复**：确认 `app.kubernetes.io/name=todo-platform` label 存在；确认 Alloy `loki.write` 地址为 `http://loki-gateway.observability.svc.cluster.local/loki/api/v1/push`；重启 Alloy。
+- **修复**：确认 `app.kubernetes.io/name=todo-platform` label 存在；确认 Alloy `loki.write` 地址为 `http://loki-gateway.observability.svc.cluster.local/loki/api/v1/push`；如果 Alloy 日志提示 River 解析失败，先修正 `observability/alloy/alloy-values.yaml` 后重新 `helm upgrade`；重启 Alloy。
 - **预防**：采集配置上线前，用一个明确 namespace 和 label 做最小范围测试。
 
 ### 错误 2：日志中没有 `trace_id`
@@ -1544,11 +1586,11 @@ argocd app sync todo-platform-dev --timeout 300
 
 2. **敏感信息不能进入日志**。认证 Header、JWT、密码、手机号、身份证号、邮箱、内部密钥、数据库连接串都不应原样写入日志。即使 Loki 有权限控制，日志系统也常被多人访问，并且保留时间较长。生产环境要在应用层和采集层都做脱敏策略。
 
-3. **Trace 采样要服务于排障目标**。本地实验使用 100% 采样，生产高流量服务不能照搬。头部采样成本低但可能漏掉慢请求，尾部采样能按错误和延迟保留更有价值的 Trace，但需要 Collector 层支持和更多内存。采样策略应和 SLO、流量规模、存储成本一起设计。
+3. **Trace 采样要服务于排障目标**。本地实验使用 100% 采样，生产高流量服务不能照搬。头部采样成本低但可能漏掉慢请求，尾部采样能按错误和延迟保留更有价值的 Trace，但需要 Collector 层支持和更多内存。Tempo 擅长按 Trace ID 精确查看瀑布图，不适合直接做“列出所有错误 Span”这类全量扫描；生产排障通常先由 Prometheus 告警或 Loki 日志缩小范围，再跳到 Tempo 看单次请求链路。
 
 4. **Loki label 要低基数**。Loki 不是 Elasticsearch，它的成本模型依赖 label 设计。`namespace`、`app`、`pod`、`container`、`level` 通常合理；`request_id`、`trace_id`、`user_id`、订单号通常不合理。高基数字段留在日志正文，通过 LogQL pipeline 解析。
 
-5. **可观测系统也要高可用和限流**。Loki、Tempo、Alloy、Grafana 在生产中需要 requests/limits、持久化、对象存储、租户隔离、保留策略、限流、备份和访问控制。可观测系统故障不应拖垮业务应用，应用侧 OTLP exporter 要有批处理和超时，采集侧要有背压策略。
+5. **可观测系统也要高可用和限流**。Loki、Tempo、Alloy、Grafana 在生产中需要 requests/limits、持久化、对象存储、租户隔离、保留策略、限流、备份和访问控制。Loki 要明确 retention，例如按合规和成本设置 7-30 天，并根据 namespace、租户或业务等级差异化。如果生产集群采用默认拒绝出站流量，还要允许业务 namespace 访问 Alloy 或 OpenTelemetry Collector 的 OTLP gRPC/HTTP 端口。应用侧 OTLP exporter 要有批处理、超时和优雅关闭；Pod 终止时如果没有调用 `Shutdown`，最后几秒的 Trace 可能丢失。
 
 ## 8. 本章小项目
 
@@ -1655,7 +1697,7 @@ flowchart TD
 
 **一句话结论**：采样策略要平衡排障价值和成本，通常不会对高流量服务长期 100% 采样。
 
-**展开解释**：本地实验 100% 采样方便学习，但生产高流量服务会产生大量 Span。常见策略包括固定比例采样、父级采样、错误请求全采样、慢请求尾采样、按租户或路由差异化采样。尾采样更有排障价值，但需要 Collector 缓存一段时间再决定是否保留，对资源要求更高。
+**展开解释**：本地实验 100% 采样方便学习，但生产高流量服务会产生大量 Span。常见策略包括固定比例采样、父级采样、错误请求全采样、慢请求尾采样、按租户或路由差异化采样。尾采样通常由 OpenTelemetry Collector 的 `tail_sampling` processor 实现，它会缓存最近一段时间的 Span，再根据错误、延迟或属性决定保留哪些 Trace；排障价值更高，但对 Collector 内存和吞吐要求也更高。
 
 **深入追问**：采样后会不会影响指标？Trace 采样不应该替代指标。请求量、错误率和延迟 SLO 仍应由指标系统完整统计。
 
