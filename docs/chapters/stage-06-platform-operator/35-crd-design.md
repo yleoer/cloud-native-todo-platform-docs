@@ -58,7 +58,7 @@ SRE 负责通过 `kubectl get`、`kubectl describe`、`status.conditions`、Even
 
 本篇只安装 CRD 和创建 CR 实例，不会创建 Deployment、PostgreSQL 或 Redis。第 36 篇会分析 Controller 应该如何 watch 这些资源；第 37-38 篇会让 Controller 根据 CR 自动创建底层资源并回写 status。
 
-项目版本线进入 `v4.1-crd-design`。
+项目版本线进入阶段六子版本 `v4.1-crd-design`，它隶属于计划文档中的 `v4.0-operator` 总版本线。
 
 ## 3. 核心概念
 
@@ -78,6 +78,17 @@ CRD 的全称是 `CustomResourceDefinition`。它本身是 Kubernetes 内置资�
 | `spec.versions[].served` | 是否对外服务 | `true` |
 | `spec.versions[].storage` | 是否作为存储版本 | `true` |
 | `schema.openAPIV3Schema` | 字段结构和校验 | `spec.image` 必填 |
+
+CRD 的常用层级可以先记成下面这张速查表，后面看完整 YAML 时就不会迷路：
+
+| 层级 | 典型字段 | 作用 |
+|---|---|---|
+| `metadata` | `name` | CRD 对象本身的名字，必须是 `<plural>.<group>` |
+| `spec` | `group`、`scope`、`names` | 定义 API group、命名空间范围和资源名称 |
+| `spec.versions[]` | `name`、`served`、`storage` | 定义 API 版本是否可访问、是否作为存储版本 |
+| `spec.versions[].schema` | `openAPIV3Schema` | 定义自定义资源的字段结构和校验规则 |
+| `spec.versions[].subresources` | `status` | 打开 `/status` 等子资源 |
+| `spec.versions[].additionalPrinterColumns` | `jsonPath` | 定义 `kubectl get` 表格列 |
 
 安装完成后，API server 会把新资源加入 discovery：
 
@@ -201,6 +212,8 @@ sequenceDiagram
 
 CRD 安装成功后，API server 会开始接受 `platform.todo.example.com/v1alpha1` 下面的资源请求。但这仍然不代表业务资源会被创建。此时还没有 Controller，`TodoApp`、`TodoDatabase`、`TodoCache` 都只是被 API server 校验并保存起来。
 
+`kubectl explain` 的信息也来自这里：API server 根据 CRD 的 OpenAPI schema 暴露字段文档，kubectl 不需要额外安装插件，就能显示 `description`、字段类型和层级路径。
+
 ### 4.2 Schema 校验发生在写入路径
 
 当你提交一个 CR 实例时，API server 会根据 CRD schema 做校验。比如 `TodoApp.spec.replicas` 定义为整数，且 `minimum: 1`、`maximum: 10`，那么下面这个对象会被拒绝：
@@ -291,7 +304,7 @@ CRD 版本升级最容易踩坑的地方是把“修改 YAML 文件”误以为�
 | 工具 | 建议版本 | 用途 |
 |---|---:|---|
 | Kubernetes | v1.35.0 或 v1.36.x | 安装 CRD 和创建 CR |
-| kubectl | 与集群 minor 版本接近 | 操作 CRD、自定义资源和 status subresource |
+| kubectl | 与集群 minor 版本接近 | 操作 CRD、自定义资源和 status subresource；通常建议与 API server 相差不超过 1 个 minor 版本 |
 | jq | 1.7.x | 检查 JSON 输出 |
 | Git | 2.45+ | 保存 CRD 和示例资源 |
 
@@ -331,7 +344,9 @@ mkdir -p operator/crds/base operator/crds/versions operator/samples
 PowerShell：
 
 ```powershell
-New-Item -ItemType Directory -Force -Path operator/crds/base,operator/crds/versions,operator/samples
+New-Item -ItemType Directory -Force -Path operator/crds/base
+New-Item -ItemType Directory -Force -Path operator/crds/versions
+New-Item -ItemType Directory -Force -Path operator/samples
 ```
 
 最终目录如下：
@@ -353,7 +368,7 @@ operator/
 
 ### 5.4 完整代码或配置
 
-下面的文件创建命令使用 Bash heredoc，适用于 Linux、macOS、Git Bash 和 WSL。Windows 用户如果直接使用 PowerShell，建议用编辑器创建同名文件并复制对应 YAML 内容；PowerShell 不支持 `cat <<'YAML'` 这种 heredoc 语法，长 YAML 也不适合在两套 shell 语法里重复维护。
+下面的文件创建命令使用 Bash heredoc，适用于 Linux、macOS、Git Bash 和 WSL。Windows 用户如果直接使用 PowerShell，建议用编辑器创建同名文件并复制对应 YAML 内容；PowerShell 不支持 `cat <<'YAML'` 这种 heredoc 语法，直接执行会出现 `Missing file specification after redirection operator` 一类错误。长 YAML 以文件内容为准，不要把 shell 创建方式当成 Kubernetes 语法本身。
 
 #### 5.4.1 TodoApp CRD
 
@@ -539,7 +554,7 @@ YAML
 - `group` 和 `names.plural` 共同决定 REST 路径：`/apis/platform.todo.example.com/v1alpha1/namespaces/{ns}/todoapps`。
 - `required: ["spec"]` 和 `spec.required: ["image"]` 保证用户至少声明应用镜像。
 - `replicas.minimum` / `maximum` 把副本数限制在教学环境可承受范围内。
-- `resources.profile` 用枚举暴露平台规格，避免业务方直接填写 CPU/memory。
+- `resources.profile` 用枚举暴露平台规格，避免业务方直接填写 CPU/memory。`small`、`medium`、`large` 是平台抽象，第 37-38 篇的 Controller 会根据 profile 计算具体的 `resources.requests` 和 `resources.limits`。
 - `subresources.status: {}` 让 status 写入走 `/status` 子资源。
 - `x-kubernetes-validations` 用 CEL 表达跨字段约束：当 `ingress.enabled=true` 时必须填写 `ingress.host`。OpenAPI schema 擅长类型、枚举和范围校验；这类“字段 A 为真时字段 B 必填”的规则，要用 CEL 或 admission webhook 表达。
 
@@ -964,6 +979,8 @@ EOF
 
 这里故意不生成 `todoapps-v1beta1-preview.yaml`，因为读者很容易把“演示用 CRD”误 apply 到集群里。真实升级不能用 `x-kubernetes-preserve-unknown-fields` 偷懒放开校验；应该为每个版本定义完整 schema，并在需要时实现 conversion webhook。
 
+注意：`operator/crds/versions/todoapps-versioning-notes.md` 是设计说明，不是 Kubernetes 清单。不要对它执行 `kubectl apply -f`；真正的版本升级要单独准备完整 CRD、conversion 和迁移方案。
+
 ### 5.5 执行命令
 
 #### 5.5.1 安装 CRD
@@ -987,6 +1004,8 @@ kubectl apply --dry-run=server -f operator/crds/base
 ```bash
 kubectl apply --server-side -f operator/crds/base
 ```
+
+这里使用 `--server-side`，是因为 CRD 对象体积较大、嵌套层级多，由 API server 管理字段所有权更稳，也能避免 client-side apply 往对象里写入过大的 `last-applied-configuration` 注解。kind 集群默认支持 server-side apply；如果你在受限集群遇到策略限制，可以在确认变更风险后退回 `kubectl apply -f operator/crds/base`。
 
 等待 CRD Established：
 
@@ -1026,6 +1045,20 @@ kubectl explain todocache.spec.memoryProfile
 
 如果 `kubectl explain` 能显示字段说明，说明 CRD 的 OpenAPI schema 已经被 API server 接收。
 
+用 `jq` 检查 CRD 的命名信息：
+
+```bash
+kubectl get crd -o json | jq -r '.items[] | select(.spec.group=="platform.todo.example.com") | "\(.spec.names.kind)\t\(.spec.names.plural)"'
+```
+
+预期输出：
+
+```text
+TodoApp         todoapps
+TodoCache       todocaches
+TodoDatabase    tododatabases
+```
+
 查看当前存储版本：
 
 ```bash
@@ -1063,9 +1096,25 @@ kubectl -n todo-dev get todoapp,tododatabase,todocache
 kubectl -n todo-dev get tda,tdb,tcache
 ```
 
-此时 `Ready` 或 `Available` 列可能为空，因为还没有 Controller 回写 status。这是预期结果。
+此时 `Ready` 或 `Available` 列可能为空，因为还没有 Controller 回写 status。**这是预期结果**：CRD 只定义 API，不负责调谐业务资源。
 
 #### 5.5.4 验证 schema 拦截非法输入
+
+验证缺少必填字段 `spec.image` 会被拒绝：
+
+```bash
+kubectl apply --dry-run=server -f - <<'YAML'
+apiVersion: platform.todo.example.com/v1alpha1
+kind: TodoApp
+metadata:
+  name: invalid-missing-image
+  namespace: todo-dev
+spec:
+  replicas: 2
+YAML
+```
+
+预期错误包含 `spec.image` 和 `Required value`。
 
 验证 `replicas` 低于最小值会被拒绝：
 
@@ -1124,7 +1173,7 @@ spec:
 YAML
 ```
 
-预期错误包含 `Unsupported value: "tiny"`。
+预期错误包含 `Unsupported value` 和 `tiny`。
 
 验证 CEL 跨字段校验会拦截缺少 host 的 Ingress：
 
@@ -1156,7 +1205,7 @@ kubectl -n todo-dev get todoapp todo-platform \
   -o jsonpath='{.status.readyReplicas}{"\n"}'
 ```
 
-命令可能返回 `todoapp.platform.todo.example.com/todo-platform patched`，但第二条 jsonpath 应该输出空行。如果 status subresource 已启用，主资源 patch 不应该更新 `status.readyReplicas`；真正的状态写入要走 `/status`。
+命令可能返回 `todoapp.platform.todo.example.com/todo-platform patched`，但第二条 jsonpath 输出应为空，也就是 `status.readyReplicas` 并未真正写入。如果 status subresource 已启用，主资源 patch 不应该更新 `status`；真正的状态写入要走 `/status`。
 
 通过 `/status` 子资源模拟 Controller 回写状态：
 
@@ -1246,7 +1295,7 @@ tododatabase.platform.todo.example.com/todo-postgres created
 todocache.platform.todo.example.com/todo-redis created
 ```
 
-如果你重复执行命令，也可能看到 `configured` 或 `unchanged`。这代表对象已经存在或内容没有变化，不是错误。
+如果你重复执行命令，也可能看到 `configured` 或 `unchanged`。`created` 表示新建对象，`configured` 表示已有对象被更新，`unchanged` 表示对象已存在且内容没有变化，三者都不是错误。
 
 非法输入 dry-run：
 
@@ -1323,7 +1372,7 @@ kubectl -n todo-dev get todoapp todo-platform \
 
 ### 5.8 清理步骤
 
-如果要保留给第 36-38 篇使用，建议只保留文件和 CRD，不清理。后续 Controller 会继续使用这三个 CRD。
+如果要保留给第 36-38 篇使用，**建议只保留文件和 CRD，不清理**。后续 Controller 会继续使用这三个 CRD。
 
 如果你要清理 CR 实例：
 
@@ -1363,7 +1412,7 @@ Remove-Item -Recurse -Force operator/crds,operator/samples
 
 ## 6. 常见错误与排障
 
-### 错误 1：CRD 名称不符合 plural.group
+### 错误 1：CRD 名称不符合 plural.group（对应 5.5.1 节）
 
 - **现象**：
 
@@ -1384,7 +1433,7 @@ Remove-Item -Recurse -Force operator/crds,operator/samples
 - **修复**：保持 `metadata.name`、`spec.group`、`spec.names.plural` 三者一致。
 - **预防**：文件名也使用 CRD 完整名称，减少复制时改漏字段。
 
-### 错误 2：schema 缩进错误导致 CRD 被拒绝
+### 错误 2：schema 缩进错误导致 CRD 被拒绝（对应 5.5.1 节）
 
 - **现象**：
 
@@ -1402,7 +1451,7 @@ Remove-Item -Recurse -Force operator/crds,operator/samples
 - **修复**：把 schema 调整到正确层级。
 - **预防**：写完 CRD 后先用 `kubectl apply --dry-run=server -f` 验证。
 
-### 错误 3：CR 实例字段被 schema 拦截
+### 错误 3：CR 实例字段被 schema 拦截（对应 5.5.4 节）
 
 - **现象**：
 
@@ -1420,7 +1469,7 @@ Remove-Item -Recurse -Force operator/crds,operator/samples
 - **修复**：把 CR 实例改成合法值，例如 `replicas: 2`。
 - **预防**：把错误留在 API server 写入阶段，而不是让 Controller 运行时报错。
 
-### 错误 4：`kubectl get` 没有显示 Ready 列
+### 错误 4：`kubectl get` 没有显示 Ready 列（对应 5.5.3 和 5.5.5 节）
 
 - **现象**：`kubectl get todoapp` 中 `READY` 或 `AVAILABLE` 列为空。
 - **原因**：additional printer columns 读取的是 status 字段；还没有 Controller 或手动 status patch 回写状态。
@@ -1433,7 +1482,7 @@ Remove-Item -Recurse -Force operator/crds,operator/samples
 - **修复**：本篇用 `kubectl patch --subresource=status` 模拟 Controller 回写；后续章节由 Controller 自动回写。
 - **预防**：区分 CR 创建成功和 status 已调谐完成。
 
-### 错误 5：删除 CRD 后 CR 实例一起消失
+### 错误 5：删除 CRD 后 CR 实例一起消失（对应 5.8 节）
 
 - **现象**：删除 CRD 后，`kubectl get todoapp` 报资源类型不存在，原来的 TodoApp 实例也无法查询。
 - **原因**：CRD 是自定义资源类型定义。删除类型定义会删除该类型下的实例数据。
@@ -1445,41 +1494,6 @@ Remove-Item -Recurse -Force operator/crds,operator/samples
 
 - **修复**：如果只是想清理实例，只删除 `todoapp`、`tododatabase`、`todocache`，不要删除 CRD。
 - **预防**：共享集群中把 CRD 删除操作纳入变更审批。
-
-### 错误 6：在 PowerShell 中直接执行 Bash heredoc
-
-- **现象**：
-
-  ```text
-  Missing file specification after redirection operator.
-  ```
-
-- **原因**：PowerShell 不支持 `cat > file <<'YAML'` 这种 Bash heredoc 语法。
-- **排查**：确认当前终端是 PowerShell、Git Bash、WSL 还是 Linux/macOS shell。
-- **修复**：在 Git Bash / WSL 中执行本篇 Bash 命令，或使用编辑器手动创建对应 YAML 文件。
-- **预防**：长 YAML 以文件内容为准，不把 shell 创建方式当成 Kubernetes 语法本身。
-
-### 错误 7：误 apply 版本演进 notes
-
-- **现象**：
-
-  ```text
-  error: no objects passed to apply
-  ```
-
-  或者把自己临时写的 `v1beta1` 预览 CRD apply 后，已有 CRD 版本、schema 或 storage 设置被意外改动。
-
-- **原因**：`operator/crds/versions/todoapps-versioning-notes.md` 是设计说明，不是 Kubernetes 清单。
-- **排查**：
-
-  ```bash
-  file operator/crds/versions/todoapps-versioning-notes.md
-  kubectl get crd todoapps.platform.todo.example.com \
-    -o jsonpath='{.spec.versions[*].name}{" stored="}{.status.storedVersions}{"\n"}'
-  ```
-
-- **修复**：只 apply `operator/crds/base`；如果已经错误修改 CRD，先导出现有 CR，再按团队变更流程恢复 CRD 定义。
-- **预防**：版本升级实验必须单独设计完整 schema、conversion 和迁移计划，不要把 notes 当模板。
 
 ## 7. 生产环境注意事项
 
@@ -1533,7 +1547,15 @@ flowchart TD
     CRDs --> Columns["kubectl get printer columns"]
 ```
 
-### 8.2 能力验收标准
+### 8.2 设计决策小结
+
+本章没有把所有字段塞进一个大 `TodoApp`，而是拆成 `TodoApp`、`TodoDatabase`、`TodoCache` 三个 CRD。这样数据库和缓存可以拥有独立生命周期、独立权限和独立 status，后续 Controller 也能分别表达应用、数据库、缓存的调谐结果。
+
+`resources.profile` 和 `memoryProfile` 使用 `small`、`medium`、`large` 这类枚举，而不是直接暴露 CPU、memory 和 Redis 内存值，是为了让平台保留资源映射权。业务方声明规格意图，Controller 再把规格映射成具体 requests、limits 或底层参数。
+
+数据库和缓存的 `version` 使用正则而不是枚举，是为了避免 CRD 因每个 patch 版本都频繁变更；枚举适合稳定且短小的业务选项，版本号更适合用 pattern 限制主版本范围，再由 Controller 或 admission 策略做更细的可用性判断。
+
+### 8.3 能力验收标准
 
 | 能力 | 验收标准 |
 |---|---|
