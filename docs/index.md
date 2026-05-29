@@ -157,7 +157,7 @@ hide:
 - [第 37 篇：手写简化版 Controller [C]](chapters/stage-06-platform-operator/37-handwritten-controller.md)
 - [第 38 篇：Kubebuilder 入门 [C]](chapters/stage-06-platform-operator/38-kubebuilder.md)
 - [第 39 篇：Operator 高级机制 [C]](chapters/stage-06-platform-operator/39-operator-advanced.md)
-- 第 40 篇：Operator 测试、发布与升级
+- [第 40 篇：Operator 测试、发布与升级 [C]](chapters/stage-06-platform-operator/40-operator-test-release.md)
 - 第 41 篇：Operator 生产实践
 - 第 42 篇：综合集成与职业能力验收
 
@@ -180,6 +180,6 @@ http://127.0.0.1:8000
 
 ## 下一步计划
 
-- 进入第 40 篇 Operator 测试、发布与升级，为 Webhook、Finalizer、Conditions 和调谐逻辑补齐自动化测试。
-- 把第 39 篇的本地部署流程整理为可重复发布流程：构建 Operator 镜像、生成部署清单、准备 Helm 4 Chart。
-- 延续阶段六产物，逐步把 TodoApp Operator 推进到可发布、可升级、可生产运维的版本。
+- 进入第 41 篇 Operator 生产实践，继续收敛 RBAC、Watch 范围、资源限制和可观测性。
+- 把第 40 篇的测试发布流水线接入生产化检查：发布前验证、发布后 smoke test、回滚演练和告警。
+- 延续阶段六产物，逐步把 TodoApp Operator 推进到可生产运维、可规模化管理的版本。
