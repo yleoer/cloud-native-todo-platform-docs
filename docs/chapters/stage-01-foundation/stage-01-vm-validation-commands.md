@@ -21,7 +21,7 @@ date
 command -v go git docker kubectl kind helm bash curl ss dig journalctl systemctl
 ```
 
-如果是在虚拟机里使用宿主机代理，并且宿主机代理端口是 `7890`，先确认虚拟机能访问宿主机地址。下面以 `192.168.2.1` 为例，实际教学时应替换为你的宿主机网关或代理监听地址。
+如果是在虚拟机里使用宿主机代理，并且宿主机代理端口是 `7890`，先确认虚拟机能访问宿主机地址。下面以 `192.168.2.1` 为例，实际教学时应替换为你的宿主机网关或代理监听地址。这个检查只用于 GitHub、脚本下载等非 Docker 镜像场景；Docker 镜像下载按第 3 节配置 registry mirrors。
 
 ```bash
 curl -I --max-time 5 http://192.168.2.1:7890 || true
@@ -51,30 +51,48 @@ Helm: v4.x
 
 如果版本不一致，先按第 1 篇重新对齐工具链，再继续后续验证。
 
-## 3. Docker 代理配置
+## 3. Docker 镜像加速配置
 
-如果 GitHub、Docker Hub 或 kind 节点镜像下载慢，可以给 Docker daemon 配置宿主机代理。这里仍以宿主机代理 `192.168.2.1:7890` 为例。
+Docker 镜像下载不要走宿主机代理，统一使用 Docker registry mirrors。先备份已有 Docker daemon 配置：
 
 ```bash
-sudo mkdir -p /etc/systemd/system/docker.service.d
+sudo mkdir -p /etc/docker
+if [[ -f /etc/docker/daemon.json ]]; then
+  sudo cp /etc/docker/daemon.json "/etc/docker/daemon.json.bak.$(date +%Y%m%d%H%M%S)"
+fi
+```
 
-sudo tee /etc/systemd/system/docker.service.d/http-proxy.conf >/dev/null <<'EOF'
-[Service]
-Environment="HTTP_PROXY=http://192.168.2.1:7890"
-Environment="HTTPS_PROXY=http://192.168.2.1:7890"
-Environment="NO_PROXY=localhost,127.0.0.1,::1,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,*.local"
+写入镜像加速配置：
+
+```bash
+sudo tee /etc/docker/daemon.json >/dev/null <<'EOF'
+{
+  "registry-mirrors": [
+    "https://docker.1ms.run",
+    "https://docker.1panel.live",
+    "https://docker.sparkcr.cn",
+    "https://hub.rat.dev",
+    "https://dockerproxy.net"
+  ]
+}
 EOF
 
 sudo systemctl daemon-reload
 sudo systemctl restart docker
-systemctl show --property=Environment docker
-docker info
+docker info | sed -n '/Registry Mirrors:/,/Live Restore Enabled:/p'
 ```
 
-如果后续不再需要代理，可以删除这个 drop-in 文件并重启 Docker：
+验证镜像拉取：
 
 ```bash
-sudo rm -f /etc/systemd/system/docker.service.d/http-proxy.conf
+docker pull hello-world
+```
+
+如果后续需要恢复原配置，先确认备份文件名，再覆盖回去并重启 Docker：
+
+```bash
+ls -1 /etc/docker/daemon.json.bak.* 2>/dev/null || true
+sudo cp /etc/docker/daemon.json.bak.YYYYMMDDHHMMSS /etc/docker/daemon.json
 sudo systemctl daemon-reload
 sudo systemctl restart docker
 ```
