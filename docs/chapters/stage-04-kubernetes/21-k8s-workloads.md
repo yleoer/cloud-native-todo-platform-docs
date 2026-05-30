@@ -265,10 +265,10 @@ flowchart LR
 | Kubernetes API Server | Ch20 默认 `v1.35.0`，可用 `KIND_NODE_IMAGE` 覆盖到 1.36.x | 本地集群控制面 |
 | kubectl | v1.35.x 或与 API Server 相差不超过 1 个小版本 | 操作 Kubernetes 对象 |
 | Todo API 镜像 | `todo-api:v0.1.0` | 本篇业务镜像 |
-| Alpine | `alpine:3.23` | Job/HPA 负载示例和 DaemonSet 示例 |
+| Alpine | `registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23` | Job/HPA 负载示例和 DaemonSet 示例 |
 | metrics-server | `v0.8.1` | HPA 指标来源，可选 |
 
-Ch20 当前默认 kind 节点镜像是 `kindest/node:v1.35.0`，本章 YAML 使用的 `apps/v1`、`batch/v1`、`autoscaling/v2` 都不是 1.36 专属 API。如果出版前切换到 Kubernetes 1.36.x kind 节点镜像，本章命令无需改动；日常实验只要保证 `kubectl` 与 API Server 相差不超过 1 个小版本即可。metrics-server `0.8.x` 官方兼容 Kubernetes `1.31+`，因此可用于本章的 1.35/1.36 实验环境。
+Ch20 当前默认 kind 节点镜像是 `registry.cn-guangzhou.aliyuncs.com/yleoer/node:v1.35.0`，本章 YAML 使用的 `apps/v1`、`batch/v1`、`autoscaling/v2` 都不是 1.36 专属 API。如果出版前切换到 Kubernetes 1.36.x kind 节点镜像，本章命令无需改动；日常实验只要保证 `kubectl` 与 API Server 相差不超过 1 个小版本即可。metrics-server `0.8.x` 官方兼容 Kubernetes `1.31+`，因此可用于本章的 1.35/1.36 实验环境。
 
 确认当前环境：
 
@@ -304,8 +304,8 @@ kind load docker-image todo-api:v0.1.0 --name "$KIND_CLUSTER"
 如果你的网络无法让 kind 节点直接从 Docker Hub 拉取 Alpine，也可以提前导入可选示例用到的镜像：
 
 ```bash
-docker pull alpine:3.23
-kind load docker-image alpine:3.23 --name "$KIND_CLUSTER"
+docker pull registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23
+kind load docker-image registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23 --name "$KIND_CLUSTER"
 ```
 
 切换到本篇使用的 context：
@@ -631,7 +631,7 @@ spec:
     spec:
       containers:
         - name: heartbeat
-          image: alpine:3.23
+          image: registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23
           imagePullPolicy: IfNotPresent
           command:
             - sh
@@ -786,7 +786,9 @@ kubectl -n todo-workloads describe hpa todo-api
 如果你还没有安装 metrics-server，HPA 的 `TARGETS` 可能显示 `<unknown>`。本篇固定使用 metrics-server `v0.8.1`，避免 `latest` 漂移导致同一章节在不同时间安装到不同版本。在 kind 本地实验中可以按下面方式安装 metrics-server：
 
 ```bash
-kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/download/v0.8.1/components.yaml
+curl -L -o components.yaml https://github.com/kubernetes-sigs/metrics-server/releases/download/v0.8.1/components.yaml
+sed -i 's|registry.k8s.io/metrics-server/|registry.cn-guangzhou.aliyuncs.com/yleoer/|g' components.yaml
+kubectl apply -f components.yaml
 kubectl -n kube-system patch deployment metrics-server --type='json' \
   -p='[{"op":"add","path":"/spec/template/spec/containers/0/args/-","value":"--kubelet-insecure-tls"}]'
 kubectl -n kube-system rollout status deployment/metrics-server --timeout=180s
@@ -804,7 +806,7 @@ kubectl top nodes
 
 ```bash
 kubectl -n todo-workloads run hpa-load \
-  --image=alpine:3.23 \
+  --image=registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23 \
   --restart=Never \
   --command -- sh -c 'while true; do wget -q -O- http://todo-api/healthz >/dev/null; done'
 
@@ -922,7 +924,7 @@ kubectl -n todo-workloads delete pod hpa-load --ignore-not-found
 如果不再使用 metrics-server：
 
 ```bash
-kubectl delete -f https://github.com/kubernetes-sigs/metrics-server/releases/download/v0.8.1/components.yaml --ignore-not-found
+kubectl delete -f components.yaml --ignore-not-found
 ```
 
 预计耗时：90-120 分钟（动手操作约 75 分钟）。

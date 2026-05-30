@@ -49,7 +49,7 @@ Docker CLI / kubectl
     `crictl`、`ctr` 和 `nerdctl` 都可以直接影响容器运行时状态。生产环境中可以用它们做只读排查，但不要绕过 kubelet 手动删除 Pod 容器、镜像或 containerd 快照，除非你正在执行经过审批的故障处理流程。
 
 !!! note "关于 kind 版本"
-    课程蓝图锁定 Kubernetes 1.36.x。本仓库第 1 篇当前用于 smoke test 的 kind 节点镜像示例是 `kindest/node:v1.35.0`。如果你的环境已有可用的 1.36.x kind 节点镜像，可以通过 `KIND_NODE_IMAGE` 环境变量覆盖。本篇实验关注 CRI、containerd 和 runc 观察链路，不依赖 1.36 专属 API。
+    课程蓝图锁定 Kubernetes 1.36.x。本仓库第 1 篇当前用于 smoke test 的 kind 节点镜像示例是 `registry.cn-guangzhou.aliyuncs.com/yleoer/node:v1.35.0`。如果你的环境已有可用的 1.36.x kind 节点镜像，可以通过 `KIND_NODE_IMAGE` 环境变量覆盖。本篇实验关注 CRI、containerd 和 runc 观察链路，不依赖 1.36 专属 API。
 
 ## 2. 本章工作场景与真实案例
 
@@ -152,7 +152,7 @@ image index
 - `config` 保存默认环境变量、入口命令、工作目录、用户、rootfs diff IDs 和 OCI Labels。
 - `layers` 是压缩后的文件系统差异层。
 - `digest` 是内容摘要，内容不变 digest 才不变，比 tag 更适合生产环境审计和回滚。
-- `image index` 用于多架构镜像，例如同一个 `alpine:3.23` 标签可以指向 amd64、arm64 等不同平台的 manifest。
+- `image index` 用于多架构镜像，例如同一个 `registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23` 标签可以指向 amd64、arm64 等不同平台的 manifest。
 
 第 16 篇中你执行过：
 
@@ -251,7 +251,7 @@ containerd 里有几个重要对象：
 | 对象 | 含义 | 类比 |
 |---|---|---|
 | content | 按 digest 存储的 blob | 镜像层、config、manifest 原始内容 |
-| image | 镜像名到 target digest 的引用 | `alpine:3.23` 指向某个 manifest |
+| image | 镜像名到 target digest 的引用 | `registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23` 指向某个 manifest |
 | snapshot | 解包后的文件系统快照 | OverlayFS 层视图 |
 | container | 容器元数据和 OCI spec | “准备启动的容器定义” |
 | task | 正在运行的进程 | “真正跑起来的容器进程” |
@@ -315,7 +315,7 @@ kubelet 收到 Pod
 执行：
 
 ```bash
-docker run --rm alpine:3.23 sh -c 'echo hello'
+docker run --rm registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23 sh -c 'echo hello'
 ```
 
 底层大致会经过：
@@ -477,11 +477,11 @@ ctr -n k8s.io content ls / snapshots ls
 | Docker Engine | 29.x | 承载 kind 节点容器，构建 / 保存本地镜像 |
 | kubectl | 1.36.x | 访问 kind 集群 |
 | kind | 0.31+ | 创建本地 Kubernetes 节点 |
-| kind node image | 课程锁定版本，当前示例为 `kindest/node:v1.35.0` | 节点内置 kubelet、containerd、crictl、ctr |
+| kind node image | 课程锁定版本，当前示例为 `registry.cn-guangzhou.aliyuncs.com/yleoer/node:v1.35.0` | 节点内置 kubelet、containerd、crictl、ctr |
 | containerd | 课程基线为 2.3.x LTS；kind 节点以自检输出为准 | 节点容器内部运行时 |
 | crictl | 与节点 Kubernetes / CRI 版本匹配 | CRI 调试 |
 | nerdctl | 2.3.x，可选 | 用 Docker 风格命令操作 containerd |
-| Alpine | `alpine:3.23` | 轻量探针容器 |
+| Alpine | `registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23` | 轻量探针容器 |
 
 这里要区分“课程基线”和“实验节点实际版本”：课程蓝图把 containerd 锁定为 2.3.x LTS，但 kind 节点镜像会内置自己的 containerd、runc 和 crictl 版本。实验是否可执行以节点内自检结果为准，生产版本规划再按课程基线或团队基线统一升级。
 
@@ -561,7 +561,7 @@ spec:
   restartPolicy: Always
   containers:
     - name: main
-      image: alpine:3.23
+      image: registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23
       imagePullPolicy: IfNotPresent
       command:
         - sh
@@ -589,7 +589,7 @@ YAML
 关键字段说明：
 
 - `Namespace` 使用 `todo-runtime`，避免和后续 Kubernetes 章节资源混在 `default` 中。
-- `image: alpine:3.23` 复用阶段三版本基线，镜像小，适合观察运行时。
+- `image: registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23` 复用阶段三版本基线，镜像小，适合观察运行时。
 - `imagePullPolicy: IfNotPresent` 让节点已有镜像时不重复拉取。
 - `command` 和 `args` 让容器持续运行，便于 `crictl` 和 `ctr` 观察。
 - `resources` 会被 kubelet 转换为运行时层的 cgroup 配置，承接第 18 篇。
@@ -649,7 +649,7 @@ MD
 
 ```bash
 KIND_CLUSTER=todo-runtime
-KIND_NODE_IMAGE="${KIND_NODE_IMAGE:-kindest/node:v1.35.0@sha256:452d707d4862f52530247495d180205e029056831160e22870e37e3f6c1ac31f}"
+KIND_NODE_IMAGE="${KIND_NODE_IMAGE:-registry.cn-guangzhou.aliyuncs.com/yleoer/node:v1.35.0@sha256:452d707d4862f52530247495d180205e029056831160e22870e37e3f6c1ac31f}"
 ```
 
 后续命令依赖这两个变量。如果你中途重新打开终端，请先重新执行本节的变量设置。
@@ -882,7 +882,7 @@ docker exec "$NODE" ctr -n k8s.io images ls | grep todo-api
 
 ```bash
 if command -v nerdctl >/dev/null 2>&1; then
-  sudo nerdctl --net=none run -d --name runtime-nerdctl-demo alpine:3.23 sleep 300
+  sudo nerdctl --net=none run -d --name runtime-nerdctl-demo registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23 sleep 300
   sudo nerdctl ps
   sudo nerdctl inspect runtime-nerdctl-demo | grep -E '"Name"|"Image"|"Runtime"|"SnapshotKey"' | head -n 20
   sudo nerdctl rm -f runtime-nerdctl-demo
@@ -929,7 +929,7 @@ POD ID              CREATED          STATE   NAME            NAMESPACE      ATTE
 
 ```text
 CONTAINER           IMAGE               CREATED          STATE    NAME   ATTEMPT   POD ID
-e83a...             alpine:3.23         1 minute ago     Running  main   0         7b5c...
+e83a...             registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23         1 minute ago     Running  main   0         7b5c...
 ```
 
 `ctr -n k8s.io tasks ls` 应能看到同一个容器 ID 的 task：
@@ -1061,14 +1061,14 @@ kind get clusters
   runtime-probe   0/1     ImagePullBackOff   0          2m
   ```
 
-- **原因**：节点无法拉取 `alpine:3.23`，常见原因是网络不可达、镜像标签写错、公司代理未配置、registry 限流。
+- **原因**：节点无法拉取 `registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23`，常见原因是网络不可达、镜像标签写错、公司代理未配置、registry 限流。
 
 - **排查**：
 
   ```bash
   kubectl -n todo-runtime describe pod runtime-probe
   docker exec "$NODE" crictl images | grep alpine || true
-  docker exec "$NODE" crictl pull alpine:3.23
+  docker exec "$NODE" crictl pull registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23
   ```
 
   `describe pod` 的 Events 会显示具体拉取错误。`crictl pull` 可以绕开 Kubernetes 事件，直接验证 CRI 层能否拉镜像。
@@ -1076,8 +1076,8 @@ kind get clusters
 - **修复**：确认标签正确；配置 Docker / containerd 镜像代理；或者提前在宿主机拉取镜像后导入 kind：
 
   ```bash
-  docker pull alpine:3.23
-  kind load docker-image alpine:3.23 --name todo-runtime
+  docker pull registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23
+  kind load docker-image registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23 --name todo-runtime
   kubectl -n todo-runtime delete pod runtime-probe
   kubectl apply -f runtime-lab/k8s/runtime-probe.yaml
   ```
@@ -1253,7 +1253,7 @@ kind get clusters
 
 ### 9.2 实操题
 
-1. 把 `runtime-probe.yaml` 中的镜像改成一个不存在的标签，例如 `alpine:not-exist`，观察 `kubectl describe pod` 和 `crictl pull` 的错误。记录后恢复为 `alpine:3.23`。
+1. 把 `runtime-probe.yaml` 中的镜像改成一个不存在的标签，例如 `alpine:not-exist`，观察 `kubectl describe pod` 和 `crictl pull` 的错误。记录后恢复为 `registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23`。
 2. 删除 `CONTAINER_ID` 变量后重新通过 `crictl pods --name runtime-probe -q` 找回 `POD_ID`，再用 `crictl ps --pod "$POD_ID" -q` 找回容器 ID，并用 `ctr -n k8s.io tasks ls` 验证同一个 task。
 3. 如果本地存在 `todo-api:v0.1.0`，执行 `kind load docker-image`，并分别用 `crictl images` 和 `ctr -n k8s.io images ls` 验证。
 

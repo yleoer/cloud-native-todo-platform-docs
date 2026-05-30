@@ -482,7 +482,7 @@ env:
   KIND_VERSION: "v0.31.0"
   KUBECTL_VERSION: "v1.35.0"
   HELM_VERSION: "v4.2.0"
-  KIND_NODE_IMAGE: "kindest/node:v1.35.0@sha256:452d707d4862f52530247495d180205e029056831160e22870e37e3f6c1ac31f"
+  KIND_NODE_IMAGE: "registry.cn-guangzhou.aliyuncs.com/yleoer/node:v1.35.0@sha256:452d707d4862f52530247495d180205e029056831160e22870e37e3f6c1ac31f"
 
 jobs:
   validate:

@@ -111,7 +111,7 @@ Docker Compose 文件是一个声明式 YAML，用来描述一组容器服务如
 ```yaml
 services:
   hello:
-    image: alpine:3.23
+    image: registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23
     command: ["echo", "hello compose"]
 ```
 
@@ -121,7 +121,7 @@ services:
 docker compose up
 ```
 
-这里的 `hello` 是服务名，`alpine:3.23` 是镜像，`command` 是容器启动命令。到了 Todo Platform，本篇会把 `hello` 扩展成 `postgres`、`redis`、`migrate`、`api`、`traefik` 五个服务。
+这里的 `hello` 是服务名，`registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23` 是镜像，`command` 是容器启动命令。到了 Todo Platform，本篇会把 `hello` 扩展成 `postgres`、`redis`、`migrate`、`api`、`traefik` 五个服务。
 
 现代 Compose Specification 不再要求写顶层 `version: "3"`。本篇使用 `compose.yaml` 文件名，并使用 Docker Compose v2 的空格命令：
 
@@ -145,11 +145,11 @@ docker-compose
 
 | service | 类型 | 镜像 | 作用 |
 |---|---|---|---|
-| `postgres` | 长期运行 | `postgres:18-alpine` | 保存 Todo 数据和迁移状态 |
-| `redis` | 长期运行 | `redis:8.2-alpine` | 提供缓存、限流和异步任务队列 |
+| `postgres` | 长期运行 | `registry.cn-guangzhou.aliyuncs.com/yleoer/postgres:18-alpine` | 保存 Todo 数据和迁移状态 |
+| `redis` | 长期运行 | `registry.cn-guangzhou.aliyuncs.com/yleoer/redis:8.2-alpine` | 提供缓存、限流和异步任务队列 |
 | `migrate` | 一次性任务 | `todo-api:v0.1.0` | 在 API 启动前执行数据库迁移 |
 | `api` | 长期运行 | `todo-api:v0.1.0` | 提供 Todo HTTP API |
-| `traefik` | 长期运行 | `traefik:v3.6` | 本地入口代理，转发请求到 API |
+| `traefik` | 长期运行 | `registry.cn-guangzhou.aliyuncs.com/yleoer/traefik:v3.6` | 本地入口代理，转发请求到 API |
 
 注意 `migrate` 不是长期服务。它执行完成后会退出，状态通常是 `Exited (0)`。这不是错误，而是我们希望看到的结果。
 
@@ -392,9 +392,9 @@ labels:
 | Docker Engine / Docker Desktop | 29.x | 运行容器 |
 | Docker Compose | v2.20 或更新版本 | 本地多服务编排 |
 | Todo API 镜像 | `todo-api:v0.1.0` | 第 16 篇构建产物 |
-| PostgreSQL | `postgres:18-alpine` | 业务数据库 |
-| Redis | `redis:8.2-alpine` | 缓存、限流、异步队列 |
-| Traefik | `traefik:v3.6` | 本地入口代理 |
+| PostgreSQL | `registry.cn-guangzhou.aliyuncs.com/yleoer/postgres:18-alpine` | 业务数据库 |
+| Redis | `registry.cn-guangzhou.aliyuncs.com/yleoer/redis:8.2-alpine` | 缓存、限流、异步队列 |
+| Traefik | `registry.cn-guangzhou.aliyuncs.com/yleoer/traefik:v3.6` | 本地入口代理 |
 | curl | 任意常见版本 | 验证 HTTP API |
 | jq | 可选 | Linux / macOS / WSL2 解析登录响应 |
 
@@ -412,13 +412,13 @@ docker image inspect todo-api:v0.1.0
 docker build -f api/Dockerfile -t todo-api:v0.1.0 .
 ```
 
-如果你的网络无法拉取 `postgres:18-alpine`、`redis:8.2-alpine`、`traefik:v3.6` 或概念示例中的 `alpine:3.23`，先确认 Docker Hub 访问和镜像代理配置。发布课程前应使用以下命令验证标签可拉取：
+如果你的网络无法拉取 `registry.cn-guangzhou.aliyuncs.com/yleoer/postgres:18-alpine`、`registry.cn-guangzhou.aliyuncs.com/yleoer/redis:8.2-alpine`、`registry.cn-guangzhou.aliyuncs.com/yleoer/traefik:v3.6` 或概念示例中的 `registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23`，先确认 Docker Hub 访问和镜像代理配置。发布课程前应使用以下命令验证标签可拉取：
 
 ```bash
-docker manifest inspect postgres:18-alpine
-docker manifest inspect redis:8.2-alpine
-docker manifest inspect traefik:v3.6
-docker manifest inspect alpine:3.23
+docker manifest inspect registry.cn-guangzhou.aliyuncs.com/yleoer/postgres:18-alpine
+docker manifest inspect registry.cn-guangzhou.aliyuncs.com/yleoer/redis:8.2-alpine
+docker manifest inspect registry.cn-guangzhou.aliyuncs.com/yleoer/traefik:v3.6
+docker manifest inspect registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23
 ```
 
 ### 5.3 文件目录结构
@@ -507,7 +507,7 @@ x-api-environment: &api-environment
 
 services:
   postgres:
-    image: postgres:18-alpine
+    image: registry.cn-guangzhou.aliyuncs.com/yleoer/postgres:18-alpine
     environment:
       POSTGRES_USER: "${POSTGRES_USER:-todo}"
       POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-todo_password}"
@@ -527,7 +527,7 @@ services:
       - todo-net
 
   redis:
-    image: redis:8.2-alpine
+    image: registry.cn-guangzhou.aliyuncs.com/yleoer/redis:8.2-alpine
     environment:
       REDIS_PASSWORD: "${REDIS_PASSWORD:-todo_redis_password}"
     command:
@@ -584,7 +584,7 @@ services:
       - todo-net
 
   traefik:
-    image: traefik:v3.6
+    image: registry.cn-guangzhou.aliyuncs.com/yleoer/traefik:v3.6
     command:
       - "--providers.docker=true"
       - "--providers.docker.exposedbydefault=false"
@@ -809,11 +809,11 @@ traefik
 
 ```text
 NAME                         IMAGE                 SERVICE    STATUS
-todo-platform-postgres-1     postgres:18-alpine    postgres   Up ... (healthy)
-todo-platform-redis-1        redis:8.2-alpine      redis      Up ... (healthy)
+todo-platform-postgres-1     registry.cn-guangzhou.aliyuncs.com/yleoer/postgres:18-alpine    postgres   Up ... (healthy)
+todo-platform-redis-1        registry.cn-guangzhou.aliyuncs.com/yleoer/redis:8.2-alpine      redis      Up ... (healthy)
 todo-platform-migrate-1      todo-api:v0.1.0       migrate    Exited (0)
 todo-platform-api-1          todo-api:v0.1.0       api        Up ... (healthy)
-todo-platform-traefik-1      traefik:v3.6          traefik    Up ...
+todo-platform-traefik-1      registry.cn-guangzhou.aliyuncs.com/yleoer/traefik:v3.6          traefik    Up ...
 ```
 
 如果默认 `ps` 没有显示已经退出的 `migrate` 容器，请执行：

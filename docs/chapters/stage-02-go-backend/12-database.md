@@ -353,7 +353,7 @@ cloud-native-todo-platform/
 ```yaml title="docker-compose.yml"
 services:
   postgres:
-    image: postgres:18-alpine
+    image: registry.cn-guangzhou.aliyuncs.com/yleoer/postgres:18-alpine
     container_name: todo-postgres
     environment:
       POSTGRES_USER: todo
@@ -377,7 +377,7 @@ volumes:
 
 这里把端口绑定到 `127.0.0.1`，表示只允许本机访问。数据库密码写在教学 Compose 文件里是为了本地实验可复现；生产环境应使用 Secret 或受控配置系统。
 
-`PGDATA` 被显式设置到 `/var/lib/postgresql/data/pgdata`，是为了让数据目录稳定落在 `todo-postgres-data` volume 里。PostgreSQL 18 官方镜像的默认数据目录和旧版本不同，教学中显式写出路径可以避免学生误以为挂了 volume，实际数据却写到另一个目录。`postgres:18-alpine` 会跟随 PostgreSQL 18 的最新补丁镜像；如果团队要求完全可复现，可以改成具体补丁标签。第 17 篇会把这个根目录 `docker-compose.yml` 演进为 `deployments/docker-compose/compose.yaml`，纳入 API、PostgreSQL、Redis 和 Traefik 的完整本地编排。
+`PGDATA` 被显式设置到 `/var/lib/postgresql/data/pgdata`，是为了让数据目录稳定落在 `todo-postgres-data` volume 里。PostgreSQL 18 官方镜像的默认数据目录和旧版本不同，教学中显式写出路径可以避免学生误以为挂了 volume，实际数据却写到另一个目录。`registry.cn-guangzhou.aliyuncs.com/yleoer/postgres:18-alpine` 会跟随 PostgreSQL 18 的最新补丁镜像；如果团队要求完全可复现，可以改成具体补丁标签。第 17 篇会把这个根目录 `docker-compose.yml` 演进为 `deployments/docker-compose/compose.yaml`，纳入 API、PostgreSQL、Redis 和 Traefik 的完整本地编排。
 
 创建 `api/migrations/000001_create_todos.up.sql`：
 

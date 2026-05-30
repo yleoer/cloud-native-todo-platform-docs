@@ -40,7 +40,7 @@
 本篇命令以 Linux / macOS / WSL2 Bash 为主。Windows 用户建议在 WSL2 Ubuntu 中执行整篇实验，避免 Bash 变量、管道和重定向写法在 PowerShell 中产生额外差异；如果必须使用 PowerShell，需要把 Bash 变量写法改为 PowerShell 变量。
 
 !!! note "关于 Kubernetes 与 kind 版本"
-    课程蓝图锁定 Kubernetes 1.36.x，但 kind v0.31.0 官方发布说明中预构建并推荐固定 digest 的默认节点镜像仍是 `kindest/node:v1.35.0@sha256:452d707d4862f52530247495d180205e029056831160e22870e37e3f6c1ac31f`。本篇实验不依赖 1.36 专属 API，因此主线优先使用 kind 官方当前稳定节点镜像，保证读者能复现。出版前如果 kind 官方 release 已提供 1.36.x 预构建节点镜像及 digest，应统一替换；如果你本地已经有可用的 1.36.x kind 节点镜像，也可以通过 `KIND_NODE_IMAGE` 环境变量覆盖。
+    课程蓝图锁定 Kubernetes 1.36.x，但 kind v0.31.0 官方发布说明中预构建并推荐固定 digest 的默认节点镜像仍是 `registry.cn-guangzhou.aliyuncs.com/yleoer/node:v1.35.0@sha256:452d707d4862f52530247495d180205e029056831160e22870e37e3f6c1ac31f`。本篇实验不依赖 1.36 专属 API，因此主线优先使用 kind 官方当前稳定节点镜像，保证读者能复现。出版前如果 kind 官方 release 已提供 1.36.x 预构建节点镜像及 digest，应统一替换；如果你本地已经有可用的 1.36.x kind 节点镜像，也可以通过 `KIND_NODE_IMAGE` 环境变量覆盖。
 
 ## 2. 本章工作场景与真实案例
 
@@ -95,7 +95,7 @@ metadata:
 spec:
   containers:
     - name: app
-      image: alpine:3.23
+      image: registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23
       command: ["sh", "-c", "while true; do echo hello; sleep 30; done"]
 ```
 
@@ -251,8 +251,8 @@ Kubernetes 排障不能只看对象列表。一个 Pod 的完整线索通常来�
 | Docker Engine / Docker Desktop | 29.x 或当前稳定版 | 承载 kind 节点容器 |
 | kubectl | v1.35.x 或与 API Server 相差不超过 1 个小版本 | 操作 Kubernetes API |
 | kind | 0.31+ | 创建本地 Kubernetes 集群 |
-| kind node image | 默认 `kindest/node:v1.35.0`，可用 `KIND_NODE_IMAGE` 覆盖 | 节点内置控制面、kubelet、containerd |
-| Alpine BusyBox `nc` | `alpine:3.23` | smoke Pod 的临时 HTTP 响应进程 |
+| kind node image | 默认 `registry.cn-guangzhou.aliyuncs.com/yleoer/node:v1.35.0`，可用 `KIND_NODE_IMAGE` 覆盖 | 节点内置控制面、kubelet、containerd |
+| Alpine BusyBox `nc` | `registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23` | smoke Pod 的临时 HTTP 响应进程 |
 | Todo API 镜像 | `todo-api:v0.1.0` | 后续章节部署对象 |
 
 检查工具：
@@ -303,7 +303,7 @@ kind: Cluster
 apiVersion: kind.x-k8s.io/v1alpha4
 nodes:
   - role: control-plane
-    image: kindest/node:v1.35.0@sha256:452d707d4862f52530247495d180205e029056831160e22870e37e3f6c1ac31f # ← kind v0.31.0 默认节点镜像
+    image: registry.cn-guangzhou.aliyuncs.com/yleoer/node:v1.35.0@sha256:452d707d4862f52530247495d180205e029056831160e22870e37e3f6c1ac31f # ← kind v0.31.0 默认节点镜像
 YAML
 ```
 
@@ -329,7 +329,7 @@ metadata:
 spec:
   containers:
     - name: web
-      image: alpine:3.23 # ← 小镜像，适合 smoke test
+      image: registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23 # ← 小镜像，适合 smoke test
       imagePullPolicy: IfNotPresent # ← kind 节点已有镜像时不重复拉取
       command:
         - sh
@@ -415,8 +415,8 @@ KIND_CLUSTER=todo-k8s
 可选：如果你已经确认有可用的 Kubernetes 1.36.x kind 节点镜像，可以生成覆盖配置。没有特殊需求时跳过这一步，直接使用 `k8s-lab/kind-config.yaml`。
 
 ```bash
-KIND_NODE_IMAGE="${KIND_NODE_IMAGE:-kindest/node:v1.35.0@sha256:452d707d4862f52530247495d180205e029056831160e22870e37e3f6c1ac31f}"
-sed "s#kindest/node:v1.35.0@sha256:452d707d4862f52530247495d180205e029056831160e22870e37e3f6c1ac31f#$KIND_NODE_IMAGE#g" \
+KIND_NODE_IMAGE="${KIND_NODE_IMAGE:-registry.cn-guangzhou.aliyuncs.com/yleoer/node:v1.35.0@sha256:452d707d4862f52530247495d180205e029056831160e22870e37e3f6c1ac31f}"
+sed "s#registry.cn-guangzhou.aliyuncs.com/yleoer/node:v1.35.0@sha256:452d707d4862f52530247495d180205e029056831160e22870e37e3f6c1ac31f#$KIND_NODE_IMAGE#g" \
   k8s-lab/kind-config.yaml > k8s-lab/kind-config.rendered.yaml
 KIND_CONFIG=k8s-lab/kind-config.rendered.yaml
 ```
@@ -658,8 +658,8 @@ rm -rf k8s-lab
 - **修复**：确认镜像标签正确；配置镜像代理；或提前拉取并导入 kind：
 
   ```bash
-  docker pull alpine:3.23
-  kind load docker-image alpine:3.23 --name todo-k8s
+  docker pull registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23
+  kind load docker-image registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23 --name todo-k8s
   kubectl -n todo-k8s-lab delete pod todo-k8s-smoke
   kubectl apply -f k8s-lab/manifests/smoke.yaml
   ```
@@ -790,7 +790,7 @@ rm -rf k8s-lab
 实操题：
 
 1. 把 `todo-k8s-smoke` Pod 的 label 从 `app: todo-k8s-smoke` 改成 `app: changed`，重新 `kubectl apply`，观察 Service 是否还能访问。恢复 label 后重新验证访问成功。
-2. 修改 `smoke.yaml` 中的镜像为 `alpine:not-exist`，观察 `ImagePullBackOff` 和 Events。记录现象后恢复为 `alpine:3.23`。
+2. 修改 `smoke.yaml` 中的镜像为 `alpine:not-exist`，观察 `ImagePullBackOff` 和 Events。记录现象后恢复为 `registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23`。
 3. 新建一个 `dev-lab` Namespace，并用 `kubectl config set-context --current --namespace=dev-lab` 设置默认 Namespace。执行 `kubectl config view --minify` 看到 namespace 生效时，说明操作成功。
 
 思考题：

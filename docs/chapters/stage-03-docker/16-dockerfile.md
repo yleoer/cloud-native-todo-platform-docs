@@ -1,6 +1,6 @@
 # 第 16 篇：Dockerfile 与镜像构建 [C]
 
-第 15 篇已经让 Todo API、PostgreSQL 和 Redis 通过 Docker CLI 跑在同一个 Docker 网络里。但 Todo API 仍然依赖 `golang:1.26-bookworm + 源码挂载 + go run`。这种方式适合学习容器运行参数，不适合交付给测试、CI/CD、预发环境或 Kubernetes。
+第 15 篇已经让 Todo API、PostgreSQL 和 Redis 通过 Docker CLI 跑在同一个 Docker 网络里。但 Todo API 仍然依赖 `registry.cn-guangzhou.aliyuncs.com/yleoer/golang:1.26-bookworm + 源码挂载 + go run`。这种方式适合学习容器运行参数，不适合交付给测试、CI/CD、预发环境或 Kubernetes。
 
 本篇把 Todo API 构建成真正的应用镜像：源码在构建阶段编译成 Linux 二进制，运行阶段只保留二进制、配置文件和迁移脚本；镜像使用非 root 用户运行，带 OCI 元数据标签，并能用 `hadolint`、`dive`、`trivy` 或 Docker Scout 做基础检查。
 
@@ -92,7 +92,7 @@ Dockerfile 的工作不是“把命令写进文件”这么简单。它把服务
 本篇会把第 15 篇的临时运行方式：
 
 ```text
-golang:1.26-bookworm + 源码挂载 + go run ./api/cmd/todo-api serve
+registry.cn-guangzhou.aliyuncs.com/yleoer/golang:1.26-bookworm + 源码挂载 + go run ./api/cmd/todo-api serve
 ```
 
 升级为可发布镜像：
@@ -122,7 +122,7 @@ Dockerfile 是镜像构建说明书。它描述基础镜像是什么、复制哪
 最小 Dockerfile 可以只有两行：
 
 ```dockerfile
-FROM alpine:3.23
+FROM registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23
 CMD ["echo", "hello dockerfile"]
 ```
 
@@ -249,7 +249,7 @@ docker run --rm todo-api:v0.1.0 openapi
 | `scratch` | 无预置用户 | 极小 | 没有 shell、证书、用户信息，排障困难 |
 | `distroless` | 视标签而定 | 小，无 shell，适合生产 | 不能直接进入容器用 shell 排障 |
 
-本篇使用 `gcr.io/distroless/static-debian12:nonroot`，也就是 distroless 的 `:nonroot` 变体，让运行镜像默认更接近生产安全基线。distroless 没有 shell，因此排障更依赖日志、指标、`docker inspect`、镜像分析工具和后续 Kubernetes 的临时调试容器。
+本篇使用 `registry.cn-guangzhou.aliyuncs.com/yleoer/static-debian12:nonroot`，也就是 distroless 的 `:nonroot` 变体，让运行镜像默认更接近生产安全基线。distroless 没有 shell，因此排障更依赖日志、指标、`docker inspect`、镜像分析工具和后续 Kubernetes 的临时调试容器。
 
 ### 3.8 镜像标签、OCI Label 与 digest
 
@@ -302,7 +302,7 @@ flowchart LR
 
 ```mermaid
 flowchart TB
-    subgraph Builder["builder 阶段：golang:1.26-bookworm"]
+    subgraph Builder["builder 阶段：registry.cn-guangzhou.aliyuncs.com/yleoer/golang:1.26-bookworm"]
         A["COPY go.mod go.sum"] --> B["go mod download"]
         B --> C["COPY . ."]
         C --> D["go test ./..."]
@@ -406,10 +406,10 @@ flowchart LR
 | 工具或镜像 | 建议版本 | 说明 |
 |---|---|---|
 | Docker Desktop / Docker Engine | 29.x 或当前稳定版 | 需要支持 BuildKit |
-| Go 构建镜像 | `golang:1.26-bookworm` | 编译 Todo API |
-| 运行镜像 | `gcr.io/distroless/static-debian12:nonroot` | 非 root 最小运行环境 |
-| PostgreSQL 镜像 | `postgres:18-alpine` | 验证数据库迁移和 API |
-| Redis 镜像 | `redis:8.2-alpine` | 验证缓存、限流和队列 |
+| Go 构建镜像 | `registry.cn-guangzhou.aliyuncs.com/yleoer/golang:1.26-bookworm` | 编译 Todo API |
+| 运行镜像 | `registry.cn-guangzhou.aliyuncs.com/yleoer/static-debian12:nonroot` | 非 root 最小运行环境 |
+| PostgreSQL 镜像 | `registry.cn-guangzhou.aliyuncs.com/yleoer/postgres:18-alpine` | 验证数据库迁移和 API |
+| Redis 镜像 | `registry.cn-guangzhou.aliyuncs.com/yleoer/redis:8.2-alpine` | 验证缓存、限流和队列 |
 | Registry 镜像 | `registry:2` | 本地推送实验 |
 | curl | 任意现代版本 | 验证 HTTP API |
 | jq | 可选 | Linux / macOS / WSL2 下解析登录 JSON |
@@ -551,7 +551,7 @@ redis-data/
 # syntax=docker/dockerfile:1.7
 
 ARG GO_VERSION=1.26
-ARG RUNTIME_IMAGE=gcr.io/distroless/static-debian12:nonroot
+ARG RUNTIME_IMAGE=registry.cn-guangzhou.aliyuncs.com/yleoer/static-debian12:nonroot
 
 FROM golang:${GO_VERSION}-bookworm AS builder
 
@@ -768,7 +768,7 @@ docker run -d \
   -e PGDATA=/var/lib/postgresql/data/pgdata \
   -v todo-postgres-data:/var/lib/postgresql/data \
   -p 127.0.0.1:15432:5432 \
-  postgres:18-alpine
+  registry.cn-guangzhou.aliyuncs.com/yleoer/postgres:18-alpine
 ```
 
 Windows PowerShell 写法：
@@ -783,7 +783,7 @@ docker run -d `
   -e PGDATA=/var/lib/postgresql/data/pgdata `
   -v todo-postgres-data:/var/lib/postgresql/data `
   -p 127.0.0.1:15432:5432 `
-  postgres:18-alpine
+  registry.cn-guangzhou.aliyuncs.com/yleoer/postgres:18-alpine
 ```
 
 启动 Redis：
@@ -794,7 +794,7 @@ docker run -d \
   --network todo-net \
   -v todo-redis-data:/data \
   -p 127.0.0.1:16379:6379 \
-  redis:8.2-alpine \
+  registry.cn-guangzhou.aliyuncs.com/yleoer/redis:8.2-alpine \
   redis-server --requirepass todo_redis_password --appendonly yes
 ```
 
@@ -806,7 +806,7 @@ docker run -d `
   --network todo-net `
   -v todo-redis-data:/data `
   -p 127.0.0.1:16379:6379 `
-  redis:8.2-alpine `
+  registry.cn-guangzhou.aliyuncs.com/yleoer/redis:8.2-alpine `
   redis-server --requirepass todo_redis_password --appendonly yes
 ```
 
@@ -1222,15 +1222,15 @@ docker image ls todo-api
 - **现象**：
 
   ```text
-  failed to solve: gcr.io/distroless/static-debian12:nonroot: failed to resolve source metadata
+  failed to solve: registry.cn-guangzhou.aliyuncs.com/yleoer/static-debian12:nonroot: failed to resolve source metadata
   exec /app/todo-api: no such file or directory
   ```
 
-- **原因**：第一类问题是网络、代理或公司镜像策略导致无法拉取 `gcr.io/distroless/static-debian12:nonroot`。第二类问题是文件可能真的没复制进去，也可能是二进制依赖动态链接器或系统库，而 distroless static 镜像里没有这些依赖。
+- **原因**：第一类问题是网络、代理或公司镜像策略导致无法拉取 `registry.cn-guangzhou.aliyuncs.com/yleoer/static-debian12:nonroot`。第二类问题是文件可能真的没复制进去，也可能是二进制依赖动态链接器或系统库，而 distroless static 镜像里没有这些依赖。
 - **排查**：
 
   ```bash
-  docker pull gcr.io/distroless/static-debian12:nonroot
+  docker pull registry.cn-guangzhou.aliyuncs.com/yleoer/static-debian12:nonroot
   docker image inspect todo-api:v0.1.0 --format '{{.Config.Entrypoint}}'
   docker history todo-api:v0.1.0
   ```

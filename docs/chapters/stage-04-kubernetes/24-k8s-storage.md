@@ -266,7 +266,7 @@ Kubernetes 中更清晰的做法是：
 | kubectl | 与 API Server 相差不超过 1 个小版本 | 用于 apply、logs、exec 和 PVC/StatefulSet 排障 |
 | kind | 0.31.x | 本地 Kubernetes 集群 |
 | Docker Engine | 29.x | 构建与导入本地镜像 |
-| PostgreSQL | 18.x | 使用 `postgres:18-alpine` |
+| PostgreSQL | 18.x | 使用 `registry.cn-guangzhou.aliyuncs.com/yleoer/postgres:18-alpine` |
 | Todo API 镜像 | `todo-api:v0.1.0` | 第 16 篇构建，第 21 篇导入 kind |
 
 确认当前 context 和集群版本：
@@ -312,11 +312,11 @@ docker image inspect todo-api:v0.1.0 >/dev/null
 kind load docker-image todo-api:v0.1.0 --name todo-k8s
 ```
 
-准备 PostgreSQL 镜像。网络正常时，kind 节点可以直接拉取 `postgres:18-alpine`；如果你所在网络访问 Docker Hub 不稳定，建议先在宿主机拉取并导入 kind，避免后续 PostgreSQL Pod 卡在 `ImagePullBackOff`：
+准备 PostgreSQL 镜像。网络正常时，kind 节点可以直接拉取 `registry.cn-guangzhou.aliyuncs.com/yleoer/postgres:18-alpine`；如果你所在网络访问 Docker Hub 不稳定，建议先在宿主机拉取并导入 kind，避免后续 PostgreSQL Pod 卡在 `ImagePullBackOff`：
 
 ```bash
-docker pull postgres:18-alpine
-kind load docker-image postgres:18-alpine --name todo-k8s
+docker pull registry.cn-guangzhou.aliyuncs.com/yleoer/postgres:18-alpine
+kind load docker-image registry.cn-guangzhou.aliyuncs.com/yleoer/postgres:18-alpine --name todo-k8s
 ```
 
 确认第 23 篇的基础对象存在：
@@ -475,7 +475,7 @@ spec:
       terminationGracePeriodSeconds: 60 # ← 给数据库优雅停止和刷盘时间
       containers:
         - name: postgres
-          image: postgres:18-alpine
+          image: registry.cn-guangzhou.aliyuncs.com/yleoer/postgres:18-alpine
           imagePullPolicy: IfNotPresent
           ports:
             - name: postgres

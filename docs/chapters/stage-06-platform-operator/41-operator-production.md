@@ -1094,7 +1094,7 @@ metadata:
   labels:
     platform.todo.example.com/managed: "true"
 spec:
-  image: nginxdemos/hello:plain-text
+  image: registry.cn-guangzhou.aliyuncs.com/yleoer/hello:plain-text
   replicas: 2
   port: 80
 YAML
@@ -1123,7 +1123,7 @@ metadata:
   name: ${UNMANAGED_NAME}
   namespace: ${TENANT_NAMESPACE}
 spec:
-  image: nginxdemos/hello:plain-text
+  image: registry.cn-guangzhou.aliyuncs.com/yleoer/hello:plain-text
   replicas: 1
   port: 80
 YAML
@@ -1182,7 +1182,9 @@ go test ./...
 
 ```bash
 if ! kubectl get deployment -n cert-manager cert-manager >/dev/null 2>&1; then
-  kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.20.0/cert-manager.yaml
+  curl -L -o cert-manager.yaml https://github.com/cert-manager/cert-manager/releases/download/v1.20.0/cert-manager.yaml
+  sed -i 's|quay.io/jetstack/|registry.cn-guangzhou.aliyuncs.com/yleoer/|g' cert-manager.yaml
+  kubectl apply -f cert-manager.yaml
   kubectl wait --for=condition=Available deployment --all -n cert-manager --timeout=300s
 fi
 ```
@@ -1274,7 +1276,7 @@ metadata:
   labels:
     platform.todo.example.com/managed: "true"
 spec:
-  image: nginxdemos/hello:plain-text
+  image: registry.cn-guangzhou.aliyuncs.com/yleoer/hello:plain-text
   replicas: 2
   port: 80
 YAML
@@ -1301,7 +1303,7 @@ metadata:
   name: todo-unmanaged
   namespace: todo-team-a
 spec:
-  image: nginxdemos/hello:plain-text
+  image: registry.cn-guangzhou.aliyuncs.com/yleoer/hello:plain-text
   replicas: 1
   port: 80
 YAML

@@ -1078,6 +1078,20 @@ helm upgrade --install monitoring prometheus-community/kube-prometheus-stack \
   --namespace monitoring \
   --create-namespace \
   -f observability/prometheus/kube-prometheus-stack-values.yaml \
+  --set prometheus.prometheusSpec.image.registry=registry.cn-guangzhou.aliyuncs.com/yleoer \
+  --set prometheus.prometheusSpec.image.repository=prometheus \
+  --set alertmanager.alertmanagerSpec.image.registry=registry.cn-guangzhou.aliyuncs.com/yleoer \
+  --set alertmanager.alertmanagerSpec.image.repository=alertmanager \
+  --set grafana.image.registry=registry.cn-guangzhou.aliyuncs.com/yleoer \
+  --set grafana.image.repository=grafana \
+  --set kube-state-metrics.image.registry=registry.cn-guangzhou.aliyuncs.com/yleoer \
+  --set kube-state-metrics.image.repository=kube-state-metrics \
+  --set prometheus-node-exporter.image.registry=registry.cn-guangzhou.aliyuncs.com/yleoer \
+  --set prometheus-node-exporter.image.repository=node-exporter \
+  --set prometheusOperator.image.registry=registry.cn-guangzhou.aliyuncs.com/yleoer \
+  --set prometheusOperator.image.repository=prometheus-operator \
+  --set prometheusOperator.prometheusConfigReloader.image.registry=registry.cn-guangzhou.aliyuncs.com/yleoer \
+  --set prometheusOperator.prometheusConfigReloader.image.repository=prometheus-config-reloader \
   --wait \
   --timeout 10m
 ```

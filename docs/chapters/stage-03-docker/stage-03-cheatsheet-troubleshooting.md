@@ -53,8 +53,8 @@
 ## 3. 镜像命令速查
 
 ```bash
-docker pull alpine:3.23
-docker pull golang:1.26-bookworm
+docker pull registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23
+docker pull registry.cn-guangzhou.aliyuncs.com/yleoer/golang:1.26-bookworm
 docker image ls
 docker image inspect todo-api:v0.1.0
 docker history todo-api:v0.1.0
@@ -177,15 +177,15 @@ docker inspect todo-api --format '{{json .NetworkSettings.Networks}}'
 在同一 Docker 网络中测试 DNS：
 
 ```bash
-docker run --rm --network todo-net alpine:3.23 nslookup todo-postgres
-docker run --rm --network todo-net alpine:3.23 nslookup todo-redis
+docker run --rm --network todo-net registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23 nslookup todo-postgres
+docker run --rm --network todo-net registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23 nslookup todo-redis
 ```
 
 Compose 环境中测试服务名：
 
 ```bash
-docker run --rm --network todo-platform_todo-net alpine:3.23 nslookup postgres
-docker run --rm --network todo-platform_todo-net alpine:3.23 nslookup redis
+docker run --rm --network todo-platform_todo-net registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23 nslookup postgres
+docker run --rm --network todo-platform_todo-net registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23 nslookup redis
 docker compose exec postgres pg_isready -U todo -d todo_platform
 docker compose exec redis redis-cli -a todo_redis_password PING
 ```
@@ -283,13 +283,13 @@ Compose 排障优先顺序：
 观察进程模型：
 
 ```bash
-docker run --rm alpine:3.23 sh -c 'echo "hostname=$(hostname)"; ps -o pid,ppid,comm; cat /proc/1/cgroup'
+docker run --rm registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23 sh -c 'echo "hostname=$(hostname)"; ps -o pid,ppid,comm; cat /proc/1/cgroup'
 ```
 
 观察资源限制：
 
 ```bash
-docker run --rm --memory=64m --cpus=0.5 alpine:3.23 sh -c 'cat /proc/self/cgroup; echo ok'
+docker run --rm --memory=64m --cpus=0.5 registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23 sh -c 'cat /proc/self/cgroup; echo ok'
 ```
 
 观察镜像层：
@@ -302,7 +302,7 @@ docker image inspect todo-api:v0.1.0 --format '{{json .RootFS.Layers}}'
 进入已有容器的 namespace：
 
 ```bash
-docker run -d --name nsenter-demo alpine:3.23 sleep 1d
+docker run -d --name nsenter-demo registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23 sleep 1d
 PID="$(docker inspect -f '{{.State.Pid}}' nsenter-demo)"
 sudo nsenter -t "$PID" -p -m -u -i -n sh
 ```

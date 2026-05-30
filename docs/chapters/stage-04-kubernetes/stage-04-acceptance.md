@@ -65,8 +65,8 @@ cloud-native-todo-platform/
 | Docker | 29.x | 构建和加载 `todo-api:v0.1.0` |
 | Helm | v4.2.x | 第 27 篇 Helm 4 Chart 实验 |
 | Kustomize | kubectl 内置 v5.x | 第 28 篇 overlay 实验 |
-| PostgreSQL | `postgres:18-alpine` | 第 24 篇 StatefulSet 实验 |
-| Alpine | `alpine:3.23` | 网络、Job、DaemonSet 和排障客户端 |
+| PostgreSQL | `registry.cn-guangzhou.aliyuncs.com/yleoer/postgres:18-alpine` | 第 24 篇 StatefulSet 实验 |
+| Alpine | `registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23` | 网络、Job、DaemonSet 和排障客户端 |
 
 真实团队应把这些版本写入 README、CI、镜像构建参数和发布说明。课程出版前如果 kind 官方已提供可复现的 Kubernetes 1.36.x 节点镜像和 digest，应统一更新第 20、21、22、25、28 篇的版本表述。
 
