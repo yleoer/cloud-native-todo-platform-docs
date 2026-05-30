@@ -223,6 +223,4 @@ nav:
       - 39. Operator 高级机制: chapters/stage-06-platform-operator/39-operator-advanced.md
       - 40. Operator 测试、发布与升级: chapters/stage-06-platform-operator/40-operator-test-release.md
       - 41. Operator 生产实践: chapters/stage-06-platform-operator/41-operator-production.md
-
-  # 阶段六后续章节规划：
-  #     - 42. 综合集成与职业能力验收: chapters/stage-06-platform-operator/42-final-integration-career.md
+      - 42. 综合集成与职业能力验收: chapters/stage-06-platform-operator/42-final-integration-career.md

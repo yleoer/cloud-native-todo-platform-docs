@@ -64,7 +64,7 @@ hide:
 
 本课程共 **42 大篇，约 230 个章节**，分为 6 个学习阶段。
 
-新版设计路线已更新为 **6 个阶段**。当前站点已发布阶段一至阶段五，并已进入阶段六平台工程与 Operator 能力。
+新版设计路线已更新为 **6 个阶段**。当前站点已完成阶段一至阶段六主线内容。
 
 <details open markdown="1">
 <summary><strong>阶段一：基础能力（第 1-6 篇，已发布）</strong></summary>
@@ -147,7 +147,7 @@ hide:
 </details>
 
 <details markdown="1">
-<summary><strong>阶段六：平台工程与 Operator 能力（第 34-42 篇，更新中）</strong></summary>
+<summary><strong>阶段六：平台工程与 Operator 能力（第 34-42 篇，已发布）</strong></summary>
 
 深入 Kubernetes API Machinery、CRD、手写 Controller、Kubebuilder、Webhook、Finalizer、Operator 测试发布、生产实践和最终集成。
 
@@ -159,7 +159,7 @@ hide:
 - [第 39 篇：Operator 高级机制 [C]](chapters/stage-06-platform-operator/39-operator-advanced.md)
 - [第 40 篇：Operator 测试、发布与升级 [C]](chapters/stage-06-platform-operator/40-operator-test-release.md)
 - [第 41 篇：Operator 生产实践 [C]](chapters/stage-06-platform-operator/41-operator-production.md)
-- 第 42 篇：综合集成与职业能力验收
+- [第 42 篇：综合集成与职业能力验收 [C]](chapters/stage-06-platform-operator/42-final-integration-career.md)
 
 </details>
 
@@ -178,8 +178,8 @@ mkdocs serve
 http://127.0.0.1:8000
 ```
 
-## 下一步计划
+## 下一步建议
 
-- 进入第 42 篇综合集成与职业能力验收，把阶段六产物整理成最终作品集。
-- 把第 41 篇的最小 RBAC、Watch 范围、资源限制、指标告警和 smoke test 纳入最终交付流程。
-- 延续阶段六产物，完成 TodoApp Operator 一键交付 Cloud Native Todo Platform 的综合演练。
+- 按第 42 篇整理 Cloud Native Todo Platform 最终作品集，保留架构图、部署手册、排障复盘和验证证据。
+- 在本地或个人云环境复跑最终一条 YAML 交付流程，确认 CI/CD、GitOps、Operator 和可观测性链路都能闭环。
+- 继续进阶 Service Mesh、WASM、eBPF、供应链安全、平台工程和 SRE 等方向。
