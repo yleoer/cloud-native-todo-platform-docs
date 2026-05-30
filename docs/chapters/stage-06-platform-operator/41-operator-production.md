@@ -321,6 +321,15 @@ verbs:
 - patch
 ```
 
+表 41-4 `TodoApp` 主资源 RBAC 收敛对比
+
+| 资源 | 第 39/40 篇 verbs | 本篇 verbs | 变化原因 |
+|---|---|---|---|
+| `todoapps` | `get;list;watch;create;update;patch;delete` | `get;list;watch;update;patch` | Controller 只读取和更新已有 CR，不创建或删除用户 CR |
+| `todoapps/status` | `get;update;patch` | `get;update;patch` | status subresource 仍需要单独更新 |
+| `todoapps/finalizers` | `update` | `update` | 添加和移除 finalizer 仍需要权限 |
+| `leases` | 通常放在集群级 RBAC 中 | 安装命名空间内的 `Role` | leader election 只需要操作自身命名空间中的 Lease |
+
 如果你的代码已经把 finalizer 更新改成 `client.Patch`，可以进一步验证是否能删除主资源 `update`。本篇先保留 `update;patch`，让权限和第 39 篇代码路径保持一致。
 
 ### 5.5 步骤 4.2：同步 Helm RBAC 模板
@@ -396,7 +405,11 @@ subjects:
 
 这个模板和第 40 篇有一个重要差异：它不再用一个集群级 `ClusterRoleBinding` 覆盖所有命名空间，而是按 `watch.namespaces` 为每个租户命名空间生成 `Role` 和 `RoleBinding`。Leader election 的 Lease 权限只授予 Operator 安装命名空间。这样 `todo-operator-system` 中的 ServiceAccount 只能在被授权的租户命名空间里管理 `TodoApp`、Deployment、Service 和 Event。
 
-生产中还要注意发布顺序：租户 namespace 必须先存在，否则 Helm 无法在这些 namespace 中创建 Role 和 RoleBinding。本章后续会先创建 `todo-team-a`、`todo-team-b`，再执行 `helm upgrade --install`。
+Helm 模板里 `range .Values.watch.namespaces` 会把 `.` 切换成当前命名空间字符串，所以循环内部要用 `$` 回到 Chart 根作用域，例如 `{{ include "todo-operator.fullname" $ }}` 和 `{{ $.Release.Namespace }}`。这是 Helm 模板里很常见的作用域写法，后续模板中看到 `$` 时可以按“根对象”理解。
+
+Webhook 证书相关的 `Certificate`、`Issuer` 和最终生成的 Secret 由 cert-manager 控制器管理，不需要 Todo Operator 的 ServiceAccount 拥有 `cert-manager.io` 或 Secret 写权限。Todo Operator 只需要把 Webhook server 需要的 Secret 挂载进 Pod；证书签发、续期和 CA 注入是 cert-manager 的职责。Leader election 的 Lease 权限现在也只授予 Operator 安装命名空间，不再使用集群级 `ClusterRole`。
+
+> **顺序提醒**：租户 namespace 必须先存在，否则 Helm 无法在这些 namespace 中创建 Role 和 RoleBinding。本章后续会先创建 `todo-team-a`、`todo-team-b`，再执行 `helm upgrade --install`。
 
 渲染模板确认 `todoapps` 不再包含 `create` 和 `delete`：
 
@@ -415,7 +428,9 @@ verbs: ["get", "list", "watch", "update", "patch"]
 
 ### 5.6 步骤 4.3：让 Manager 支持 Watch 范围
 
-编辑 `cmd/main.go`，增加下面的导入：
+以下代码片段均添加到 `cmd/main.go` 中。helper 函数放在 `main()` 函数之前；`ctrl.Options` 的修改在原有 `ctrl.NewManager` 调用处就地替换；Reconciler 注册代码在原有 `TodoAppReconciler` 初始化处补充 `WatchLabelSelector` 字段。原文件中已有的日志、Scheme、metrics、webhook server、health probe 和 leader election flag 代码都要保留。
+
+编辑 `cmd/main.go`，在原有 import 基础上增加下面这些依赖：
 
 ```go
 import (
@@ -495,6 +510,23 @@ if err = (&controller.TodoAppReconciler{
 
 这段代码的行为是：`WATCH_NAMESPACE` 为空时仍 Watch 全部命名空间；设置为 `todo-team-a,todo-team-b` 时只同步这两个命名空间。`WATCH_LABEL_SELECTOR` 为空时接管所有 `TodoApp`；设置为 `platform.todo.example.com/managed=true` 时只让带标签的对象进入 Reconcile。
 
+改造后的 `main.go` 结构可以按下面顺序自查：
+
+```text
+import block
+init() 注册 Scheme
+cacheNamespacesFromEnv()
+labelSelectorFromEnv()
+main()
+  解析 flag
+  创建 webhook server
+  解析 WATCH_LABEL_SELECTOR
+  ctrl.NewManager(... Cache + LeaderElectionNamespace ...)
+  注册 TodoAppReconciler(... WatchLabelSelector ...)
+  注册 Webhook、healthz、readyz
+  mgr.Start(...)
+```
+
 ### 5.7 步骤 4.4：增加 Predicate、Field Index 和内部接管防御
 
 编辑 `internal/controller/todoapp_controller.go` 的 import，确保包含：
@@ -518,7 +550,7 @@ import (
 给 Reconciler 增加字段：
 
 ```go
-const deploymentOwnerKey = ".metadata.controller"
+const deploymentOwnerNameKey = ".metadata.controller"
 
 type TodoAppReconciler struct {
 	client.Client
@@ -539,6 +571,8 @@ func (r *TodoAppReconciler) shouldManage(todo *platformv1alpha1.TodoApp) (bool, 
 	return selector.Matches(labels.Set(todo.Labels)), nil
 }
 ```
+
+这份结构体里，`Client`、`Scheme` 和 `Recorder` 来自第 39 篇；其中 `Recorder` 使用第 39 篇定义的 `recordEventRecorder` 最小接口，包含 `Event` 和 `Eventf` 两个方法，能够继续兼容第 40 篇 envtest 中的 `record.NewFakeRecorder(20)`。`WatchLabelSelector` 是本篇新增字段，用来把 `cmd/main.go` 中解析出的接管标签传给 Reconciler。
 
 在 `Reconcile` 读取到 `TodoApp` 后，立即增加一次内部防御：
 
@@ -561,7 +595,7 @@ func (r *TodoAppReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	if err := mgr.GetFieldIndexer().IndexField(
 		context.Background(),
 		&appsv1.Deployment{},
-		deploymentOwnerKey,
+		deploymentOwnerNameKey,
 		func(rawObj client.Object) []string {
 			deployment, ok := rawObj.(*appsv1.Deployment)
 			if !ok {
@@ -605,7 +639,15 @@ func (r *TodoAppReconciler) SetupWithManager(mgr ctrl.Manager) error {
 platformv1alpha1 "github.com/example/todo-operator/api/v1alpha1"
 ```
 
-这里故意只把 label predicate 放在主资源 `TodoApp` 上，没有直接套到 owned Deployment/Service。原因是第 39 篇生成的子资源标签不一定包含 `platform.todo.example.com/managed=true`；如果把同一个 predicate 套到子资源事件上，Deployment status 变化可能不会重新入队。内部 `shouldManage` 是第二道防线，负责防止未接管对象被误处理。这个 index 暂时不改变业务行为，但它为后续按 owner 快速查找 Deployment 打基础。生产 Controller 常见的演进方向是：不要靠命名约定猜子资源，而是通过 owner 或标签索引列出关联对象。
+这里故意只把 label predicate 放在主资源 `TodoApp` 上，没有直接套到 owned Deployment/Service。原因是第 39 篇生成的子资源标签不一定包含 `platform.todo.example.com/managed=true`；如果把同一个 predicate 套到子资源事件上，Deployment status 变化可能不会重新入队。当子资源变化触发 Reconcile 时，内部 `shouldManage` 会在读取 `TodoApp` 后做二次检查，防止未接管对象被误处理。`deploymentOwnerNameKey` 索引的是 controller owner 的 name，而不是直接索引整个 `metadata.ownerReferences`，这个 index 暂时不改变业务行为，但它为后续按 owner 快速查找 Deployment 打基础。生产 Controller 常见的演进方向是：不要靠命名约定猜子资源，而是通过 owner 或标签索引列出关联对象。
+
+完成 §5.6 和 §5.7 的代码修改后，先做一次编译检查，再继续写 Helm 模板：
+
+```bash
+go build ./...
+```
+
+如果这里编译失败，优先检查 `TodoAppReconciler` 是否已经新增 `WatchLabelSelector` 字段、`recordEventRecorder` 是否仍保留在 controller 文件中，以及 `cmd/main.go` 的新增 import 是否和现有 import 合并正确。
 
 ### 5.8 步骤 4.5：扩展 Helm values
 
@@ -627,6 +669,8 @@ manager:
   logEncoder: json
 
 watch:
+  # 留空列表 [] 表示不限制命名空间，继续 Watch 全部命名空间。
+  # 生产环境建议显式列出目标租户命名空间。
   namespaces:
     - todo-team-a
     - todo-team-b
@@ -654,6 +698,7 @@ resources:
 
 podSecurityContext:
   runAsNonRoot: true
+  # 65532 是 distroless/nobody 常见 UID；如果你的镜像使用其他非 root 用户，请按镜像实际 UID 调整。
   runAsUser: 65532
   runAsGroup: 65532
   seccompProfile:
@@ -798,7 +843,7 @@ spec:
 {{- end }}
 ```
 
-注意 `trimPrefix ":" .Values.manager.metricsBindAddress` 只适合 `:8080` 这种端口格式。如果你改成 `127.0.0.1:8080`，应显式增加一个 `metrics.containerPort` 值，避免模板解析错误。
+注意 `trimPrefix ":" .Values.manager.metricsBindAddress` 只适合 `:8080` 这种端口格式。如果你改成 `127.0.0.1:8080`，应显式增加一个 `metrics.containerPort` 值，避免模板解析错误。生产 Chart 更建议显式定义 `metrics.containerPort: 8080`，让监听地址和容器端口分别配置。
 
 ### 5.10 步骤 4.7：限制 Webhook 范围并增加监控资源
 
@@ -888,6 +933,15 @@ spec:
 {{- end }}
 ```
 
+`controller="todoapp"` 是 controller-runtime 根据 Controller 注册名称生成的常见标签值，但不同项目脚手架或显式命名可能不同。发布前先用下面的命令确认实际标签，再把 PrometheusRule 中的 label 写死：
+
+```bash
+kubectl port-forward -n todo-operator-system svc/todo-operator-metrics 18080:8080 >/tmp/todo-operator-port-forward.log 2>&1 &
+curl -s http://127.0.0.1:18080/metrics | grep -E "controller_runtime_reconcile_(total|errors_total|time_seconds)"
+```
+
+如果实际输出中的 `controller` 不是 `todoapp`，以 `/metrics` 为准调整规则。`TodoOperatorReconcileP99Slow` 中的 5 秒阈值适合本地教学和小规模环境，生产环境应按对象数量、外部依赖和 SLO 单独配置。
+
 如果你的集群没有 Prometheus Operator CRD，`helm template` 可以渲染这些资源，但 `kubectl apply` 会因为找不到 `ServiceMonitor` 或 `PrometheusRule` kind 而失败。学习环境可以先设置：
 
 ```bash
@@ -905,6 +959,15 @@ helm template todo-operator ../helm/todo-operator \
 ```bash
 kubectl create namespace todo-team-a --dry-run=client -o yaml | kubectl apply -f -
 kubectl create namespace todo-team-b --dry-run=client -o yaml | kubectl apply -f -
+kubectl label namespace todo-team-a platform.todo.example.com/admission=enabled --overwrite
+kubectl label namespace todo-team-b platform.todo.example.com/admission=enabled --overwrite
+```
+
+如果你在纯 PowerShell 中对管道语义不熟，也可以使用下面的直接命令；遇到 AlreadyExists 时说明命名空间已经存在，可以继续执行 label 命令：
+
+```powershell
+kubectl create namespace todo-team-a
+kubectl create namespace todo-team-b
 kubectl label namespace todo-team-a platform.todo.example.com/admission=enabled --overwrite
 kubectl label namespace todo-team-b platform.todo.example.com/admission=enabled --overwrite
 ```
@@ -958,6 +1021,8 @@ pods                        0     50
 requests.cpu                0     2
 ```
 
+Kubernetes 对自定义资源配额使用 `count/<resource>.<group>` 形式；如果 API server 或 CRD 尚未就绪，`kubectl apply` 会提示无法识别 `count/todoapps.platform.todo.example.com`，此时先确认 `TodoApp` CRD 已安装，再重新应用配额。
+
 ### 5.12 步骤 4.9：编写生产 smoke test 脚本
 
 发布后 smoke test 要回答三个问题：Operator ServiceAccount 是否被正确授权、被接管的 `TodoApp` 是否能完整调谐、未接管对象是否不会被误处理。创建 `test/e2e/run-production-smoke.sh`：
@@ -985,6 +1050,7 @@ done
 managed_file="$(mktemp)"
 unmanaged_file="$(mktemp)"
 port_forward_pid=""
+metrics_ready=false
 
 cleanup() {
   kubectl delete -f "${managed_file}" --ignore-not-found >/dev/null 2>&1 || true
@@ -1071,7 +1137,20 @@ fi
 
 kubectl port-forward -n "${OPERATOR_NAMESPACE}" "svc/${RELEASE_NAME}-metrics" "${METRICS_LOCAL_PORT}:8080" >/tmp/todo-operator-port-forward.log 2>&1 &
 port_forward_pid="$!"
-sleep 3
+
+for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15; do
+  if curl -fsS "http://127.0.0.1:${METRICS_LOCAL_PORT}/metrics" >/dev/null 2>&1; then
+    metrics_ready=true
+    break
+  fi
+  sleep 1
+done
+
+if [ "${metrics_ready}" != "true" ]; then
+  echo "metrics endpoint is not ready"
+  cat /tmp/todo-operator-port-forward.log || true
+  exit 1
+fi
 
 curl -fsS "http://127.0.0.1:${METRICS_LOCAL_PORT}/metrics" \
   | grep -E "controller_runtime_reconcile_(total|errors_total|time_seconds)" >/dev/null
@@ -1097,6 +1176,15 @@ chmod +x test/e2e/run-production-smoke.sh
 make generate
 make manifests
 go test ./...
+```
+
+确认 cert-manager 已安装。第 40 篇如果保留了 kind 集群，这一步通常已经满足；如果你重建了集群，需要重新安装：
+
+```bash
+if ! kubectl get deployment -n cert-manager cert-manager >/dev/null 2>&1; then
+  kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.20.0/cert-manager.yaml
+  kubectl wait --for=condition=Available deployment --all -n cert-manager --timeout=300s
+fi
 ```
 
 渲染 Helm Chart。若当前集群没有 Prometheus Operator CRD，先关闭监控 CR：
@@ -1260,6 +1348,8 @@ deployment "todo-operator-controller-manager" successfully rolled out
 production smoke test passed
 ```
 
+如果你使用手工 `kubectl port-forward ... &` 检查 metrics，测试结束后记得关闭后台进程。Bash 中可用 `jobs` 查看后台任务，再执行 `kill %1`；如果无法确认任务号，可以用 `pkill -f 'port-forward.*todo-operator-metrics'` 清理。
+
 ### 5.14 步骤 8：清理实验环境
 
 删除测试对象：
@@ -1416,6 +1506,8 @@ helm list -A | grep todo-operator
 4. **监控指标要和动作手册绑定。** `controller_runtime_reconcile_errors_total` 升高时，值班人员应该知道先看哪些 namespace、哪些 `TodoApp`、哪些 Events 和哪条回滚命令。没有动作手册的告警只会制造噪声。本篇的 PrometheusRule 是起点，生产环境还应补充告警分级、静默策略和事故复盘模板。
 
 5. **Webhook 影响写路径，发布必须留观察窗口。** 即使第 40 篇已经测试过 Webhook，生产升级仍要关注 endpoints、证书、CA bundle、延迟和失败率。启用 `namespaceSelector` 后，还要确认目标 namespace 都带正确标签。发布后至少观察 15-30 分钟的 admission 错误、业务 GitOps 同步状态和 smoke test 结果。
+
+**事故案例：Webhook 证书过期导致租户 CR 更新失败。** 某团队的 Tenant Operator 在周五晚间证书过期，cert-manager 自动续期失败，`failurePolicy=Fail` 的 ValidatingWebhook 开始拒绝目标命名空间里的 Tenant CR 创建和更新。值班人员最初只看到 GitOps 同步失败，误以为是业务 YAML 写错，排查 40 分钟后才发现 WebhookConfiguration 中的 CA bundle 和 Service endpoints 状态异常。复盘结论是：Webhook 必须用 `namespaceSelector` 控制影响面，证书过期和 Webhook 请求失败率必须进入告警，发布单里要写清楚紧急降级动作，例如临时缩小 Webhook 范围或切换到经过评审的 `failurePolicy` 策略。这个案例对应本篇的三条主线：限制影响范围、监控证书和 Admission、准备可审计的应急流程。
 
 ## 8. 本章小项目
 
