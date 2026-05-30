@@ -52,6 +52,8 @@ SRE 负责运行和排障 Operator。他们关注 Controller 日志、Reconcile 
 
 第 37 篇的手写版本位于 `<project-root>/operator/handwritten/`，本篇 Kubebuilder 版本位于 `<project-root>/operator/kubebuilder/`。两个目录在同一个项目仓库中并列存在，便于学习者直接对比“手写控制循环”和“工程化 Operator 项目”的差异。
 
+本篇只为 `TodoApp` 创建 Kubebuilder API 和 Controller，目标是先跑通“自定义资源 -> Deployment / Service / status”的应用交付闭环。第 35 篇定义过的 `TodoDatabase` 和 `TodoCache` 仍然作为平台 API 契约保留，后续可以按同样模式扩展独立 Controller，但不在本篇实现。
+
 本篇输出会被后续章节继续演进：
 
 - 第 39 篇会在本篇 Operator 上增加 OwnerReference 深化、Finalizer、Webhook、Conditions 和事件记录。
