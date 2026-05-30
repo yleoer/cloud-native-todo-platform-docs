@@ -494,6 +494,8 @@ spec:
 
 这份文件是最终作品集契约，适合放进 PR 和 Argo CD。`ghcr.io/your-org/todo-api:v5.0.0` 和 `change-me-in-real-env` 都是占位符，使用前必须替换。它默认要求集群中已经安装 `TodoDatabase` 和 `TodoCache` CRD。当前课程 Operator 不会调谐数据库和缓存实例，所以它们在这里的作用是表达平台 API 边界；如果你已经继续实现 DB/Cache Controller，它们才会触发真正的 PostgreSQL 和 Redis 交付。
 
+为了避免作品集误读，本章后续提到“一条 YAML”时，默认指两层含义：路径 A 是当前课程已实现的最小闭环，也就是 `TodoApp` 触发 Operator 创建应用层 Deployment 和 Service；路径 B 是完整平台契约展示，也就是同一份作品集中包含 `TodoDatabase` 和 `TodoCache` 这类未来可调谐的 API 对象。路径 B 不是在声称当前 Operator 已经自动交付数据库和缓存。
+
 #### 5.4.3 GitOps Application
 
 创建 `deployments/gitops/applications/todo-platform-final.yaml`：
@@ -842,6 +844,7 @@ flowchart TB
 - cert-manager、Prometheus Operator、Argo CD 已按课程前文安装。
 - Todo Operator 已安装到 todo-operator-system。
 - Operator Watch 范围包含 todo-team-a。
+- 当前课程 Operator 管理 TodoApp 到 Deployment/Service；TodoDatabase 和 TodoCache 需要额外 Controller 才会交付真实数据库和缓存。
 
 ## 部署步骤
 

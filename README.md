@@ -108,6 +108,8 @@ Kubernetes API Machinery、CRD、手写 Controller、Kubebuilder、Webhook、Fin
 - [第 40 篇：Operator 测试、发布与升级 [C]](docs/chapters/stage-06-platform-operator/40-operator-test-release.md)
 - [第 41 篇：Operator 生产实践 [C]](docs/chapters/stage-06-platform-operator/41-operator-production.md)
 - [第 42 篇：综合集成与职业能力验收 [C]](docs/chapters/stage-06-platform-operator/42-final-integration-career.md)
+- [附录 A：Operator 开发能力验收](docs/chapters/stage-06-platform-operator/stage-06-operator-acceptance.md)
+- [附录 B：版本锁定与环境矩阵](docs/chapters/stage-06-platform-operator/stage-06-version-environment.md)
 
 </details>
 
@@ -223,7 +225,9 @@ docs/
 │   │   ├── 39-operator-advanced.md  # 第 39 篇：Operator 高级机制 [C]
 │   │   ├── 40-operator-test-release.md # 第 40 篇：Operator 测试、发布与升级 [C]
 │   │   ├── 41-operator-production.md # 第 41 篇：Operator 生产实践 [C]
-│   │   └── 42-final-integration-career.md # 第 42 篇：综合集成与职业能力验收 [C]
+│   │   ├── 42-final-integration-career.md # 第 42 篇：综合集成与职业能力验收 [C]
+│   │   ├── stage-06-operator-acceptance.md # 阶段六附录 A：Operator 开发能力验收
+│   │   └── stage-06-version-environment.md # 阶段六附录 B：版本锁定与环境矩阵
 ├── projects/                   # 项目实战
 ├── labs/                       # 实验索引
 ├── troubleshooting/           # 排障手册

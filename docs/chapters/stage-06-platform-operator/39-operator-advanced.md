@@ -333,6 +333,8 @@ kubebuilder version
 export KIND_NODE_IMAGE=kindest/node:v1.36.0
 ```
 
+如果你从第 34-38 篇一路沿用阶段五的 `todo-gitops` 集群，请先确认服务端版本。前几篇可以在 v1.35/v1.36 上运行，但本篇的 `MutatingAdmissionPolicy` 可选实验需要 v1.36 API。若当前集群仍是 v1.35，可以继续完成 Webhook、Finalizer、Events 和 Conditions 主实验，但应跳过 §5.11；如果要完整验证 §5.11，请新建一个 v1.36 kind 集群，不要在共享测试或生产集群上为了课程实验删除 CRD 或重建集群。
+
 首次创建集群时，kind 会自动拉取 `kindest/node:v1.36.0`，镜像体积较大，网络较慢时可能需要几分钟。如果你在公司网络或国内网络环境中拉取失败，可以先配置 Docker 代理或镜像加速，再手动执行 `docker pull "${KIND_NODE_IMAGE}"`。
 
 如果课程环境提供了更新的 1.36.x patch 镜像，可以替换为对应 tag，但必须在实验记录中写明实际使用的完整镜像名，避免“kind 默认版本”带来的不可复现问题。
