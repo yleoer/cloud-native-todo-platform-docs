@@ -547,18 +547,18 @@ file_mode() {
 require_dir() {
   local path="$1"
   if [[ -d "$path" ]]; then
-    ok "directory exists: ${path#"$ROOT_DIR"/}"
+    ok "directory exists: ${path#$ROOT_DIR/}"
   else
-    fail "directory missing: ${path#"$ROOT_DIR"/}"
+    fail "directory missing: ${path#$ROOT_DIR/}"
   fi
 }
 
 require_file() {
   local path="$1"
   if [[ -f "$path" ]]; then
-    ok "file exists: ${path#"$ROOT_DIR"/}"
+    ok "file exists: ${path#$ROOT_DIR/}"
   else
-    fail "file missing: ${path#"$ROOT_DIR"/}"
+    fail "file missing: ${path#$ROOT_DIR/}"
   fi
 }
 
@@ -566,16 +566,16 @@ require_mode() {
   local path="$1"
   local expected="$2"
   if [[ ! -e "$path" ]]; then
-    fail "cannot check mode, path missing: ${path#"$ROOT_DIR"/}"
+    fail "cannot check mode, path missing: ${path#$ROOT_DIR/}"
     return
   fi
 
   local actual
   actual="$(file_mode "$path")"
   if [[ "$actual" == "$expected" ]]; then
-    ok "mode ${expected}: ${path#"$ROOT_DIR"/}"
+    ok "mode ${expected}: ${path#$ROOT_DIR/}"
   else
-    fail "mode expected ${expected}, got ${actual}: ${path#"$ROOT_DIR"/}"
+    fail "mode expected ${expected}, got ${actual}: ${path#$ROOT_DIR/}"
   fi
 }
 
@@ -583,16 +583,16 @@ require_symlink_target() {
   local path="$1"
   local expected="$2"
   if [[ ! -L "$path" ]]; then
-    fail "symlink missing: ${path#"$ROOT_DIR"/}"
+    fail "symlink missing: ${path#$ROOT_DIR/}"
     return
   fi
 
   local actual
   actual="$(readlink "$path")"
   if [[ "$actual" == "$expected" ]]; then
-    ok "symlink target ${expected}: ${path#"$ROOT_DIR"/}"
+    ok "symlink target ${expected}: ${path#$ROOT_DIR/}"
   else
-    fail "symlink target expected ${expected}, got ${actual}: ${path#"$ROOT_DIR"/}"
+    fail "symlink target expected ${expected}, got ${actual}: ${path#$ROOT_DIR/}"
   fi
 }
 

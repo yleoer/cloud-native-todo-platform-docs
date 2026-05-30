@@ -27,7 +27,6 @@
 - [第 6 篇：Shell 脚本与自动化基础 [A]](docs/chapters/stage-01-foundation/06-shell-scripting.md)
 - [附录 A：基础环境作品集验收](docs/chapters/stage-01-foundation/stage-01-acceptance.md)
 - [附录 B：命令速查与排障手册](docs/chapters/stage-01-foundation/stage-01-cheatsheet-troubleshooting.md)
-- [附录 C：虚拟机验证命令清单](docs/chapters/stage-01-foundation/stage-01-vm-validation-commands.md)
 
 </details>
 
@@ -180,8 +179,7 @@ docs/
 │   │   ├── 05-git-basics.md         # 第 5 篇：Git 基础与团队协作 [A]
 │   │   ├── 06-shell-scripting.md    # 第 6 篇：Shell 脚本与自动化基础 [A]
 │   │   ├── stage-01-acceptance.md   # 阶段一附录 A：作品集验收
-│   │   ├── stage-01-cheatsheet-troubleshooting.md # 阶段一附录 B：速查与排障
-│   │   └── stage-01-vm-validation-commands.md # 阶段一附录 C：虚拟机验证命令清单
+│   │   └── stage-01-cheatsheet-troubleshooting.md # 阶段一附录 B：速查与排障
 │   ├── stage-02-go-backend/    # 阶段二：Go 语言与后端开发
 │   │   ├── 07-go-basics.md          # 第 7 篇：Go 语言基础
 │   │   ├── 08-go-engineering-testing.md # 第 8 篇：Go 工程化与测试

@@ -79,7 +79,6 @@ hide:
 - [第 6 篇：Shell 脚本与自动化基础 [A]](chapters/stage-01-foundation/06-shell-scripting.md)
 - [附录 A：基础环境作品集验收](chapters/stage-01-foundation/stage-01-acceptance.md)
 - [附录 B：命令速查与排障手册](chapters/stage-01-foundation/stage-01-cheatsheet-troubleshooting.md)
-- [附录 C：虚拟机验证命令清单](chapters/stage-01-foundation/stage-01-vm-validation-commands.md)
 
 </details>
 
