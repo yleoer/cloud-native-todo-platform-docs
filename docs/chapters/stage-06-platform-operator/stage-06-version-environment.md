@@ -29,6 +29,32 @@
 - cert-manager 官方支持矩阵显示 1.20.x 支持和测试到 Kubernetes 1.35；面向 Kubernetes 1.36 的锁定版本应在正式出版前重新确认，优先采用首个官方列出支持 1.36 的 cert-manager 版本。若复核时该版本尚未发布，则 Webhook 证书实验应使用 v1.35 线或明确标注为兼容性待验证。
 - Helm 相关命令以实际 `helm version` 为准，至少确认 `helm template --include-crds`、`helm list -A`、`helm version --short`、`helm install/upgrade/rollback` 在锁定版本中可用。
 
+出版前还应单独复核以下高风险兼容点：
+
+```bash
+# GitHub Actions 版本号必须真实存在。
+git ls-remote --tags https://github.com/actions/checkout.git refs/tags/v6
+git ls-remote --tags https://github.com/actions/setup-go.git refs/tags/v6
+git ls-remote --tags https://github.com/actions/setup-python.git refs/tags/v6
+
+# 第 39-40 篇 recorder 接口必须保持最小签名。
+go test ./test/envtest -run 'TestReconcile' -count=1
+
+# 第 41 篇 predicate API 必须能在锁定 controller-runtime 版本下编译。
+go build ./...
+
+# Kubebuilder 生成的 Makefile 可能因版本或模板差异变化，先 dry-run 再执行。
+make -n build-installer IMG=todo-operator:v0.3.0-test
+
+# 最终 CI 所需工具必须在 runner 上可解析。
+python --version
+helm version --short
+kubectl version --client=true
+kubectl kustomize config/default >/tmp/todo-operator-rendered.yaml
+```
+
+如果任一命令失败，不要在正文中继续使用“已锁定版本”这样的笼统说法，而应在对应章节写明失败原因、替代命令和已验证的工具版本。例如 `actions/*@v6` 对 self-hosted runner 要求更高，旧 runner 可以临时回退到 `checkout@v4`、`setup-go@v5`、`setup-python@v5`；`make build-installer` 不存在时使用第 40 篇给出的 `kustomize edit set image` 加 `kubectl kustomize` 路径生成清单。
+
 ## 2. 阶段六集群策略
 
 阶段六建议使用两段式环境：

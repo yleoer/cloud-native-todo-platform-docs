@@ -811,11 +811,18 @@ Kustomize 继续作为 Kubebuilder 项目的清单源头。这里必须把清单
 
 ```bash
 mkdir -p dist
-make build-installer IMG="${OPERATOR_IMG}"
-cp dist/install.yaml dist/todo-operator-v0.3.0.yaml
+if make -n build-installer IMG="${OPERATOR_IMG}" >/dev/null 2>&1; then
+  make build-installer IMG="${OPERATOR_IMG}"
+  cp dist/install.yaml dist/todo-operator-v0.3.0.yaml
+else
+  cd config/manager
+  kustomize edit set image controller="${OPERATOR_IMG}"
+  cd ../..
+  kubectl kustomize config/default > dist/todo-operator-v0.3.0.yaml
+fi
 ```
 
-Kubebuilder 4.x 默认 Makefile 通常包含 `build-installer` target，它会把 `IMG` 写入 manager 镜像并输出 `dist/install.yaml`。如果你的 Makefile 没有这个 target，先查看本地 Makefile，再使用下面的等价思路生成清单：
+Kubebuilder 4.x 默认 Makefile 通常包含 `build-installer` target，它会把 `IMG` 写入 manager 镜像并输出 `dist/install.yaml`。上面的命令先用 `make -n build-installer` 做 dry-run 检查；如果本地 Makefile 没有这个 target，就自动走等价的 Kustomize 渲染路径。你也可以手工执行同样的备选命令：
 
 ```bash
 cd config/manager

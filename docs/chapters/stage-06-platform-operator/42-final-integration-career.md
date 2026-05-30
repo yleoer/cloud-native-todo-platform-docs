@@ -629,7 +629,15 @@ jobs:
           fi
 ```
 
-上面的 workflow 使用 `actions/checkout@v6`、`actions/setup-go@v6` 和 `actions/setup-python@v6`，需要 GitHub-hosted runner 或足够新的 self-hosted runner。企业内网 runner 如果版本较旧，可以临时退回到 `checkout@v4`、`setup-go@v5`、`setup-python@v5`，但要在团队内统一升级策略。Node 24 运行时的 action 通常要求 runner 至少为 v2.327.1，`checkout@v6` 在 Docker container action 凭据场景下可能需要 v2.329.0 或更新版本。`HELM_VERSION: v4.2.0` 是课程示例中的精确 patch 版本，实际项目应替换为团队锁定的 Helm 4.2.x 版本。
+上面的 workflow 使用 `actions/checkout@v6`、`actions/setup-go@v6` 和 `actions/setup-python@v6`。出版前不要只凭记忆判断版本号是否存在，应执行下面的命令复核 tag：
+
+```bash
+git ls-remote --tags https://github.com/actions/checkout.git refs/tags/v6
+git ls-remote --tags https://github.com/actions/setup-go.git refs/tags/v6
+git ls-remote --tags https://github.com/actions/setup-python.git refs/tags/v6
+```
+
+这些 v6 action 需要 GitHub-hosted runner 或足够新的 self-hosted runner。企业内网 runner 如果版本较旧，可以临时退回到 `checkout@v4`、`setup-go@v5`、`setup-python@v5`，但要在团队内统一升级策略。Node 24 运行时的 action 通常要求 runner 至少为 v2.327.1，`checkout@v6` 在 Docker container action 凭据场景下可能需要 v2.329.0 或更新版本。`python-version: "3.14"` 和 `HELM_VERSION: v4.2.0` 都属于课程示例中的精确版本，正式发布前应在 GitHub Actions 中至少跑通一次；如果 runner 暂时无法解析 Python 3.14，先降到团队已验证的 3.13.x，并同步更新本章和阶段六版本附录。Helm 同理，必须用 `helm version --short`、`helm template --include-crds` 和一次真实 `helm install/upgrade/rollback` 证明锁定版本可用。
 
 `kubectl apply --dry-run=client --validate=false` 只能检查 YAML 基本结构，并跳过 OpenAPI schema 校验；它无法验证集群中是否真的有 CRD，也不会调用 Webhook。生产 CI 可以增加一个 kind job：安装 CRD 和 Operator 后执行 `--dry-run=server`，这样能发现 schema、Webhook 和 RBAC 问题。这里把 client dry-run 放在主 workflow，是为了让没有 kubeconfig 的 GitHub runner 也能完成基础语法检查。
 
