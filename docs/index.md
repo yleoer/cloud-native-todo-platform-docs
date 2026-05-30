@@ -158,7 +158,7 @@ hide:
 - [第 38 篇：Kubebuilder 入门 [C]](chapters/stage-06-platform-operator/38-kubebuilder.md)
 - [第 39 篇：Operator 高级机制 [C]](chapters/stage-06-platform-operator/39-operator-advanced.md)
 - [第 40 篇：Operator 测试、发布与升级 [C]](chapters/stage-06-platform-operator/40-operator-test-release.md)
-- 第 41 篇：Operator 生产实践
+- [第 41 篇：Operator 生产实践 [C]](chapters/stage-06-platform-operator/41-operator-production.md)
 - 第 42 篇：综合集成与职业能力验收
 
 </details>
@@ -180,6 +180,6 @@ http://127.0.0.1:8000
 
 ## 下一步计划
 
-- 进入第 41 篇 Operator 生产实践，继续收敛 RBAC、Watch 范围、资源限制和可观测性。
-- 把第 40 篇的测试发布流水线接入生产化检查：发布前验证、发布后 smoke test、回滚演练和告警。
-- 延续阶段六产物，逐步把 TodoApp Operator 推进到可生产运维、可规模化管理的版本。
+- 进入第 42 篇综合集成与职业能力验收，把阶段六产物整理成最终作品集。
+- 把第 41 篇的最小 RBAC、Watch 范围、资源限制、指标告警和 smoke test 纳入最终交付流程。
+- 延续阶段六产物，完成 TodoApp Operator 一键交付 Cloud Native Todo Platform 的综合演练。
