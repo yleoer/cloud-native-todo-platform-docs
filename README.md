@@ -106,7 +106,7 @@ Kubernetes API Machinery、CRD、手写 Controller、Kubebuilder、Webhook、Fin
 - [第 38 篇：Kubebuilder 入门 [C]](docs/chapters/stage-06-platform-operator/38-kubebuilder.md)
 - [第 39 篇：Operator 高级机制 [C]](docs/chapters/stage-06-platform-operator/39-operator-advanced.md)
 - [第 40 篇：Operator 测试、发布与升级 [C]](docs/chapters/stage-06-platform-operator/40-operator-test-release.md)
-- 第 41 篇：Operator 生产实践
+- [第 41 篇：Operator 生产实践 [C]](docs/chapters/stage-06-platform-operator/41-operator-production.md)
 - 第 42 篇：综合集成与职业能力验收
 
 </details>
@@ -221,7 +221,8 @@ docs/
 │   │   ├── 37-handwritten-controller.md # 第 37 篇：手写简化版 Controller [C]
 │   │   ├── 38-kubebuilder.md        # 第 38 篇：Kubebuilder 入门 [C]
 │   │   ├── 39-operator-advanced.md  # 第 39 篇：Operator 高级机制 [C]
-│   │   └── 40-operator-test-release.md # 第 40 篇：Operator 测试、发布与升级 [C]
+│   │   ├── 40-operator-test-release.md # 第 40 篇：Operator 测试、发布与升级 [C]
+│   │   └── 41-operator-production.md # 第 41 篇：Operator 生产实践 [C]
 │   └── ...                     # 后续阶段章节（待完成）
 ├── projects/                   # 项目实战
 ├── labs/                       # 实验索引
