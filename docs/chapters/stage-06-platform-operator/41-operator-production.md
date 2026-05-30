@@ -323,7 +323,97 @@ verbs:
 
 如果你的代码已经把 finalizer 更新改成 `client.Patch`，可以进一步验证是否能删除主资源 `update`。本篇先保留 `update;patch`，让权限和第 39 篇代码路径保持一致。
 
-### 5.5 步骤 4.2：让 Manager 支持 Watch 范围
+### 5.5 步骤 4.2：同步 Helm RBAC 模板
+
+第 40 篇的 Helm Chart 中 RBAC 以“能跑通”为目标，本篇必须同步收敛 Chart 模板，否则 `make manifests` 生成的权限和 `helm install` 实际安装的权限会不一致。编辑 `../helm/todo-operator/templates/rbac.yaml`，替换为下面的完整模板：
+
+```yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "todo-operator.fullname" . }}-leader-election-role
+  namespace: {{ .Release.Namespace }}
+rules:
+  - apiGroups: ["coordination.k8s.io"]
+    resources: ["leases"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "todo-operator.fullname" . }}-leader-election-rolebinding
+  namespace: {{ .Release.Namespace }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "todo-operator.fullname" . }}-leader-election-role
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "todo-operator.serviceAccountName" . }}
+    namespace: {{ .Release.Namespace }}
+{{- range .Values.watch.namespaces }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "todo-operator.fullname" $ }}-manager-role
+  namespace: {{ . }}
+rules:
+  - apiGroups: ["platform.todo.example.com"]
+    resources: ["todoapps"]
+    verbs: ["get", "list", "watch", "update", "patch"]
+  - apiGroups: ["platform.todo.example.com"]
+    resources: ["todoapps/status"]
+    verbs: ["get", "update", "patch"]
+  - apiGroups: ["platform.todo.example.com"]
+    resources: ["todoapps/finalizers"]
+    verbs: ["update"]
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: [""]
+    resources: ["services"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["create", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "todo-operator.fullname" $ }}-manager-rolebinding
+  namespace: {{ . }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "todo-operator.fullname" $ }}-manager-role
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "todo-operator.serviceAccountName" $ }}
+    namespace: {{ $.Release.Namespace }}
+{{- end }}
+```
+
+这个模板和第 40 篇有一个重要差异：它不再用一个集群级 `ClusterRoleBinding` 覆盖所有命名空间，而是按 `watch.namespaces` 为每个租户命名空间生成 `Role` 和 `RoleBinding`。Leader election 的 Lease 权限只授予 Operator 安装命名空间。这样 `todo-operator-system` 中的 ServiceAccount 只能在被授权的租户命名空间里管理 `TodoApp`、Deployment、Service 和 Event。
+
+生产中还要注意发布顺序：租户 namespace 必须先存在，否则 Helm 无法在这些 namespace 中创建 Role 和 RoleBinding。本章后续会先创建 `todo-team-a`、`todo-team-b`，再执行 `helm upgrade --install`。
+
+渲染模板确认 `todoapps` 不再包含 `create` 和 `delete`：
+
+```bash
+helm template todo-operator ../helm/todo-operator \
+  -n todo-operator-system \
+  --show-only templates/rbac.yaml | grep -A8 'resources: \["todoapps"\]'
+```
+
+预期输出应包含：
+
+```text
+resources: ["todoapps"]
+verbs: ["get", "list", "watch", "update", "patch"]
+```
+
+### 5.6 步骤 4.3：让 Manager 支持 Watch 范围
 
 编辑 `cmd/main.go`，增加下面的导入：
 
@@ -405,7 +495,7 @@ if err = (&controller.TodoAppReconciler{
 
 这段代码的行为是：`WATCH_NAMESPACE` 为空时仍 Watch 全部命名空间；设置为 `todo-team-a,todo-team-b` 时只同步这两个命名空间。`WATCH_LABEL_SELECTOR` 为空时接管所有 `TodoApp`；设置为 `platform.todo.example.com/managed=true` 时只让带标签的对象进入 Reconcile。
 
-### 5.6 步骤 4.3：增加 Predicate 和 Field Index
+### 5.7 步骤 4.4：增加 Predicate、Field Index 和内部接管防御
 
 编辑 `internal/controller/todoapp_controller.go` 的 import，确保包含：
 
@@ -416,6 +506,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
@@ -435,7 +526,33 @@ type TodoAppReconciler struct {
 	Recorder           recordEventRecorder
 	WatchLabelSelector *metav1.LabelSelector
 }
+
+func (r *TodoAppReconciler) shouldManage(todo *platformv1alpha1.TodoApp) (bool, error) {
+	if r.WatchLabelSelector == nil {
+		return true, nil
+	}
+
+	selector, err := metav1.LabelSelectorAsSelector(r.WatchLabelSelector)
+	if err != nil {
+		return false, err
+	}
+	return selector.Matches(labels.Set(todo.Labels)), nil
+}
 ```
+
+在 `Reconcile` 读取到 `TodoApp` 后，立即增加一次内部防御：
+
+```go
+managed, err := r.shouldManage(&todo)
+if err != nil {
+	return ctrl.Result{}, err
+}
+if !managed {
+	return ctrl.Result{}, nil
+}
+```
+
+这一步不能只依赖 predicate。predicate 能过滤主资源 watch 事件，但历史子资源事件、人工 enqueue 或未来新增的 watch 源仍可能触发 Reconcile。Reconcile 内部再次判断接管标签，可以避免未被接管的 `TodoApp` 被误调谐。注意：如果一个已经被接管的对象后来移除了标签，生产系统要先定义清理或迁移策略；本篇 smoke test 只验证“从未被接管的对象不会创建子资源”。
 
 替换 `SetupWithManager`：
 
@@ -488,9 +605,9 @@ func (r *TodoAppReconciler) SetupWithManager(mgr ctrl.Manager) error {
 platformv1alpha1 "github.com/example/todo-operator/api/v1alpha1"
 ```
 
-这里故意只把 label predicate 放在主资源 `TodoApp` 上，没有直接套到 owned Deployment/Service。原因是第 39 篇生成的子资源标签不一定包含 `platform.todo.example.com/managed=true`；如果把同一个 predicate 套到子资源事件上，Deployment status 变化可能不会重新入队。这个 index 暂时不改变业务行为，但它为后续按 owner 快速查找 Deployment 打基础。生产 Controller 常见的演进方向是：不要靠命名约定猜子资源，而是通过 owner 或标签索引列出关联对象。
+这里故意只把 label predicate 放在主资源 `TodoApp` 上，没有直接套到 owned Deployment/Service。原因是第 39 篇生成的子资源标签不一定包含 `platform.todo.example.com/managed=true`；如果把同一个 predicate 套到子资源事件上，Deployment status 变化可能不会重新入队。内部 `shouldManage` 是第二道防线，负责防止未接管对象被误处理。这个 index 暂时不改变业务行为，但它为后续按 owner 快速查找 Deployment 打基础。生产 Controller 常见的演进方向是：不要靠命名约定猜子资源，而是通过 owner 或标签索引列出关联对象。
 
-### 5.7 步骤 4.4：扩展 Helm values
+### 5.8 步骤 4.5：扩展 Helm values
 
 编辑 `../helm/todo-operator/values.yaml`，把第 40 篇的 values 扩展为下面的生产基线：
 
@@ -566,7 +683,7 @@ metrics:
 
 这份 values 故意把生产开关集中在一个文件里，方便 PR 审查。生产配置不应该散落在多个模板深处，让审查者只能靠搜索猜测。
 
-### 5.8 步骤 4.5：更新 Deployment、PDB 和 Metrics 模板
+### 5.9 步骤 4.6：更新 Deployment、PDB 和 Metrics 模板
 
 更新 `../helm/todo-operator/templates/deployment.yaml` 中的 Pod spec 关键部分：
 
@@ -683,7 +800,7 @@ spec:
 
 注意 `trimPrefix ":" .Values.manager.metricsBindAddress` 只适合 `:8080` 这种端口格式。如果你改成 `127.0.0.1:8080`，应显式增加一个 `metrics.containerPort` 值，避免模板解析错误。
 
-### 5.9 步骤 4.6：限制 Webhook 范围并增加监控资源
+### 5.10 步骤 4.7：限制 Webhook 范围并增加监控资源
 
 更新 `../helm/todo-operator/templates/webhooks.yaml`，在两个 Webhook 的 `webhooks` 条目中加入：
 
@@ -781,7 +898,7 @@ helm template todo-operator ../helm/todo-operator \
 
 生产环境不要因为 CRD 缺失就删除监控，而应该明确选择监控栈：Prometheus Operator、托管 Prometheus，或者由平台统一采集 `/metrics`。
 
-### 5.10 步骤 4.7：增加租户命名空间和配额
+### 5.11 步骤 4.8：增加租户命名空间和配额
 
 创建两个租户命名空间：
 
@@ -841,7 +958,138 @@ pods                        0     50
 requests.cpu                0     2
 ```
 
-### 5.11 步骤 5-7：执行验证和发布后 smoke test
+### 5.12 步骤 4.9：编写生产 smoke test 脚本
+
+发布后 smoke test 要回答三个问题：Operator ServiceAccount 是否被正确授权、被接管的 `TodoApp` 是否能完整调谐、未接管对象是否不会被误处理。创建 `test/e2e/run-production-smoke.sh`：
+
+```bash
+mkdir -p test/e2e
+cat > test/e2e/run-production-smoke.sh <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+
+OPERATOR_NAMESPACE="${OPERATOR_NAMESPACE:-todo-operator-system}"
+RELEASE_NAME="${RELEASE_NAME:-todo-operator}"
+TENANT_NAMESPACE="${TENANT_NAMESPACE:-todo-team-a}"
+MANAGED_NAME="${MANAGED_NAME:-todo-production-smoke}"
+UNMANAGED_NAME="${UNMANAGED_NAME:-todo-unmanaged}"
+METRICS_LOCAL_PORT="${METRICS_LOCAL_PORT:-18080}"
+
+for cmd in kubectl curl grep mktemp; do
+  if ! command -v "${cmd}" >/dev/null 2>&1; then
+    echo "missing required command: ${cmd}"
+    exit 1
+  fi
+done
+
+managed_file="$(mktemp)"
+unmanaged_file="$(mktemp)"
+port_forward_pid=""
+
+cleanup() {
+  kubectl delete -f "${managed_file}" --ignore-not-found >/dev/null 2>&1 || true
+  kubectl delete -f "${unmanaged_file}" --ignore-not-found >/dev/null 2>&1 || true
+  if [ -n "${port_forward_pid}" ]; then
+    kill "${port_forward_pid}" >/dev/null 2>&1 || true
+  fi
+  rm -f "${managed_file}" "${unmanaged_file}"
+}
+trap cleanup EXIT
+
+expect_can_i() {
+  local expected="$1"
+  shift
+  local actual
+  actual="$(kubectl auth can-i "$@")"
+  if [ "${actual}" != "${expected}" ]; then
+    echo "expected '${expected}' for kubectl auth can-i $*, got '${actual}'"
+    exit 1
+  fi
+}
+
+service_account="system:serviceaccount:${OPERATOR_NAMESPACE}:${RELEASE_NAME}"
+
+kubectl rollout status "deployment/${RELEASE_NAME}-controller-manager" \
+  -n "${OPERATOR_NAMESPACE}" \
+  --timeout=180s
+
+expect_can_i yes list todoapps.platform.todo.example.com --as="${service_account}" -n "${TENANT_NAMESPACE}"
+expect_can_i no delete todoapps.platform.todo.example.com --as="${service_account}" -n "${TENANT_NAMESPACE}"
+expect_can_i yes create deployments.apps --as="${service_account}" -n "${TENANT_NAMESPACE}"
+expect_can_i no create deployments.apps --as="${service_account}" -n default
+expect_can_i no get secrets --as="${service_account}" -n "${TENANT_NAMESPACE}"
+
+cat > "${managed_file}" <<YAML
+apiVersion: platform.todo.example.com/v1alpha1
+kind: TodoApp
+metadata:
+  name: ${MANAGED_NAME}
+  namespace: ${TENANT_NAMESPACE}
+  labels:
+    platform.todo.example.com/managed: "true"
+spec:
+  image: nginxdemos/hello:plain-text
+  replicas: 2
+  port: 80
+YAML
+
+kubectl apply -f "${managed_file}"
+kubectl rollout status "deployment/${MANAGED_NAME}" -n "${TENANT_NAMESPACE}" --timeout=180s
+
+ready_replicas="$(kubectl get todoapp "${MANAGED_NAME}" -n "${TENANT_NAMESPACE}" -o jsonpath='{.status.readyReplicas}')"
+if [ "${ready_replicas}" != "2" ]; then
+  echo "expected readyReplicas=2, got ${ready_replicas}"
+  kubectl get todoapp "${MANAGED_NAME}" -n "${TENANT_NAMESPACE}" -o yaml
+  exit 1
+fi
+
+ready_condition="$(kubectl get todoapp "${MANAGED_NAME}" -n "${TENANT_NAMESPACE}" -o jsonpath='{range .status.conditions[?(@.type=="Ready")]}{.status}{end}')"
+if [ "${ready_condition}" != "True" ]; then
+  echo "expected Ready=True, got ${ready_condition}"
+  kubectl describe todoapp "${MANAGED_NAME}" -n "${TENANT_NAMESPACE}" || true
+  exit 1
+fi
+
+cat > "${unmanaged_file}" <<YAML
+apiVersion: platform.todo.example.com/v1alpha1
+kind: TodoApp
+metadata:
+  name: ${UNMANAGED_NAME}
+  namespace: ${TENANT_NAMESPACE}
+spec:
+  image: nginxdemos/hello:plain-text
+  replicas: 1
+  port: 80
+YAML
+
+kubectl apply -f "${unmanaged_file}"
+sleep 10
+if kubectl get deployment "${UNMANAGED_NAME}" -n "${TENANT_NAMESPACE}" >/dev/null 2>&1; then
+  echo "unmanaged TodoApp unexpectedly created a Deployment"
+  exit 1
+fi
+
+kubectl port-forward -n "${OPERATOR_NAMESPACE}" "svc/${RELEASE_NAME}-metrics" "${METRICS_LOCAL_PORT}:8080" >/tmp/todo-operator-port-forward.log 2>&1 &
+port_forward_pid="$!"
+sleep 3
+
+curl -fsS "http://127.0.0.1:${METRICS_LOCAL_PORT}/metrics" \
+  | grep -E "controller_runtime_reconcile_(total|errors_total|time_seconds)" >/dev/null
+
+curl -fsS "http://127.0.0.1:${METRICS_LOCAL_PORT}/metrics" \
+  | grep -E "workqueue_(depth|adds_total|retries_total)" >/dev/null || true
+
+kubectl delete -f "${managed_file}"
+kubectl wait --for=delete "todoapp/${MANAGED_NAME}" -n "${TENANT_NAMESPACE}" --timeout=120s
+
+echo "production smoke test passed"
+EOF
+chmod +x test/e2e/run-production-smoke.sh
+```
+
+脚本里有两个细节值得注意。第一，`kubectl auth can-i create deployments.apps -n default` 预期返回 `no`，这是验证 Helm RBAC 已经从集群级绑定收敛到目标租户命名空间。第二，`workqueue_*` 指标只做宽松检查：不同 controller-runtime 版本的 workqueue 标签和指标组合可能不同，生产告警规则应先以实际 `/metrics` 输出为准。
+
+### 5.13 步骤 5-7：执行验证和发布后 smoke test
 
 先运行代码生成和测试：
 
@@ -912,6 +1160,7 @@ SA=system:serviceaccount:todo-operator-system:todo-operator
 kubectl auth can-i list todoapps.platform.todo.example.com --as="${SA}" -n todo-team-a
 kubectl auth can-i delete todoapps.platform.todo.example.com --as="${SA}" -n todo-team-a
 kubectl auth can-i create deployments.apps --as="${SA}" -n todo-team-a
+kubectl auth can-i create deployments.apps --as="${SA}" -n default
 kubectl auth can-i get secrets --as="${SA}" -n todo-team-a
 ```
 
@@ -921,6 +1170,7 @@ kubectl auth can-i get secrets --as="${SA}" -n todo-team-a
 yes
 no
 yes
+no
 no
 ```
 
@@ -996,7 +1246,21 @@ controller_runtime_reconcile_errors_total{controller="todoapp"} ...
 controller_runtime_reconcile_time_seconds_bucket{controller="todoapp",le="..."} ...
 ```
 
-### 5.12 步骤 8：清理实验环境
+上面这些命令也可以直接通过脚本执行：
+
+```bash
+test/e2e/run-production-smoke.sh
+```
+
+预期输出：
+
+```text
+deployment "todo-operator-controller-manager" successfully rolled out
+...
+production smoke test passed
+```
+
+### 5.14 步骤 8：清理实验环境
 
 删除测试对象：
 
@@ -1043,10 +1307,11 @@ helm list -A | grep todo-operator
 
   ```bash
   kubectl auth can-i create deployments.apps --as=system:serviceaccount:todo-operator-system:todo-operator -n todo-team-a
-  kubectl get clusterrole todo-operator-manager-role -o yaml
+  kubectl get role todo-operator-manager-role -n todo-team-a -o yaml
+  kubectl get rolebinding todo-operator-manager-rolebinding -n todo-team-a -o yaml
   ```
 
-  第一条如果返回 `no`，说明运行中的 ServiceAccount 没有创建 Deployment 的权限；第二条用于确认 Helm 安装后的实际权限，而不是只看源码 marker。
+  第一条如果返回 `no`，说明运行中的 ServiceAccount 没有创建 Deployment 的权限；后两条用于确认 Helm 安装后的实际 Role 和 RoleBinding，而不是只看源码 marker。
 
 - **修复**：把 Reconciler 实际需要的资源和 verb 补回 marker 与 Helm 模板，执行 `make manifests` 后重新发布 Chart。
 - **预防**：每次收敛 RBAC 后都运行 `kubectl auth can-i` 和 kind e2e；不要只靠肉眼审查 YAML。
@@ -1168,7 +1433,7 @@ helm list -A | grep todo-operator
 
 | 验收项 | 判断方式 |
 |---|---|
-| RBAC 最小权限 | `kubectl auth can-i delete todoapps...` 返回 `no`，创建 Deployment 返回 `yes` |
+| RBAC 最小权限 | `delete todoapps` 返回 `no`，目标 namespace 创建 Deployment 返回 `yes`，`default` namespace 创建 Deployment 返回 `no` |
 | Watch 范围 | 目标 namespace 中带标签 `TodoApp` 被调谐，未带标签对象不创建 Deployment |
 | 多副本可用 | `replicaCount=2` 时只产生一个 leader，两个 Pod Ready |
 | 资源与安全 | Deployment 中存在 requests/limits、非 root、只读 rootfs 和 drop capabilities |
@@ -1193,7 +1458,7 @@ helm list -A | grep todo-operator
 
 1. 把 `watch.namespaces` 从 `todo-team-a,todo-team-b` 改为只包含 `todo-team-a`，在 `todo-team-b` 创建带接管标签的 `TodoApp`。验收标准：`TodoApp` 被创建，但不会生成 Deployment。
 2. 给 Helm Chart 增加 `manager.maxConcurrentReconciles` 值，并在 `SetupWithManager` 中接入 controller options。验收标准：`helm template` 能看到参数，Controller 启动日志能确认并发配置。
-3. 增加一个 PrometheusRule：当 `workqueue_depth{name="todoapp"}` 持续 10 分钟大于 100 时告警。验收标准：`helm template --show-only templates/prometheusrule.yaml` 能渲染出新规则。
+3. 先执行 `curl -s http://127.0.0.1:8080/metrics | grep workqueue` 确认实际 workqueue 指标，再增加一个 PrometheusRule：当 TodoApp 队列深度持续 10 分钟大于 100 时告警。验收标准：`helm template --show-only templates/prometheusrule.yaml` 能渲染出新规则。
 
 ### 思考题
 
