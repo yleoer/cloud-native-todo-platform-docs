@@ -6,6 +6,8 @@
 
 本篇的目标不是把所有高级机制讲成抽象名词，而是把它们落到同一个 Todo Operator 里：创建时默认字段，提交时校验字段，运行时记录事件和状态，删除时执行清理逻辑，并理解未来多版本演进要怎样设计。
 
+本篇内容密度较高，建议分两次学习：第一次聚焦 Webhook 默认值与校验，也就是 §3.3、§5.2-§5.6；第二次聚焦 Finalizer、Conditions、Events 与调谐策略，也就是 §3.2、§3.5、§5.7-§5.10。`MutatingAdmissionPolicy` 和多版本 CRD 作为生产演进视角，先按“了解并能解释边界”处理，不要求第一次就完整实现 conversion webhook。
+
 ## 1. 本章学习目标
 
 ### 1.1 知识目标
@@ -332,6 +334,8 @@ kubebuilder version
 ```bash
 export KIND_NODE_IMAGE=kindest/node:v1.36.0
 ```
+
+如果你从第 34-38 篇一路沿用阶段五的 `todo-gitops` 集群，请先确认服务端版本。前几篇可以在 v1.35/v1.36 上运行，但本篇的 `MutatingAdmissionPolicy` 可选实验需要 v1.36 API。若当前集群仍是 v1.35，可以继续完成 Webhook、Finalizer、Events 和 Conditions 主实验，但应跳过 §5.11；如果要完整验证 §5.11，请新建一个 v1.36 kind 集群，不要在共享测试或生产集群上为了课程实验删除 CRD 或重建集群。
 
 首次创建集群时，kind 会自动拉取 `kindest/node:v1.36.0`，镜像体积较大，网络较慢时可能需要几分钟。如果你在公司网络或国内网络环境中拉取失败，可以先配置 Docker 代理或镜像加速，再手动执行 `docker pull "${KIND_NODE_IMAGE}"`。
 

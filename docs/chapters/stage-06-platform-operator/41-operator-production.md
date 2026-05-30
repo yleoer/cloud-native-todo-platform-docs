@@ -1509,6 +1509,8 @@ helm list -A | grep todo-operator
 
 **事故案例：Webhook 证书过期导致租户 CR 更新失败。** 某团队的 Tenant Operator 在周五晚间证书过期，cert-manager 自动续期失败，`failurePolicy=Fail` 的 ValidatingWebhook 开始拒绝目标命名空间里的 Tenant CR 创建和更新。值班人员最初只看到 GitOps 同步失败，误以为是业务 YAML 写错，排查 40 分钟后才发现 WebhookConfiguration 中的 CA bundle 和 Service endpoints 状态异常。复盘结论是：Webhook 必须用 `namespaceSelector` 控制影响面，证书过期和 Webhook 请求失败率必须进入告警，发布单里要写清楚紧急降级动作，例如临时缩小 Webhook 范围或切换到经过评审的 `failurePolicy` 策略。这个案例对应本篇的三条主线：限制影响范围、监控证书和 Admission、准备可审计的应急流程。
 
+**事故案例：RBAC 从 ClusterRole 收敛到 Role 后漏绑租户命名空间。** 某平台团队为了最小权限，把 Operator 从全局 `ClusterRoleBinding` 改成每个租户 namespace 一个 `RoleBinding`。变更在 `todo-team-a` 验证通过后直接推广，但 `todo-team-b` 的 RoleBinding 没有随租户清单同步创建，结果业务方提交的 `TodoApp` 一直处于 Pending，Controller 日志反复出现 forbidden，GitOps 却只显示 CR 已经 apply 成功。复盘结论是：RBAC 收敛不能只看模板 diff，必须把“租户 namespace 列表、ServiceAccount 名称、RoleBinding 生成结果、`kubectl auth can-i` 输出、smoke test”作为同一张发布检查表。这个案例也解释了为什么本篇强调 Watch 范围、RBAC、Helm values 和发布后验证必须一起变更。
+
 ## 8. 本章小项目
 
 本章小项目是完成 `<project-root>/operator/kubebuilder/` 和 `<project-root>/operator/helm/todo-operator/` 的生产基线改造。
