@@ -115,6 +115,8 @@ bash --version:
 - `./scripts/check.sh`
 - `kubectl apply --dry-run=client --validate=false -f docs/examples/multi-doc.yaml`
 
+执行 `kubectl apply --dry-run=client` 前，先确认 `kubectl config current-context` 指向可用的本地 kind 集群。课程当前 kubectl 基线下，如果没有可用 kube context，客户端 dry-run 也可能连接 `localhost:8080` 并失败。
+
 如果你完成了第 1 篇的可选 kind smoke test，再补充以下增强输出：
 
 - `kind get clusters`
@@ -239,8 +241,12 @@ main() {
 
   echo '==> yaml manifests'
   if [[ -f docs/examples/multi-doc.yaml ]]; then
-    kubectl apply --dry-run=client --validate=false -f docs/examples/multi-doc.yaml \
-      || fail "kubectl yaml dry-run failed"
+    if kubectl config current-context >/dev/null 2>&1; then
+      kubectl apply --dry-run=client --validate=false -f docs/examples/multi-doc.yaml \
+        || fail "kubectl yaml dry-run failed"
+    else
+      fail "kubectl current-context is not available; create kind cluster before yaml dry-run"
+    fi
   else
     fail "file missing: docs/examples/multi-doc.yaml"
   fi
@@ -367,7 +373,7 @@ bash -n scripts/*.sh
 | 现象 | 常见原因 | 处理方式 |
 |---|---|---|
 | `docker version` 失败 | Docker Engine 未安装、未启动，或当前用户无权限访问 Docker daemon | 执行 `sudo systemctl status docker`，必要时启动 Docker 并检查 `docker` 用户组 |
-| `kubectl apply --dry-run=client` 失败 | YAML 格式错误或文件路径不对 | 检查缩进、冒号、文件位置 |
+| `kubectl apply --dry-run=client` 失败 | YAML 格式错误、文件路径不对，或当前没有可用 kube context | 检查缩进、冒号、文件位置；执行 `kubectl config current-context` 和 `kind get clusters` |
 | `kubectl get nodes` 失败 | 这是增强验收；可能没有集群或 kubeconfig 上下文错误 | 执行 `kind get clusters`、`kubectl config get-contexts`，或仅保留基础 dry-run 验收 |
 | `bash -n scripts/*.sh` 失败 | Shell 脚本语法错误 | 根据行号修复，再运行 ShellCheck |
 | `go build ./...` 失败 | Go 模块未初始化或代码未完成 | 执行 `go mod tidy`，检查包路径 |

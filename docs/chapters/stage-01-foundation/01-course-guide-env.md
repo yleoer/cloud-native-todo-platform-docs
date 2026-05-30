@@ -769,17 +769,18 @@ EOF
 
 `KIND_NODE_IMAGE` 使用 kind v0.31 官方发布中已经预构建的节点镜像，并锁定 digest，保证同学之间创建出来的本地集群版本一致。课程主线的 Kubernetes / kubectl 基线仍是 1.36.x；如果 kind 后续官方发布 1.36.x 节点镜像，只需要更新这一行并重新创建本地集群。
 
-校验这个 digest 的方法如下：
+校验这个镜像的方法如下。注意：`kindest/node:v1.35.0` 是可变 tag，直接查看 tag 的 `RepoDigests` 时可能显示当前仓库 tag digest；课程真正锁定的是 `KIND_NODE_IMAGE` 中 `@sha256:...` 后面的镜像 digest。
 
 ```bash
-docker pull kindest/node:v1.35.0
-docker inspect kindest/node:v1.35.0 --format '{{.RepoDigests}}'
+source scripts/versions.conf
+docker pull "$KIND_NODE_IMAGE"
+docker image inspect "$KIND_NODE_IMAGE" --format '{{index .RepoDigests 0}}'
 ```
 
-预期输出应包含：
+创建 kind 集群后，也可以检查控制平面容器实际使用的镜像：
 
-```text
-kindest/node@sha256:452d707d4862f52530247495d180205e029056831160e22870e37e3f6c1ac31f
+```bash
+docker inspect todo-dev-control-plane --format '{{.Config.Image}} {{.Image}}'
 ```
 
 kind v0.31 官方发布的预构建节点镜像中没有 1.36.x 节点镜像，因此本篇先锁定 `v1.35.0` 作为 kind 烟测集群。后续如果 kind 官方发布 `kindest/node:v1.36.x`，再把 `KIND_NODE_IMAGE` 和 5.10 的预期节点版本一起升级。
@@ -1002,6 +1003,7 @@ git log --oneline -1
 ```bash
 cd ~/workspace/cloud-native-todo-platform
 ./scripts/check-env.sh
+kubectl config current-context
 kubectl apply --dry-run=client --validate=false -f docs/examples/multi-doc.yaml
 test -f docs/environment.md
 test -f scripts/versions.conf
@@ -1137,7 +1139,7 @@ kubectl apply --dry-run=client --validate=false -f docs/examples/multi-doc.yaml
 
 **修复：** 统一使用 2 个空格缩进；列表项前使用 `- `；键值对写成 `key: value`。如果编辑器能显示不可见字符，打开 Tab 和空格显示功能。
 
-**预防：** VS Code 安装 YAML 插件，项目内统一 2 空格缩进。复制 YAML 后先用 `kubectl apply --dry-run=client --validate=false` 做客户端解析检查，再提交 Git。
+**预防：** VS Code 安装 YAML 插件，项目内统一 2 空格缩进。复制 YAML 后先确认 `kubectl config current-context` 指向可用的 kind 集群，再用 `kubectl apply --dry-run=client --validate=false` 做客户端解析检查，最后提交 Git。
 
 ### 错误 4：kubectl 当前没有可用集群或 context 不对
 
@@ -1157,7 +1159,7 @@ kubectl config get-contexts
 kind get clusters
 ```
 
-**修复：** 如果只是做客户端 YAML 检查，使用 `--dry-run=client --validate=false`；如果要真实验证资源，先创建 kind 集群：
+**修复：** 在课程当前 kubectl 基线中，即使使用 `--dry-run=client --validate=false`，没有可用 kube context 时也可能连接 `localhost:8080` 并失败。先创建 kind 集群并确认当前 context，再执行 YAML 检查：
 
 ```bash
 source scripts/versions.conf
