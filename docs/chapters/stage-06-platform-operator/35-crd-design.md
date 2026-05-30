@@ -1641,6 +1641,8 @@ flowchart TD
 
 本篇仍然没有 Controller，所以自定义资源不会自动创建 Deployment、数据库或缓存。这个“不会自动发生”的边界非常重要：CRD 定义 API，Controller 执行调谐。下一篇就会分析 Controller 应该如何监听这些资源。
 
+还要提前记住一个阶段六边界：第 38-41 篇主线会优先实现 `TodoApp` Controller，把应用交付到 Deployment 和 Service；`TodoDatabase` 与 `TodoCache` 已经作为平台 API 契约定义好，但对应 Controller 会作为作品集扩展方向保留。这样设计是为了先把一个可运行、可测试、可发布的 Operator 主链路做扎实。
+
 ## 12. 下一章衔接
 
 下一篇第 36 篇会进入 Controller 机制：Informer 与 Workqueue。我们会围绕本篇的三个 CRD 继续追问：

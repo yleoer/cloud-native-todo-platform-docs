@@ -1106,6 +1106,8 @@ spec:
             secretName: {{ include "todo-operator.fullname" . }}-webhook-server-cert
 ```
 
+这里刻意保持 `replicaCount: 1` 和 `--leader-elect=false`，是为了让本章先聚焦测试、镜像、Helm 安装、升级与回滚链路。第 41 篇会把同一个 Chart 推进到生产基线：开启多副本、leader election、PDB、资源限制和更严格的安全上下文。不要在没有 leader election 的情况下把 `replicaCount` 直接调大。
+
 创建 `../helm/todo-operator/templates/certificate.yaml`：
 
 ```yaml

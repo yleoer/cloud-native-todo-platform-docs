@@ -18,6 +18,18 @@
 | 生产基线 | 第 41 篇 | 最小 RBAC、Watch 范围、metrics、PDB | 生产安全、可观测性和稳定性检查通过 |
 | 最终集成 | 第 42 篇 | 最终 YAML、作品集文档、面试讲解稿 | 能演示最小闭环并诚实说明项目边界 |
 
+阶段六项目主线可以按下面路径理解。第 35 篇先定义 API 契约，第 37 篇用手写 Controller 建立控制循环直觉，第 38-41 篇持续在同一个 `<project-root>/operator/kubebuilder/` 项目上叠加能力，第 42 篇再收束为最终交付包。
+
+```mermaid
+flowchart LR
+    CRD["第 35 篇\nCRD 契约"] --> Hand["第 37 篇\noperator/handwritten"]
+    Hand --> KB["第 38 篇\noperator/kubebuilder 初始化"]
+    KB --> Life["第 39 篇\nWebhook / Finalizer / Conditions"]
+    Life --> Release["第 40 篇\nenvtest / kind e2e / Helm"]
+    Release --> Prod["第 41 篇\n生产基线"]
+    Prod --> Final["第 42 篇\n最终交付包"]
+```
+
 ## 2. 两条验收路径
 
 | 路径 | 适合对象 | 必做范围 | 完成标志 |
@@ -97,11 +109,14 @@ helm rollback todo-operator 1 -n todo-operator-system
 生产基线验证：
 
 ```bash
+OPERATOR_SA="${OPERATOR_SA:-todo-operator}"
 kubectl auth can-i create deployments.apps -n todo-team-a \
-  --as=system:serviceaccount:todo-operator-system:todo-operator-controller-manager
+  --as="system:serviceaccount:todo-operator-system:${OPERATOR_SA}"
 kubectl -n todo-operator-system get deploy,svc,pod
 kubectl -n todo-operator-system port-forward svc/todo-operator-metrics 8080:8080
 ```
+
+如果使用第 40-41 篇 Helm Chart 且 release 名为 `todo-operator`，默认 ServiceAccount 通常是 `todo-operator`。如果使用 Kubebuilder `make deploy` 或自定义 values，可能是 `todo-operator-controller-manager` 或其他名称；先用 `kubectl get sa -n todo-operator-system` 确认，再覆盖 `OPERATOR_SA`。
 
 最终最小闭环：
 

@@ -13,14 +13,21 @@
 | kind | v0.31+ | 本地集成测试集群 | 能拉取并启动 `kindest/node:v1.36.0` |
 | Docker | 29.x | 构建 Operator 和 Todo API 镜像 | `docker build`、`kind load docker-image` |
 | Kubebuilder | 4.11.x | 初始化项目、生成 Webhook/RBAC/CRD | `kubebuilder version` 与正文命令一致 |
-| controller-runtime | Kubebuilder 项目依赖版本 | Manager、Client、cache、envtest | `go list -m sigs.k8s.io/controller-runtime` |
+| controller-runtime | Kubebuilder 项目依赖版本 | Manager、Client、cache、envtest | `go list -m sigs.k8s.io/controller-runtime`，记录具体版本号 |
 | controller-gen | Kubebuilder 项目锁定版本 | 生成 CRD、DeepCopy、RBAC | `make manifests` 后无未预期 diff |
 | setup-envtest | Kubebuilder 项目锁定版本 | 下载 API server 和 etcd 测试二进制 | `make envtest`、`go test ./test/envtest -v` |
-| cert-manager | 1.20.x | Webhook 证书和 CA 注入 | Pod Ready，Certificate/Issuer 正常 |
+| cert-manager | 1.20.x（v1.35 验证线）；v1.36 线需复核官方支持矩阵 | Webhook 证书和 CA 注入 | Pod Ready，Certificate/Issuer 正常 |
 | Helm | 4.2.x | Operator Chart 安装、升级、回滚 | `helm lint/template/install/upgrade/rollback` |
 | kustomize | kubectl 内置或项目锁定版本 | 渲染 Kubebuilder config | `kubectl kustomize config/default` |
 
 版本表中的 `x` 不是随意漂移的意思。正式出版或团队落地时，应记录具体 patch 版本和验证日期。
+
+截至 2026-05-30 的出版前复核结论如下：
+
+- `MutatingAdmissionPolicy` 在 Kubernetes v1.36 中已是 stable，并默认启用；第 39 篇仍把它放在可选实验中，是为了避免学习者被准入策略细节打断主线。
+- `kubectl kustomize` 仍是 kubectl 官方命令的一部分，出版前保留 `kubectl kustomize config/default` 作为实际验证口径。
+- cert-manager 官方支持矩阵显示 1.20.x 支持和测试到 Kubernetes 1.35；面向 Kubernetes 1.36 的锁定版本应在正式出版前重新确认，优先采用首个官方列出支持 1.36 的 cert-manager 版本。若复核时该版本尚未发布，则 Webhook 证书实验应使用 v1.35 线或明确标注为兼容性待验证。
+- Helm 相关命令以实际 `helm version` 为准，至少确认 `helm template --include-crds`、`helm list -A`、`helm version --short`、`helm install/upgrade/rollback` 在锁定版本中可用。
 
 ## 2. 阶段六集群策略
 
