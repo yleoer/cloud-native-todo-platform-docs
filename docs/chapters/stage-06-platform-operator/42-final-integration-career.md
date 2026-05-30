@@ -440,7 +440,7 @@ metadata:
 type: Opaque
 stringData:
   username: todo
-  password: change-me-in-real-env
+  password: change-me-in-real-env # 使用前替换为环境专用 Secret，不要提交真实生产密码。
 ---
 apiVersion: platform.todo.example.com/v1alpha1
 kind: TodoDatabase
@@ -487,12 +487,12 @@ metadata:
     platform.todo.example.com/release: "v5.0-final-delivery"
     platform.todo.example.com/source: "deployments/final/todoapp-full.yaml"
 spec:
-  image: ghcr.io/your-org/todo-api:v5.0.0
+  image: ghcr.io/your-org/todo-api:v5.0.0 # 使用前替换为 CI 发布的镜像 tag 或 digest。
   replicas: 2
   port: 80
 ```
 
-这份文件是最终作品集契约，适合放进 PR 和 Argo CD。它默认要求集群中已经安装 `TodoDatabase` 和 `TodoCache` CRD。当前课程 Operator 不会调谐数据库和缓存实例，所以它们在这里的作用是表达平台 API 边界；如果你已经继续实现 DB/Cache Controller，它们才会触发真正的 PostgreSQL 和 Redis 交付。
+这份文件是最终作品集契约，适合放进 PR 和 Argo CD。`ghcr.io/your-org/todo-api:v5.0.0` 和 `change-me-in-real-env` 都是占位符，使用前必须替换。它默认要求集群中已经安装 `TodoDatabase` 和 `TodoCache` CRD。当前课程 Operator 不会调谐数据库和缓存实例，所以它们在这里的作用是表达平台 API 边界；如果你已经继续实现 DB/Cache Controller，它们才会触发真正的 PostgreSQL 和 Redis 交付。
 
 #### 5.4.3 GitOps Application
 
@@ -527,6 +527,8 @@ spec:
 
 把 `repoURL` 改成你的项目仓库地址。这里用 `directory.include: todoapp-full.yaml` 是为了让 Argo CD 只同步完整作品集入口，不把本地 smoke YAML 一起同步。生产环境建议把 `targetRevision` 固定到环境分支或发布标签，例如 `prod`、`release/v5.0.0`，避免所有 `main` 变更自动进入生产。
 
+`ServerSideApply=true` 用于让 Argo CD 采用 server-side apply，适合字段较多的 CR 和后续多控制面协作场景，也能避免大型对象的 `last-applied-configuration` annotation 过大。它会改变字段所有权和冲突检测方式，生产环境应先在预发环境验证。
+
 本示例默认没有开启 `prune`。生产环境只有在确认删除资源的影响面后，才建议开启自动 prune；如果最终 YAML 包含 Namespace 或 CR 实例，错误 prune 可能导致租户资源被删除。
 
 #### 5.4.4 最终集成 CI
@@ -554,7 +556,11 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v6
         with:
-          go-version: "1.26.x"
+          go-version: "1.26"
+          cache: true
+          cache-dependency-path: |
+            api/go.sum
+            operator/kubebuilder/go.sum
 
       - name: Set up Python
         uses: actions/setup-python@v6
@@ -571,7 +577,7 @@ jobs:
           sudo install -m 0755 linux-amd64/helm /usr/local/bin/helm
           curl -fsSLo kubectl "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl"
           sudo install -m 0755 kubectl /usr/local/bin/kubectl
-          helm version --short
+          helm version
           kubectl version --client=true
 
       - name: Install docs dependencies
@@ -621,7 +627,9 @@ jobs:
           fi
 ```
 
-`kubectl apply --dry-run=client --validate=false` 只能检查 YAML 基本结构，无法验证集群中是否真的有 CRD，也不会调用 Webhook。生产 CI 可以增加一个 kind job：安装 CRD 和 Operator 后执行 `--dry-run=server`，这样能发现 schema、Webhook 和 RBAC 问题。这里把 client dry-run 放在主 workflow，是为了让没有 kubeconfig 的 GitHub runner 也能完成基础语法检查。
+上面的 workflow 使用 `actions/checkout@v6`、`actions/setup-go@v6` 和 `actions/setup-python@v6`，需要 GitHub-hosted runner 或足够新的 self-hosted runner。企业内网 runner 如果版本较旧，可以临时退回到 `checkout@v4`、`setup-go@v5`、`setup-python@v5`，但要在团队内统一升级策略。Node 24 运行时的 action 通常要求 runner 至少为 v2.327.1，`checkout@v6` 在 Docker container action 凭据场景下可能需要 v2.329.0 或更新版本。`HELM_VERSION: v4.2.0` 是课程示例中的精确 patch 版本，实际项目应替换为团队锁定的 Helm 4.2.x 版本。
+
+`kubectl apply --dry-run=client --validate=false` 只能检查 YAML 基本结构，并跳过 OpenAPI schema 校验；它无法验证集群中是否真的有 CRD，也不会调用 Webhook。生产 CI 可以增加一个 kind job：安装 CRD 和 Operator 后执行 `--dry-run=server`，这样能发现 schema、Webhook 和 RBAC 问题。这里把 client dry-run 放在主 workflow，是为了让没有 kubeconfig 的 GitHub runner 也能完成基础语法检查。
 
 #### 5.4.5 最终验证脚本
 
@@ -638,6 +646,23 @@ OPERATOR_NAMESPACE="${OPERATOR_NAMESPACE:-todo-operator-system}"
 OPERATOR_SERVICE_ACCOUNT="${OPERATOR_SERVICE_ACCOUNT:-todo-operator}"
 METRICS_SERVICE="${METRICS_SERVICE:-todo-operator-metrics}"
 METRICS_LOCAL_PORT="${METRICS_LOCAL_PORT:-18080}"
+
+if [ "${1:-}" = "--help" ]; then
+  cat <<'EOF'
+Usage:
+  scripts/final-verify.sh
+
+Environment variables:
+  NAMESPACE                  target tenant namespace, default todo-team-a
+  APP_NAME                   TodoApp name, default todo-platform-final
+  MANIFEST                   manifest path, default deployments/final/todoapp-local-smoke.yaml
+  OPERATOR_NAMESPACE         operator namespace, default todo-operator-system
+  OPERATOR_SERVICE_ACCOUNT   operator service account, default todo-operator
+  METRICS_SERVICE            metrics service name, default todo-operator-metrics
+  METRICS_LOCAL_PORT         local port for metrics port-forward, default 18080
+EOF
+  exit 0
+fi
 
 port_forward_pid=""
 
@@ -759,6 +784,12 @@ PowerShell 中设置环境变量的写法如下：
 $env:MANIFEST = "deployments/final/todoapp-local-smoke.yaml"
 $env:METRICS_LOCAL_PORT = "18081"
 bash scripts/final-verify.sh
+```
+
+查看脚本可覆盖参数：
+
+```bash
+scripts/final-verify.sh --help
 ```
 
 #### 5.4.6 作品集架构说明
@@ -1058,7 +1089,10 @@ kubectl -n todo-team-a rollout status deployment/todo-platform-final --timeout=6
 kubectl -n todo-team-a get pods
 kubectl -n todo-team-a get events --sort-by=.lastTimestamp | tail -n 20
 kubectl -n todo-team-a describe todoapp todo-platform-final
+curl -s http://127.0.0.1:18080/metrics | grep controller_runtime_reconcile_errors_total || true
 ```
+
+最后一行需要你已经通过 `scripts/final-verify.sh` 或手工 `kubectl port-forward` 暴露了 metrics。如果没有暴露 metrics，可以先跳过；它的作用是观察 Reconcile 错误计数是否随故障增长。
 
 修复镜像：
 
@@ -1117,12 +1151,16 @@ rate(controller_runtime_reconcile_errors_total{controller="todoapp"}[5m])
 histogram_quantile(0.95, rate(controller_runtime_reconcile_time_seconds_bucket{controller="todoapp"}[5m]))
 ```
 
+第一条用于观察 `TodoApp` Reconcile 错误率，第二条用于观察 Reconcile P95 耗时。实际查询时要先确认第 41 篇 Controller 注册名称对应的 `controller` label 是否就是 `todoapp`。
+
 Loki 查询示例：
 
 ```logql
 {namespace="todo-team-a"} |= "todo-platform-final"
 {namespace="todo-operator-system"} |= "todo-platform-final"
 ```
+
+第一条用于查询业务命名空间中的应用日志，第二条用于查询 Operator 日志中是否出现同名对象的调谐记录。
 
 Trace 查询没有统一命令，取决于你在第 32 篇使用 Tempo、Jaeger 还是其他后端。作品集里至少保存一张截图，能展示 `request_id` 或 trace id 如何从 API 日志跳到 Trace 明细。
 
@@ -1243,6 +1281,12 @@ kubectl -n todo-team-a patch todoapp todo-platform-final --type=merge \
 
 ```bash
 kubectl -n argocd delete application todo-platform-final --ignore-not-found
+```
+
+如果你使用 Argo CD CLI，也可以执行：
+
+```bash
+argocd app delete todo-platform-final
 ```
 
 不要在共享集群中随意删除 CRD 或 Operator。删除 CRD 会删除所有命名空间中的同类自定义资源，这不是普通清理动作。
@@ -1511,3 +1555,5 @@ kubectl -n argocd delete application todo-platform-final --ignore-not-found
 - **SRE**：深入 SLO、错误预算、容量规划、混沌工程、事故指挥和复盘机制。
 
 最终建议你保留三份材料：一个能运行的仓库，一个能证明运行结果的 evidence 目录，一份能讲清楚项目的 3-5 分钟讲解稿。技术会更新，但这种把复杂系统讲清楚、交付清楚、排障清楚的能力，会长期有用。
+
+如果你已经跟着课程走到这里，接下来最有价值的事不是继续堆更多工具名，而是挑一个真实环境，把这条交付链路再跑一遍、讲一遍、复盘一遍。能把复杂系统稳定落地的人，永远比只会背技术清单的人更稀缺。
