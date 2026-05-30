@@ -12,7 +12,7 @@
 
 ## 🎯 学习路径
 
-新版课程设计为 **6 个学习阶段、42 大篇、约 230 章**。当前站点已发布阶段一至阶段五，并已进入阶段六平台工程与 Operator 能力。
+新版课程设计为 **6 个学习阶段、42 大篇、约 230 章**。当前站点已完成阶段一至阶段六主线内容。
 
 <details open>
 <summary><strong>阶段一：基础能力（第 1-6 篇，已发布）</strong></summary>
@@ -95,7 +95,7 @@ CI/CD、GitOps、Prometheus / Grafana、Loki、OpenTelemetry 和 Kubernetes 生�
 </details>
 
 <details>
-<summary><strong>阶段六：平台工程与 Operator 能力（第 34-42 篇，更新中）</strong></summary>
+<summary><strong>阶段六：平台工程与 Operator 能力（第 34-42 篇，已发布）</strong></summary>
 
 Kubernetes API Machinery、CRD、手写 Controller、Kubebuilder、Webhook、Finalizer、Operator 测试发布、生产实践和最终集成。
 
@@ -107,7 +107,7 @@ Kubernetes API Machinery、CRD、手写 Controller、Kubebuilder、Webhook、Fin
 - [第 39 篇：Operator 高级机制 [C]](docs/chapters/stage-06-platform-operator/39-operator-advanced.md)
 - [第 40 篇：Operator 测试、发布与升级 [C]](docs/chapters/stage-06-platform-operator/40-operator-test-release.md)
 - [第 41 篇：Operator 生产实践 [C]](docs/chapters/stage-06-platform-operator/41-operator-production.md)
-- 第 42 篇：综合集成与职业能力验收
+- [第 42 篇：综合集成与职业能力验收 [C]](docs/chapters/stage-06-platform-operator/42-final-integration-career.md)
 
 </details>
 
@@ -222,8 +222,8 @@ docs/
 │   │   ├── 38-kubebuilder.md        # 第 38 篇：Kubebuilder 入门 [C]
 │   │   ├── 39-operator-advanced.md  # 第 39 篇：Operator 高级机制 [C]
 │   │   ├── 40-operator-test-release.md # 第 40 篇：Operator 测试、发布与升级 [C]
-│   │   └── 41-operator-production.md # 第 41 篇：Operator 生产实践 [C]
-│   └── ...                     # 后续阶段章节（待完成）
+│   │   ├── 41-operator-production.md # 第 41 篇：Operator 生产实践 [C]
+│   │   └── 42-final-integration-career.md # 第 42 篇：综合集成与职业能力验收 [C]
 ├── projects/                   # 项目实战
 ├── labs/                       # 实验索引
 ├── troubleshooting/           # 排障手册
