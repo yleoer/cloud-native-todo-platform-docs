@@ -4,7 +4,7 @@
 
 最后一篇要做的事不是再加一个孤立功能，而是把这些能力串成一条可以展示、可以验收、可以排障、可以讲给面试官听的完整交付链路。真实岗位里，一个项目能不能写在简历上，不取决于它用了多少技术名词，而取决于你能不能讲清楚：它解决了什么问题，架构边界在哪里，发布链路如何收敛，出故障时怎么定位，回滚时有什么证据。
 
-本篇特色项目是：**整理 Cloud Native Todo Platform 最终作品集，完成从 Git Push、CI/CD、GitOps、Argo CD、Todo Operator 到一条 YAML 交付 Todo Platform 的综合演练，并把交付过程沉淀成部署说明、排障文档和面试讲解稿。**
+本篇特色项目是：**整理 Cloud Native Todo Platform 最终作品集，完成从 Git Push、CI/CD、GitOps、Argo CD、Todo Operator 到一条 YAML 触发应用交付的综合演练，并把交付过程沉淀成部署说明、排障文档和面试讲解稿。**
 
 ## 1. 本章学习目标
 
@@ -23,7 +23,7 @@
 学完本章后，你应该能够：
 
 - 能独立整理项目目录，形成面向团队交付的 `deployments/final/`、`docs/portfolio/`、`scripts/final-verify.sh` 和 GitOps Application 示例。
-- 能编写一份最终 `TodoApp` 交付 YAML，用一条 `kubectl apply -f deployments/final/todoapp-full.yaml` 触发平台交付流程。
+- 能编写最小可执行 `TodoApp` 交付 YAML，用一条 `kubectl apply -f deployments/final/todoapp-local-smoke.yaml` 验证当前 Operator 闭环。
 - 能配置最终集成 CI，验证 Go 测试、Operator 构建、Helm 模板、文档构建和最终 YAML server-side dry-run。
 - 能通过 Argo CD Application 把最终交付入口纳入 GitOps，并判断 `Synced`、`OutOfSync`、`Healthy`、`Degraded` 的原因。
 - 能模拟一次镜像错误故障，从 `TodoApp`、Deployment、Events、日志、metrics 和 Git 变更记录中定位并修复。
@@ -57,12 +57,14 @@
 
 本章把项目版本线推进到 `v5.0-final-delivery`。其中第 41 篇的 `v4.7-operator-production` 是 Operator 自身的生产基线，本篇的 `v5.0-final-delivery` 是整个 Cloud Native Todo Platform 的综合交付基线。
 
-需要提前说明一个边界：第 35 篇定义过 `TodoApp`、`TodoDatabase`、`TodoCache` 三个 CRD，第 38-41 篇重点实现了 `TodoApp` 对 Deployment 和 Service 的自动化管理。因此本章实验采用“两级验收”：
+需要提前说明一个边界：第 35 篇定义过 `TodoApp`、`TodoDatabase`、`TodoCache` 三个 CRD，第 38-41 篇实际完成的是 `TodoApp` 对 Deployment、Service、status、Events 和 metrics 的自动化管理。也就是说，当前课程主线已经具备“应用交付 Operator”的可执行能力，但还没有实现数据库和缓存的独立 Controller。
 
-- **可执行验收**：基于第 41 篇已有 Operator，`TodoApp` 能创建并维护 Deployment、Service、status、Events 和 metrics。
-- **作品集验收**：把 `TodoDatabase`、`TodoCache` 作为平台 API 契约纳入最终 YAML，说明数据库和缓存的后续 Controller 扩展方向。
+因此本章实验采用“两条路径”：
 
-如果你已经实现了数据库和缓存 Controller，同一份最终 YAML 可以继续扩展为真正的一条 YAML 拉起全栈；如果还没有实现，本章至少保证最终交付入口、发布链路和排障证据完整可演示。
+- **路径 A：最小可执行闭环**。只依赖第 41 篇已有 Operator，使用 `deployments/final/todoapp-local-smoke.yaml` 创建 `TodoApp`，验证 Deployment、Service、Ready condition、RBAC、metrics 和故障演练。这条路径是本章必须跑通的主路径。
+- **路径 B：完整作品集增强路径**。使用 `deployments/final/todoapp-full.yaml` 表达 `TodoApp`、`TodoDatabase`、`TodoCache` 的最终平台契约，并接入 Argo CD、Prometheus、Loki、Trace 和作品集证据。只有当你已经安装第 35 篇三个 CRD，或已经继续实现 DB/Cache Controller 时，才把它作为完整可执行路径。
+
+这样安排不是降低目标，而是让课程边界更真实：企业项目经常会先交付一个可运行的最小闭环，再把尚未自动化的能力写成明确的 API 契约和路线图。面试或评审时，能诚实讲清“已经实现什么、还计划实现什么”，比把未完成能力说成已完成更专业。
 
 ## 3. 核心概念
 
@@ -74,7 +76,7 @@
 
 | 契约对象 | 谁负责 | 作用 | 本章文件 |
 |---|---|---|---|
-| `TodoApp` CR | 应用团队提交，平台团队定义 | 声明 Todo API 镜像、副本数、端口和接管标签 | `deployments/final/todoapp-full.yaml` |
+| `TodoApp` CR | 应用团队提交，平台团队定义 | 声明 Todo API 镜像、副本数、端口和接管标签 | `deployments/final/todoapp-local-smoke.yaml` / `todoapp-full.yaml` |
 | Operator Helm release | 平台团队 | 安装 CRD、Webhook、Controller Manager、metrics、RBAC | `operator/helm/todo-operator/` |
 | GitOps Application | 平台/SRE | 把最终交付目录同步到目标集群 | `deployments/gitops/applications/todo-platform-final.yaml` |
 | CI 工作流 | 平台/应用共同维护 | 在合并前验证代码、模板、文档和最终 YAML | `.github/workflows/final-integration.yml` |
@@ -106,7 +108,9 @@ git commit SHA
 
 “一条 YAML 部署整套平台”容易被误解成一个文件里要塞进所有 Kubernetes 对象。更准确的说法是：平台前置能力已经安装完成后，应用团队通过一份声明式入口触发平台自动化交付。
 
-本项目的一条 YAML 包含四类内容：
+本章会给出两份 YAML。第一份是 **最小可执行 YAML**，只包含命名空间准入边界和 `TodoApp`，用于证明第 41 篇 Operator 能完成真实调谐。第二份是 **完整作品集 YAML**，在最小路径之上加入资源配额、数据库和缓存契约，用于表达最终平台设计。
+
+完整作品集 YAML 包含四类内容：
 
 - 命名空间准入标签：告诉 Webhook 和 Operator 这个 namespace 属于 Todo Platform 管理范围。
 - 租户资源边界：`ResourceQuota`、`LimitRange` 等限制教学集群资源消耗。
@@ -114,6 +118,8 @@ git commit SHA
 - 应用交付入口：`TodoApp` 触发 Operator 创建 Deployment、Service，并回写 status。
 
 注意，Operator、CRD、Prometheus、Loki、Tempo 或 Jaeger、Argo CD 这些属于平台控制面，不应该由业务 YAML 每次重复安装。它们更像“机场跑道”，业务 YAML 是“航班计划”。航班计划可以一份文件提交，但跑道需要平台团队先维护好。
+
+因此，本章的“必须通过”标准是最小可执行 YAML 能创建并验证 `TodoApp`；“增强通过”标准才是完整作品集 YAML 能在具备 DB/Cache CRD 和 GitOps 控制面的环境中闭环。
 
 ### 3.4 最终作品集
 
@@ -214,11 +220,12 @@ sequenceDiagram
 
 ```mermaid
 flowchart LR
-    YAML["todoapp-full.yaml"] --> NS["Namespace labels"]
-    YAML --> Quota["ResourceQuota / LimitRange"]
-    YAML --> DBCR["TodoDatabase CR"]
-    YAML --> CacheCR["TodoCache CR"]
-    YAML --> AppCR["TodoApp CR"]
+    Smoke["todoapp-local-smoke.yaml"] --> NS["Namespace labels"]
+    Smoke --> AppCR["TodoApp CR"]
+    Full["todoapp-full.yaml"] --> Quota["ResourceQuota / LimitRange"]
+    Full --> DBCR["TodoDatabase CR"]
+    Full --> CacheCR["TodoCache CR"]
+    Full --> AppCR
 
     NS --> Admission["Webhook namespaceSelector"]
     AppCR --> Predicate["Operator label selector"]
@@ -229,7 +236,7 @@ flowchart LR
     Quota --> Limit["Tenant resource boundary"]
 ```
 
-从用户视角看，这是一条 YAML。从平台视角看，它会经过多道边界：namespace 标签决定 Admission 是否生效，接管标签决定 Operator 是否处理，RBAC 决定 Operator 是否有权创建子资源，Quota 决定租户能消耗多少资源，status 决定用户能看到什么结果。
+从用户视角看，最小路径和完整路径都是“一条 YAML 入口”。从平台视角看，它们会经过多道边界：namespace 标签决定 Admission 是否生效，接管标签决定 Operator 是否处理，RBAC 决定 Operator 是否有权创建子资源，Quota 决定租户能消耗多少资源，status 决定用户能看到什么结果。
 
 这也是为什么第 41 篇强调最小 RBAC、Watch 范围、Webhook `namespaceSelector`、predicate 和 metrics。没有这些边界，一条 YAML 不是简化交付，而是扩大事故影响面。
 
@@ -272,7 +279,7 @@ flowchart TD
 
 ### 5.1 步骤 1：实验目标
 
-本次实验目标是：在项目仓库中整理最终交付入口和作品集材料，用一条 `kubectl apply -f deployments/final/todoapp-full.yaml` 创建 Todo Platform 声明，并用验证脚本证明 Operator、GitOps、可观测性和排障链路可用。
+本次实验目标是：在项目仓库中整理最终交付入口和作品集材料，先用一条 `kubectl apply -f deployments/final/todoapp-local-smoke.yaml` 跑通当前 Operator 的最小闭环，再用 `deployments/final/todoapp-full.yaml` 整理完整平台契约和作品集证据。
 
 预计耗时：90 分钟（动手操作约 60 分钟）。
 
@@ -322,6 +329,7 @@ cloud-native-todo-platform/
 │       └── final-integration.yml
 ├── deployments/
 │   ├── final/
+│   │   ├── todoapp-local-smoke.yaml
 │   │   └── todoapp-full.yaml
 │   └── gitops/
 │       └── applications/
@@ -350,7 +358,39 @@ mkdir -p scripts
 
 ### 5.4 步骤 4：完整配置
 
-#### 5.4.1 最终一条 YAML
+#### 5.4.1 最小可执行 YAML
+
+先创建 `deployments/final/todoapp-local-smoke.yaml`。这份文件只验证第 41 篇已经实现的能力：namespace 准入标签、`TodoApp` 接管标签、Deployment/Service 调谐和 status 回写。
+
+```yaml
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: todo-team-a
+  labels:
+    platform.todo.example.com/admission: "enabled"
+    platform.todo.example.com/tenant: "todo-team-a"
+---
+apiVersion: platform.todo.example.com/v1alpha1
+kind: TodoApp
+metadata:
+  name: todo-platform-final
+  namespace: todo-team-a
+  labels:
+    platform.todo.example.com/managed: "true"
+    platform.todo.example.com/part-of: "cloud-native-todo-platform"
+  annotations:
+    platform.todo.example.com/release: "v5.0-final-delivery"
+    platform.todo.example.com/source: "deployments/final/todoapp-local-smoke.yaml"
+spec:
+  image: nginxdemos/hello:plain-text
+  replicas: 2
+  port: 80
+```
+
+这里使用 `nginxdemos/hello:plain-text` 是为了让本地 kind 和课程环境稳定验收。它不是最终业务镜像，只用于证明 Operator 闭环可执行。真正作品集里应把 `TodoApp.spec.image` 替换为课程 Todo API 镜像或镜像 digest。
+
+#### 5.4.2 完整作品集 YAML
 
 创建 `deployments/final/todoapp-full.yaml`：
 
@@ -447,16 +487,14 @@ metadata:
     platform.todo.example.com/release: "v5.0-final-delivery"
     platform.todo.example.com/source: "deployments/final/todoapp-full.yaml"
 spec:
-  image: nginxdemos/hello:plain-text
+  image: ghcr.io/your-org/todo-api:v5.0.0
   replicas: 2
   port: 80
 ```
 
-这里使用 `nginxdemos/hello:plain-text` 是为了让本地 kind 验收稳定可执行。生产作品集里应把它替换为 CI 产出的 Todo API 镜像，例如 `ghcr.io/your-org/todo-api:v5.0.0` 或更推荐的 digest 形式。
+这份文件是最终作品集契约，适合放进 PR 和 Argo CD。它默认要求集群中已经安装 `TodoDatabase` 和 `TodoCache` CRD。当前课程 Operator 不会调谐数据库和缓存实例，所以它们在这里的作用是表达平台 API 边界；如果你已经继续实现 DB/Cache Controller，它们才会触发真正的 PostgreSQL 和 Redis 交付。
 
-如果你还没有安装 `TodoDatabase` 和 `TodoCache` CRD，可以先临时删除这两个对象，完成 `TodoApp` 主链路验收；作品集里仍要说明数据库和缓存 CRD 是第 35 篇的 API 契约，后续 Controller 扩展会让它们真正创建底层资源。
-
-#### 5.4.2 GitOps Application
+#### 5.4.3 GitOps Application
 
 创建 `deployments/gitops/applications/todo-platform-final.yaml`：
 
@@ -474,21 +512,24 @@ spec:
     repoURL: https://github.com/your-org/cloud-native-todo-platform.git
     targetRevision: main
     path: deployments/final
+    directory:
+      include: todoapp-full.yaml
   destination:
     server: https://kubernetes.default.svc
     namespace: todo-team-a
   syncPolicy:
     automated:
-      prune: true
       selfHeal: true
     syncOptions:
       - CreateNamespace=true
       - ServerSideApply=true
 ```
 
-把 `repoURL` 改成你的项目仓库地址。生产环境建议把 `targetRevision` 固定到环境分支或发布标签，例如 `prod`、`release/v5.0.0`，避免所有 `main` 变更自动进入生产。
+把 `repoURL` 改成你的项目仓库地址。这里用 `directory.include: todoapp-full.yaml` 是为了让 Argo CD 只同步完整作品集入口，不把本地 smoke YAML 一起同步。生产环境建议把 `targetRevision` 固定到环境分支或发布标签，例如 `prod`、`release/v5.0.0`，避免所有 `main` 变更自动进入生产。
 
-#### 5.4.3 最终集成 CI
+本示例默认没有开启 `prune`。生产环境只有在确认删除资源的影响面后，才建议开启自动 prune；如果最终 YAML 包含 Namespace 或 CR 实例，错误 prune 可能导致租户资源被删除。
+
+#### 5.4.4 最终集成 CI
 
 创建 `.github/workflows/final-integration.yml`：
 
@@ -508,7 +549,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
 
       - name: Set up Go
         uses: actions/setup-go@v6
@@ -519,6 +560,19 @@ jobs:
         uses: actions/setup-python@v6
         with:
           python-version: "3.14"
+
+      - name: Install Helm and kubectl
+        env:
+          HELM_VERSION: v4.2.0
+          KUBECTL_VERSION: v1.36.0
+        run: |
+          curl -fsSLo helm.tar.gz "https://get.helm.sh/helm-${HELM_VERSION}-linux-amd64.tar.gz"
+          tar -xzf helm.tar.gz
+          sudo install -m 0755 linux-amd64/helm /usr/local/bin/helm
+          curl -fsSLo kubectl "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl"
+          sudo install -m 0755 kubectl /usr/local/bin/kubectl
+          helm version --short
+          kubectl version --client=true
 
       - name: Install docs dependencies
         run: |
@@ -555,8 +609,10 @@ jobs:
 
       - name: Validate final YAML syntax
         run: |
+          test -f deployments/final/todoapp-local-smoke.yaml
           test -f deployments/final/todoapp-full.yaml
-          kubectl apply --dry-run=client -f deployments/final/todoapp-full.yaml
+          kubectl apply --dry-run=client --validate=false -f deployments/final/todoapp-local-smoke.yaml
+          kubectl apply --dry-run=client --validate=false -f deployments/final/todoapp-full.yaml
 
       - name: Build docs
         run: |
@@ -565,9 +621,9 @@ jobs:
           fi
 ```
 
-`kubectl apply --dry-run=client` 只能检查 YAML 基本结构，无法验证集群中是否真的有 CRD。生产 CI 可以增加一个 kind job：安装 CRD 和 Operator 后执行 `--dry-run=server`，这样能发现 schema、Webhook 和 RBAC 问题。
+`kubectl apply --dry-run=client --validate=false` 只能检查 YAML 基本结构，无法验证集群中是否真的有 CRD，也不会调用 Webhook。生产 CI 可以增加一个 kind job：安装 CRD 和 Operator 后执行 `--dry-run=server`，这样能发现 schema、Webhook 和 RBAC 问题。这里把 client dry-run 放在主 workflow，是为了让没有 kubeconfig 的 GitHub runner 也能完成基础语法检查。
 
-#### 5.4.4 最终验证脚本
+#### 5.4.5 最终验证脚本
 
 创建 `scripts/final-verify.sh`：
 
@@ -577,8 +633,9 @@ set -euo pipefail
 
 NAMESPACE="${NAMESPACE:-todo-team-a}"
 APP_NAME="${APP_NAME:-todo-platform-final}"
-MANIFEST="${MANIFEST:-deployments/final/todoapp-full.yaml}"
+MANIFEST="${MANIFEST:-deployments/final/todoapp-local-smoke.yaml}"
 OPERATOR_NAMESPACE="${OPERATOR_NAMESPACE:-todo-operator-system}"
+OPERATOR_SERVICE_ACCOUNT="${OPERATOR_SERVICE_ACCOUNT:-todo-operator}"
 METRICS_SERVICE="${METRICS_SERVICE:-todo-operator-metrics}"
 METRICS_LOCAL_PORT="${METRICS_LOCAL_PORT:-18080}"
 
@@ -606,26 +663,7 @@ need curl
 echo "==> checking CRDs"
 kubectl get crd todoapps.platform.todo.example.com >/dev/null
 
-missing_crd=0
-if kubectl get crd tododatabases.platform.todo.example.com >/dev/null 2>&1; then
-  echo "TodoDatabase CRD found"
-else
-  echo "TodoDatabase CRD not found; install Chapter 35 CRDs or remove TodoDatabase from ${MANIFEST}" >&2
-  missing_crd=1
-fi
-
-if kubectl get crd todocaches.platform.todo.example.com >/dev/null 2>&1; then
-  echo "TodoCache CRD found"
-else
-  echo "TodoCache CRD not found; install Chapter 35 CRDs or remove TodoCache from ${MANIFEST}" >&2
-  missing_crd=1
-fi
-
-if [ "${missing_crd}" = "1" ]; then
-  exit 1
-fi
-
-echo "==> applying final manifest"
+echo "==> applying manifest: ${MANIFEST}"
 kubectl apply -f "${MANIFEST}"
 
 echo "==> waiting for namespace and TodoApp"
@@ -645,32 +683,66 @@ echo "${ready_condition}"
 echo "${ready_condition}" | grep -E 'True .*DeploymentReady|True'
 
 echo "==> checking RBAC boundary"
-SA="system:serviceaccount:${OPERATOR_NAMESPACE}:todo-operator"
-kubectl auth can-i create deployments --as="${SA}" -n "${NAMESPACE}" | grep yes
-kubectl auth can-i delete todoapps --as="${SA}" -n "${NAMESPACE}" | grep no
+SA="system:serviceaccount:${OPERATOR_NAMESPACE}:${OPERATOR_SERVICE_ACCOUNT}"
+if kubectl -n "${OPERATOR_NAMESPACE}" get serviceaccount "${OPERATOR_SERVICE_ACCOUNT}" >/dev/null 2>&1; then
+  kubectl auth can-i create deployments --as="${SA}" -n "${NAMESPACE}" | grep yes
+  kubectl auth can-i delete todoapps --as="${SA}" -n "${NAMESPACE}" | grep no
+else
+  echo "skip RBAC check: serviceaccount ${SA} not found"
+  echo "set OPERATOR_SERVICE_ACCOUNT to the Helm-rendered service account name"
+fi
 
 echo "==> checking operator metrics"
-kubectl -n "${OPERATOR_NAMESPACE}" port-forward "svc/${METRICS_SERVICE}" "${METRICS_LOCAL_PORT}:8080" \
-  >/tmp/todo-final-port-forward.log 2>&1 &
-port_forward_pid="$!"
+if kubectl -n "${OPERATOR_NAMESPACE}" get service "${METRICS_SERVICE}" >/dev/null 2>&1; then
+  kubectl -n "${OPERATOR_NAMESPACE}" port-forward "svc/${METRICS_SERVICE}" "${METRICS_LOCAL_PORT}:8080" \
+    >/tmp/todo-final-port-forward.log 2>&1 &
+  port_forward_pid="$!"
 
-for attempt in $(seq 1 20); do
-  if curl -fsS "http://127.0.0.1:${METRICS_LOCAL_PORT}/metrics" >/tmp/todo-final-metrics.txt 2>/dev/null; then
-    break
-  fi
-  sleep 1
-done
+  for attempt in $(seq 1 20); do
+    if curl -fsS "http://127.0.0.1:${METRICS_LOCAL_PORT}/metrics" >/tmp/todo-final-metrics.txt 2>/dev/null; then
+      break
+    fi
+    sleep 1
+  done
 
-grep 'controller_runtime_reconcile' /tmp/todo-final-metrics.txt
+  grep 'controller_runtime_reconcile' /tmp/todo-final-metrics.txt
+else
+  echo "skip metrics check: service ${OPERATOR_NAMESPACE}/${METRICS_SERVICE} not found"
+  echo "set METRICS_SERVICE to the Helm-rendered metrics service name"
+  : > /tmp/todo-final-metrics.txt
+fi
+
+echo "==> optional DB/Cache CRD check"
+if kubectl get crd tododatabases.platform.todo.example.com >/dev/null 2>&1; then
+  kubectl -n "${NAMESPACE}" get tododatabase || true
+else
+  echo "TodoDatabase CRD not found; this is fine for the local smoke path"
+fi
+
+if kubectl get crd todocaches.platform.todo.example.com >/dev/null 2>&1; then
+  kubectl -n "${NAMESPACE}" get todocache || true
+else
+  echo "TodoCache CRD not found; this is fine for the local smoke path"
+fi
 
 echo "==> collecting evidence"
 mkdir -p docs/portfolio/evidence
 kubectl -n "${NAMESPACE}" get todoapp "${APP_NAME}" -o yaml > docs/portfolio/evidence/final-todoapp.yaml
 kubectl -n "${NAMESPACE}" get deploy,svc,pod > docs/portfolio/evidence/final-k8s-state.txt
 kubectl -n "${NAMESPACE}" get events --sort-by=.lastTimestamp > docs/portfolio/evidence/final-events.txt
-sed -n '1,80p' /tmp/todo-final-metrics.txt > docs/portfolio/evidence/final-metrics-sample.txt
+if [ -s /tmp/todo-final-metrics.txt ]; then
+  sed -n '1,80p' /tmp/todo-final-metrics.txt > docs/portfolio/evidence/final-metrics-sample.txt
+else
+  echo "metrics sample not collected" > docs/portfolio/evidence/final-metrics-sample.txt
+fi
 
 echo "final verification passed"
+```
+
+脚本默认验证最小可执行路径。如果你已经具备完整 DB/Cache CRD 和真实 Todo API 镜像，可以这样验证完整作品集 YAML：
+
+```bash
+MANIFEST=deployments/final/todoapp-full.yaml scripts/final-verify.sh
 ```
 
 给脚本增加执行权限：
@@ -681,7 +753,15 @@ chmod +x scripts/final-verify.sh
 
 Windows 用户建议在 WSL 或 Git Bash 中执行这个脚本。如果必须使用 PowerShell，可以把每条 `kubectl` 命令拆开执行，本章后面的验证标准保持不变。
 
-#### 5.4.5 作品集架构说明
+PowerShell 中设置环境变量的写法如下：
+
+```powershell
+$env:MANIFEST = "deployments/final/todoapp-local-smoke.yaml"
+$env:METRICS_LOCAL_PORT = "18081"
+bash scripts/final-verify.sh
+```
+
+#### 5.4.6 作品集架构说明
 
 创建 `docs/portfolio/architecture.md`：
 
@@ -718,7 +798,7 @@ flowchart TB
 当前 Operator 已实现 TodoApp 到 Deployment/Service 的调谐。TodoDatabase 和 TodoCache 是平台 API 契约，可在后续 Controller 中扩展为 PostgreSQL 和 Redis 的自动化交付。
 ~~~~
 
-#### 5.4.6 部署手册
+#### 5.4.7 部署手册
 
 创建 `docs/portfolio/deploy-runbook.md`：
 
@@ -758,7 +838,7 @@ flowchart TB
 - Loki 中是否出现启动失败或依赖连接错误。
 ```
 
-#### 5.4.7 故障排查文档
+#### 5.4.8 故障排查文档
 
 创建 `docs/portfolio/troubleshooting.md`：
 
@@ -807,7 +887,7 @@ GitOps manifest 中的 spec.image 指向不存在或无权限拉取的镜像标�
 CI 中增加镜像存在性检查；生产 manifest 优先使用 digest；发布前执行 server-side dry-run 和最终 smoke test。
 ```
 
-#### 5.4.8 面试讲解稿
+#### 5.4.9 面试讲解稿
 
 创建 `docs/portfolio/interview-talk-track.md`：
 
@@ -833,7 +913,7 @@ CI 中增加镜像存在性检查；生产 manifest 优先使用 digest；发布
 - 看到 ImagePullBackOff 时，你会按什么顺序排查？
 ```
 
-#### 5.4.9 证据目录说明
+#### 5.4.10 证据目录说明
 
 创建 `docs/portfolio/evidence/README.md`：
 
@@ -857,27 +937,32 @@ CI 中增加镜像存在性检查；生产 manifest 优先使用 digest；发布
 
 ### 5.5 步骤 5：执行命令
 
+下面命令默认在项目根目录执行，并假设当前 kubeconfig 已指向第 41 篇使用的 kind 集群。Windows 用户建议使用 WSL 或 Git Bash；PowerShell 用户把 `export A=B` 改成 `$env:A = "B"`。
+
 #### 5.5.1 本地验证文件和模板
 
 先检查文件是否都在：
 
 ```bash
+test -f deployments/final/todoapp-local-smoke.yaml
 test -f deployments/final/todoapp-full.yaml
 test -f deployments/gitops/applications/todo-platform-final.yaml
 test -f .github/workflows/final-integration.yml
 test -x scripts/final-verify.sh
 ```
 
-验证 YAML 基本结构：
+验证 YAML 基本结构。这里使用 `--validate=false`，是因为 client dry-run 环境不一定能访问集群 OpenAPI schema，也不一定安装了全部 CRD：
 
 ```bash
-kubectl apply --dry-run=client -f deployments/final/todoapp-full.yaml
-kubectl apply --dry-run=client -f deployments/gitops/applications/todo-platform-final.yaml
+kubectl apply --dry-run=client --validate=false -f deployments/final/todoapp-local-smoke.yaml
+kubectl apply --dry-run=client --validate=false -f deployments/final/todoapp-full.yaml
+kubectl apply --dry-run=client --validate=false -f deployments/gitops/applications/todo-platform-final.yaml
 ```
 
-如果你的集群已安装所有 CRD，可以进一步执行 server-side dry-run：
+如果你的集群已安装所有 CRD，可以进一步执行 server-side dry-run。最小路径只要求 `TodoApp` CRD；完整路径还要求 `TodoDatabase` 和 `TodoCache` CRD：
 
 ```bash
+kubectl apply --dry-run=server -f deployments/final/todoapp-local-smoke.yaml
 kubectl apply --dry-run=server -f deployments/final/todoapp-full.yaml
 ```
 
@@ -887,6 +972,7 @@ kubectl apply --dry-run=server -f deployments/final/todoapp-full.yaml
 kubectl get pods -n todo-operator-system
 kubectl get deploy -n todo-operator-system
 kubectl get svc -n todo-operator-system
+kubectl get sa -n todo-operator-system
 kubectl get validatingwebhookconfiguration | grep todo
 ```
 
@@ -898,17 +984,17 @@ kubectl auth can-i create deployments --as="${SA}" -n todo-team-a
 kubectl auth can-i delete todoapps --as="${SA}" -n todo-team-a
 ```
 
-预期第一个返回 `yes`，第二个返回 `no`。
+预期第一个返回 `yes`，第二个返回 `no`。如果你的 Helm release 渲染出的 ServiceAccount 不是 `todo-operator`，先用 `kubectl get sa -n todo-operator-system` 找到真实名称，再替换 `SA`。
 
-#### 5.5.3 应用最终 YAML
+#### 5.5.3 跑通最小可执行闭环
 
 ```bash
-kubectl apply -f deployments/final/todoapp-full.yaml
-kubectl -n todo-team-a get todoapp,tododatabase,todocache
+kubectl apply -f deployments/final/todoapp-local-smoke.yaml
+kubectl -n todo-team-a get todoapp
 kubectl -n todo-team-a get deploy,svc,pod
 ```
 
-如果你没有安装 `TodoDatabase` 和 `TodoCache` CRD，先删除最终 YAML 中对应两段，再执行本节命令。不要为了跳过错误而删除 `TodoApp` 的接管标签，否则第 41 篇的 predicate 会让 Operator 忽略这个对象。
+这一段是本章主路径。只要第 41 篇 Operator 已安装，并且 Watch 范围包含 `todo-team-a`，就应该能跑通。
 
 #### 5.5.4 运行最终验证脚本
 
@@ -918,17 +1004,45 @@ scripts/final-verify.sh
 
 脚本会完成这些检查：
 
-- CRD 是否存在。
-- 最终 YAML 是否能 apply。
+- `TodoApp` CRD 是否存在。
+- 最小 YAML 是否能 apply。
 - `TodoApp` 是否存在。
 - Deployment 是否 rollout 成功。
 - Service 是否存在。
 - `TodoApp.status.conditions` 是否进入 Ready。
-- Operator RBAC 是否符合预期。
-- metrics 是否能访问。
+- Operator RBAC 是否符合预期，如果 ServiceAccount 名称能匹配。
+- metrics 是否能访问，如果 metrics Service 名称能匹配。
 - 证据文件是否写入 `docs/portfolio/evidence/`。
 
-#### 5.5.5 模拟一次错误镜像故障
+如果你的 ServiceAccount 或 metrics Service 名称不同，用环境变量覆盖：
+
+```bash
+OPERATOR_SERVICE_ACCOUNT=todo-operator-controller-manager \
+METRICS_SERVICE=todo-operator-controller-manager-metrics-service \
+scripts/final-verify.sh
+```
+
+#### 5.5.5 验证完整作品集 YAML
+
+完整路径需要三个 CRD 都已安装：
+
+```bash
+kubectl get crd todoapps.platform.todo.example.com
+kubectl get crd tododatabases.platform.todo.example.com
+kubectl get crd todocaches.platform.todo.example.com
+```
+
+把 `deployments/final/todoapp-full.yaml` 中的镜像替换为你的真实 Todo API 镜像或 digest，然后执行：
+
+```bash
+kubectl apply --dry-run=server -f deployments/final/todoapp-full.yaml
+kubectl apply -f deployments/final/todoapp-full.yaml
+MANIFEST=deployments/final/todoapp-full.yaml scripts/final-verify.sh
+```
+
+如果你尚未实现 DB/Cache Controller，`TodoDatabase` 和 `TodoCache` 只会作为 API 对象存在，不会自动创建 PostgreSQL 或 Redis。这一点要写进作品集的“当前边界”。
+
+#### 5.5.6 模拟一次错误镜像故障
 
 把镜像改成一个不存在的 tag：
 
@@ -957,7 +1071,7 @@ kubectl -n todo-team-a rollout status deployment/todo-platform-final --timeout=1
 
 在 GitOps 生产流程中，这个修复不应该用 `kubectl patch` 直接做在线修改，而应该改 `deployments/final/todoapp-full.yaml` 并通过 PR 合并。这里用 patch 是为了本地快速演练定位路径。
 
-#### 5.5.6 接入 Argo CD
+#### 5.5.7 接入 Argo CD
 
 如果你的本地集群已经安装 Argo CD，先修改 Application 的 `repoURL`，然后执行：
 
@@ -982,17 +1096,42 @@ kubectl -n argocd get application todo-platform-final -o yaml
 
 重点看 `.status.sync.status`、`.status.health.status`、`.status.operationState.phase` 和 `.status.summary`。
 
+Argo CD 修复故障时，不要直接 patch 线上 Deployment。推荐流程是：
+
+```bash
+git checkout -b fix/final-image-digest
+# 编辑 deployments/final/todoapp-full.yaml，把 spec.image 改为已存在的镜像 tag 或 digest
+git add deployments/final/todoapp-full.yaml
+git commit -m "修复最终交付镜像版本"
+git push origin fix/final-image-digest
+```
+
+PR 合并后，等待 Argo CD 同步，再检查 Application revision 是否已经变成新的 commit。
+
+#### 5.5.8 补充可观测性证据
+
+如果第 31-32 篇的可观测组件已经安装，可以保存下面三类证据。Prometheus 查询示例：
+
+```promql
+rate(controller_runtime_reconcile_errors_total{controller="todoapp"}[5m])
+histogram_quantile(0.95, rate(controller_runtime_reconcile_time_seconds_bucket{controller="todoapp"}[5m]))
+```
+
+Loki 查询示例：
+
+```logql
+{namespace="todo-team-a"} |= "todo-platform-final"
+{namespace="todo-operator-system"} |= "todo-platform-final"
+```
+
+Trace 查询没有统一命令，取决于你在第 32 篇使用 Tempo、Jaeger 还是其他后端。作品集里至少保存一张截图，能展示 `request_id` 或 trace id 如何从 API 日志跳到 Trace 明细。
+
 ### 5.6 步骤 6：预期输出
 
-最终 YAML apply 成功时，你会看到类似输出：
+最小可执行 YAML apply 成功时，你会看到类似输出：
 
 ```text
 namespace/todo-team-a configured
-resourcequota/todo-team-a-quota configured
-limitrange/todo-team-a-defaults configured
-secret/todo-postgres-credentials configured
-tododatabase.platform.todo.example.com/todo-postgres configured
-todocache.platform.todo.example.com/todo-redis configured
 todoapp.platform.todo.example.com/todo-platform-final configured
 ```
 
@@ -1046,11 +1185,13 @@ Warning  Failed     kubelet  Error: ImagePullBackOff
 
 ### 5.7 步骤 7：验证方法
 
-本章完成后，用下面的 checklist 验收：
+本章完成后，先用必须项验收，再看增强项。
+
+必须通过：
 
 | 验收项 | 命令 | 通过标准 |
 |---|---|---|
-| 最终 YAML 可应用 | `kubectl apply -f deployments/final/todoapp-full.yaml` | 所有目标资源 created 或 configured |
+| 最小 YAML 可应用 | `kubectl apply -f deployments/final/todoapp-local-smoke.yaml` | Namespace 和 TodoApp created 或 configured |
 | Operator 接管对象 | `kubectl -n todo-team-a get deploy todo-platform-final` | Deployment 存在 |
 | 业务副本 Ready | `kubectl -n todo-team-a rollout status deploy/todo-platform-final` | rollout 成功 |
 | 状态回写 | `kubectl -n todo-team-a describe todoapp todo-platform-final` | Ready condition 为 True |
@@ -1058,7 +1199,16 @@ Warning  Failed     kubelet  Error: ImagePullBackOff
 | metrics 暴露 | `curl http://127.0.0.1:18080/metrics` | 包含 controller_runtime_reconcile 指标 |
 | 故障可定位 | 查看 Events 和排障文档 | 能解释 ImagePullBackOff 根因 |
 | 作品集完整 | `ls docs/portfolio` | 架构、部署、排障、讲解稿和 evidence 目录存在 |
+
+增强项：
+
+| 验收项 | 命令 | 通过标准 |
+|---|---|---|
+| 完整 YAML 可应用 | `kubectl apply -f deployments/final/todoapp-full.yaml` | TodoApp、TodoDatabase、TodoCache created 或 configured |
 | GitOps 可接入 | `argocd app get todo-platform-final` | Application 可创建并进入 Synced |
+| Prometheus 证据 | 查询 reconcile 错误率和耗时 | 能保存查询结果或 Grafana 截图 |
+| 日志证据 | 使用 LogQL 查询目标 namespace | 能定位应用或 Operator 日志 |
+| Trace 证据 | 在 Trace 后端按 trace id 查询 | 能展示一次请求链路 |
 
 如果要把本章作为最终课程验收，建议录制或保存三类证据：
 
@@ -1071,6 +1221,7 @@ Warning  Failed     kubelet  Error: ImagePullBackOff
 如果只想清理本章创建的租户资源：
 
 ```bash
+kubectl delete -f deployments/final/todoapp-local-smoke.yaml --ignore-not-found
 kubectl delete -f deployments/final/todoapp-full.yaml --ignore-not-found
 ```
 
@@ -1103,7 +1254,7 @@ kubectl -n argocd delete application todo-platform-final --ignore-not-found
 - **现象**：
 
   ```text
-  error: resource mapping not found for name: "todo-platform-final" namespace: "todo-team-a" from "deployments/final/todoapp-full.yaml": no matches for kind "TodoApp" in version "platform.todo.example.com/v1alpha1"
+  error: resource mapping not found for name: "todo-platform-final" namespace: "todo-team-a" from "deployments/final/todoapp-local-smoke.yaml": no matches for kind "TodoApp" in version "platform.todo.example.com/v1alpha1"
   ensure CRDs are installed first
   ```
 
@@ -1119,7 +1270,7 @@ kubectl -n argocd delete application todo-platform-final --ignore-not-found
 
   如果 `kubectl get crd` 中没有 `todoapps`，说明第 35 篇或第 40-41 篇的 CRD 安装没有完成。
 
-- **修复**：安装 Operator Helm Chart 或 CRD 清单，然后重新 apply 最终 YAML。
+- **修复**：安装 Operator Helm Chart 或 CRD 清单，然后重新 apply 最小 YAML。完整作品集 YAML 还需要安装 `TodoDatabase` 和 `TodoCache` CRD。
 
 - **预防**：在最终验证脚本开头检查 CRD；GitOps 应用可以用 sync wave 或依赖关系保证 CRD 先于 CR 实例安装。
 
@@ -1242,7 +1393,8 @@ kubectl -n argocd delete application todo-platform-final --ignore-not-found
 
 本章小项目是完成 Cloud Native Todo Platform 最终交付包。你需要在项目仓库中交付：
 
-- `deployments/final/todoapp-full.yaml`：最终一条 YAML 交付入口。
+- `deployments/final/todoapp-local-smoke.yaml`：最小可执行交付入口，必须能在第 41 篇 Operator 上跑通。
+- `deployments/final/todoapp-full.yaml`：完整作品集交付入口，表达 TodoApp、TodoDatabase 和 TodoCache 平台契约。
 - `deployments/gitops/applications/todo-platform-final.yaml`：Argo CD Application 示例。
 - `.github/workflows/final-integration.yml`：最终集成 CI。
 - `scripts/final-verify.sh`：最终验收脚本。
@@ -1256,10 +1408,11 @@ kubectl -n argocd delete application todo-platform-final --ignore-not-found
 
 | 验收项 | 判断方式 |
 |---|---|
-| 一条 YAML 可执行 | `kubectl apply -f deployments/final/todoapp-full.yaml` 成功 |
+| 最小一条 YAML 可执行 | `kubectl apply -f deployments/final/todoapp-local-smoke.yaml` 成功 |
 | Operator 自动调谐 | `TodoApp` 创建后生成同名 Deployment 和 Service |
 | 业务状态 Ready | Deployment rollout 成功，`TodoApp.status.conditions` 为 Ready |
-| GitOps 可接入 | Argo CD Application 能指向 `deployments/final` |
+| 完整契约可说明 | 能解释 `todoapp-full.yaml` 中 DB/Cache 当前是 API 契约还是已调谐资源 |
+| GitOps 可接入 | Argo CD Application 能指向 `deployments/final` 并只 include `todoapp-full.yaml` |
 | CI 覆盖核心路径 | Go、Helm、YAML、docs 至少有对应验证步骤 |
 | 故障可复现 | 错误镜像演练能产生可解释的 `ImagePullBackOff` 证据 |
 | 证据可归档 | `docs/portfolio/evidence/` 包含对象状态、Events、metrics 样例和截图占位 |
@@ -1273,13 +1426,13 @@ kubectl -n argocd delete application todo-platform-final --ignore-not-found
 
 1. 为什么“Pod Running”不能代表最终交付链路完全健康？还需要哪些证据？
 2. CI/CD、GitOps 和 Operator 分别负责哪一段自动化？它们的边界是什么？
-3. 为什么最终 YAML 中仍然需要 namespace 标签、ResourceQuota 和接管标签？
+3. 为什么最小 YAML 中必须保留 namespace 标签和接管标签？完整 YAML 中为什么还要增加 ResourceQuota？
 4. 作品集里的架构图、部署手册、故障复盘和面试讲解稿分别回答什么问题？
 5. 使用镜像 digest 相比使用普通 tag 有什么生产价值？
 
 ### 实操题
 
-1. 把最终 YAML 中的 `replicas` 从 2 改为 3，通过 GitOps 或手工 apply 触发变更。验收标准：Deployment 最终 Ready 副本数为 3，`TodoApp.status.readyReplicas` 同步更新。
+1. 把 `todoapp-local-smoke.yaml` 中的 `replicas` 从 2 改为 3，通过手工 apply 触发变更。验收标准：Deployment 最终 Ready 副本数为 3，`TodoApp.status.readyReplicas` 同步更新。
 2. 给 `scripts/final-verify.sh` 增加 Ingress 或 Gateway API 验证。验收标准：当入口资源存在时脚本检查 HTTP 状态码；不存在时输出跳过说明。
 3. 在 `.github/workflows/final-integration.yml` 中增加 kind server-side dry-run job。验收标准：CI 能安装 CRD 后执行 `kubectl apply --dry-run=server -f deployments/final/todoapp-full.yaml`。
 
@@ -1330,11 +1483,19 @@ kubectl -n argocd delete application todo-platform-final --ignore-not-found
 
 **深入追问**：如果面试官问你个人贡献怎么证明？可以指向 Reconciler 代码、CRD schema、Helm Chart、CI 工作流、最终验证脚本、Grafana 截图和故障复盘文档。
 
+### 面试题 6：当前 Operator 还没有管理数据库和缓存，你如何解释项目边界？
+
+**一句话结论**：我会明确说明当前已实现的是 `TodoApp` 应用交付闭环，`TodoDatabase` 和 `TodoCache` 是已经设计好的平台 API 契约，后续可以继续实现对应 Controller。
+
+**展开解释**：项目里最小可执行路径已经能用 `TodoApp` 自动创建 Deployment 和 Service，并完成 status、Events、metrics 和故障演练。完整作品集 YAML 中保留 DB/Cache CR，是为了展示最终平台 API 设计和演进方向，但不会把尚未实现的 Controller 说成已经完成。
+
+**深入追问**：如果要补齐这部分，你会怎么做？我会先为 `TodoDatabase` 和 `TodoCache` 定义 Reconcile 边界、RBAC、OwnerReference/Finalizer 策略和 status conditions，再分别对接 PostgreSQL/Redis Helm Chart 或托管云服务，并补齐 envtest、kind e2e 和迁移回滚策略。
+
 ## 11. 本章总结
 
 本篇完成了 Cloud Native Todo Platform 的最终集成。知识上，你把 Go API、Docker、Kubernetes、Helm、Kustomize、CI/CD、GitOps、可观测性、CRD、Controller 和 Operator 放进同一张交付图里，理解了从代码提交到运行中 Pod 的完整状态链路。
 
-实践上，你整理了最终一条 YAML、GitOps Application、最终集成 CI、验证脚本、架构说明、部署手册、故障排查文档和面试讲解稿。你还通过错误镜像演练验证了排障路径：从 `TodoApp` 到 Deployment、Pod Events、Operator metrics 和 GitOps 源头，而不是停留在“重启试试”。
+实践上，你整理了最小可执行 YAML、完整作品集 YAML、GitOps Application、最终集成 CI、验证脚本、架构说明、部署手册、故障排查文档和面试讲解稿。你还通过错误镜像演练验证了排障路径：从 `TodoApp` 到 Deployment、Pod Events、Operator metrics 和 GitOps 源头，而不是停留在“重启试试”。
 
 能力上，你已经具备把一个学习项目转换成职业作品集的基本方法：用工程证据证明技术能力，用故障复盘证明生产意识，用清晰表达证明你理解架构取舍。至此，这套课程的主线从“会写一个服务”推进到了“能交付一个可治理的平台能力”。
 
