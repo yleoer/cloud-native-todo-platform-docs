@@ -481,7 +481,7 @@ spec:
       serviceAccountName: traefik
       containers:
         - name: traefik
-          image: traefik:v3.6.17
+          image: registry.cn-guangzhou.aliyuncs.com/yleoer/registry.cn-guangzhou.aliyuncs.com/yleoer/traefik:v3.6.17
           imagePullPolicy: IfNotPresent
           args:
             - --entrypoints.web.address=:80

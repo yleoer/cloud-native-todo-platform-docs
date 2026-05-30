@@ -244,7 +244,7 @@ helm version
 
 ```bash
 export OPERATOR_IMG=todo-operator:v0.3.0-test
-export KIND_NODE_IMAGE=kindest/node:v1.36.0
+export KIND_NODE_IMAGE=registry.cn-guangzhou.aliyuncs.com/yleoer/node:v1.36.0
 export KIND_CLUSTER_NAME=todo-operator-e2e
 ```
 
@@ -252,7 +252,7 @@ Windows PowerShell 使用下面的等价写法：
 
 ```powershell
 $env:OPERATOR_IMG = "todo-operator:v0.3.0-test"
-$env:KIND_NODE_IMAGE = "kindest/node:v1.36.0"
+$env:KIND_NODE_IMAGE = "registry.cn-guangzhou.aliyuncs.com/yleoer/node:v1.36.0"
 $env:KIND_CLUSTER_NAME = "todo-operator-e2e"
 ```
 
@@ -347,7 +347,7 @@ func TestTodoAppValidateRejectsLatestImage(t *testing.T) {
 	port := int32(80)
 	todo := &platformv1alpha1.TodoApp{}
 	todo.Name = "todo-invalid"
-	todo.Spec.Image = "nginx:latest"
+	todo.Spec.Image = "registry.cn-guangzhou.aliyuncs.com/yleoer/nginx:latest"
 	todo.Spec.Replicas = &replicas
 	todo.Spec.Port = &port
 
@@ -368,7 +368,7 @@ func TestTodoAppValidateWarnsOnPortChange(t *testing.T) {
 
 	oldTodo := &platformv1alpha1.TodoApp{}
 	oldTodo.Name = "todo-platform"
-	oldTodo.Spec.Image = "nginxdemos/hello:plain-text"
+	oldTodo.Spec.Image = "registry.cn-guangzhou.aliyuncs.com/yleoer/hello:plain-text"
 	oldTodo.Spec.Replicas = &replicas
 	oldTodo.Spec.Port = &oldPort
 
@@ -474,7 +474,7 @@ func TestReconcileCreatesDeploymentServiceAndStatus(t *testing.T) {
 			Namespace: "default",
 		},
 		Spec: platformv1alpha1.TodoAppSpec{
-			Image:    "nginxdemos/hello:plain-text",
+			Image:    "registry.cn-guangzhou.aliyuncs.com/yleoer/hello:plain-text",
 			Replicas: &replicas,
 			Port:     &port,
 		},
@@ -542,7 +542,7 @@ func TestReconcileRemovesFinalizerOnDelete(t *testing.T) {
 			Namespace: "default",
 		},
 		Spec: platformv1alpha1.TodoAppSpec{
-			Image:    "nginxdemos/hello:plain-text",
+			Image:    "registry.cn-guangzhou.aliyuncs.com/yleoer/hello:plain-text",
 			Replicas: &replicas,
 			Port:     &port,
 		},
@@ -664,7 +664,7 @@ mkdir -p test/e2e
 set -euo pipefail
 
 CLUSTER_NAME="${KIND_CLUSTER_NAME:-todo-operator-e2e}"
-KIND_NODE_IMAGE="${KIND_NODE_IMAGE:-kindest/node:v1.36.0}"
+KIND_NODE_IMAGE="${KIND_NODE_IMAGE:-registry.cn-guangzhou.aliyuncs.com/yleoer/node:v1.36.0}"
 IMG="${OPERATOR_IMG:-todo-operator:v0.3.0-test}"
 CERT_MANAGER_VERSION="${CERT_MANAGER_VERSION:-v1.20.0}"
 DELETE_CLUSTER="${DELETE_CLUSTER:-false}"
@@ -699,7 +699,9 @@ kubectl cluster-info >/dev/null
 make generate
 make manifests
 
-kubectl apply -f "https://github.com/cert-manager/cert-manager/releases/download/${CERT_MANAGER_VERSION}/cert-manager.yaml"
+curl -L -o cert-manager.yaml "https://github.com/cert-manager/cert-manager/releases/download/${CERT_MANAGER_VERSION}/cert-manager.yaml"
+sed -i 's|quay.io/jetstack/|registry.cn-guangzhou.aliyuncs.com/yleoer/|g' cert-manager.yaml
+kubectl apply -f cert-manager.yaml
 kubectl wait --for=condition=Available deployment --all -n cert-manager --timeout=300s
 
 docker build -t "${IMG}" .
@@ -718,7 +720,7 @@ metadata:
   name: todo-e2e
   namespace: default
 spec:
-  image: nginxdemos/hello:plain-text
+  image: registry.cn-guangzhou.aliyuncs.com/yleoer/hello:plain-text
   replicas: 2
   port: 80
 YAML
@@ -759,7 +761,7 @@ metadata:
   name: todo-invalid-e2e
   namespace: default
 spec:
-  image: nginx:latest
+  image: registry.cn-guangzhou.aliyuncs.com/yleoer/nginx:latest
   replicas: 2
   port: 80
 YAML
@@ -1242,7 +1244,9 @@ kubectl get deployment -n cert-manager
 如果没有安装，执行：
 
 ```bash
-kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.20.0/cert-manager.yaml
+curl -L -o cert-manager.yaml https://github.com/cert-manager/cert-manager/releases/download/v1.20.0/cert-manager.yaml
+sed -i 's|quay.io/jetstack/|registry.cn-guangzhou.aliyuncs.com/yleoer/|g' cert-manager.yaml
+kubectl apply -f cert-manager.yaml
 kubectl wait --for=condition=Available deployment --all -n cert-manager --timeout=300s
 ```
 

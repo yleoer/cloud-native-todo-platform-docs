@@ -10,7 +10,7 @@
 | Kubernetes | v1.35.0 或 v1.36.x | 第 34-38 篇基础 API/CRD/Controller | 确认不使用 v1.36 专属能力 |
 | Kubernetes | v1.36.x | 第 39-42 篇 Webhook、策略型准入、生产基线 | `kubectl version` 服务端为 v1.36.x |
 | kubectl | v1.36.x | 操作 API、dry-run、排障 | 客户端与服务端小版本差异不超过 1 |
-| kind | v0.31+ | 本地集成测试集群 | 能拉取并启动 `kindest/node:v1.36.0` |
+| kind | v0.31+ | 本地集成测试集群 | 能拉取并启动 `registry.cn-guangzhou.aliyuncs.com/yleoer/node:v1.36.0` |
 | Docker | 29.x | 构建 Operator 和 Todo API 镜像 | `docker build`、`kind load docker-image` |
 | Kubebuilder | 4.11.x | 初始化项目、生成 Webhook/RBAC/CRD | `kubebuilder version` 与正文命令一致 |
 | controller-runtime | Kubebuilder 项目依赖版本 | Manager、Client、cache、envtest | `go list -m sigs.k8s.io/controller-runtime`，记录具体版本号 |
@@ -75,7 +75,7 @@ kubectl api-resources | grep -i mutatingadmissionpolicy || true
 
 ```bash
 kind delete cluster --name todo-operator-e2e
-kind create cluster --name todo-operator-e2e --image kindest/node:v1.36.0
+kind create cluster --name todo-operator-e2e --image registry.cn-guangzhou.aliyuncs.com/yleoer/node:v1.36.0
 ```
 
 不要在共享测试、预发或生产集群上为了课程实验随意删除集群或 CRD。

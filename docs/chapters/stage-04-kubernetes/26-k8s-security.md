@@ -339,7 +339,7 @@ flowchart TD
 | Kubernetes | v1.25+，推荐 v1.36.x | 主线实验使用 v1.25+ 稳定能力；User Namespaces 增强步骤推荐 v1.36 |
 | kind | v0.29.x 或更新 | 继续使用第 20 篇创建的 `todo-k8s` 集群即可 |
 | kubectl | 与集群小版本相差不超过 1 | 用于 apply、auth can-i、rollout 和 exec |
-| 容器镜像 | `alpine:3.23` | 用 BusyBox `nc` 模拟 Todo API HTTP 服务 |
+| 容器镜像 | `registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23` | 用 BusyBox `nc` 模拟 Todo API HTTP 服务 |
 | 操作系统 | Linux / macOS / WSL2 | Windows PowerShell 用户需改写 heredoc |
 
 表 26-4 本篇安全能力兼容性：
@@ -517,7 +517,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: todo-api
-          image: alpine:3.23
+          image: registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
@@ -600,7 +600,7 @@ spec:
       type: RuntimeDefault
   containers:
     - name: client
-      image: alpine:3.23
+      image: registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23
       imagePullPolicy: IfNotPresent
       command: ["sh", "-c", "sleep 3600"]
       securityContext:
@@ -680,7 +680,7 @@ metadata:
 spec:
   containers:
     - name: shell
-      image: alpine:3.23
+      image: registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23
       command: ["sh", "-c", "sleep 3600"]
       securityContext:
         privileged: true

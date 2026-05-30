@@ -330,9 +330,9 @@ jq --version
 确认本篇用到的公共镜像 tag 可以访问：
 
 ```bash
-docker manifest inspect registry.k8s.io/pause:3.10 >/dev/null
-docker manifest inspect registry.k8s.io/e2e-test-images/busybox:1.36.1-1 >/dev/null
-docker manifest inspect registry.k8s.io/e2e-test-images/agnhost:2.53 >/dev/null
+docker manifest inspect registry.cn-guangzhou.aliyuncs.com/yleoer/pause:3.10 >/dev/null
+docker manifest inspect registry.cn-guangzhou.aliyuncs.com/yleoer/busybox:1.36.1-1 >/dev/null
+docker manifest inspect registry.cn-guangzhou.aliyuncs.com/yleoer/agnhost:2.53 >/dev/null
 docker manifest inspect curlimages/curl:8.16.0 >/dev/null
 docker manifest inspect nicolaka/netshoot:v0.14 >/dev/null
 ```
@@ -389,7 +389,7 @@ spec:
     troubleshooting.cloudnative.example/missing-node: "true"
   containers:
     - name: pause
-      image: registry.k8s.io/pause:3.10
+      image: registry.cn-guangzhou.aliyuncs.com/yleoer/pause:3.10
       resources:
         requests:
           cpu: 10m
@@ -464,7 +464,7 @@ metadata:
 spec:
   containers:
     - name: writer
-      image: registry.k8s.io/e2e-test-images/busybox:1.36.1-1
+      image: registry.cn-guangzhou.aliyuncs.com/yleoer/busybox:1.36.1-1
       command: ["sh", "-c", "date >> /data/probe.txt && sleep 3600"]
       volumeMounts:
         - name: data
@@ -513,7 +513,7 @@ spec:
         value: "2"
   containers:
     - name: dns
-      image: registry.k8s.io/e2e-test-images/busybox:1.36.1-1
+      image: registry.cn-guangzhou.aliyuncs.com/yleoer/busybox:1.36.1-1
       command: ["sh", "-c", "sleep 3600"]
       resources:
         requests:
@@ -545,7 +545,7 @@ spec:
   restartPolicy: Always
   containers:
     - name: memory-hog
-      image: registry.k8s.io/e2e-test-images/agnhost:2.53
+      image: registry.cn-guangzhou.aliyuncs.com/yleoer/agnhost:2.53
       args:
         - stress
         - --mem-total
@@ -894,7 +894,7 @@ kubectl -n kube-system get pod -l k8s-app=kube-dns
 ```bash
 kubectl -n todo-dev delete pod todo-dns-client
 kubectl -n todo-dev run todo-dns-client \
-  --image=registry.k8s.io/e2e-test-images/busybox:1.36.1-1 \
+  --image=registry.cn-guangzhou.aliyuncs.com/yleoer/busybox:1.36.1-1 \
   --restart=Never \
   --command -- sleep 3600
 kubectl -n todo-dev wait --for=condition=Ready pod/todo-dns-client --timeout=120s

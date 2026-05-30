@@ -368,7 +368,7 @@ cloud-native-todo-platform/
 ```yaml title="docker-compose.yml"
 services:
   postgres:
-    image: postgres:18-alpine
+    image: registry.cn-guangzhou.aliyuncs.com/yleoer/postgres:18-alpine
     container_name: todo-postgres
     environment:
       POSTGRES_USER: todo
@@ -387,7 +387,7 @@ services:
       retries: 20
 
   redis:
-    image: redis:8.2-alpine
+    image: registry.cn-guangzhou.aliyuncs.com/yleoer/redis:8.2-alpine
     container_name: todo-redis
     command: ["redis-server", "--requirepass", "todo_redis_password", "--appendonly", "yes"]
     ports:

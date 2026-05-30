@@ -1079,6 +1079,7 @@ helm upgrade --install loki grafana/loki \
   --namespace observability \
   --create-namespace \
   -f observability/loki/loki-values.yaml \
+  --set loki.image.repository=registry.cn-guangzhou.aliyuncs.com/yleoer/loki \
   --wait \
   --timeout 10m
 ```
@@ -1090,6 +1091,7 @@ helm upgrade --install tempo grafana/tempo \
   --version 1.24.4 \
   --namespace observability \
   -f observability/tempo/tempo-values.yaml \
+  --set tempo.image.repository=registry.cn-guangzhou.aliyuncs.com/yleoer/tempo \
   --wait \
   --timeout 10m
 ```
@@ -1101,6 +1103,7 @@ helm upgrade --install alloy grafana/alloy \
   --version 1.8.2 \
   --namespace observability \
   -f observability/alloy/alloy-values.yaml \
+  --set alloy.image.repository=registry.cn-guangzhou.aliyuncs.com/yleoer/alloy \
   --wait \
   --timeout 10m
 ```

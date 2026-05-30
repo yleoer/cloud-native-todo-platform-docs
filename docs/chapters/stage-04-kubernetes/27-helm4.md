@@ -1178,7 +1178,7 @@ spec:
   restartPolicy: Never
   containers:
     - name: wget
-      image: alpine:3.23
+      image: registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23
       command:
         - wget
       args:

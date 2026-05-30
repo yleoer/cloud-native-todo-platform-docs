@@ -332,12 +332,12 @@ kubebuilder version
 本篇需要 Kubernetes 1.36.x。后续创建 kind 集群时固定使用课程节点镜像：
 
 ```bash
-export KIND_NODE_IMAGE=kindest/node:v1.36.0
+export KIND_NODE_IMAGE=registry.cn-guangzhou.aliyuncs.com/yleoer/node:v1.36.0
 ```
 
 如果你从第 34-38 篇一路沿用阶段五的 `todo-gitops` 集群，请先确认服务端版本。前几篇可以在 v1.35/v1.36 上运行，但本篇的 `MutatingAdmissionPolicy` 可选实验需要 v1.36 API。若当前集群仍是 v1.35，可以继续完成 Webhook、Finalizer、Events 和 Conditions 主实验，但应跳过 §5.11；如果要完整验证 §5.11，请新建一个 v1.36 kind 集群，不要在共享测试或生产集群上为了课程实验删除 CRD 或重建集群。
 
-首次创建集群时，kind 会自动拉取 `kindest/node:v1.36.0`，镜像体积较大，网络较慢时可能需要几分钟。如果你在公司网络或国内网络环境中拉取失败，可以先配置 Docker 代理或镜像加速，再手动执行 `docker pull "${KIND_NODE_IMAGE}"`。
+首次创建集群时，kind 会自动拉取 `registry.cn-guangzhou.aliyuncs.com/yleoer/node:v1.36.0`，镜像体积较大，网络较慢时可能需要几分钟。如果你在公司网络或国内网络环境中拉取失败，可以先配置 Docker 代理或镜像加速，再手动执行 `docker pull "${KIND_NODE_IMAGE}"`。
 
 如果课程环境提供了更新的 1.36.x patch 镜像，可以替换为对应 tag，但必须在实验记录中写明实际使用的完整镜像名，避免“kind 默认版本”带来的不可复现问题。
 
@@ -425,7 +425,7 @@ import (
 )
 
 const (
-	DefaultTodoAppImage    = "nginxdemos/hello:plain-text"
+	DefaultTodoAppImage    = "registry.cn-guangzhou.aliyuncs.com/yleoer/hello:plain-text"
 	DefaultTodoAppReplicas = int32(2)
 	DefaultTodoAppPort     = int32(80)
 )
@@ -1106,16 +1106,12 @@ kind delete cluster --name todo-operator
 kind create cluster --name todo-operator --image "${KIND_NODE_IMAGE}"
 ```
 
-安装 cert-manager：
+安装 cert-manager。先下载清单并替换镜像地址，再从本地文件安装：
 
 ```bash
-kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.20.0/cert-manager.yaml
-```
-
-如果当前网络无法直接访问 GitHub，可以先把清单下载到本地，再从本地文件安装：
-
-```bash
-curl -L -o cert-manager.yaml https://github.com/cert-manager/cert-manager/releases/download/v1.20.0/cert-manager.yaml
+CERT_MANAGER_VERSION="v1.20.0"
+curl -L -o cert-manager.yaml "https://github.com/cert-manager/cert-manager/releases/download/${CERT_MANAGER_VERSION}/cert-manager.yaml"
+sed -i 's|quay.io/jetstack/|registry.cn-guangzhou.aliyuncs.com/yleoer/|g' cert-manager.yaml
 kubectl apply -f cert-manager.yaml
 ```
 
@@ -1294,7 +1290,7 @@ kubectl get todoapp todo-defaults -o jsonpath='{.spec.image}{" "}{.spec.replicas
 预期输出：
 
 ```text
-nginxdemos/hello:plain-text 2 80
+registry.cn-guangzhou.aliyuncs.com/yleoer/hello:plain-text 2 80
 ```
 
 创建一个非法样例，验证 Validating Webhook：
@@ -1307,7 +1303,7 @@ metadata:
   name: todo-invalid
   namespace: default
 spec:
-  image: nginx:latest
+  image: registry.cn-guangzhou.aliyuncs.com/yleoer/nginx:latest
   replicas: 2
   port: 80
 EOF
@@ -1323,7 +1319,7 @@ kubectl apply -f config/samples/platform_v1alpha1_todoapp_invalid.yaml
 
 ```text
 The TodoApp "todo-invalid" is invalid:
-* spec.image: Invalid value: "nginx:latest": image must include an explicit non-latest tag
+* spec.image: Invalid value: "registry.cn-guangzhou.aliyuncs.com/yleoer/nginx:latest": image must include an explicit non-latest tag
 ```
 
 如果把 `replicas` 改成 `20` 或把 `port` 改成 `70000`，请求也会被拒绝。根据 Admission 与 CRD schema 的执行顺序，错误可能来自 Webhook，也可能先被 CRD OpenAPI schema 拦截；无论哪一种，非法对象都不会进入 etcd。
@@ -1344,8 +1340,8 @@ kubectl get todoapp
 
 ```text
 NAME            IMAGE                         REPLICAS   PHASE         READY   AGE
-todo-defaults   nginxdemos/hello:plain-text   2          Progressing   0       20s
-todo-platform   nginxdemos/hello:plain-text   2          Progressing   0       5s
+todo-defaults   registry.cn-guangzhou.aliyuncs.com/yleoer/hello:plain-text   2          Progressing   0       20s
+todo-platform   registry.cn-guangzhou.aliyuncs.com/yleoer/hello:plain-text   2          Progressing   0       5s
 ```
 
 等待镜像拉取和 Pod Ready 后再次查看：
@@ -1674,7 +1670,7 @@ kind delete cluster --name todo-operator
 
   先确认 Server Version 是否为 `v1.36.x`，再看 `api-resources` 是否有输出。没有输出说明当前集群不支持本可选能力。
 
-- **修复**：跳过可选实验，继续使用 Mutating Webhook；或者删除 kind 集群后使用 `kindest/node:v1.36.0` 重新创建课程锁定环境。
+- **修复**：跳过可选实验，继续使用 Mutating Webhook；或者删除 kind 集群后使用 `registry.cn-guangzhou.aliyuncs.com/yleoer/node:v1.36.0` 重新创建课程锁定环境。
 - **预防**：生产上线前明确集群版本矩阵，不要在多版本集群中默认启用新 API。
 
 ## 7. 生产环境注意事项

@@ -50,9 +50,9 @@
 出版前还需要验证以下公共镜像 tag 可以访问；如果企业网络无法直接访问 Docker Hub、GHCR 或 `registry.k8s.io`，请使用企业镜像代理或私有 registry，并在命令中替换镜像地址：
 
 ```bash
-docker manifest inspect registry.k8s.io/pause:3.10 >/dev/null
-docker manifest inspect registry.k8s.io/e2e-test-images/busybox:1.36.1-1 >/dev/null
-docker manifest inspect registry.k8s.io/e2e-test-images/agnhost:2.53 >/dev/null
+docker manifest inspect registry.cn-guangzhou.aliyuncs.com/yleoer/pause:3.10 >/dev/null
+docker manifest inspect registry.cn-guangzhou.aliyuncs.com/yleoer/busybox:1.36.1-1 >/dev/null
+docker manifest inspect registry.cn-guangzhou.aliyuncs.com/yleoer/agnhost:2.53 >/dev/null
 docker manifest inspect curlimages/curl:8.16.0 >/dev/null
 docker manifest inspect nicolaka/netshoot:v0.14 >/dev/null
 ```

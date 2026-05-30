@@ -383,12 +383,12 @@ metadata:
     platform.todo.example.com/release: "v5.0-final-delivery"
     platform.todo.example.com/source: "deployments/final/todoapp-local-smoke.yaml"
 spec:
-  image: nginxdemos/hello:plain-text
+  image: registry.cn-guangzhou.aliyuncs.com/yleoer/hello:plain-text
   replicas: 2
   port: 80
 ```
 
-这里使用 `nginxdemos/hello:plain-text` 是为了让本地 kind 和课程环境稳定验收。它不是最终业务镜像，只用于证明 Operator 闭环可执行。真正作品集里应把 `TodoApp.spec.image` 替换为课程 Todo API 镜像或镜像 digest。
+这里使用 `registry.cn-guangzhou.aliyuncs.com/yleoer/hello:plain-text` 是为了让本地 kind 和课程环境稳定验收。它不是最终业务镜像，只用于证明 Operator 闭环可执行。真正作品集里应把 `TodoApp.spec.image` 替换为课程 Todo API 镜像或镜像 digest。
 
 #### 5.4.2 完整作品集 YAML
 
@@ -1090,7 +1090,7 @@ MANIFEST=deployments/final/todoapp-full.yaml scripts/final-verify.sh
 
 ```bash
 kubectl -n todo-team-a patch todoapp todo-platform-final --type=merge \
-  -p '{"spec":{"image":"nginxdemos/hello:missing-final-42"}}'
+  -p '{"spec":{"image":"registry.cn-guangzhou.aliyuncs.com/yleoer/hello:missing-final-42"}}'
 ```
 
 观察 rollout：
@@ -1109,7 +1109,7 @@ curl -s http://127.0.0.1:18080/metrics | grep controller_runtime_reconcile_error
 
 ```bash
 kubectl -n todo-team-a patch todoapp todo-platform-final --type=merge \
-  -p '{"spec":{"image":"nginxdemos/hello:plain-text"}}'
+  -p '{"spec":{"image":"registry.cn-guangzhou.aliyuncs.com/yleoer/hello:plain-text"}}'
 
 kubectl -n todo-team-a rollout status deployment/todo-platform-final --timeout=180s
 ```
@@ -1194,7 +1194,7 @@ kubectl -n todo-team-a get todoapp todo-platform-final
 
 ```text
 NAME                  IMAGE                         REPLICAS   PHASE   READY   AGE
-todo-platform-final   nginxdemos/hello:plain-text   2          Ready   2       2m
+todo-platform-final   registry.cn-guangzhou.aliyuncs.com/yleoer/hello:plain-text   2          Ready   2       2m
 ```
 
 查看工作负载：
@@ -1226,7 +1226,7 @@ final verification passed
 故障演练时，错误镜像会看到类似输出：
 
 ```text
-Warning  Failed     kubelet  Failed to pull image "nginxdemos/hello:missing-final-42"
+Warning  Failed     kubelet  Failed to pull image "registry.cn-guangzhou.aliyuncs.com/yleoer/hello:missing-final-42"
 Warning  Failed     kubelet  Error: ImagePullBackOff
 ```
 

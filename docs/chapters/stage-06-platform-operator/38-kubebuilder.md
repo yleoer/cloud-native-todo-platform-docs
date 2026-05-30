@@ -938,12 +938,12 @@ metadata:
   name: todo-platform
   namespace: default
 spec:
-  image: nginxdemos/hello:plain-text  # ← 使用可直接暴露 HTTP 的示例镜像
+  image: registry.cn-guangzhou.aliyuncs.com/yleoer/hello:plain-text  # ← 使用可直接暴露 HTTP 的示例镜像
   replicas: 2                         # ← 期望创建 2 个 Pod
   port: 80                            # ← 容器和 Service 暴露端口
 ```
 
-本篇为了聚焦 Operator 机制，使用 `nginxdemos/hello:plain-text` 作为可访问的 HTTP 镜像。真实项目中这里会替换为课程前面构建出来的 Todo API 镜像。如果所在网络无法拉取该镜像，先通过 `kubectl describe pod` 确认是否为 `ErrImagePull` 或 `ImagePullBackOff`，再替换为内部仓库中可访问、监听 80 端口的 HTTP 示例镜像。
+本篇为了聚焦 Operator 机制，使用 `registry.cn-guangzhou.aliyuncs.com/yleoer/hello:plain-text` 作为可访问的 HTTP 镜像。真实项目中这里会替换为课程前面构建出来的 Todo API 镜像。如果所在网络无法拉取该镜像，先通过 `kubectl describe pod` 确认是否为 `ErrImagePull` 或 `ImagePullBackOff`，再替换为内部仓库中可访问、监听 80 端口的 HTTP 示例镜像。
 
 > **可选实验**：如果已经完成前面章节的 Todo API 镜像构建，可以把镜像加载到 kind 集群后再切换 `TodoApp.spec.image`。这一步不是完成本章的必需操作，目的是把本章 Operator 实验接回课程主线。
 
@@ -1076,7 +1076,7 @@ kubectl get deployment,service,pods -l app.kubernetes.io/instance=todo-platform
 
 ```text
 NAME            IMAGE                         REPLICAS   READY   AGE
-todo-platform   nginxdemos/hello:plain-text   2          2       60s
+todo-platform   registry.cn-guangzhou.aliyuncs.com/yleoer/hello:plain-text   2          2       60s
 
 NAME                            READY   UP-TO-DATE   AVAILABLE   AGE
 deployment.apps/todo-platform-api   2/2     2            2           60s
@@ -1170,7 +1170,7 @@ NAME                READY   UP-TO-DATE   AVAILABLE   AGE
 todo-platform-api   3/3     3            3           ...
 
 NAME            IMAGE                         REPLICAS   READY   AGE
-todo-platform   nginxdemos/hello:plain-text   3          3       ...
+todo-platform   registry.cn-guangzhou.aliyuncs.com/yleoer/hello:plain-text   3          3       ...
 ```
 
 如果现在再次执行 sample 文件，会把 `replicas` 从 `3` 回滚到文件中的 `2`，这属于一次真实变更，不是幂等验证：
@@ -1417,7 +1417,7 @@ Dockerfile
 
 1. 给 `TodoAppSpec` 增加 `resources` 字段，用来声明 CPU 和内存 requests。验收标准：`make manifests` 后 CRD schema 中能看到 `resources` 字段，并且 Deployment container 中出现对应 requests。
 2. 给 `TodoApp` 增加 `Service` 打印列，显示 Service 端口。验收标准：执行 `kubectl get todoapp` 时能看到新增列，且值来自 `spec.port`。
-3. 把示例镜像从 `nginxdemos/hello:plain-text` 改成课程 Todo API 镜像，并通过 `kubectl port-forward` 访问健康检查接口。验收标准：curl 返回 Todo API 的健康检查响应。
+3. 把示例镜像从 `registry.cn-guangzhou.aliyuncs.com/yleoer/hello:plain-text` 改成课程 Todo API 镜像，并通过 `kubectl port-forward` 访问健康检查接口。验收标准：curl 返回 Todo API 的健康检查响应。
 
 ### 9.3 思考题
 

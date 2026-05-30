@@ -311,13 +311,13 @@ NetworkPolicy 是 Namespace 内对象。它不能跨 Namespace “保护所有�
 | kubectl | 与 API Server 相差不超过 1 个小版本 | 访问临时实验集群并执行排障命令 |
 | kind | 0.31.x | 创建临时网络实验集群 |
 | Docker Engine | 29.x | 运行 kind 节点和加载镜像 |
-| kind 节点镜像 | `kindest/node:v1.35.0@sha256:452d707d4862f52530247495d180205e029056831160e22870e37e3f6c1ac31f` | kind 0.31.0 官方 release 推荐镜像；临时实验集群实际 Kubernetes 版本为 1.35.0 |
+| kind 节点镜像 | `registry.cn-guangzhou.aliyuncs.com/yleoer/node:v1.35.0@sha256:452d707d4862f52530247495d180205e029056831160e22870e37e3f6c1ac31f` | kind 0.31.0 官方 release 推荐镜像；临时实验集群实际 Kubernetes 版本为 1.35.0 |
 | Calico | 3.32.0 | 提供 CNI 和 NetworkPolicy 执行能力 |
 | Alpine | 3.23 | 运行轻量 HTTP / TCP 测试容器，2026-05-28 已验证 tag 可用 |
 
 本篇使用临时集群 `todo-network-lab`。如果你已经在第 20-24 篇的主集群 `todo-k8s` 中运行 Todo Platform，不要直接修改主集群 CNI。临时集群里的 Namespace、Pod、Service 和 NetworkPolicy 都只服务本篇实验，删除 `todo-network-lab` 不会影响主集群中的 PostgreSQL、Todo API 或入口资源。
 
-为保证可复现，本篇临时使用 kind 0.31.0 官方 release 明确列出的 `kindest/node:v1.35.0` 镜像，并 pin digest。第 25 篇实验只验证标准 DNS、Service、kube-proxy 线索和 NetworkPolicy 行为，不依赖 Kubernetes 1.36 专属特性。kind 发布 1.36.x 节点镜像后，可以把下面配置中的 `image` 行替换为对应的 1.36.x 官方镜像和 digest。
+为保证可复现，本篇临时使用 kind 0.31.0 官方 release 明确列出的 `registry.cn-guangzhou.aliyuncs.com/yleoer/node:v1.35.0` 镜像，并 pin digest。第 25 篇实验只验证标准 DNS、Service、kube-proxy 线索和 NetworkPolicy 行为，不依赖 Kubernetes 1.36 专属特性。kind 发布 1.36.x 节点镜像后，可以把下面配置中的 `image` 行替换为对应的 1.36.x 官方镜像和 digest。
 
 Calico 安装命令会访问 `raw.githubusercontent.com`。发布前已验证 Calico 3.32.0 的 `tigera-operator.yaml` 和 `custom-resources.yaml` 可下载，且官方 custom resources 中仍包含 `APIServer` 自定义资源。如果网络无法访问，请提前从 Calico 官方仓库下载对应 manifest，或使用团队可信镜像源；不要从来源不明的第三方链接复制安装清单。
 
@@ -334,7 +334,7 @@ kubectl version
 准备 Alpine 镜像，避免实验时因为网络问题拉取失败：
 
 ```bash
-docker pull alpine:3.23
+docker pull registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23
 ```
 
 ### 5.3 文件目录结构
@@ -375,7 +375,7 @@ networking:
   serviceSubnet: "10.96.0.0/16" # ← Kubernetes 默认 Service 网段
 nodes:
   - role: control-plane
-    image: kindest/node:v1.35.0@sha256:452d707d4862f52530247495d180205e029056831160e22870e37e3f6c1ac31f # ← kind 0.31.0 官方推荐镜像；kind 发布 1.36.x 后替换为课程基线镜像
+    image: registry.cn-guangzhou.aliyuncs.com/yleoer/node:v1.35.0@sha256:452d707d4862f52530247495d180205e029056831160e22870e37e3f6c1ac31f # ← kind 0.31.0 官方推荐镜像；kind 发布 1.36.x 后替换为课程基线镜像
 YAML
 ```
 
@@ -416,7 +416,7 @@ spec:
     spec:
       containers:
         - name: api
-          image: alpine:3.23
+          image: registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23
           imagePullPolicy: IfNotPresent
           command:
             - sh
@@ -465,7 +465,7 @@ spec:
     spec:
       containers:
         - name: postgres-port
-          image: alpine:3.23
+          image: registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23
           imagePullPolicy: IfNotPresent
           command:
             - sh
@@ -524,7 +524,7 @@ spec:
   restartPolicy: Never
   containers:
     - name: client
-      image: alpine:3.23
+      image: registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23
       imagePullPolicy: IfNotPresent
       command: ["sleep", "3600"]
 ---
@@ -539,7 +539,7 @@ spec:
   restartPolicy: Never
   containers:
     - name: client
-      image: alpine:3.23
+      image: registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23
       imagePullPolicy: IfNotPresent
       command: ["sleep", "3600"]
 YAML
@@ -613,7 +613,7 @@ kubectl config use-context kind-todo-network-lab
 把 Alpine 镜像导入 kind 节点：
 
 ```bash
-kind load docker-image alpine:3.23 --name todo-network-lab
+kind load docker-image registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23 --name todo-network-lab
 ```
 
 安装 Calico 3.32.0。这里使用 Calico operator 安装方式，并为 kind 配置 VXLAN 网络。Calico 容器镜像会从镜像仓库拉取；如果你的网络受限，可以提前拉取 Calico 相关镜像并用 `kind load docker-image --name todo-network-lab` 导入临时集群，或配置可信镜像代理：

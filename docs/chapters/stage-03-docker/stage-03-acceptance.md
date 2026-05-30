@@ -57,10 +57,10 @@ cloud-native-todo-platform/
 |---|---|---|
 | Docker | Docker Desktop 或 Docker Engine 当前稳定版 | 需要支持 Compose v2 和 BuildKit |
 | Docker Compose | v2.20 或更新版本 | 使用 `docker compose`，不是旧版 `docker-compose` |
-| Go 镜像 | `golang:1.26-bookworm` | 与阶段二 Go 后端项目保持当前稳定工具链，固定 Debian 变体便于复现构建环境 |
-| Alpine 镜像 | `alpine:3.23` | 用于轻量命令实验和 rootfs 观察 |
-| PostgreSQL | `postgres:18-alpine` | 阶段二数据库能力延续，与第 15 / 17 篇一致 |
-| Redis | `redis:8.2-alpine` | 阶段二缓存与限流能力延续，与第 15 / 17 篇一致 |
+| Go 镜像 | `registry.cn-guangzhou.aliyuncs.com/yleoer/golang:1.26-bookworm` | 与阶段二 Go 后端项目保持当前稳定工具链，固定 Debian 变体便于复现构建环境 |
+| Alpine 镜像 | `registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23` | 用于轻量命令实验和 rootfs 观察 |
+| PostgreSQL | `registry.cn-guangzhou.aliyuncs.com/yleoer/postgres:18-alpine` | 阶段二数据库能力延续，与第 15 / 17 篇一致 |
+| Redis | `registry.cn-guangzhou.aliyuncs.com/yleoer/redis:8.2-alpine` | 阶段二缓存与限流能力延续，与第 15 / 17 篇一致 |
 | kind | 0.31+ | 第 19 篇用于观察 Kubernetes 节点运行时 |
 | kubectl | 与 kind 集群兼容 | 用于部署和查看探针工作负载 |
 
@@ -144,7 +144,7 @@ docker inspect todo-api:v0.1.0
 docker network inspect todo-platform_default 2>/dev/null || true
 docker volume ls
 
-docker run --rm alpine:3.23 sh -c 'cat /etc/os-release; ps -o pid,ppid,comm'
+docker run --rm registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23 sh -c 'cat /etc/os-release; ps -o pid,ppid,comm'
 
 kind create cluster --name todo-runtime
 kind load docker-image todo-api:v0.1.0 --name todo-runtime
@@ -169,7 +169,7 @@ docker exec -it "$NODE" crictl pods
 检查你的 Dockerfile 是否满足：
 
 - [ ] 使用多阶段构建，把编译阶段和运行阶段分开。
-- [ ] 使用固定基础镜像标签，例如 `golang:1.26-bookworm`。
+- [ ] 使用固定基础镜像标签，例如 `registry.cn-guangzhou.aliyuncs.com/yleoer/golang:1.26-bookworm`。
 - [ ] 使用 `.dockerignore` 排除 `.git`、`.env`、日志、临时文件和本地构建产物。
 - [ ] 先复制 `go.mod`、`go.sum`，再复制业务源码，提高缓存命中率。
 - [ ] 构建阶段执行 `go test ./...` 或说明为什么放到 CI 中执行。

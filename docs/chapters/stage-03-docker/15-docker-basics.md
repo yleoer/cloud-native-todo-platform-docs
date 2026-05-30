@@ -4,7 +4,7 @@
 
 本篇对应新版课程计划中的第 15 篇，类型为 **A 类：工具/环境章**。本篇特色项目是：**使用 Docker 运行 Todo API、PostgreSQL 和 Redis，并验证三类容器在同一个 Docker 网络中互通**。
 
-本篇暂时不编写 Dockerfile，也不编写 Docker Compose YAML。Todo API 会使用官方 `golang:1.26-bookworm` 镜像加代码目录挂载的方式运行。第 16 篇会把 Todo API 构建成自己的生产镜像，第 17 篇会把多容器启动命令整理成 Compose 编排文件。
+本篇暂时不编写 Dockerfile，也不编写 Docker Compose YAML。Todo API 会使用官方 `registry.cn-guangzhou.aliyuncs.com/yleoer/golang:1.26-bookworm` 镜像加代码目录挂载的方式运行。第 16 篇会把 Todo API 构建成自己的生产镜像，第 17 篇会把多容器启动命令整理成 Compose 编排文件。
 
 本篇覆盖计划中的 5 个主题：
 
@@ -98,7 +98,7 @@ todo-api 容器
 
 本篇产出会被后续章节直接复用：
 
-- 第 16 篇会把当前用 `golang:1.26-bookworm` 临时运行的 Todo API，构建成 `todo-api` 应用镜像。
+- 第 16 篇会把当前用 `registry.cn-guangzhou.aliyuncs.com/yleoer/golang:1.26-bookworm` 临时运行的 Todo API，构建成 `todo-api` 应用镜像。
 - 第 17 篇会把本篇多条 `docker run` 命令整理为 `compose.yaml`。
 - 第 18 篇会深入解释本篇已经使用过的容器进程、文件系统、网络和数据卷隔离。
 - 第 19 篇会把 Docker 背后的 containerd、runc 和 CRI 调用链拆开观察。
@@ -127,18 +127,18 @@ Docker 是一种容器平台，用来创建、运行、分发和管理容器。�
 
 | 镜像 | 用途 |
 |---|---|
-| `postgres:18-alpine` | 运行 PostgreSQL 数据库 |
-| `redis:8.2-alpine` | 运行 Redis 缓存与限流依赖 |
-| `golang:1.26-bookworm` | 临时运行 Todo API 源码 |
-| `alpine:3.23` | 作为轻量工具容器测试网络 |
+| `registry.cn-guangzhou.aliyuncs.com/yleoer/postgres:18-alpine` | 运行 PostgreSQL 数据库 |
+| `registry.cn-guangzhou.aliyuncs.com/yleoer/redis:8.2-alpine` | 运行 Redis 缓存与限流依赖 |
+| `registry.cn-guangzhou.aliyuncs.com/yleoer/golang:1.26-bookworm` | 临时运行 Todo API 源码 |
+| `registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23` | 作为轻量工具容器测试网络 |
 
 拉取镜像：
 
 ```bash
-docker pull postgres:18-alpine
-docker pull redis:8.2-alpine
-docker pull golang:1.26-bookworm
-docker pull alpine:3.23
+docker pull registry.cn-guangzhou.aliyuncs.com/yleoer/postgres:18-alpine
+docker pull registry.cn-guangzhou.aliyuncs.com/yleoer/redis:8.2-alpine
+docker pull registry.cn-guangzhou.aliyuncs.com/yleoer/golang:1.26-bookworm
+docker pull registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23
 ```
 
 查看本地镜像：
@@ -154,7 +154,7 @@ docker image ls
 容器是镜像运行起来后的进程实例。同一个镜像可以启动多个容器：
 
 ```text
-postgres:18-alpine 镜像
+registry.cn-guangzhou.aliyuncs.com/yleoer/postgres:18-alpine 镜像
   ├── todo-postgres 容器
   └── test-postgres 容器
 ```
@@ -292,10 +292,10 @@ flowchart LR
     Container --> Network["Docker 网络"]
 ```
 
-执行 `docker run postgres:18-alpine` 时，大致发生这些事：
+执行 `docker run registry.cn-guangzhou.aliyuncs.com/yleoer/postgres:18-alpine` 时，大致发生这些事：
 
 1. Docker CLI 把请求发送给 Docker daemon。
-2. Docker daemon 检查本地是否已有 `postgres:18-alpine` 镜像。
+2. Docker daemon 检查本地是否已有 `registry.cn-guangzhou.aliyuncs.com/yleoer/postgres:18-alpine` 镜像。
 3. 如果本地没有，就从镜像仓库拉取。
 4. 基于镜像创建容器文件系统，并加上容器可写层。
 5. 挂载数据卷，设置环境变量，配置端口映射和网络。
@@ -371,7 +371,7 @@ sequenceDiagram
 
 | 本篇手工参数 | 第 16/17 篇会演进为 |
 |---|---|
-| `golang:1.26-bookworm` + `go run` | Dockerfile 多阶段构建出的 `todo-api` 镜像 |
+| `registry.cn-guangzhou.aliyuncs.com/yleoer/golang:1.26-bookworm` + `go run` | Dockerfile 多阶段构建出的 `todo-api` 镜像 |
 | `-e TODO_DATABASE_DSN=...` | Compose / Kubernetes 中的环境变量和 Secret |
 | `-v "$PWD:/workspace"` | 构建上下文、开发挂载或配置挂载 |
 | `--network todo-net` | Compose network 或 Kubernetes Service |
@@ -391,10 +391,10 @@ sequenceDiagram
 |---|---|---|
 | Docker Desktop / Docker Engine | 29.x 或当前稳定版 | 需要能执行 `docker version` |
 | Docker Compose | v2 | 本篇只做版本确认，第 17 篇正式使用 |
-| Go 工具链镜像 | `golang:1.26-bookworm` | 用来运行 Todo API 源码 |
-| PostgreSQL 镜像 | `postgres:18-alpine` | 权威数据源 |
-| Redis 镜像 | `redis:8.2-alpine` | 缓存、限流和轻量任务 |
-| Alpine 镜像 | `alpine:3.23` | 网络排查工具容器 |
+| Go 工具链镜像 | `registry.cn-guangzhou.aliyuncs.com/yleoer/golang:1.26-bookworm` | 用来运行 Todo API 源码 |
+| PostgreSQL 镜像 | `registry.cn-guangzhou.aliyuncs.com/yleoer/postgres:18-alpine` | 权威数据源 |
+| Redis 镜像 | `registry.cn-guangzhou.aliyuncs.com/yleoer/redis:8.2-alpine` | 缓存、限流和轻量任务 |
+| Alpine 镜像 | `registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23` | 网络排查工具容器 |
 | curl | 任意现代版本 | 验证 HTTP API |
 | jq | 可选 | Linux / macOS / WSL2 下推荐用来解析登录 JSON |
 
@@ -473,10 +473,10 @@ Todo API 容器会使用这些关键环境变量：
 先拉取本篇要用的官方镜像。这样如果网络、镜像名或平台架构有问题，会在启动容器前暴露出来。
 
 ```bash
-docker pull postgres:18-alpine
-docker pull redis:8.2-alpine
-docker pull golang:1.26-bookworm
-docker pull alpine:3.23
+docker pull registry.cn-guangzhou.aliyuncs.com/yleoer/postgres:18-alpine
+docker pull registry.cn-guangzhou.aliyuncs.com/yleoer/redis:8.2-alpine
+docker pull registry.cn-guangzhou.aliyuncs.com/yleoer/golang:1.26-bookworm
+docker pull registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23
 docker image ls
 ```
 
@@ -520,7 +520,7 @@ docker run -d \
   -e PGDATA=/var/lib/postgresql/data/pgdata \
   -v todo-postgres-data:/var/lib/postgresql/data \
   -p 127.0.0.1:15432:5432 \
-  postgres:18-alpine
+  registry.cn-guangzhou.aliyuncs.com/yleoer/postgres:18-alpine
 ```
 
 Windows PowerShell 写法：
@@ -535,7 +535,7 @@ docker run -d `
   -e PGDATA=/var/lib/postgresql/data/pgdata `
   -v todo-postgres-data:/var/lib/postgresql/data `
   -p 127.0.0.1:15432:5432 `
-  postgres:18-alpine
+  registry.cn-guangzhou.aliyuncs.com/yleoer/postgres:18-alpine
 ```
 
 启动 Redis 容器。
@@ -546,7 +546,7 @@ docker run -d \
   --network todo-net \
   -v todo-redis-data:/data \
   -p 127.0.0.1:16379:6379 \
-  redis:8.2-alpine \
+  registry.cn-guangzhou.aliyuncs.com/yleoer/redis:8.2-alpine \
   redis-server --requirepass todo_redis_password --appendonly yes
 ```
 
@@ -558,7 +558,7 @@ docker run -d `
   --network todo-net `
   -v todo-redis-data:/data `
   -p 127.0.0.1:16379:6379 `
-  redis:8.2-alpine `
+  registry.cn-guangzhou.aliyuncs.com/yleoer/redis:8.2-alpine `
   redis-server --requirepass todo_redis_password --appendonly yes
 ```
 
@@ -608,8 +608,8 @@ PONG
 验证容器名可以被 Docker DNS 解析。
 
 ```bash
-docker run --rm --network todo-net alpine:3.23 nslookup todo-postgres
-docker run --rm --network todo-net alpine:3.23 nslookup todo-redis
+docker run --rm --network todo-net registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23 nslookup todo-postgres
+docker run --rm --network todo-net registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23 nslookup todo-redis
 ```
 
 预期输出中应能看到 `todo-postgres` 和 `todo-redis` 对应的容器 IP。
@@ -624,7 +624,7 @@ docker run --rm --network todo-net alpine:3.23 nslookup todo-redis
       -v todo-go-mod-cache:/go/pkg/mod \
       -v todo-go-build-cache:/root/.cache/go-build \
       -w /workspace \
-      golang:1.26-bookworm \
+      registry.cn-guangzhou.aliyuncs.com/yleoer/golang:1.26-bookworm \
       go run ./api/cmd/todo-api hash-password "change-me-123")
 
     echo "$HASH"
@@ -638,7 +638,7 @@ docker run --rm --network todo-net alpine:3.23 nslookup todo-redis
       -v todo-go-mod-cache:/go/pkg/mod `
       -v todo-go-build-cache:/root/.cache/go-build `
       -w /workspace `
-      golang:1.26-bookworm `
+      registry.cn-guangzhou.aliyuncs.com/yleoer/golang:1.26-bookworm `
       go run ./api/cmd/todo-api hash-password "change-me-123"
 
     $hash
@@ -665,7 +665,7 @@ docker run --rm --network todo-net alpine:3.23 nslookup todo-redis
       -e TODO_REDIS_PASSWORD=todo_redis_password \
       -e TODO_JWT_SECRET=0123456789abcdef0123456789abcdef \
       -e TODO_AUTH_USERS="admin=$HASH" \
-      golang:1.26-bookworm \
+      registry.cn-guangzhou.aliyuncs.com/yleoer/golang:1.26-bookworm \
       go run ./api/cmd/todo-api config-check
     ```
 
@@ -686,7 +686,7 @@ docker run --rm --network todo-net alpine:3.23 nslookup todo-redis
       -e TODO_REDIS_PASSWORD=todo_redis_password `
       -e TODO_JWT_SECRET=0123456789abcdef0123456789abcdef `
       -e "TODO_AUTH_USERS=admin=$hash" `
-      golang:1.26-bookworm `
+      registry.cn-guangzhou.aliyuncs.com/yleoer/golang:1.26-bookworm `
       go run ./api/cmd/todo-api config-check
     ```
 
@@ -706,7 +706,7 @@ docker run --rm --network todo-net alpine:3.23 nslookup todo-redis
       -e TODO_DATABASE_DSN='postgres://todo:todo_password@todo-postgres:5432/todo_platform?sslmode=disable' \
       -e TODO_JWT_SECRET=0123456789abcdef0123456789abcdef \
       -e TODO_AUTH_USERS="admin=$HASH" \
-      golang:1.26-bookworm \
+      registry.cn-guangzhou.aliyuncs.com/yleoer/golang:1.26-bookworm \
       go run ./api/cmd/todo-api migrate
     ```
 
@@ -724,7 +724,7 @@ docker run --rm --network todo-net alpine:3.23 nslookup todo-redis
       -e "TODO_DATABASE_DSN=postgres://todo:todo_password@todo-postgres:5432/todo_platform?sslmode=disable" `
       -e TODO_JWT_SECRET=0123456789abcdef0123456789abcdef `
       -e "TODO_AUTH_USERS=admin=$hash" `
-      golang:1.26-bookworm `
+      registry.cn-guangzhou.aliyuncs.com/yleoer/golang:1.26-bookworm `
       go run ./api/cmd/todo-api migrate
     ```
 
@@ -757,7 +757,7 @@ migration applied
       -e TODO_JWT_SECRET=0123456789abcdef0123456789abcdef \
       -e TODO_AUTH_USERS="admin=$HASH" \
       -p 127.0.0.1:18080:18080 \
-      golang:1.26-bookworm \
+      registry.cn-guangzhou.aliyuncs.com/yleoer/golang:1.26-bookworm \
       go run ./api/cmd/todo-api serve
     ```
 
@@ -780,7 +780,7 @@ migration applied
       -e TODO_JWT_SECRET=0123456789abcdef0123456789abcdef `
       -e "TODO_AUTH_USERS=admin=$hash" `
       -p 127.0.0.1:18080:18080 `
-      golang:1.26-bookworm `
+      registry.cn-guangzhou.aliyuncs.com/yleoer/golang:1.26-bookworm `
       go run ./api/cmd/todo-api serve
     ```
 
@@ -878,9 +878,9 @@ exit
 
 ```text
 CONTAINER ID   IMAGE                  COMMAND                  STATUS         PORTS                         NAMES
-...            golang:1.26-bookworm   "go run ./api/cmd/..."   Up ...         127.0.0.1:18080->18080/tcp    todo-api
-...            postgres:18-alpine     "docker-entrypoint..."   Up ...         127.0.0.1:15432->5432/tcp     todo-postgres
-...            redis:8.2-alpine       "docker-entrypoint..."   Up ...         127.0.0.1:16379->6379/tcp     todo-redis
+...            registry.cn-guangzhou.aliyuncs.com/yleoer/golang:1.26-bookworm   "go run ./api/cmd/..."   Up ...         127.0.0.1:18080->18080/tcp    todo-api
+...            registry.cn-guangzhou.aliyuncs.com/yleoer/postgres:18-alpine     "docker-entrypoint..."   Up ...         127.0.0.1:15432->5432/tcp     todo-postgres
+...            registry.cn-guangzhou.aliyuncs.com/yleoer/redis:8.2-alpine       "docker-entrypoint..."   Up ...         127.0.0.1:16379->6379/tcp     todo-redis
 ```
 
 `/healthz` 应返回：
@@ -952,8 +952,8 @@ curl -i http://127.0.0.1:18080/healthz
 验证容器 DNS：
 
 ```bash
-docker run --rm --network todo-net alpine:3.23 nslookup todo-postgres
-docker run --rm --network todo-net alpine:3.23 nslookup todo-redis
+docker run --rm --network todo-net registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23 nslookup todo-postgres
+docker run --rm --network todo-net registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23 nslookup todo-redis
 ```
 
 ### 5.8 清理步骤
@@ -1053,7 +1053,7 @@ docker volume rm todo-postgres-data todo-redis-data todo-go-mod-cache todo-go-bu
 - **排查挂载问题**：如果日志里出现 `stat /workspace/api/cmd/todo-api: no such file or directory`，用轻量容器验证目录是否真的挂载成功：
 
   ```bash
-  docker run --rm -v "$PWD:/workspace" -w /workspace alpine:3.23 ls
+  docker run --rm -v "$PWD:/workspace" -w /workspace registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23 ls
   ```
 
   Windows PowerShell 写法：
@@ -1061,7 +1061,7 @@ docker volume rm todo-postgres-data todo-redis-data todo-go-mod-cache todo-go-bu
   ```powershell
   Get-Location
   Test-Path .\api\cmd\todo-api
-  docker run --rm -v "${PWD}:/workspace" -w /workspace alpine:3.23 ls
+  docker run --rm -v "${PWD}:/workspace" -w /workspace registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23 ls
   ```
 
 - **修复**：按 5.5 重新生成 `HASH`，确认 `TODO_JWT_SECRET` 至少 32 字节，确认命令在项目根目录执行。Windows 用户还要确认 Docker Desktop 已启用 WSL integration 或允许当前磁盘共享；路径包含空格时保留 `-v "${PWD}:/workspace"` 的引号。
@@ -1081,8 +1081,8 @@ docker volume rm todo-postgres-data todo-redis-data todo-go-mod-cache todo-go-bu
 
   ```bash
   docker network inspect todo-net
-  docker run --rm --network todo-net alpine:3.23 nslookup todo-postgres
-  docker run --rm --network todo-net alpine:3.23 nslookup todo-redis
+  docker run --rm --network todo-net registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23 nslookup todo-postgres
+  docker run --rm --network todo-net registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23 nslookup todo-redis
   ```
 
 - **修复**：确保三个容器都使用 `--network todo-net`；`TODO_DATABASE_DSN` 使用 `todo-postgres:5432`；`TODO_REDIS_ADDR` 使用 `todo-redis:6379`。
@@ -1119,7 +1119,7 @@ curl -i -H 'Content-Type: application/json' \
 
 ## 7. 生产环境注意事项
 
-1. **不要把手工 docker run 和 Go 工具链容器当成生产发布方式**。本篇手动命令适合学习和本地排障，`golang:1.26-bookworm` 加源码挂载也便于理解容器运行参数；但生产环境需要 Dockerfile、镜像标签、CI 构建、制品仓库、部署配置、回滚策略和审计记录。生产发布应使用第 16 篇的多阶段 Dockerfile 构建精简镜像，并配置非 root 用户运行。
+1. **不要把手工 docker run 和 Go 工具链容器当成生产发布方式**。本篇手动命令适合学习和本地排障，`registry.cn-guangzhou.aliyuncs.com/yleoer/golang:1.26-bookworm` 加源码挂载也便于理解容器运行参数；但生产环境需要 Dockerfile、镜像标签、CI 构建、制品仓库、部署配置、回滚策略和审计记录。生产发布应使用第 16 篇的多阶段 Dockerfile 构建精简镜像，并配置非 root 用户运行。
 
 2. **镜像来源和标签必须可控**。生产不应长期使用 `latest`，也不应随意拉取不可信镜像。团队需要固定镜像标签，必要时固定 digest，并使用漏洞扫描和镜像签名。第 16 篇会继续讲 Dockerfile、镜像体积、非 root 运行、构建缓存和安全扫描。
 
@@ -1171,7 +1171,7 @@ curl -i -H 'Content-Type: application/json' \
 ### 思考题
 
 1. 如果测试同学说“我本机 Docker 里能跑，但 CI 里跑不起来”，你会从镜像、网络、端口、环境变量、数据卷哪些方向排查？
-2. 本篇用 `golang:1.26-bookworm` 加源码挂载运行 API。它适合本地学习，但为什么不适合生产发布？
+2. 本篇用 `registry.cn-guangzhou.aliyuncs.com/yleoer/golang:1.26-bookworm` 加源码挂载运行 API。它适合本地学习，但为什么不适合生产发布？
 
 ## 10. 本章面试题
 
@@ -1225,4 +1225,4 @@ curl -i -H 'Content-Type: application/json' \
 
 ## 12. 下一章衔接
 
-第 16 篇会把本篇的 `golang:1.26-bookworm + 源码挂载 + go run` 改造成真正的 Todo API 镜像。你将学习 Dockerfile、多阶段构建、构建缓存、`.dockerignore`、非 root 用户和镜像安全。如果跳过本篇，下一章里 `EXPOSE`、`CMD`、镜像标签、端口映射和运行用户这些概念会缺少运行经验支撑。
+第 16 篇会把本篇的 `registry.cn-guangzhou.aliyuncs.com/yleoer/golang:1.26-bookworm + 源码挂载 + go run` 改造成真正的 Todo API 镜像。你将学习 Dockerfile、多阶段构建、构建缓存、`.dockerignore`、非 root 用户和镜像安全。如果跳过本篇，下一章里 `EXPOSE`、`CMD`、镜像标签、端口映射和运行用户这些概念会缺少运行经验支撑。

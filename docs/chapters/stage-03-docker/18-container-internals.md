@@ -117,7 +117,7 @@ Docker CLI / Compose
 启动一个容器后，容器内通常会看到自己的 1 号进程：
 
 ```bash
-docker run --rm alpine:3.23 sh -c 'ps -o pid,ppid,comm'
+docker run --rm registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23 sh -c 'ps -o pid,ppid,comm'
 ```
 
 预期类似：
@@ -165,7 +165,7 @@ cgroups 是 control groups 的缩写，用来限制、统计和隔离资源使�
 Docker 中这些参数背后都离不开 cgroups：
 
 ```bash
-docker run --rm --memory=128m --cpus=0.5 alpine:3.23 sh -c 'cat /proc/self/cgroup'
+docker run --rm --memory=128m --cpus=0.5 registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23 sh -c 'cat /proc/self/cgroup'
 ```
 
 Kubernetes 中这些字段最终也会落到节点上的 cgroups：
@@ -248,7 +248,7 @@ docker CLI
 执行：
 
 ```bash
-docker run --rm -m 128m --cpus=0.5 --name demo alpine:3.23 sh
+docker run --rm -m 128m --cpus=0.5 --name demo registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23 sh
 ```
 
 底层大致会发生：
@@ -336,7 +336,7 @@ cpu.max = 50000 100000
 Dockerfile 中每个会改变文件系统的步骤通常会形成一个镜像层：
 
 ```dockerfile
-FROM alpine:3.23
+FROM registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23
 RUN apk add --no-cache ca-certificates
 COPY todo-api /app/todo-api
 ```
@@ -360,7 +360,7 @@ flowchart TB
 很多容器内显示用户是 root：
 
 ```bash
-docker run --rm alpine:3.23 id
+docker run --rm registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23 id
 ```
 
 输出可能是：
@@ -402,7 +402,7 @@ uid=0(root) gid=0(root)
 | Linux | Ubuntu 24.04 / 22.04 或同类发行版 | 执行 namespace / cgroup / OverlayFS 实验 |
 | WSL2 Ubuntu | Windows 推荐 | 可完成大部分实验 |
 | Docker | 29.x | 导出 rootfs、观察真实容器 |
-| Alpine 镜像 | `alpine:3.23` | 轻量 rootfs 和 demo 容器 |
+| Alpine 镜像 | `registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23` | 轻量 rootfs 和 demo 容器 |
 | util-linux | 发行版当前版本 | 提供 `unshare`、`lsns`、`findmnt`、`nsenter` |
 | iproute2 | 发行版当前版本 | 提供 `ip` |
 | Python 3 | 3.x | 内存限制实验 |
@@ -465,7 +465,7 @@ test -f /sys/fs/cgroup/cgroup.controllers && cat /sys/fs/cgroup/cgroup.controlle
 
 ```text
 container-lab/
-├── rootfs/                 # 从 alpine:3.23 导出的 rootfs
+├── rootfs/                 # 从 registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23 导出的 rootfs
 ├── image-layers/
 │   ├── base/               # 模拟镜像只读层
 │   └── app/                # 模拟应用只读层
@@ -637,7 +637,7 @@ docker inspect "$TODO_API_CONTAINER" --format 'Memory={{.HostConfig.Memory}} Nan
 如果你没有应用仓库，也可以启动独立 demo 容器：
 
 ```bash
-docker run -d --name internals-demo alpine:3.23 sleep 1d
+docker run -d --name internals-demo registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23 sleep 1d
 HOST_PID="$(docker inspect internals-demo --format '{{.State.Pid}}')"
 echo "$HOST_PID"
 sudo ls -l /proc/"$HOST_PID"/ns
@@ -766,8 +766,8 @@ sudo umount "$LAB/mnt" 2>/dev/null || true
 cd "$LAB"
 sudo rm -rf rootfs
 mkdir -p rootfs
-docker pull alpine:3.23
-CID="$(docker create alpine:3.23)"
+docker pull registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23
+CID="$(docker create registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23)"
 docker export "$CID" | sudo tar -C rootfs -xf -
 docker rm "$CID"
 ```
@@ -850,13 +850,13 @@ sudo cgexec -g memory,cpu:todo-lab-v1 python3 "$LAB/allocate-memory.py"
 Docker 参数能观察同样思想：
 
 ```bash
-docker run --rm --memory=64m --cpus=0.5 alpine:3.23 sh -c 'cat /proc/self/cgroup; echo ok'
+docker run --rm --memory=64m --cpus=0.5 registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23 sh -c 'cat /proc/self/cgroup; echo ok'
 ```
 
 查看容器资源配置：
 
 ```bash
-docker run -d --name limit-demo --memory=64m --cpus=0.5 alpine:3.23 sleep 1d
+docker run -d --name limit-demo --memory=64m --cpus=0.5 registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23 sleep 1d
 docker inspect limit-demo --format 'Memory={{.HostConfig.Memory}} NanoCpus={{.HostConfig.NanoCpus}}'
 docker rm -f limit-demo
 ```
@@ -947,7 +947,7 @@ sudo env LAB="$LAB" INSIDE_MINI_NS=1 \
 启动 demo 容器：
 
 ```bash
-docker run -d --name nsenter-demo alpine:3.23 sleep 1d
+docker run -d --name nsenter-demo registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23 sleep 1d
 DEMO_PID="$(docker inspect nsenter-demo --format '{{.State.Pid}}')"
 echo "$DEMO_PID"
 ```
@@ -1027,12 +1027,12 @@ PID   PPID  COMMAND
 最小验证：
 
 ```bash
-docker run --rm alpine:3.23 sh -c 'ps -o pid,ppid,comm; cat /proc/1/cgroup'
+docker run --rm registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23 sh -c 'ps -o pid,ppid,comm; cat /proc/1/cgroup'
 sudo unshare --uts --fork bash -c 'hostname todo-uts; hostname'
 sudo unshare --pid --fork --mount-proc bash -c 'ps -o pid,ppid,comm'
 test -x "$LAB/rootfs/bin/sh"
 sudo chroot "$LAB/rootfs" /bin/sh -c 'cat /etc/os-release'
-docker run --rm --memory=64m --cpus=0.5 alpine:3.23 sh -c 'cat /proc/self/cgroup; echo ok'
+docker run --rm --memory=64m --cpus=0.5 registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23 sh -c 'cat /proc/self/cgroup; echo ok'
 ```
 
 进阶验证：
@@ -1157,7 +1157,7 @@ findmnt | grep container-lab || echo "no container-lab mounts"
 - **修复**：跳过手动 cgroup，使用 Docker 替代实验：
 
   ```bash
-  docker run --rm --memory=64m --cpus=0.5 alpine:3.23 sh -c 'cat /proc/self/cgroup; echo ok'
+  docker run --rm --memory=64m --cpus=0.5 registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23 sh -c 'cat /proc/self/cgroup; echo ok'
   ```
 
 - **预防**：真实工作中通常通过 Docker、containerd、systemd 或 Kubernetes 管理 cgroup，不手写生产节点的 `/sys/fs/cgroup`。
@@ -1210,7 +1210,7 @@ findmnt | grep container-lab || echo "no container-lab mounts"
   ```bash
   sudo rm -rf "$LAB/rootfs"
   mkdir -p "$LAB/rootfs"
-  CID="$(docker create alpine:3.23)"
+  CID="$(docker create registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23)"
   docker export "$CID" | sudo tar -C "$LAB/rootfs" -xf -
   docker rm "$CID"
   ```
@@ -1237,7 +1237,7 @@ findmnt | grep container-lab || echo "no container-lab mounts"
 
   ```bash
   docker rm -f nsenter-demo 2>/dev/null || true
-  docker run -d --name nsenter-demo alpine:3.23 sleep 1d
+  docker run -d --name nsenter-demo registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23 sleep 1d
   DEMO_PID="$(docker inspect nsenter-demo --format '{{.State.Pid}}')"
   sudo nsenter --target "$DEMO_PID" --uts hostname
   ```
@@ -1265,7 +1265,7 @@ findmnt | grep container-lab || echo "no container-lab mounts"
 完成后，你应该得到：
 
 - `~/container-lab/mini-container.sh`
-- 从 `alpine:3.23` 导出的 `rootfs/`
+- 从 `registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23` 导出的 `rootfs/`
 - OverlayFS 模拟目录：`image-layers/`、`upper/`、`work/`、`merged/`
 - 一份 `docs/docker/chapter-18-runtime-internals-record.md` 记录
 
@@ -1338,7 +1338,7 @@ findmnt | grep container-lab || echo "no container-lab mounts"
 ### 实操题
 
 1. 使用 `unshare --uts` 修改新 namespace 中的 hostname，退出后验证宿主机 hostname 没有变化。当原 shell 中 `hostname` 仍为原值时，说明成功。
-2. 使用 `docker run --rm --memory=64m --cpus=0.5 alpine:3.23 ...` 观察 `/proc/self/cgroup`，再用 `docker inspect` 查看 `HostConfig.Memory` 和 `HostConfig.NanoCpus`。当两处都能看到资源限制信息时，说明成功。
+2. 使用 `docker run --rm --memory=64m --cpus=0.5 registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23 ...` 观察 `/proc/self/cgroup`，再用 `docker inspect` 查看 `HostConfig.Memory` 和 `HostConfig.NanoCpus`。当两处都能看到资源限制信息时，说明成功。
 3. 修改 OverlayFS 合并视图中的 `app.txt`，确认只读层文件未变化、`upper/app.txt` 出现修改后的内容。当 lower 不变、upper 改变时，说明你理解了 copy-up。
 
 ### 思考题

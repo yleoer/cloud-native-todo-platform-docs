@@ -802,7 +802,7 @@ grep -n "todo-platform-env-" /tmp/todo-gitops-dev.yaml
 创建或复用一个持续运行的 kind 集群。第 29 篇的 CI 集群会随 workflow 销毁，本篇需要保留集群给 Argo CD 持续运行：
 
 ```bash
-kind create cluster --name todo-gitops --image kindest/node:v1.35.0
+kind create cluster --name todo-gitops --image registry.cn-guangzhou.aliyuncs.com/yleoer/node:v1.35.0
 kubectl cluster-info --context kind-todo-gitops
 ```
 
@@ -812,8 +812,10 @@ kubectl cluster-info --context kind-todo-gitops
 ARGOCD_VERSION="v3.4.3"
 
 kubectl create namespace argocd --dry-run=client -o yaml | kubectl apply -f -
-kubectl apply -n argocd --server-side --force-conflicts \
-  -f "https://raw.githubusercontent.com/argoproj/argo-cd/${ARGOCD_VERSION}/manifests/install.yaml"
+curl -L -o argocd-install.yaml "https://raw.githubusercontent.com/argoproj/argo-cd/${ARGOCD_VERSION}/manifests/install.yaml"
+sed -i 's|quay.io/argoproj/|registry.cn-guangzhou.aliyuncs.com/yleoer/|g' argocd-install.yaml
+sed -i 's|redis:7.0.15-alpine|registry.cn-guangzhou.aliyuncs.com/yleoer/redis:7.0.15-alpine|g' argocd-install.yaml
+kubectl apply -n argocd --server-side --force-conflicts -f argocd-install.yaml
 
 kubectl -n argocd rollout status deployment/argocd-server --timeout=300s
 kubectl -n argocd rollout status statefulset/argocd-application-controller --timeout=300s

@@ -748,7 +748,7 @@ DOCKER_REQUIRED_PREFIX="Docker version 29."
 KUBECTL_REQUIRED_PREFIX=v1.36
 KIND_REQUIRED_PREFIX=kind
 HELM_REQUIRED_PREFIX=v4.
-KIND_NODE_IMAGE=kindest/node:v1.35.0@sha256:452d707d4862f52530247495d180205e029056831160e22870e37e3f6c1ac31f
+KIND_NODE_IMAGE=registry.cn-guangzhou.aliyuncs.com/yleoer/node:v1.35.0@sha256:452d707d4862f52530247495d180205e029056831160e22870e37e3f6c1ac31f
 ```
 
 写入文件：
@@ -761,7 +761,7 @@ DOCKER_REQUIRED_PREFIX="Docker version 29."
 KUBECTL_REQUIRED_PREFIX=v1.36
 KIND_REQUIRED_PREFIX=kind
 HELM_REQUIRED_PREFIX=v4.
-KIND_NODE_IMAGE=kindest/node:v1.35.0@sha256:452d707d4862f52530247495d180205e029056831160e22870e37e3f6c1ac31f
+KIND_NODE_IMAGE=registry.cn-guangzhou.aliyuncs.com/yleoer/node:v1.35.0@sha256:452d707d4862f52530247495d180205e029056831160e22870e37e3f6c1ac31f
 EOF
 ```
 
@@ -772,8 +772,8 @@ EOF
 校验这个 digest 的方法如下：
 
 ```bash
-docker pull kindest/node:v1.35.0
-docker inspect kindest/node:v1.35.0 --format '{{.RepoDigests}}'
+docker pull registry.cn-guangzhou.aliyuncs.com/yleoer/node:v1.35.0
+docker inspect registry.cn-guangzhou.aliyuncs.com/yleoer/node:v1.35.0 --format '{{.RepoDigests}}'
 ```
 
 预期输出应包含：

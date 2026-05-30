@@ -828,7 +828,7 @@ EOF
 
 ```bash
 cat > operator/handwritten/Dockerfile <<'EOF'
-FROM golang:1.26-bookworm AS build
+FROM registry.cn-guangzhou.aliyuncs.com/yleoer/golang:1.26-bookworm AS build
 WORKDIR /src
 
 COPY go.mod go.sum ./
@@ -838,7 +838,7 @@ RUN go mod download
 COPY . .
 RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/todo-handwritten-controller .
 
-FROM gcr.io/distroless/static-debian12:nonroot
+FROM registry.cn-guangzhou.aliyuncs.com/yleoer/static-debian12:nonroot
 COPY --from=build /out/todo-handwritten-controller /todo-handwritten-controller
 USER 65532:65532
 ENTRYPOINT ["/todo-handwritten-controller"]
