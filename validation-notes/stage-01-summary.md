@@ -164,12 +164,18 @@ curl --noproxy 127.0.0.1,localhost -fsS http://127.0.0.1:18080/healthz
 
 详见 `validation-notes/stage-01-command-appendix.md`。
 
-## 验证后清理状态
+## 验证后环境状态
 
-- `kind get clusters`：无集群。
-- `docker ps`：无 kind 临时容器。
+- `kind get clusters`：保留 `todo-dev` 作为后续阶段共享环境。
+- `docker ps`：未额外保留 kind 容器以外的临时容器。
 - `todo-process-demo`：inactive。
-- `todo-network-demo` / `todo-dev-server`：无残留进程。
+- `todo-network-demo` / `todo-dev-server`：已清理。
+
+## 环境保留策略
+
+- 后续阶段验证默认不清理上一阶段的共享环境。
+- 阶段结束时优先记录环境状态，而不是销毁集群、服务或运行时产物。
+- 只有当残留环境会阻塞下一阶段、冲突端口、或你明确要求清理时，才执行销毁或回收。
 
 ## 文档仓库验证
 

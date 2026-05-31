@@ -218,16 +218,16 @@ make check-foundation
 kind delete cluster --name todo-dev
 ```
 
-## 验证后清理
+## 验证后状态检查
 
 ```bash
-./scripts/clean.sh --all
-sudo systemctl stop todo-process-demo || true
-kind delete cluster --name todo-dev || true
 kind get clusters || true
 docker ps --format '{{.Names}} {{.Image}}' | rg 'todo-dev|kindest/node' || true
+systemctl is-active todo-process-demo || true
 ps -ef | rg 'todo-(network-demo|dev-server|process-demo)' || true
 ```
+
+后续阶段默认保留上一阶段环境，不主动执行 `kind delete cluster`、删除容器或清空运行时目录。只有残留环境阻塞下一阶段验证时，再按需清理并在阶段总结中记录原因。
 
 ## 文档仓库验证
 
