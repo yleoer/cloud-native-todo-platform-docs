@@ -93,7 +93,12 @@ cloud-native-todo-platform/
 
     docker build -f api/Dockerfile -t todo-api:v0.1.0 .
     docker image inspect todo-api:v0.1.0 --format '{{.Config.User}}'
-    docker run --rm todo-api:v0.1.0 config-check
+    HASH=$(docker run --rm todo-api:v0.1.0 hash-password "change-me-123")
+    docker run --rm \
+      -e TODO_ENV=dev \
+      -e TODO_JWT_SECRET=0123456789abcdef0123456789abcdef \
+      -e "TODO_AUTH_USERS=admin=${HASH}" \
+      todo-api:v0.1.0 config-check
 
     cd deployments/docker-compose
     test -f .env
@@ -112,7 +117,12 @@ cloud-native-todo-platform/
 
     docker build -f api/Dockerfile -t todo-api:v0.1.0 .
     docker image inspect todo-api:v0.1.0 --format '{{.Config.User}}'
-    docker run --rm todo-api:v0.1.0 config-check
+    $hash = docker run --rm todo-api:v0.1.0 hash-password "change-me-123"
+    docker run --rm `
+      -e TODO_ENV=dev `
+      -e TODO_JWT_SECRET=0123456789abcdef0123456789abcdef `
+      -e "TODO_AUTH_USERS=admin=$hash" `
+      todo-api:v0.1.0 config-check
 
     Set-Location deployments\docker-compose
     Test-Path .env
@@ -146,17 +156,29 @@ docker volume ls
 
 docker run --rm registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23 sh -c 'cat /etc/os-release; ps -o pid,ppid,comm'
 
-kind create cluster --name todo-runtime
-kind load docker-image todo-api:v0.1.0 --name todo-runtime
+kind get clusters
+KIND_CLUSTER=todo-runtime
+if kind get clusters | grep -qx todo-dev; then
+  KIND_CLUSTER=todo-dev
+else
+  kind create cluster --name "$KIND_CLUSTER"
+fi
+kind load docker-image todo-api:v0.1.0 --name "$KIND_CLUSTER"
 kubectl get nodes -o wide
 ```
 
 如果你已经完成第 19 篇运行时探针实验，还应该能进入 kind 节点查看 CRI 层状态：
 
+<<<<<<< HEAD
 ```bash linenums="0"
 NODE="$(docker ps --filter name=todo-runtime-control-plane --format '{{.Names}}' | head -n 1)"
+=======
+```bash
+NODE="$(docker ps --filter "name=${KIND_CLUSTER}-control-plane" --format '{{.Names}}' | head -n 1)"
+>>>>>>> origin/main
 docker exec -it "$NODE" crictl ps
-docker exec -it "$NODE" crictl images
+docker exec -it "$NODE" crictl images | grep todo-api
+docker exec -it "$NODE" ctr -n k8s.io images ls | grep todo-api
 docker exec -it "$NODE" crictl pods
 ```
 
@@ -177,7 +199,7 @@ docker exec -it "$NODE" crictl pods
 - [ ] 以非 root 用户运行。
 - [ ] 使用 OCI Label 记录版本、commit、构建时间和仓库地址。
 - [ ] 不把数据库密码、Redis 密码、JWT Secret 写入镜像。
-- [ ] 能通过 `docker run --rm todo-api:v0.1.0 config-check` 验证基础配置。
+- [ ] 能通过带 `TODO_ENV`、`TODO_JWT_SECRET`、`TODO_AUTH_USERS` 的 `docker run --rm ... config-check` 验证基础配置。
 
 ## 6. Compose 验收清单
 
@@ -214,7 +236,7 @@ docker exec -it "$NODE" crictl pods
 ```text
 docker build -f api/Dockerfile -t todo-api:v0.1.0 .:
 docker image inspect todo-api:v0.1.0 --format '{{.Config.User}}':
-docker run --rm todo-api:v0.1.0 config-check:
+docker run --rm -e TODO_ENV=dev -e TODO_JWT_SECRET=... -e TODO_AUTH_USERS=... todo-api:v0.1.0 config-check:
 ```
 
 ## Compose 运行记录

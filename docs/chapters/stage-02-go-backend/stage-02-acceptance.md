@@ -74,6 +74,18 @@ cloud-native-todo-platform/
 
 如果你的目录和这里不完全一致，没有关系。验收重点是：你能说明每个目录的职责，并能通过命令证明关键功能可运行。
 
+如果你是从阶段一连续验证，而不是从课程配套仓库的阶段二起始分支开始，请先确认阶段二主线产物已经落地。至少应存在：
+
+- `cmd/todo-cli/`
+- `api/cmd/todo-api/`
+- `api/cmd/todo-load/`
+- `api/internal/`
+- `api/migrations/`
+- `configs/`
+- `docker-compose.yml`
+
+如果这些目录或文件缺失，请先同步阶段二代码产物，或切换到课程配套仓库的阶段二起始分支，再执行本附录验收命令。
+
 ## 3. 统一版本与工具基线
 
 阶段二建议统一使用以下基线：
@@ -184,7 +196,7 @@ go list -m -versions golang.org/x/crypto
     export TODO_CONFIG_DIR=configs
     export TODO_ENV=dev
     export TODO_JWT_SECRET=0123456789abcdef0123456789abcdef
-    export TODO_AUTH_USERS="admin=$HASH"
+    export TODO_AUTH_USERS="admin=${HASH}"
 
     go run ./api/cmd/todo-api serve
     ```
@@ -206,16 +218,21 @@ go list -m -versions golang.org/x/crypto
 
 === "Linux / macOS / WSL2"
 
+<<<<<<< HEAD
     ```bash linenums="0"
     curl -i http://127.0.0.1:18080/healthz
+=======
+    ```bash
+    curl --noproxy 127.0.0.1,localhost -i http://127.0.0.1:18080/healthz
+>>>>>>> origin/main
 
-    curl -i http://127.0.0.1:18080/api/v2/todos
+    curl --noproxy 127.0.0.1,localhost -i http://127.0.0.1:18080/api/v2/todos
 
-    TOKEN=$(curl -s -H "Content-Type: application/json" \
+    TOKEN=$(curl --noproxy 127.0.0.1,localhost -s -H "Content-Type: application/json" \
       -d '{"username":"admin","password":"change-me-123"}' \
       http://127.0.0.1:18080/api/v2/auth/login | jq -r '.data.token')
 
-    curl -i -H "Authorization: Bearer $TOKEN" \
+    curl --noproxy 127.0.0.1,localhost -i -H "Authorization: Bearer $TOKEN" \
       -H "Content-Type: application/json" \
       -d '{"title":"stage 02 acceptance"}' \
       http://127.0.0.1:18080/api/v2/todos
@@ -241,6 +258,7 @@ go list -m -versions golang.org/x/crypto
 - 登录成功后能拿到 JWT。
 - 带 Token 创建 Todo 返回 `201 Created`。
 - 服务日志中包含 `request_id`、`status`、`method` 和 `path`。
+- 验证 `todo-load` 时必须确认输出中的 `failed=0`；如果 `failed > 0`，程序或验收脚本应返回非 0。
 
 如果没有安装 `jq`，Linux、macOS、WSL2 可以先打印登录响应，再手动复制 `data.token` 字段。
 

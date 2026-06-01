@@ -373,7 +373,7 @@ docker scout cves todo-api:v0.1.0
 
 ## 12. 清理命令速查
 
-清理指定实验容器：
+清理指定实验容器。连续验证多阶段时，先确认这些容器不是前序阶段仍需保留的数据库或缓存环境：
 
 ```bash linenums="0"
 docker rm -f todo-api todo-postgres todo-redis 2>/dev/null || true

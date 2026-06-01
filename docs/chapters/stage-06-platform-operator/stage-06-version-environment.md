@@ -15,7 +15,7 @@
 | Kubebuilder | 4.11.x | 初始化项目、生成 Webhook/RBAC/CRD | `kubebuilder version` 与正文命令一致 |
 | controller-runtime | Kubebuilder 项目依赖版本 | Manager、Client、cache、envtest | `go list -m sigs.k8s.io/controller-runtime`，记录具体版本号 |
 | controller-gen | Kubebuilder 项目锁定版本 | 生成 CRD、DeepCopy、RBAC | `make manifests` 后无未预期 diff |
-| setup-envtest | Kubebuilder 项目锁定版本 | 下载 API server 和 etcd 测试二进制 | `make envtest`、`go test ./test/envtest -v` |
+| setup-envtest | Kubebuilder 项目锁定版本 | 下载 API server 和 etcd 测试二进制 | `make envtest`、`KUBEBUILDER_ASSETS=... go test ./test/envtest -v` |
 | cert-manager | 1.20.x（v1.35 验证线）；v1.36 线需复核官方支持矩阵 | Webhook 证书和 CA 注入 | Pod Ready，Certificate/Issuer 正常 |
 | Helm | 4.2.x | Operator Chart 安装、升级、回滚 | `helm lint/template/install/upgrade/rollback` |
 | kustomize | kubectl 内置或项目锁定版本 | 渲染 Kubebuilder config | `kubectl kustomize config/default` |
@@ -27,7 +27,7 @@
 - `MutatingAdmissionPolicy` 在 Kubernetes v1.36 中已是 stable，并默认启用；第 39 篇仍把它放在可选实验中，是为了避免学习者被准入策略细节打断主线。
 - `kubectl kustomize` 仍是 kubectl 官方命令的一部分，出版前保留 `kubectl kustomize config/default` 作为实际验证口径。
 - cert-manager 官方支持矩阵显示 1.20.x 支持和测试到 Kubernetes 1.35；面向 Kubernetes 1.36 的锁定版本应在正式出版前重新确认，优先采用首个官方列出支持 1.36 的 cert-manager 版本。若复核时该版本尚未发布，则 Webhook 证书实验应使用 v1.35 线或明确标注为兼容性待验证。
-- Helm 相关命令以实际 `helm version` 为准，至少确认 `helm template --include-crds`、`helm list -A`、`helm version --short`、`helm install/upgrade/rollback` 在锁定版本中可用。
+- Helm 相关命令以实际 `helm version` 为准。Helm 4.2.0 实测不支持短格式版本输出，出版验证使用 `helm version`，并至少确认 `helm template --include-crds`、`helm list -A`、`helm install/upgrade/rollback` 在锁定版本中可用。
 
 出版前还应单独复核以下高风险兼容点：
 
@@ -48,7 +48,7 @@ make -n build-installer IMG=todo-operator:v0.3.0-test
 
 # 最终 CI 所需工具必须在 runner 上可解析。
 python --version
-helm version --short
+helm version
 kubectl version --client=true
 kubectl kustomize config/default >/tmp/todo-operator-rendered.yaml
 ```
@@ -112,7 +112,7 @@ envtest 需要下载本地 API server 和 etcd 二进制，首次运行可能较
 
 ```bash linenums="0"
 make envtest
-go test ./test/envtest -v
+KUBEBUILDER_ASSETS="$(pwd)/bin/k8s/1.35.0-linux-amd64" go test ./test/envtest -v
 ```
 
 常见问题：

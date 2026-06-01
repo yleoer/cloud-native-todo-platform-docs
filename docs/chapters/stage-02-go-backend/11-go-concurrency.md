@@ -670,14 +670,18 @@ func run(ctx context.Context, cfg config) error {
 	elapsed := time.Since(started)
 	total := okCount.Load() + failCount.Load()
 	rps := float64(total) / elapsed.Seconds()
+	failed := failCount.Load()
 	fmt.Printf("requests=%d concurrency=%d ok=%d failed=%d elapsed=%s rps=%.2f\n",
 		total,
 		cfg.concurrency,
 		okCount.Load(),
-		failCount.Load(),
+		failed,
 		elapsed.Round(time.Millisecond),
 		rps,
 	)
+	if failed > 0 {
+		return fmt.Errorf("load test failed: %d request(s) failed", failed)
+	}
 	return nil
 }
 
@@ -770,6 +774,8 @@ requests=50 concurrency=5 ok=50 failed=0 elapsed=42ms rps=1190.48
 - `failed=0` 表示请求都成功。
 - `concurrency=5` 表示同时有 5 个 worker 发请求。
 - `rps` 只是本地粗略吞吐，不代表生产容量。
+
+验收时不能只看 `todo-load` 进程是否退出，还必须确认输出里的 `failed=0`。如果 `failed > 0`，上面的实现会返回非 0 退出码，便于脚本和 CI 正确判断压测失败。
 
 ### 5.7 验证方法
 

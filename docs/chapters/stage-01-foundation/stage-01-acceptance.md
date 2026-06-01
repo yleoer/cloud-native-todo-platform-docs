@@ -98,7 +98,7 @@ bash --version:
 
 ## 实验成果
 
-- [ ] 第 1 篇：完成开发环境安装，能运行 YAML 客户端 dry-run；如果 Docker daemon 可用，再完成可选 kind smoke test。
+- [ ] 第 1 篇：完成开发环境安装；确认已有 Kubernetes context，或创建临时 kind 集群后运行 YAML 客户端 dry-run；如果 Docker daemon 可用，再完成可选 kind smoke test。
 - [ ] 第 2 篇：完成 Todo 平台 Linux 服务器目录结构。
 - [ ] 第 3 篇：完成 Go HTTP 服务 systemd 托管实验。
 - [ ] 第 4 篇：完成 Todo HTTP 服务网络访问链路排障。
@@ -113,6 +113,7 @@ bash --version:
 - `go build ./...`
 - `bash -n scripts/*.sh`
 - `./scripts/check.sh`
+- `kubectl config current-context`
 - `kubectl apply --dry-run=client --validate=false -f docs/examples/multi-doc.yaml`
 
 如果你完成了第 1 篇的可选 kind smoke test，再补充以下增强输出：
@@ -239,8 +240,12 @@ main() {
 
   echo '==> yaml manifests'
   if [[ -f docs/examples/multi-doc.yaml ]]; then
-    kubectl apply --dry-run=client --validate=false -f docs/examples/multi-doc.yaml \
-      || fail "kubectl yaml dry-run failed"
+    if kubectl config current-context >/dev/null 2>&1; then
+      kubectl apply --dry-run=client --validate=false -f docs/examples/multi-doc.yaml \
+        || fail "kubectl yaml dry-run failed"
+    else
+      printf '[warn] no kubernetes context, skip kubectl dry-run; create a temporary kind cluster before final acceptance\n'
+    fi
   else
     fail "file missing: docs/examples/multi-doc.yaml"
   fi

@@ -127,7 +127,7 @@ jobs:
   validate:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v4
       - run: go test ./...
 ```
 
@@ -140,7 +140,7 @@ jobs:
 | job | 一组在同一 runner 上执行的步骤 | `validate`、`build-image`、`deploy-kind` |
 | step | job 内的一步命令或 action | `go test ./...`、`docker/build-push-action` |
 | runner | 执行 job 的机器 | GitHub 托管的 `ubuntu-24.04` |
-| action | 可复用的步骤封装 | `actions/setup-go@v6`、`docker/build-push-action@v7` |
+| action | 可复用的步骤封装 | `actions/setup-go@v5`、`docker/build-push-action@v7` |
 | secret | 加密保存的敏感变量 | `KUBECONFIG_B64` |
 | environment | 部署环境和审批边界 | `dev`、`prod` |
 
@@ -276,7 +276,7 @@ CI 构建慢通常来自三类重复工作：
 - Docker 每次从零构建。
 - Kubernetes 工具每次重复安装。
 
-本篇使用 `actions/setup-go@v6` 的 Go 缓存，并使用 Docker Buildx 的 GitHub Actions cache：
+本篇使用 `actions/setup-go@v5` 的 Go 缓存，并使用 Docker Buildx 的 GitHub Actions cache：
 
 ```yaml linenums="0"
 cache-from: type=gha
@@ -492,10 +492,10 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
 
       - name: Set up Go
-        uses: actions/setup-go@v6
+        uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: true
@@ -521,7 +521,7 @@ jobs:
           tar -xzf helm.tar.gz
           sudo install -m 0755 linux-amd64/helm /usr/local/bin/helm
           kubectl version --client
-          helm version --short
+          helm version
 
       - name: Helm dependency build
         run: helm dependency build deployments/helm/todo-platform
@@ -579,7 +579,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
@@ -652,7 +652,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
 
       - name: Log in to GHCR
         uses: docker/login-action@v3
@@ -1005,7 +1005,7 @@ rm -f .github/workflows/todo-platform-ci-cd.yml
 
 1. **PR 门禁和部署权限必须分层。** PR 来自外部 fork 时，不应读取生产 Secret，也不应执行部署脚本。把 `validate` job 设计成无 Secret、只读权限，可以让贡献者安全参与；把镜像推送和部署放到 main push 或受保护 environment 中，才能避免“有人在 PR 里改脚本读取密钥”的事故。不要轻易使用 `pull_request_target` 执行 PR 中的代码。
 
-2. **Action 版本要可治理。** 教学中使用 `actions/checkout@v6`、`actions/setup-go@v6` 这类 major tag 便于阅读；生产中应评估是否 pin 到 commit SHA，并用 Dependabot 或内部流程统一升级。第三方 action 越多，供应链风险越大。关键仓库应限制允许的 actions 来源，并为 `.github/workflows/` 设置强制审查。
+2. **Action 版本要可治理。** 教学中使用 `actions/checkout@v4`、`actions/setup-go@v5` 这类已验证 major tag 便于阅读；生产中应评估是否 pin 到 commit SHA，并用 Dependabot 或内部流程统一升级。第三方 action 越多，供应链风险越大。关键仓库应限制允许的 actions 来源，并为 `.github/workflows/` 设置强制审查。
 
 3. **镜像发布必须可追溯。** `latest` 不能作为生产发布依据。每次构建至少保留 commit SHA tag、digest、构建时间、workflow run id 和源仓库链接。Kubernetes 部署记录中应能追踪到 digest。发生漏洞或回滚时，团队才能知道哪些环境运行了受影响镜像。
 
@@ -1031,7 +1031,7 @@ deploy-prod:
 
   steps:
     - name: Checkout repository
-      uses: actions/checkout@v6
+      uses: actions/checkout@v4
 
     - name: Install kubectl
       run: |

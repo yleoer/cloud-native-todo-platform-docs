@@ -191,6 +191,8 @@ sequenceDiagram
 
 ```bash linenums="0"
 go test ./...
+make envtest
+KUBEBUILDER_ASSETS="$(pwd)/bin/k8s/1.35.0-linux-amd64" go test ./test/envtest -v
 test/e2e/run-kind-e2e.sh
 helm install todo-operator ../helm/todo-operator -n todo-operator-system --create-namespace
 helm upgrade todo-operator ../helm/todo-operator -n todo-operator-system
@@ -260,6 +262,7 @@ $env:KIND_CLUSTER_NAME = "todo-operator-e2e"
 
 ```bash linenums="0"
 make envtest
+KUBEBUILDER_ASSETS="$(pwd)/bin/k8s/1.35.0-linux-amd64" go test ./test/envtest -run TestReconcileCreatesDeploymentServiceAndStatus -v
 ```
 
 ### 5.3 步骤 3：目录结构
@@ -707,6 +710,11 @@ kubectl wait --for=condition=Available deployment --all -n cert-manager --timeou
 docker build -t "${IMG}" .
 kind load docker-image "${IMG}" --name "${CLUSTER_NAME}"
 
+if [[ "${PUSH_IMAGE:-false}" == "true" ]]; then
+  docker push "${IMG}"
+  docker manifest inspect "${IMG}"
+fi
+
 make deploy IMG="${IMG}"
 kubectl wait --for=condition=Available deployment/todo-operator-controller-manager -n todo-operator-system --timeout=180s
 
@@ -786,6 +794,8 @@ chmod +x test/e2e/run-kind-e2e.sh
 ```
 
 本脚本使用 Bash here-doc 和 `chmod`，Windows 学习者建议在 Git Bash 或 WSL 中运行。如果只能使用 PowerShell，可以把脚本内容保存为 `.ps1`，并把 `cat > file <<'YAML'` 改写为 PowerShell here-string：`@' ... '@ | Set-Content file.yaml`。
+
+默认情况下脚本只把 Operator 镜像加载到本地 kind 集群。若要验证远端镜像仓库，把 `OPERATOR_IMG` 设为完整仓库地址，并设置 `PUSH_IMAGE=true`；脚本会执行 `docker push` 和 `docker manifest inspect`。如果 inspect 失败，不要继续发布 Helm Chart，因为远端集群很可能会进入 `ImagePullBackOff`。
 
 运行集成测试：
 
@@ -1443,7 +1453,7 @@ rm -f /tmp/todoapp-e2e.yaml /tmp/todoapp-invalid.yaml /tmp/todo-operator-chart.y
   find bin -name kube-apiserver -o -name etcd
   ```
 
-- **修复**：重新执行 `make envtest`，确认网络代理和 `GOPROXY` 可用，再运行 `go test ./test/envtest -v`。
+- **修复**：重新执行 `make envtest`，确认网络代理和 `GOPROXY` 可用，再运行 `KUBEBUILDER_ASSETS="$(pwd)/bin/k8s/1.35.0-linux-amd64" go test ./test/envtest -v`。
 - **预防**：在 CI 中缓存 envtest 二进制，避免每次流水线重新下载。
 
 ### 错误 2：envtest 创建 `TodoApp` 报 `no matches for kind`
@@ -1564,7 +1574,7 @@ rm -f /tmp/todoapp-e2e.yaml /tmp/todoapp-invalid.yaml /tmp/todo-operator-chart.y
 | 验收项 | 判断方式 |
 |---|---|
 | Webhook 测试 | `go test ./internal/webhook/...` 通过 |
-| envtest | `go test ./test/envtest -v` 通过 |
+| envtest | `KUBEBUILDER_ASSETS=... go test ./test/envtest -v` 通过 |
 | kind 集成测试 | `test/e2e/run-kind-e2e.sh` 成功退出 |
 | 镜像发布 | `docker build` 和 `kind load` 成功 |
 | Kustomize 清单 | `kubectl apply --dry-run=server -f dist/todo-operator-v0.3.0.yaml` 通过 |

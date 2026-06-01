@@ -654,6 +654,14 @@ KIND_NODE_IMAGE="${KIND_NODE_IMAGE:-registry.cn-guangzhou.aliyuncs.com/yleoer/no
 
 后续命令依赖这两个变量。如果你中途重新打开终端，请先重新执行本节的变量设置。
 
+如果你已经按第 1 篇或阶段一验收创建过 `todo-dev` kind 集群，并且只是想连续验证课程命令，可以复用已有集群，避免重复拉取节点镜像：
+
+```bash
+kind get clusters
+kubectl --context kind-todo-dev get nodes -o wide
+KIND_CLUSTER=todo-dev
+```
+
 如果课程版本锁已经提供了更新的 `KIND_NODE_IMAGE`，这里会优先使用环境变量中的值。创建集群：
 
 ```bash linenums="0"

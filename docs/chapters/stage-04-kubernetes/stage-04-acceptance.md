@@ -85,7 +85,7 @@ docker image inspect todo-api:v0.1.0
 
 1. 第 20 篇：`todo-k8s` kind 集群存在，`todo-k8s-control-plane` 为 Ready。
 2. 第 21 篇：`todo-workloads` 中 Todo API Deployment Ready，Service 可通过 `port-forward` 访问。
-3. 第 22 篇：Ingress 和 Gateway API 路由可通过 Traefik 入口访问，LoadBalancer 在 kind 中的 `<pending>` 行为能解释清楚。
+3. 第 22 篇：Ingress 和 Gateway API 分别通过 Traefik 入口访问；如果其中一条返回 404，需要按独立入口链路排查，不能把 Gateway 通过等同于 Ingress 通过。LoadBalancer 在 kind 中的 `<pending>` 行为能解释清楚。
 4. 第 23 篇：Pod 中能看到 ConfigMap 注入的 `TODO_ENV`、`TODO_API_ADDR`、`TODO_RELEASE`，Secret 不被明文提交。
 5. 第 24 篇：Todo API 已连接 PostgreSQL，删除 PostgreSQL Pod 后数据仍存在。
 6. 第 25 篇：NetworkPolicy 能阻断未授权客户端，并允许指定客户端访问 Todo API。

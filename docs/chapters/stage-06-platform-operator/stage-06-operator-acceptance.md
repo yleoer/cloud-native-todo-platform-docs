@@ -92,8 +92,17 @@ envtest 与 kind 集成验证：
 
 ```bash linenums="0"
 make envtest
-go test ./test/envtest -v
+KUBEBUILDER_ASSETS="$(pwd)/bin/k8s/1.35.0-linux-amd64" go test ./test/envtest -v
 ./test/e2e/run-kind-e2e.sh
+```
+
+首次 Helm 安装前，先创建并标注租户 namespace。Chart 会在这些 namespace 中创建 Role 和 RoleBinding；namespace 不存在时，Helm install 会失败并留下 failed release：
+
+```bash
+kubectl create namespace todo-team-a --dry-run=client -o yaml | kubectl apply -f -
+kubectl create namespace todo-team-b --dry-run=client -o yaml | kubectl apply -f -
+kubectl label namespace todo-team-a platform.todo.example.com/admission=enabled --overwrite
+kubectl label namespace todo-team-b platform.todo.example.com/admission=enabled --overwrite
 ```
 
 Helm 发布验证：
@@ -111,6 +120,8 @@ helm rollback todo-operator 1 -n todo-operator-system
 ```bash linenums="0"
 OPERATOR_SA="${OPERATOR_SA:-todo-operator}"
 kubectl auth can-i create deployments.apps -n todo-team-a \
+  --as="system:serviceaccount:todo-operator-system:${OPERATOR_SA}"
+kubectl auth can-i create events -n todo-operator-system \
   --as="system:serviceaccount:todo-operator-system:${OPERATOR_SA}"
 kubectl -n todo-operator-system get deploy,svc,pod
 kubectl -n todo-operator-system port-forward svc/todo-operator-metrics 8080:8080

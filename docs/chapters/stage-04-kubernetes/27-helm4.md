@@ -431,8 +431,13 @@ flowchart TD
 
 检查版本：
 
+<<<<<<< HEAD
 ```bash linenums="0"
 helm version --short
+=======
+```bash
+helm version
+>>>>>>> origin/main
 kubectl version --client
 kubectl cluster-info
 docker image inspect todo-api:v0.1.0 >/dev/null
