@@ -631,7 +631,11 @@ namespace/todo-dev created (dry run)
 configmap/todo-env created (dry run)
 ```
 
-这里加上 `--validate=false`，是为了跳过 OpenAPI Schema 校验；但在部分 kubectl 版本中，它仍会访问 API discovery。因此它不是离线 YAML 检查工具，只能在已有 context 的前提下做基础客户端 dry-run，不能替代真正的集群验证。后面创建 kind 集群后，还要再执行一次真实 `kubectl apply`。
+这里加上 `--validate=false`，只是为了跳过 kubectl 的 OpenAPI Schema 字段校验，避免因为本地没有可用集群而在 schema 下载阶段直接失败。
+
+但需要注意：`--validate=false` 并不等于离线模式。即使配合 `--dry-run=client`，`kubectl apply` 在资源识别、GVK/GVR 映射、API discovery 等阶段仍可能访问当前 kubeconfig 指向的 API Server。
+
+因此，这条命令只能在已有 kubeconfig/context 的前提下做基础客户端 dry-run，它不能替代真正的离线 YAML 校验工具，也不能替代集群侧验证。
 
 ### 5.7 编写环境记录和 README
 
