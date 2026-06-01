@@ -39,7 +39,7 @@ Go 服务运行在 Linux 之上，无论是物理服务器、虚拟机、Docker 
 
 本篇结束时，你至少应该能独立完成下面这组任务：
 
-```bash
+```bash linenums="0"
 pwd
 ls -lah
 mkdir -p server/todo-platform/{config,logs,data,tmp,releases}
@@ -145,7 +145,7 @@ flowchart TB
 
 绝对路径从 `/` 开始：
 
-```text
+```text linenums="0"
 /home/dev/workspace/cloud-native-todo-platform
 /etc/todo-platform/app.env
 /var/log/todo-platform/todo-api.log
@@ -153,7 +153,7 @@ flowchart TB
 
 相对路径从当前目录开始：
 
-```text
+```text linenums="0"
 docs/environment.md
 ../cloud-native-todo-platform
 ./scripts/check-env.sh
@@ -171,13 +171,13 @@ docs/environment.md
 
 操作文件前，先确认当前位置：
 
-```bash
+```bash linenums="0"
 pwd
 ```
 
 示例输出：
 
-```text
+```text linenums="0"
 /home/dev/workspace/cloud-native-todo-platform
 ```
 
@@ -234,13 +234,13 @@ Linux 文件权限围绕三个角色展开：
 
 查看权限：
 
-```bash
+```bash linenums="0"
 ls -l server/todo-platform/config/app.env
 ```
 
 示例输出：
 
-```text
+```text linenums="0"
 -rw-r----- 1 dev dev 128 May 27 10:00 app.env
 ```
 
@@ -282,7 +282,7 @@ ls -l server/todo-platform/config/app.env
 
 一个常见排障路径是：
 
-```bash
+```bash linenums="0"
 tail -n 100 server/todo-platform/logs/todo-api.log
 grep -n "ERROR" server/todo-platform/logs/todo-api.log
 find server/todo-platform \( -name "*.env" -o -name "*.log" \) -print
@@ -294,7 +294,7 @@ find server/todo-platform \( -name "*.env" -o -name "*.log" \) -print
 
 `tar` 常用于打包、备份、迁移目录：
 
-```bash
+```bash linenums="0"
 tar -czf todo-server-backup.tar.gz server/todo-platform
 tar -tzf todo-server-backup.tar.gz | head
 tar -xzf todo-server-backup.tar.gz -C /tmp
@@ -312,7 +312,7 @@ tar -xzf todo-server-backup.tar.gz -C /tmp
 
 软链接像一个可替换的入口：
 
-```text
+```text linenums="0"
 server/todo-platform/current -> releases/2026-05-27-001
 ```
 
@@ -320,13 +320,13 @@ server/todo-platform/current -> releases/2026-05-27-001
 
 `readlink` 命令可以查看软链接指向的目标路径：
 
-```bash
+```bash linenums="0"
 readlink server/todo-platform/current
 ```
 
 环境变量是传递运行参数的一种方式：
 
-```bash
+```bash linenums="0"
 export TODO_ENV=dev
 printenv TODO_ENV
 ```
@@ -339,7 +339,7 @@ printenv TODO_ENV
 
 当你执行下面命令时：
 
-```bash
+```bash linenums="0"
 cat server/todo-platform/config/app.env
 ```
 
@@ -384,7 +384,7 @@ flowchart TB
 
 假设有两个发布版本：
 
-```text
+```text linenums="0"
 releases/
 ├── 2026-05-27-001/
 └── 2026-05-27-002/
@@ -393,13 +393,13 @@ current -> releases/2026-05-27-001
 
 发布新版本时：
 
-```bash
+```bash linenums="0"
 ln -sfn releases/2026-05-27-002 server/todo-platform/current
 ```
 
 如果新版本异常，回滚只需要：
 
-```bash
+```bash linenums="0"
 ln -sfn releases/2026-05-27-001 server/todo-platform/current
 ```
 
@@ -442,7 +442,7 @@ flowchart LR
 
 建议在第 1 篇创建的仓库中执行：
 
-```bash
+```bash linenums="0"
 cd ~/workspace/cloud-native-todo-platform
 ```
 
@@ -461,7 +461,7 @@ cd ~/workspace/cloud-native-todo-platform
 
 实验完成后的目标结构如下：
 
-```text
+```text linenums="0"
 cloud-native-todo-platform/
 ├── scripts/
 │   └── check-server-layout.sh
@@ -484,13 +484,13 @@ cloud-native-todo-platform/
 
 创建完成后用 `tree` 验证：
 
-```bash
+```bash linenums="0"
 tree -a -L 4 server scripts
 ```
 
 如果没有 `tree`，可以用：
 
-```bash
+```bash linenums="0"
 find server scripts -maxdepth 4 -print
 ```
 
@@ -647,7 +647,7 @@ main "$@"
 
 先确认你在课程仓库根目录：
 
-```bash
+```bash linenums="0"
 pwd
 ls
 ```
@@ -656,14 +656,14 @@ ls
 
 创建目录：
 
-```bash
+```bash linenums="0"
 mkdir -p server/todo-platform/{config,logs,data,tmp,releases/2026-05-27-001}
 mkdir -p scripts
 ```
 
 写入配置文件：
 
-```bash
+```bash linenums="0"
 cat > server/todo-platform/config/app.env <<'EOF'
 TODO_ENV=dev
 TODO_HTTP_ADDR=127.0.0.1:8080
@@ -675,7 +675,7 @@ EOF
 
 写入示例日志：
 
-```bash
+```bash linenums="0"
 cat > server/todo-platform/logs/todo-api.log <<'EOF'
 2026-05-27T09:00:00+08:00 INFO todo-api started env=dev addr=127.0.0.1:8080
 2026-05-27T09:00:05+08:00 INFO request_id=req-001 method=GET path=/healthz status=200
@@ -685,7 +685,7 @@ EOF
 
 写入版本说明和数据目录占位文件：
 
-```bash
+```bash linenums="0"
 cat > server/todo-platform/releases/2026-05-27-001/README.md <<'EOF'
 # Todo Platform Release 2026-05-27-001
 
@@ -696,13 +696,13 @@ touch server/todo-platform/data/.keep
 
 创建当前版本软链接：
 
-```bash
+```bash linenums="0"
 ln -sfn releases/2026-05-27-001 server/todo-platform/current
 ```
 
 设置权限：
 
-```bash
+```bash linenums="0"
 chmod 750 server/todo-platform/{config,logs,data,releases}
 chmod 700 server/todo-platform/tmp
 chmod 640 server/todo-platform/config/app.env
@@ -711,7 +711,7 @@ chmod 640 server/todo-platform/logs/todo-api.log
 
 练习复制、重命名和删除。这里先复制配置文件，再把备份文件重命名为更清晰的 `.backup` 后缀：
 
-```bash
+```bash linenums="0"
 cp server/todo-platform/config/app.env server/todo-platform/config/app.env.bak
 mv server/todo-platform/config/app.env.bak server/todo-platform/config/app.env.backup
 chmod 640 server/todo-platform/config/app.env.backup
@@ -719,7 +719,7 @@ chmod 640 server/todo-platform/config/app.env.backup
 
 练习查看用户、用户组和权限。`id` 让你知道当前终端用户是谁，`stat` 用来确认文件权限和所有者：
 
-```bash
+```bash linenums="0"
 id
 stat server/todo-platform/config/app.env
 ls -ld server/todo-platform/{config,logs,data,tmp,releases}
@@ -727,14 +727,14 @@ ls -ld server/todo-platform/{config,logs,data,tmp,releases}
 
 `chown` 用来修改文件所有者，真实服务器通常由管理员或部署脚本执行。本实验目录已经属于当前用户，默认不需要执行 `chown`。如果你曾经误用 `sudo` 创建了 root 拥有的实验文件，可以用下面命令把目录恢复给当前用户：
 
-```bash
+```bash linenums="0"
 # 可选，仅当实验目录的所有者异常时执行
 sudo chown -R "$(id -un):$(id -gn)" server/todo-platform
 ```
 
 练习安全删除。先创建一个明确的临时文件，再删除它；不要对不确定的路径执行 `rm -rf`：
 
-```bash
+```bash linenums="0"
 touch server/todo-platform/tmp/delete-me.txt
 ls -l server/todo-platform/tmp/delete-me.txt
 rm server/todo-platform/tmp/delete-me.txt
@@ -746,13 +746,13 @@ rm server/todo-platform/tmp/delete-me.txt
 
 保存后赋予执行权限：
 
-```bash
+```bash linenums="0"
 chmod +x scripts/check-server-layout.sh
 ```
 
 练习查看和搜索：
 
-```bash
+```bash linenums="0"
 cat server/todo-platform/config/app.env
 less server/todo-platform/logs/todo-api.log
 tail -n 2 server/todo-platform/logs/todo-api.log
@@ -765,14 +765,14 @@ ls -l server/todo-platform/current
 
 创建备份包：
 
-```bash
+```bash linenums="0"
 tar -czf server/todo-platform-backup.tar.gz server/todo-platform
 tar -tzf server/todo-platform-backup.tar.gz | head
 ```
 
 运行检查脚本：
 
-```bash
+```bash linenums="0"
 ./scripts/check-server-layout.sh
 ```
 
@@ -780,19 +780,19 @@ tar -tzf server/todo-platform-backup.tar.gz | head
 
 查看软链接时，预期类似：
 
-```text
+```text linenums="0"
 current -> releases/2026-05-27-001
 ```
 
 搜索错误日志时，预期类似：
 
-```text
+```text linenums="0"
 3:2026-05-27T09:00:10+08:00 ERROR request_id=req-002 method=GET path=/todos status=500 error="database not configured"
 ```
 
 检查脚本预期输出：
 
-```text
+```text linenums="0"
 [OK] directory exists: server/todo-platform
 [OK] directory exists: server/todo-platform/config
 [OK] directory exists: server/todo-platform/logs
@@ -823,7 +823,7 @@ Server layout check completed.
 
 集中执行下面命令：
 
-```bash
+```bash linenums="0"
 test -d server/todo-platform/config
 test -d server/todo-platform/logs
 test -d server/todo-platform/data
@@ -854,20 +854,20 @@ tar -tzf server/todo-platform-backup.tar.gz | head
 
 如果你只想清理备份包：
 
-```bash
+```bash linenums="0"
 rm -f server/todo-platform-backup.tar.gz
 ```
 
 如果你想重做整个实验，请先确认当前位置：
 
-```bash
+```bash linenums="0"
 pwd
 ls server
 ```
 
 确认你在 `cloud-native-todo-platform` 仓库后，再删除实验目录：
 
-```bash
+```bash linenums="0"
 rm -rf server/todo-platform
 rm -f server/todo-platform-backup.tar.gz
 rm -f scripts/check-server-layout.sh
@@ -883,7 +883,7 @@ rm -f scripts/check-server-layout.sh
 
 - **现象**：
 
-  ```text
+  ```text linenums="0"
   cat: server/todo-platform/config/app.env: No such file or directory
   ```
 
@@ -891,7 +891,7 @@ rm -f scripts/check-server-layout.sh
 
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   pwd
   ls -lah
   find . -path "*app.env" -print
@@ -901,7 +901,7 @@ rm -f scripts/check-server-layout.sh
 
 - **修复**：回到仓库根目录，再重新创建目录和配置文件。
 
-  ```bash
+  ```bash linenums="0"
   cd ~/workspace/cloud-native-todo-platform
   mkdir -p server/todo-platform/config
   ```
@@ -912,7 +912,7 @@ rm -f scripts/check-server-layout.sh
 
 - **现象**：
 
-  ```text
+  ```text linenums="0"
   bash: ./scripts/check-server-layout.sh: Permission denied
   ```
 
@@ -920,7 +920,7 @@ rm -f scripts/check-server-layout.sh
 
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   ls -l scripts/check-server-layout.sh
   stat scripts/check-server-layout.sh
   ```
@@ -929,7 +929,7 @@ rm -f scripts/check-server-layout.sh
 
 - **修复**：
 
-  ```bash
+  ```bash linenums="0"
   chmod +x scripts/check-server-layout.sh
   ./scripts/check-server-layout.sh
   ```
@@ -940,7 +940,7 @@ rm -f scripts/check-server-layout.sh
 
 - **现象**：
 
-  ```bash
+  ```bash linenums="0"
   grep -n "ERROR" server/todo-platform/logs/todo-api.log
   ```
 
@@ -950,7 +950,7 @@ rm -f scripts/check-server-layout.sh
 
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   wc -l server/todo-platform/logs/todo-api.log
   cat server/todo-platform/logs/todo-api.log
   grep -ni "error" server/todo-platform/logs/todo-api.log
@@ -964,7 +964,7 @@ rm -f scripts/check-server-layout.sh
 
 - **现象**：
 
-  ```text
+  ```text linenums="0"
   ls: cannot access 'server/todo-platform/current': No such file or directory
   ```
 
@@ -974,7 +974,7 @@ rm -f scripts/check-server-layout.sh
 
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   ls -l server/todo-platform/current
   readlink server/todo-platform/current
   ls -lah server/todo-platform/releases
@@ -982,7 +982,7 @@ rm -f scripts/check-server-layout.sh
 
 - **修复**：
 
-  ```bash
+  ```bash linenums="0"
   mkdir -p server/todo-platform/releases/2026-05-27-001
   ln -sfn releases/2026-05-27-001 server/todo-platform/current
   ```
@@ -993,13 +993,13 @@ rm -f scripts/check-server-layout.sh
 
 - **现象**：
 
-  ```text
+  ```text linenums="0"
   ./scripts/check-server-layout.sh: line 2: $'\r': command not found
   ```
 
   或者你在错误目录中运行脚本，导致文件找不到：
 
-  ```text
+  ```text linenums="0"
   [FAIL] directory missing: server/todo-platform/config
   [FAIL] file missing: server/todo-platform/config/app.env
   ```
@@ -1008,7 +1008,7 @@ rm -f scripts/check-server-layout.sh
 
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   pwd
   file scripts/check-server-layout.sh
   ls -ld server/todo-platform/config
@@ -1019,14 +1019,14 @@ rm -f scripts/check-server-layout.sh
 
 - **修复**：
 
-  ```bash
+  ```bash linenums="0"
   sed -i 's/\r$//' scripts/check-server-layout.sh
   chmod +x scripts/check-server-layout.sh
   ```
 
   如果是目录错误，切回课程仓库后重新执行实验：
 
-  ```bash
+  ```bash linenums="0"
   cd ~/workspace/cloud-native-todo-platform
   ./scripts/check-server-layout.sh
   ```
@@ -1068,7 +1068,7 @@ rm -f scripts/check-server-layout.sh
 
 验收命令：
 
-```bash
+```bash linenums="0"
 cd ~/workspace/cloud-native-todo-platform
 ./scripts/check-server-layout.sh
 grep -n "ERROR" server/todo-platform/logs/todo-api.log
@@ -1090,72 +1090,13 @@ tar -tzf server/todo-platform-backup.tar.gz | head
 | 备份恢复 | 能用 `tar -tzf` 检查备份包内容 |
 | 自动化检查 | 能运行 `scripts/check-server-layout.sh` 并读懂输出 |
 
-## 9. 本章练习题
+## 9. 练习题与面试题
 
-### 基础题
+本章练习题和面试题已拆分到独立页面，完成正文学习后再进入题库练习与复盘。
 
-1. 绝对路径和相对路径有什么区别？分别举一个 Todo 平台中的例子。
-2. `/etc`、`/var/log`、`/var/lib`、`/opt` 通常分别放什么内容？
-3. `chmod 640 config/app.env` 中的 `640` 分别代表什么权限？
-4. 为什么目录需要 `x` 权限才能进入？
+[查看本章练习题与面试题](../../questions/stage-01-foundation/02-linux-filesystem.md)
 
-### 实操题
-
-1. 把 `server/todo-platform/config/app.env` 复制为 `app.env.bak`，再用 `ls -l` 验证。
-2. 在 `todo-api.log` 中追加一行 `WARN` 日志，并用 `grep -n "WARN"` 找到它。
-3. 使用 `less server/todo-platform/logs/todo-api.log` 查看日志，并练习按 `q` 退出。
-4. 使用 `find server/todo-platform \( -name "*.env" -o -name "*.log" \) -print` 查找配置和日志文件。
-5. 新建 `server/todo-platform/releases/2026-05-27-002`，把 `current` 切到新版本，再切回旧版本。
-6. 解压 `server/todo-platform-backup.tar.gz` 到 `/tmp/todo-restore`，确认内容完整后删除 `/tmp/todo-restore`。
-
-### 思考题
-
-1. 为什么生产环境中不建议把配置、日志、数据和程序都放在同一个目录？
-2. 如果 Kubernetes Pod 挂载了一个目录后应用配置文件消失了，你会如何用本篇知识排查？
-
-## 10. 本章面试题
-
-### 1. Linux 中绝对路径和相对路径的区别是什么？
-
-参考答案：
-
-一句话结论：绝对路径从 `/` 开始，不依赖当前目录；相对路径从当前目录开始，会受到 `pwd` 的影响。
-
-展开解释：例如 `/etc/todo-platform/app.env` 是绝对路径，无论你在哪个目录都指向同一个位置；`server/todo-platform/config/app.env` 是相对路径，只有在课程仓库根目录下才指向预期文件。脚本中如果使用相对路径，必须先确定执行目录，或者在脚本里计算项目根目录。
-
-深入追问：脚本如何避免相对路径出错？可以回答：使用 `$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)` 计算脚本所在仓库根目录，再基于这个根目录拼接路径。
-
-### 2. `chmod 755` 和 `chmod 640` 分别适合什么场景？
-
-参考答案：
-
-一句话结论：`755` 适合普通可执行脚本或目录，`640` 适合不希望所有人读取的配置文件。
-
-展开解释：`755` 表示所有者可读写执行，组和其他人可读可执行；常用于脚本、发布目录或需要被进入的普通目录。`640` 表示所有者可读写，组可读，其他人无权限；常用于应用配置。敏感配置还可以更严格，例如 `600`。
-
-深入追问：为什么不直接用 `777`？可以回答：`777` 会让所有用户读写执行，扩大误操作和安全攻击面，生产环境应遵守最小权限原则。
-
-### 3. 软链接在发布和回滚中有什么价值？
-
-参考答案：
-
-一句话结论：软链接可以让固定入口指向不同版本目录，从而简化发布和回滚。
-
-展开解释：例如 `current -> releases/2026-05-27-001`。发布新版本时创建新的 release 目录，再把 `current` 指向新版本；回滚时把 `current` 指回旧版本。这样可以保留历史版本，也方便脚本使用固定路径启动服务。
-
-深入追问：软链接有哪些风险？可以回答：目标目录不存在会造成断链；相对链接和绝对链接要统一；切换前应检查目标版本目录完整。
-
-### 4. 线上服务无法读取配置文件，你会怎么排查？
-
-参考答案：
-
-一句话结论：先确认路径是否存在，再确认进程用户是否有权限，最后确认配置内容和启动参数是否正确。
-
-展开解释：可以依次执行 `pwd`、`ls -l`、`stat config/app.env`、`id`、`grep` 等命令。路径不存在时检查工作目录和配置路径；权限不足时检查所有者、所属组和权限位；内容错误时检查配置文件是否是预期版本。
-
-深入追问：如果在 Kubernetes 中发生类似问题呢？可以回答：还要检查 ConfigMap/Secret/PVC 的挂载路径、volumeMount 是否覆盖了原目录、SecurityContext 中的 `runAsUser` 和 `fsGroup` 是否与文件权限匹配。
-
-## 11. 本章总结
+## 10. 本章总结
 
 本篇系统训练了 Linux 文件系统与命令基础。你理解了目录树、路径规则、文件操作、权限位、文本查看、搜索、压缩、软链接和环境变量这些核心概念，也知道它们为什么会影响后端服务、容器和 Kubernetes 工作负载。
 
@@ -1163,7 +1104,7 @@ tar -tzf server/todo-platform-backup.tar.gz | head
 
 能力价值上，本篇训练的是“能在服务器上稳稳操作”的基本功。真正的工程能力不是记住某个命令，而是知道操作前如何确认路径，出错后如何查看证据，修改权限时如何控制风险，发布目录如何支持回滚。这些习惯会直接影响你未来排查线上问题的速度和安全边界。
 
-## 12. 下一章衔接
+## 11. 下一章衔接
 
 下一篇进入 **Linux 进程、服务与软件管理**。
 

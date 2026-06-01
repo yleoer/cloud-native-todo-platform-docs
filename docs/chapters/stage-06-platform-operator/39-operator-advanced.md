@@ -64,7 +64,7 @@ OwnerReference 是 Kubernetes 对象 metadata 中的一组归属引用，用来�
 
 第 38 篇已经在代码中使用过：
 
-```go
+```go linenums="0"
 if err := controllerutil.SetControllerReference(todo, deployment, r.Scheme); err != nil {
 	return err
 }
@@ -72,7 +72,7 @@ if err := controllerutil.SetControllerReference(todo, deployment, r.Scheme); err
 
 它会在 Deployment 上生成类似下面的 metadata：
 
-```yaml
+```yaml linenums="0"
 metadata:
   ownerReferences:
     - apiVersion: platform.todo.example.com/v1alpha1
@@ -100,7 +100,7 @@ Finalizer 是 metadata 中的字符串列表。只要对象还带着 Finalizer�
 
 一个带 Finalizer 的 `TodoApp` 看起来像这样：
 
-```yaml
+```yaml linenums="0"
 metadata:
   finalizers:
     - platform.todo.example.com/todoapp-cleanup
@@ -108,7 +108,7 @@ metadata:
 
 删除生命周期可以概括为：
 
-```text
+```text linenums="0"
 用户删除 TodoApp
   -> API server 设置 deletionTimestamp
   -> TodoApp 仍保留在集群中
@@ -128,7 +128,7 @@ Admission Webhook 是 API server 在对象写入前调用的 HTTPS 扩展点。K
 
 本篇使用下面的 Kubebuilder 命令生成 Webhook 骨架：
 
-```bash
+```bash linenums="0"
 kubebuilder create webhook --group platform --version v1alpha1 --kind TodoApp --defaulting --programmatic-validation
 ```
 
@@ -140,7 +140,7 @@ Kubernetes 1.36 中，`MutatingAdmissionPolicy` 已经进入 stable。它允许�
 
 一个最小示例是：当 `TodoApp.spec.port` 缺失时，自动填充 80。
 
-```yaml
+```yaml linenums="0"
 apiVersion: admissionregistration.k8s.io/v1
 kind: MutatingAdmissionPolicy
 metadata:
@@ -185,7 +185,7 @@ Reconcile 返回错误时，controller-runtime 会根据 rate limiter 自动重�
 
 多版本 CRD 的常见路径是：
 
-```text
+```text linenums="0"
 v1alpha1
   -> v1beta1
   -> v1
@@ -309,19 +309,19 @@ flowchart TD
 
 确认当前项目：
 
-```bash
+```bash linenums="0"
 pwd
 ```
 
 预期输出类似：
 
-```text
+```text linenums="0"
 <project-root>/operator/kubebuilder
 ```
 
 确认工具版本：
 
-```bash
+```bash linenums="0"
 go version
 docker version --format '{{.Server.Version}}'
 kubectl version --client
@@ -331,7 +331,7 @@ kubebuilder version
 
 本篇需要 Kubernetes 1.36.x。后续创建 kind 集群时固定使用课程节点镜像：
 
-```bash
+```bash linenums="0"
 export KIND_NODE_IMAGE=registry.cn-guangzhou.aliyuncs.com/yleoer/node:v1.36.0
 ```
 
@@ -349,7 +349,7 @@ export KIND_NODE_IMAGE=registry.cn-guangzhou.aliyuncs.com/yleoer/node:v1.36.0
 
 本实验最终涉及的关键文件如下：
 
-```text
+```text linenums="0"
 operator/
 └── kubebuilder/
     ├── api/
@@ -388,13 +388,13 @@ operator/
 
 在 Kubebuilder 项目根目录执行：
 
-```bash
+```bash linenums="0"
 kubebuilder create webhook --group platform --version v1alpha1 --kind TodoApp --defaulting --programmatic-validation
 ```
 
 预期输出：
 
-```text
+```text linenums="0"
 Writing scaffold for you to edit...
 internal/webhook/v1alpha1/todoapp_webhook.go
 cmd/main.go
@@ -410,7 +410,7 @@ cmd/main.go
 
 编辑 `api/v1alpha1/todoapp_types.go`，替换为下面的完整内容：
 
-```go
+```go linenums="0"
 /*
 Copyright 2026.
 
@@ -539,7 +539,7 @@ func init() {
 
 编辑 `internal/webhook/v1alpha1/todoapp_webhook.go`，替换为下面的完整内容：
 
-```go
+```go linenums="0"
 /*
 Copyright 2026.
 
@@ -649,11 +649,11 @@ func SetupTodoAppWebhookWithManager(mgr ctrl.Manager) error {
 
 确认 `cmd/main.go` 中有 Webhook 注册逻辑。Kubebuilder 通常会自动生成，关键片段应类似：
 
-```go
+```go linenums="0"
 webhookv1alpha1 "github.com/example/todo-operator/internal/webhook/v1alpha1"
 ```
 
-```go
+```go linenums="0"
 if err = webhookv1alpha1.SetupTodoAppWebhookWithManager(mgr); err != nil {
 	setupLog.Error(err, "unable to create webhook", "webhook", "TodoApp")
 	os.Exit(1)
@@ -668,7 +668,7 @@ if err = webhookv1alpha1.SetupTodoAppWebhookWithManager(mgr); err != nil {
 
 和第 38 篇相比，这里有三处刻意变化。第一，Deployment 和 Service 都直接使用 `todo.Name`，方便 OwnerReference、Events 和排障输出围绕同一个对象名关联；第 38 篇的 `{name}-api` 命名适合强调“由主资源派生子资源”，本篇更强调生命周期闭环。第二，Service 固定暴露集群内 `port: 80`，`targetPort` 指向 `TodoApp.spec.port`，让用户声明的是容器监听端口，而 Service 对外入口保持稳定。第三，本篇在部分更新逻辑中用 `reflect.DeepEqual` 比较容器和端口结构，便于教学中看清“期望态整体变化”；生产 Operator 可以进一步收窄字段所有权，避免覆盖别的控制面写入。
 
-```go
+```go linenums="0"
 /*
 Copyright 2026.
 
@@ -1043,7 +1043,7 @@ func (r *TodoAppReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 还需要确认 `cmd/main.go` 创建 Reconciler 时注入 Event Recorder。关键片段如下：
 
-```go
+```go linenums="0"
 if err = (&controller.TodoAppReconciler{
 	Client:   mgr.GetClient(),
 	Scheme:   mgr.GetScheme(),
@@ -1056,27 +1056,27 @@ if err = (&controller.TodoAppReconciler{
 
 格式化并重新生成代码：
 
-```bash
+```bash linenums="0"
 gofmt -w api/v1alpha1/todoapp_types.go internal/webhook/v1alpha1/todoapp_webhook.go internal/controller/todoapp_controller.go cmd/main.go
 ```
 
 生成 DeepCopy、CRD、RBAC 和 Webhook 清单：
 
-```bash
+```bash linenums="0"
 make generate
 make manifests
 ```
 
 整理依赖并运行测试入口：
 
-```bash
+```bash linenums="0"
 go mod tidy
 make test
 ```
 
 如果 `make test` 首次下载 envtest 较慢，先执行：
 
-```bash
+```bash linenums="0"
 make envtest
 ```
 
@@ -1088,27 +1088,27 @@ Webhook 必须能被 API server 访问，因此本章不使用本地 `make run` 
 
 创建或复用 kind 集群：
 
-```bash
+```bash linenums="0"
 kind create cluster --name todo-operator --image "${KIND_NODE_IMAGE}"
 kubectl config use-context kind-todo-operator
 ```
 
 确认服务端版本：
 
-```bash
+```bash linenums="0"
 kubectl version
 ```
 
 预期输出中服务端版本应为 `v1.36.x`。如果不是，先删除集群并使用正确的 `KIND_NODE_IMAGE` 重新创建：
 
-```bash
+```bash linenums="0"
 kind delete cluster --name todo-operator
 kind create cluster --name todo-operator --image "${KIND_NODE_IMAGE}"
 ```
 
 安装 cert-manager。先下载清单并替换镜像地址，再从本地文件安装：
 
-```bash
+```bash linenums="0"
 CERT_MANAGER_VERSION="v1.20.0"
 curl -L -o cert-manager.yaml "https://github.com/cert-manager/cert-manager/releases/download/${CERT_MANAGER_VERSION}/cert-manager.yaml"
 sed -i 's|quay.io/jetstack/|registry.cn-guangzhou.aliyuncs.com/yleoer/|g' cert-manager.yaml
@@ -1117,7 +1117,7 @@ kubectl apply -f cert-manager.yaml
 
 等待 cert-manager 就绪：
 
-```bash
+```bash linenums="0"
 kubectl wait --for=condition=Available deployment --all -n cert-manager --timeout=300s
 ```
 
@@ -1130,13 +1130,13 @@ kubectl wait --for=condition=Available deployment --all -n cert-manager --timeou
 
 先定位生成的注释块：
 
-```bash
+```bash linenums="0"
 grep -nE "WEBHOOK|CERTMANAGER|manager_webhook_patch|webhookcainjection_patch" config/default/kustomization.yaml
 ```
 
 第一处：`resources` 中必须包含 `../webhook` 和 `../certmanager`：
 
-```yaml
+```yaml linenums="0"
 resources:
   - ../crd
   - ../rbac
@@ -1147,7 +1147,7 @@ resources:
 
 第二处：`patches` 中必须包含 manager webhook volume patch 和 webhook CA injection patch：
 
-```yaml
+```yaml linenums="0"
 patches:
   - path: manager_webhook_patch.yaml
   - path: webhookcainjection_patch.yaml
@@ -1155,7 +1155,7 @@ patches:
 
 第三处：如果生成文件包含 cert-manager 证书替换块，需要启用 `replacements`，让证书 DNS 名称和 Webhook Service 对齐。关键片段如下：
 
-```yaml
+```yaml linenums="0"
 replacements:
   - source:
       kind: Service
@@ -1177,7 +1177,7 @@ replacements:
 
 第四处：确认 `config/default` 最终能渲染出 Webhook、证书和带 webhook volume 的 manager Deployment：
 
-```bash
+```bash linenums="0"
 kubectl kustomize config/default | grep -E "kind: (MutatingWebhookConfiguration|ValidatingWebhookConfiguration|Certificate|Issuer|Deployment)"
 ```
 
@@ -1185,7 +1185,7 @@ kubectl kustomize config/default | grep -E "kind: (MutatingWebhookConfiguration|
 
 预期输出至少包含：
 
-```text
+```text linenums="0"
 kind: MutatingWebhookConfiguration
 kind: ValidatingWebhookConfiguration
 kind: Certificate
@@ -1197,63 +1197,63 @@ kind: Deployment
 
 构建本地 Operator 镜像：
 
-```bash
+```bash linenums="0"
 docker build -t todo-operator:v0.2.0-lifecycle .
 ```
 
 确认本地镜像存在：
 
-```bash
+```bash linenums="0"
 docker images todo-operator:v0.2.0-lifecycle
 ```
 
 把镜像加载到 kind：
 
-```bash
+```bash linenums="0"
 kind load docker-image todo-operator:v0.2.0-lifecycle --name todo-operator
 ```
 
 确认镜像已进入 kind 节点：
 
-```bash
+```bash linenums="0"
 docker exec todo-operator-control-plane crictl images | grep todo-operator
 ```
 
 部署 Operator：
 
-```bash
+```bash linenums="0"
 make deploy IMG=todo-operator:v0.2.0-lifecycle
 ```
 
 等待 Controller Manager 就绪：
 
-```bash
+```bash linenums="0"
 kubectl wait --for=condition=Available deployment/todo-operator-controller-manager -n todo-operator-system --timeout=180s
 ```
 
 检查证书、Service 和 endpoints：
 
-```bash
+```bash linenums="0"
 kubectl get certificate,issuer -n todo-operator-system
 kubectl get svc,endpoints -n todo-operator-system
 ```
 
 判断标准：
 
-```text
+```text linenums="0"
 Certificate READY=True
 webhook-service endpoints 不为空
 ```
 
 查看 Webhook 配置：
 
-```bash
+```bash linenums="0"
 kubectl get mutatingwebhookconfiguration,validatingwebhookconfiguration | grep todo
 ```
 
 预期输出类似：
 
-```text
+```text linenums="0"
 mutatingwebhookconfiguration.admissionregistration.k8s.io/todo-operator-mutating-webhook-configuration
 validatingwebhookconfiguration.admissionregistration.k8s.io/todo-operator-validating-webhook-configuration
 ```
@@ -1264,7 +1264,7 @@ validatingwebhookconfiguration.admissionregistration.k8s.io/todo-operator-valida
 
 创建一个省略 `image`、`replicas` 和 `port` 的样例，验证 Mutating Webhook 默认值：
 
-```bash
+```bash linenums="0"
 cat > config/samples/platform_v1alpha1_todoapp_defaults.yaml <<'EOF'
 apiVersion: platform.todo.example.com/v1alpha1
 kind: TodoApp
@@ -1277,25 +1277,25 @@ EOF
 
 提交样例：
 
-```bash
+```bash linenums="0"
 kubectl apply -f config/samples/platform_v1alpha1_todoapp_defaults.yaml
 ```
 
 查看默认值是否已写入对象：
 
-```bash
+```bash linenums="0"
 kubectl get todoapp todo-defaults -o jsonpath='{.spec.image}{" "}{.spec.replicas}{" "}{.spec.port}{"\n"}'
 ```
 
 预期输出：
 
-```text
+```text linenums="0"
 registry.cn-guangzhou.aliyuncs.com/yleoer/hello:plain-text 2 80
 ```
 
 创建一个非法样例，验证 Validating Webhook：
 
-```bash
+```bash linenums="0"
 cat > config/samples/platform_v1alpha1_todoapp_invalid.yaml <<'EOF'
 apiVersion: platform.todo.example.com/v1alpha1
 kind: TodoApp
@@ -1311,13 +1311,13 @@ EOF
 
 提交非法样例：
 
-```bash
+```bash linenums="0"
 kubectl apply -f config/samples/platform_v1alpha1_todoapp_invalid.yaml
 ```
 
 预期输出应包含：
 
-```text
+```text linenums="0"
 The TodoApp "todo-invalid" is invalid:
 * spec.image: Invalid value: "registry.cn-guangzhou.aliyuncs.com/yleoer/nginx:latest": image must include an explicit non-latest tag
 ```
@@ -1326,19 +1326,19 @@ The TodoApp "todo-invalid" is invalid:
 
 验证正常样例：
 
-```bash
+```bash linenums="0"
 kubectl apply -f config/samples/platform_v1alpha1_todoapp.yaml
 ```
 
 查看 `TodoApp` 状态：
 
-```bash
+```bash linenums="0"
 kubectl get todoapp
 ```
 
 预期输出类似：
 
-```text
+```text linenums="0"
 NAME            IMAGE                         REPLICAS   PHASE         READY   AGE
 todo-defaults   registry.cn-guangzhou.aliyuncs.com/yleoer/hello:plain-text   2          Progressing   0       20s
 todo-platform   registry.cn-guangzhou.aliyuncs.com/yleoer/hello:plain-text   2          Progressing   0       5s
@@ -1346,43 +1346,43 @@ todo-platform   registry.cn-guangzhou.aliyuncs.com/yleoer/hello:plain-text   2  
 
 等待镜像拉取和 Pod Ready 后再次查看：
 
-```bash
+```bash linenums="0"
 kubectl get todoapp todo-platform -o jsonpath='{.status.phase}{" "}{.status.readyReplicas}{"\n"}'
 ```
 
 预期输出：
 
-```text
+```text linenums="0"
 Ready 2
 ```
 
 查看 Conditions：
 
-```bash
+```bash linenums="0"
 kubectl get todoapp todo-platform -o yaml | yq '.status.conditions'
 ```
 
 如果本机没有 `yq`，使用：
 
-```bash
+```bash linenums="0"
 kubectl get todoapp todo-platform -o jsonpath='{range .status.conditions[*]}{.type}{" "}{.status}{" "}{.reason}{"\n"}{end}'
 ```
 
 预期输出：
 
-```text
+```text linenums="0"
 Ready True DeploymentReady
 ```
 
 查看事件：
 
-```bash
+```bash linenums="0"
 kubectl describe todoapp todo-platform
 ```
 
 预期在 Events 区域看到类似内容：
 
-```text
+```text linenums="0"
 Normal  FinalizerAdded  todoapp-controller  Added cleanup finalizer
 Normal  Ready           todoapp-controller  TodoApp is ready
 ```
@@ -1393,19 +1393,19 @@ Normal  Ready           todoapp-controller  TodoApp is ready
 
 删除 `TodoApp`：
 
-```bash
+```bash linenums="0"
 kubectl delete todoapp todo-platform
 ```
 
 立刻观察删除过程：
 
-```bash
+```bash linenums="0"
 kubectl get todoapp todo-platform -o yaml
 ```
 
 如果对象还在删除中，会看到：
 
-```yaml
+```yaml linenums="0"
 metadata:
   deletionTimestamp: "2026-05-29T10:00:00Z"
   finalizers:
@@ -1416,25 +1416,25 @@ status:
 
 本篇的 `cleanupExternalResources` 是幂等空实现，所以 Finalizer 很快会被移除，对象最终消失：
 
-```bash
+```bash linenums="0"
 kubectl get todoapp todo-platform
 ```
 
 预期输出：
 
-```text
+```text linenums="0"
 Error from server (NotFound): todoapps.platform.todo.example.com "todo-platform" not found
 ```
 
 确认 OwnerReference 清理了子资源：
 
-```bash
+```bash linenums="0"
 kubectl get deployment,service -l app.kubernetes.io/instance=todo-platform
 ```
 
 预期输出：
 
-```text
+```text linenums="0"
 No resources found in default namespace.
 ```
 
@@ -1446,27 +1446,27 @@ No resources found in default namespace.
 
 先确认 API 是否存在：
 
-```bash
+```bash linenums="0"
 kubectl version
 kubectl api-resources | grep -i mutatingadmission
 ```
 
 如果 `kubectl version` 中的 Server Version 不是 `v1.36.x`，或者 `api-resources` 没有输出，直接跳过本小节。不同 Kubernetes 小版本的字段细节可能调整，继续实验前先查看当前集群的 schema：
 
-```bash
+```bash linenums="0"
 kubectl explain mutatingadmissionpolicy.spec
 kubectl explain mutatingadmissionpolicybinding.spec
 ```
 
 创建目录：
 
-```bash
+```bash linenums="0"
 mkdir -p config/mutating-policy
 ```
 
 创建 `config/mutating-policy/todoapp-default-port.yaml`：
 
-```yaml
+```yaml linenums="0"
 apiVersion: admissionregistration.k8s.io/v1
 kind: MutatingAdmissionPolicy
 metadata:
@@ -1500,19 +1500,19 @@ spec:
 
 先检查清单语法：
 
-```bash
+```bash linenums="0"
 kubectl apply --dry-run=server -f config/mutating-policy/todoapp-default-port.yaml
 ```
 
 确认无误后应用策略：
 
-```bash
+```bash linenums="0"
 kubectl apply -f config/mutating-policy/todoapp-default-port.yaml
 ```
 
 验证 API 是否支持：
 
-```bash
+```bash linenums="0"
 kubectl get mutatingadmissionpolicy todoapp-default-port
 ```
 
@@ -1524,26 +1524,26 @@ kubectl get mutatingadmissionpolicy todoapp-default-port
 
 删除样例资源：
 
-```bash
+```bash linenums="0"
 kubectl delete -f config/samples/platform_v1alpha1_todoapp_defaults.yaml --ignore-not-found
 kubectl delete -f config/samples/platform_v1alpha1_todoapp.yaml --ignore-not-found
 ```
 
 删除可选 Admission Policy：
 
-```bash
+```bash linenums="0"
 kubectl delete -f config/mutating-policy/todoapp-default-port.yaml --ignore-not-found
 ```
 
 卸载 Operator：
 
-```bash
+```bash linenums="0"
 make undeploy
 ```
 
 删除 kind 集群：
 
-```bash
+```bash linenums="0"
 kind delete cluster --name todo-operator
 ```
 
@@ -1555,20 +1555,20 @@ kind delete cluster --name todo-operator
 
 - **现象**：提交 `TodoApp` 时报错：
 
-  ```text
+  ```text linenums="0"
   failed calling webhook "vtodoapp-v1alpha1.kb.io": tls: failed to verify certificate: x509: certificate signed by unknown authority
   ```
 
 - **原因**：WebhookConfiguration 中的 `caBundle` 没有被 cert-manager 注入，或 manager Pod 使用的证书 Secret 尚未生成。
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   kubectl get certificate,issuer -n todo-operator-system
   ```
 
   关注 `READY` 是否为 `True`。如果 `False`，继续查看 cert-manager 日志。
 
-  ```bash
+  ```bash linenums="0"
   kubectl logs -n cert-manager deploy/cert-manager
   ```
 
@@ -1579,20 +1579,20 @@ kind delete cluster --name todo-operator
 
 - **现象**：
 
-  ```text
+  ```text linenums="0"
   failed calling webhook "mtodoapp-v1alpha1.kb.io": no endpoints available for service "todo-operator-webhook-service"
   ```
 
 - **原因**：API server 找到了 Webhook Service，但 Service 后面没有 Ready 的 manager Pod，通常是镜像拉取失败、Pod CrashLoopBackOff 或 label selector 不匹配。
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   kubectl get pod,svc,endpoints -n todo-operator-system
   ```
 
   如果 endpoints 为空，说明 Service 没有后端 Pod。
 
-  ```bash
+  ```bash linenums="0"
   kubectl describe pod -n todo-operator-system -l control-plane=controller-manager
   ```
 
@@ -1603,7 +1603,7 @@ kind delete cluster --name todo-operator
 
 - **现象**：
 
-  ```bash
+  ```bash linenums="0"
   kubectl get todoapp
   ```
 
@@ -1612,19 +1612,19 @@ kind delete cluster --name todo-operator
 - **原因**：Finalizer 清理逻辑失败，或者 Controller 已经停止，导致 finalizer 没有被移除。
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   kubectl get todoapp todo-platform -o jsonpath='{.metadata.finalizers}{" "}{.metadata.deletionTimestamp}{"\n"}'
   ```
 
   如果 finalizer 仍在且 deletionTimestamp 不为空，说明对象正在等待 Controller 清理。
 
-  ```bash
+  ```bash linenums="0"
   kubectl logs -n todo-operator-system deploy/todo-operator-controller-manager
   ```
 
 - **修复**：优先修复 Controller 或外部清理失败原因。只有确认外部资源已经人工清理后，才可以手动移除 finalizer：
 
-  ```bash
+  ```bash linenums="0"
   kubectl patch todoapp todo-platform --type merge -p '{"metadata":{"finalizers":null}}'
   ```
 
@@ -1636,14 +1636,14 @@ kind delete cluster --name todo-operator
 
 - **现象**：
 
-  ```text
+  ```text linenums="0"
   Operation cannot be fulfilled on todoapps.platform.todo.example.com "todo-platform": the object has been modified
   ```
 
 - **原因**：Controller 基于旧的 `resourceVersion` 更新 status，期间对象已经被用户、Webhook 或另一个 Reconcile 更新。
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   kubectl get todoapp todo-platform -o jsonpath='{.metadata.resourceVersion}{" "}{.metadata.generation}{" "}{.status.observedGeneration}{"\n"}'
   ```
 
@@ -1656,14 +1656,14 @@ kind delete cluster --name todo-operator
 
 - **现象**：
 
-  ```text
+  ```text linenums="0"
   error: resource mapping not found for name: "todoapp-default-port" namespace: "" from "...": no matches for kind "MutatingAdmissionPolicy" in version "admissionregistration.k8s.io/v1"
   ```
 
 - **原因**：当前 Kubernetes 版本低于 1.36，或 API server 没有启用对应 API。
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   kubectl version
   kubectl api-resources | grep -i mutatingadmission
   ```
@@ -1714,7 +1714,7 @@ kind delete cluster --name todo-operator
 
 ### 8.3 建议提交内容
 
-```text
+```text linenums="0"
 operator/kubebuilder/api/v1alpha1/todoapp_types.go
 operator/kubebuilder/internal/controller/todoapp_controller.go
 operator/kubebuilder/internal/webhook/v1alpha1/todoapp_webhook.go
@@ -1724,70 +1724,13 @@ operator/kubebuilder/config/
 
 不要提交本地 kind 集群缓存、临时日志、构建产物、二进制文件或个人 IDE 配置。
 
-## 9. 本章练习题
+## 9. 练习题与面试题
 
-### 9.1 基础题
+本章练习题和面试题已拆分到独立页面，完成正文学习后再进入题库练习与复盘。
 
-1. OwnerReference 和 Finalizer 都能参与删除流程，它们分别解决什么问题？为什么不能互相替代？
-2. Mutating Webhook 和 Validating Webhook 的执行目的有什么不同？各举一个 TodoApp 场景。
-3. 为什么 `replicas` 和 `port` 改成指针字段后更适合做默认值注入？
-4. Conditions、Events 和 Controller 日志分别适合回答哪类排障问题？
-5. conversion webhook 解决什么问题？什么情况下只维护多个 CRD 版本还不够？
+[查看本章练习题与面试题](../../questions/stage-06-platform-operator/39-operator-advanced.md)
 
-### 9.2 实操题
-
-1. 给 Webhook 增加规则：镜像必须来自公司内部仓库前缀 `registry.example.com/`。验收标准：外部镜像被拒绝，内部镜像可以创建。
-2. 修改 Finalizer 清理函数，模拟删除一个外部 DNS 记录。验收标准：清理成功后删除继续，清理失败时 `TodoApp` 保持 `Terminating` 并写入 Warning Event。
-3. 给 Conditions 增加 `Degraded` 类型，当 Deployment Ready 副本数长期小于期望值时置为 `True`。验收标准：镜像不可拉取时能在 status 中看到 `Degraded=True`。
-
-### 9.3 思考题
-
-1. 如果 Webhook 规则升级后会拒绝历史上已经存在的 `TodoApp`，你会如何设计灰度、回滚和兼容策略？
-2. 如果 Finalizer 清理的是云数据库实例，怎样避免误删生产数据库？你会记录哪些外部资源标识和审计信息？
-
-## 10. 本章面试题
-
-### 面试题 1：OwnerReference 和 Finalizer 的区别是什么？
-
-**一句话结论**：OwnerReference 让 Kubernetes garbage collector 清理集群内子资源，Finalizer 让 Controller 在主资源删除前执行自定义清理逻辑。
-
-**展开解释**：Deployment、Service 这类 Kubernetes dependent 可以通过 OwnerReference 归属于 `TodoApp`，owner 删除后由 garbage collector 清理。外部数据库、DNS、云负载均衡这类资源不是 Kubernetes dependent，必须由 Controller 在 Finalizer 阶段主动清理。
-
-**深入追问**：Finalizer 为什么会导致资源卡住？因为只要 finalizer 字符串还在 metadata 中，对象就不会真正删除。Controller 故障或清理逻辑失败都会让对象停在 `Terminating`。
-
-### 面试题 2：Admission Webhook 适合做什么，不适合做什么？
-
-**一句话结论**：Webhook 适合快速、确定地做默认值和校验，不适合做慢速外部调用或创建资源。
-
-**展开解释**：Webhook 位于 API server 写路径上，执行太慢会拖慢用户请求，故障会影响资源创建更新。默认镜像、检查副本数、拒绝 `latest` 标签适合 Webhook；创建数据库、等待 Pod Ready、访问第三方系统不适合 Webhook，应该交给 Reconciler。
-
-**深入追问**：如果 Webhook 必须访问外部系统怎么办？优先重新设计，改为异步 Reconcile；确实必须访问时，要设置短超时、缓存结果、明确 failurePolicy，并评估 API server 写路径风险。
-
-### 面试题 3：为什么 Conditions 要使用固定 type，而不是每次追加一条？
-
-**一句话结论**：Condition 表达当前状态，不是历史日志；固定 type 可以让机器和人稳定读取。
-
-**展开解释**：`Ready=True`、`Ready=False` 是同一类状态的不同取值，应该更新同一个 Condition。每次追加新 Condition 会让对象越来越大，也会让自动化系统不知道该读哪一条。历史变化应该交给 Event、日志和审计系统。
-
-**深入追问**：`ObservedGeneration` 有什么作用？它表示 Controller 观察并处理到的 spec generation。若 `metadata.generation` 大于 `status.observedGeneration`，说明 status 可能还没反映最新 spec。
-
-### 面试题 4：MutatingAdmissionPolicy 和 Mutating Webhook 如何取舍？
-
-**一句话结论**：简单、无副作用、能用 CEL 表达的默认值可以考虑 MutatingAdmissionPolicy，复杂逻辑仍然使用 Webhook。
-
-**展开解释**：MutatingAdmissionPolicy 不需要维护服务和证书，适合简单字段补全。Webhook 可以使用 Go 代码处理复杂规则、跨字段逻辑和版本演进，但也带来部署、证书和可用性成本。
-
-**深入追问**：为什么本篇仍然保留 Webhook？因为我们还需要 programmatic validation、更新前后对象对比和与 Kubebuilder 项目生成流程对齐，这些更适合 Webhook。
-
-### 面试题 5：CRD 多版本升级的核心风险是什么？
-
-**一句话结论**：核心风险是破坏已有用户的 YAML 和控制器对对象结构的假设。
-
-**展开解释**：一旦 `TodoApp` 被业务团队写进 GitOps 仓库，字段就是契约。直接重命名字段、改变类型或收窄枚举会让旧对象无法更新。生产 Operator 通常先新增版本，保证 storage version 和 served versions 的转换，再通过 conversion webhook 保持兼容。
-
-**深入追问**：什么时候必须使用 conversion webhook？当不同版本之间字段结构不再一一对应，或者需要在读写时做语义转换时，就需要 conversion webhook。
-
-## 11. 本章总结
+## 10. 本章总结
 
 本篇把 Todo Operator 从“能创建子资源”推进到“能管理生命周期”。知识上，你理解了 OwnerReference、Finalizer、Admission Webhook、MutatingAdmissionPolicy、Conditions、Events、重试策略和多版本 CRD 的职责边界。它们不是零散高级特性，而是生产 Operator 必须面对的 API 生命周期问题。
 
@@ -1795,7 +1738,7 @@ operator/kubebuilder/config/
 
 能力上，你已经能从平台工程视角评价一个 Operator 是否具备生产雏形：输入是否被约束，删除是否可控，状态是否可读，错误是否可排查，API 是否有升级路径。下一步要把这些能力纳入自动化测试、镜像构建、发布和升级流程。
 
-## 12. 下一章衔接
+## 11. 下一章衔接
 
 下一篇第 40 篇会基于本篇 `operator/kubebuilder/` 继续推进 Operator 测试、发布与升级。我们会为 Webhook 默认值、Webhook 校验、Finalizer 删除、Conditions 回写和 Deployment/Service 调谐编写 envtest 与 kind 集成测试。
 

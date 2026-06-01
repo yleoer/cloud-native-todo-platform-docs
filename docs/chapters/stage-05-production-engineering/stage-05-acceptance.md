@@ -49,7 +49,7 @@
 
 出版前还需要验证以下公共镜像 tag 可以访问；如果企业网络无法直接访问 Docker Hub、GHCR 或 `registry.k8s.io`，请使用企业镜像代理或私有 registry，并在命令中替换镜像地址：
 
-```bash
+```bash linenums="0"
 docker manifest inspect registry.cn-guangzhou.aliyuncs.com/yleoer/pause:3.10 >/dev/null
 docker manifest inspect registry.cn-guangzhou.aliyuncs.com/yleoer/busybox:1.36.1-1 >/dev/null
 docker manifest inspect registry.cn-guangzhou.aliyuncs.com/yleoer/agnhost:2.53 >/dev/null
@@ -59,7 +59,7 @@ docker manifest inspect nicolaka/netshoot:v0.14 >/dev/null
 
 替代流程：
 
-```bash
+```bash linenums="0"
 docker pull <your-registry>/<image>:<tag>
 kind load docker-image <your-registry>/<image>:<tag> --name todo-gitops
 ```
@@ -95,7 +95,7 @@ NetworkPolicy 的语义由 Kubernetes API 定义，但是否真正执行取决�
 
 作品集说明应该强调“工程闭环”，不要只罗列工具名。推荐描述方式：
 
-```text
+```text linenums="0"
 为 Todo Platform 建立生产工程闭环：使用 GitHub Actions 完成测试、扫描、镜像构建和部署验证；使用 Argo CD 管理 dev/prod GitOps 环境；接入 Prometheus/Grafana 监控、Loki 日志、Tempo Trace；设计 7 类 Kubernetes 故障演练并形成排障 runbook 和事故复盘模板。
 ```
 
@@ -103,20 +103,20 @@ NetworkPolicy 的语义由 Kubernetes API 定义，但是否真正执行取决�
 
 文档仓库验证：
 
-```bash
+```bash linenums="0"
 mkdocs build --strict
 ```
 
 应用仓库基础验证：
 
-```bash
+```bash linenums="0"
 go test ./...
 go build ./...
 ```
 
 Kubernetes 基线验证：
 
-```bash
+```bash linenums="0"
 kubectl get nodes
 kubectl get namespace todo-dev monitoring observability argocd
 kubectl -n todo-dev rollout status deployment/todo-platform --timeout=180s
@@ -125,7 +125,7 @@ kubectl -n todo-dev get svc,endpointslice,pod
 
 Argo CD 验证：
 
-```bash
+```bash linenums="0"
 argocd app get todo-platform-dev
 argocd app sync todo-platform-dev --timeout 300
 argocd app wait todo-platform-dev --sync --health --timeout 300
@@ -133,14 +133,14 @@ argocd app wait todo-platform-dev --sync --health --timeout 300
 
 确认当前运行镜像：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-dev get deployment todo-platform \
   -o jsonpath='{.spec.template.spec.containers[0].image}{"\n"}'
 ```
 
 Prometheus 与 Grafana 验证：
 
-```bash
+```bash linenums="0"
 kubectl -n monitoring get pod
 kubectl -n monitoring get servicemonitor,prometheusrule
 kubectl -n monitoring port-forward service/monitoring-grafana 3000:80
@@ -148,7 +148,7 @@ kubectl -n monitoring port-forward service/monitoring-grafana 3000:80
 
 Loki、Tempo 与 Alloy 验证：
 
-```bash
+```bash linenums="0"
 kubectl -n observability get pod,svc
 kubectl -n observability logs daemonset/alloy --tail=80
 kubectl -n observability port-forward service/loki-gateway 3100:80
@@ -157,7 +157,7 @@ kubectl -n observability port-forward service/tempo 3200:3100
 
 排障演练收尾验证：
 
-```bash
+```bash linenums="0"
 ./troubleshooting/k8s/99-cleanup.sh
 argocd app sync todo-platform-dev --timeout 300
 kubectl -n todo-dev rollout status deployment/todo-platform --timeout=180s
@@ -179,7 +179,7 @@ kubectl -n todo-dev get pod,svc,pvc,networkpolicy | grep -E 'todo-(pending|broke
 
 走查完成后，至少应保留以下证据：
 
-```text
+```text linenums="0"
 GitHub Actions run URL
 GHCR image digest
 Argo CD Synced/Healthy 截图

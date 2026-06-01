@@ -48,7 +48,7 @@
 
 本篇结束时，你至少应该能成功执行：
 
-```bash
+```bash linenums="0"
 cd ~/workspace/cloud-native-todo-platform
 go fmt ./api/...
 go test ./api/...
@@ -58,7 +58,7 @@ TODO_API_ADDR=127.0.0.1:18080 ./bin/todo-api
 
 另开一个终端验证：
 
-```bash
+```bash linenums="0"
 curl -s http://127.0.0.1:18080/healthz
 curl -s -X POST http://127.0.0.1:18080/api/v1/todos -H 'Content-Type: application/json' -d '{"title":"learn net/http"}'
 curl -s http://127.0.0.1:18080/api/v1/todos
@@ -96,7 +96,7 @@ curl -s http://127.0.0.1:18080/api/v1/todos
 
 本篇会新增 `api/` 目录，把 Todo 平台从 CLI 项目推进到 API 服务：
 
-```text
+```text linenums="0"
 cloud-native-todo-platform/
 ├── api/
 │   ├── cmd/todo-api/
@@ -122,7 +122,7 @@ cloud-native-todo-platform/
 
 Go 标准库把 HTTP 处理能力抽象成一个接口：
 
-```go
+```go linenums="0"
 type Handler interface {
 	ServeHTTP(ResponseWriter, *Request)
 }
@@ -132,7 +132,7 @@ type Handler interface {
 
 为了让普通函数也能当 Handler 使用，标准库提供了 `http.HandlerFunc`：
 
-```go
+```go linenums="0"
 func healthz(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte("ok"))
@@ -147,7 +147,7 @@ func healthz(w http.ResponseWriter, r *http.Request) {
 
 Go 1.22 之后，标准库 `ServeMux` 支持更清晰的路由模式：
 
-```go
+```go linenums="0"
 mux := http.NewServeMux()
 mux.HandleFunc("GET /healthz", healthz)
 mux.HandleFunc("GET /api/v1/todos/{id}", getTodo)
@@ -155,7 +155,7 @@ mux.HandleFunc("GET /api/v1/todos/{id}", getTodo)
 
 在 Handler 中可以读取路径变量：
 
-```go
+```go linenums="0"
 id := r.PathValue("id")
 ```
 
@@ -175,7 +175,7 @@ id := r.PathValue("id")
 
 `http.ResponseWriter` 用于写响应。一个重要规则是：**先写状态码，再写响应体**。
 
-```go
+```go linenums="0"
 w.Header().Set("Content-Type", "application/json")
 w.WriteHeader(http.StatusCreated)
 json.NewEncoder(w).Encode(payload)
@@ -187,19 +187,19 @@ json.NewEncoder(w).Encode(payload)
 
 HTTP API 常用 JSON 作为请求和响应格式。创建 Todo 的请求体可以设计为：
 
-```json
+```json linenums="0"
 {"title":"learn net/http"}
 ```
 
 响应可以设计为：
 
-```json
+```json linenums="0"
 {"data":{"id":1,"title":"learn net/http","status":"pending"}}
 ```
 
 错误响应也要稳定：
 
-```json
+```json linenums="0"
 {"error":{"code":"invalid_title","message":"title is required"}}
 ```
 
@@ -209,7 +209,7 @@ HTTP API 常用 JSON 作为请求和响应格式。创建 Todo 的请求体可�
 
 标准库中间件通常长这样：
 
-```go
+```go linenums="0"
 func middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// 请求前逻辑
@@ -278,7 +278,7 @@ sequenceDiagram
 
 新手写 API 时，很容易在 Handler 里直接写全局变量：
 
-```go
+```go linenums="0"
 var todos = map[int]Todo{}
 ```
 
@@ -313,13 +313,13 @@ Handler 的职责是把 Go 错误映射成 HTTP 响应。不要把底层错误�
 
 生产 HTTP 服务不能只写：
 
-```go
+```go linenums="0"
 http.ListenAndServe(addr, handler)
 ```
 
 更稳妥的方式是显式创建 `http.Server`：
 
-```go
+```go linenums="0"
 server := &http.Server{
 	Addr:              addr,
 	Handler:           handler,
@@ -363,7 +363,7 @@ server := &http.Server{
 
 进入项目根目录：
 
-```bash
+```bash linenums="0"
 cd ~/workspace/cloud-native-todo-platform
 test -f go.mod || go mod init cloud-native-todo-platform
 ```
@@ -372,13 +372,13 @@ test -f go.mod || go mod init cloud-native-todo-platform
 
 创建本篇目录：
 
-```bash
+```bash linenums="0"
 mkdir -p api/cmd/todo-api api/internal/handler/http api/internal/model api/internal/repository api/internal/service bin
 ```
 
 本篇完成后的目录结构：
 
-```text
+```text linenums="0"
 cloud-native-todo-platform/
 ├── api/
 │   ├── cmd/
@@ -1340,37 +1340,37 @@ func request(t *testing.T, server *httptest.Server, method, path, body string) (
 
 格式化代码：
 
-```bash
+```bash linenums="0"
 go fmt ./api/...
 ```
 
 运行测试：
 
-```bash
+```bash linenums="0"
 go test ./api/...
 ```
 
 构建服务：
 
-```bash
+```bash linenums="0"
 go build -o bin/todo-api ./api/cmd/todo-api
 ```
 
 查看配置：
 
-```bash
+```bash linenums="0"
 TODO_API_ADDR=127.0.0.1:18080 ./bin/todo-api config-check
 ```
 
 查看路由：
 
-```bash
+```bash linenums="0"
 ./bin/todo-api routes
 ```
 
 启动服务：
 
-```bash
+```bash linenums="0"
 TODO_API_ADDR=127.0.0.1:18080 ./bin/todo-api
 ```
 
@@ -1378,7 +1378,7 @@ TODO_API_ADDR=127.0.0.1:18080 ./bin/todo-api
 
 另开一个终端验证 API：
 
-```bash
+```bash linenums="0"
 curl -s http://127.0.0.1:18080/healthz
 curl -s http://127.0.0.1:18080/readyz
 curl -s -X POST http://127.0.0.1:18080/api/v1/todos -H 'Content-Type: application/json' -d '{"title":"learn net/http"}'
@@ -1395,7 +1395,7 @@ curl -s -X DELETE -i http://127.0.0.1:18080/api/v1/todos/1
 
 `go test ./api/...` 应类似：
 
-```text
+```text linenums="0"
 ?   	cloud-native-todo-platform/api/cmd/todo-api	[no test files]
 ?   	cloud-native-todo-platform/api/internal/model	[no test files]
 ?   	cloud-native-todo-platform/api/internal/repository	[no test files]
@@ -1405,7 +1405,7 @@ ok  	cloud-native-todo-platform/api/internal/handler/http	0.0s
 
 `./bin/todo-api routes` 应输出：
 
-```text
+```text linenums="0"
 GET /healthz
 GET /readyz
 GET /api/v1/todos
@@ -1418,13 +1418,13 @@ DELETE /api/v1/todos/{id}
 
 创建 Todo 的响应类似：
 
-```json
+```json linenums="0"
 {"data":{"id":1,"title":"learn net/http","status":"pending","created_at":"2026-05-27T10:00:00Z","updated_at":"2026-05-27T10:00:00Z"}}
 ```
 
 删除 Todo 的响应状态是 `204 No Content`，没有响应体：
 
-```text
+```text linenums="0"
 HTTP/1.1 204 No Content
 X-Request-Id: req-8
 Date: Wed, 27 May 2026 10:00:00 GMT
@@ -1432,7 +1432,7 @@ Date: Wed, 27 May 2026 10:00:00 GMT
 
 按 `Ctrl+C` 停止服务时，日志会看到类似输出：
 
-```json
+```json linenums="0"
 {"time":"2026-05-27T10:00:00Z","level":"INFO","msg":"shutdown signal received"}
 {"time":"2026-05-27T10:00:00Z","level":"INFO","msg":"todo api stopped"}
 ```
@@ -1441,7 +1441,7 @@ Date: Wed, 27 May 2026 10:00:00 GMT
 
 验证格式、测试和构建：
 
-```bash
+```bash linenums="0"
 go fmt ./api/...
 go test ./api/...
 go build -o bin/todo-api ./api/cmd/todo-api
@@ -1450,13 +1450,13 @@ git diff --check
 
 验证服务端口：
 
-```bash
+```bash linenums="0"
 ss -lntp | grep 18080
 ```
 
 验证 HTTP 状态码：
 
-```bash
+```bash linenums="0"
 curl -s -o /tmp/healthz.out -w '%{http_code}\n' http://127.0.0.1:18080/healthz
 curl -s -o /tmp/notfound.out -w '%{http_code}\n' http://127.0.0.1:18080/api/v1/todos/999
 ```
@@ -1475,13 +1475,13 @@ curl -s -o /tmp/notfound.out -w '%{http_code}\n' http://127.0.0.1:18080/api/v1/t
 
 删除构建产物：
 
-```bash
+```bash linenums="0"
 rm -f bin/todo-api
 ```
 
 如果服务还在运行，先查看并停止：
 
-```bash
+```bash linenums="0"
 ss -lntp | grep 18080
 ```
 
@@ -1497,7 +1497,7 @@ ss -lntp | grep 18080
 
 - **现象**：
 
-  ```text
+  ```text linenums="0"
   listen tcp 127.0.0.1:18080: bind: address already in use
   ```
 
@@ -1505,7 +1505,7 @@ ss -lntp | grep 18080
 
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   ss -lntp | grep 18080
   ```
 
@@ -1513,7 +1513,7 @@ ss -lntp | grep 18080
 
 - **修复**：换一个端口启动：
 
-  ```bash
+  ```bash linenums="0"
   TODO_API_ADDR=127.0.0.1:18081 ./bin/todo-api
   ```
 
@@ -1525,7 +1525,7 @@ ss -lntp | grep 18080
 
 - **现象**：
 
-  ```text
+  ```text linenums="0"
   404 page not found
   ```
 
@@ -1533,7 +1533,7 @@ ss -lntp | grep 18080
 
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   ./bin/todo-api routes
   curl -i http://127.0.0.1:18080/api/v1/todo/1
   ```
@@ -1542,7 +1542,7 @@ ss -lntp | grep 18080
 
 - **修复**：使用正确路径：
 
-  ```bash
+  ```bash linenums="0"
   curl -i http://127.0.0.1:18080/api/v1/todos/1
   ```
 
@@ -1552,7 +1552,7 @@ ss -lntp | grep 18080
 
 - **现象**：
 
-  ```json
+  ```json linenums="0"
   {"error":{"code":"unsupported_media_type","message":"Content-Type must be application/json"}}
   ```
 
@@ -1560,7 +1560,7 @@ ss -lntp | grep 18080
 
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   curl -i -X POST http://127.0.0.1:18080/api/v1/todos -d '{"title":"learn"}'
   ```
 
@@ -1568,7 +1568,7 @@ ss -lntp | grep 18080
 
 - **修复**：
 
-  ```bash
+  ```bash linenums="0"
   curl -i -X POST http://127.0.0.1:18080/api/v1/todos -H 'Content-Type: application/json' -d '{"title":"learn"}'
   ```
 
@@ -1578,7 +1578,7 @@ ss -lntp | grep 18080
 
 - **现象**：
 
-  ```json
+  ```json linenums="0"
   {"error":{"code":"bad_json","message":"request body is invalid: unexpected EOF"}}
   ```
 
@@ -1586,7 +1586,7 @@ ss -lntp | grep 18080
 
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   curl -i -X POST http://127.0.0.1:18080/api/v1/todos -H 'Content-Type: application/json' -d '{"title":'
   ```
 
@@ -1594,7 +1594,7 @@ ss -lntp | grep 18080
 
 - **修复**：使用合法 JSON：
 
-  ```bash
+  ```bash linenums="0"
   curl -i -X POST http://127.0.0.1:18080/api/v1/todos -H 'Content-Type: application/json' -d '{"title":"learn JSON"}'
   ```
 
@@ -1604,7 +1604,7 @@ ss -lntp | grep 18080
 
 - **现象**：
 
-  ```json
+  ```json linenums="0"
   {"error":{"code":"not_found","message":"todo not found"}}
   ```
 
@@ -1612,7 +1612,7 @@ ss -lntp | grep 18080
 
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   curl -s http://127.0.0.1:18080/api/v1/todos
   curl -i http://127.0.0.1:18080/api/v1/todos/999
   ```
@@ -1661,7 +1661,7 @@ ss -lntp | grep 18080
 
 验收命令：
 
-```bash
+```bash linenums="0"
 cd ~/workspace/cloud-native-todo-platform
 go fmt ./api/...
 go test ./api/...
@@ -1682,82 +1682,13 @@ TODO_API_ADDR=127.0.0.1:18080 ./bin/todo-api config-check
 | 生产基础 | 能说明超时、请求体限制和优雅关闭的作用 |
 | 验证能力 | `go test ./api/...`、`go build`、`curl` CRUD 均通过 |
 
-## 9. 本章练习题
+## 9. 练习题与面试题
 
-### 基础题
+本章练习题和面试题已拆分到独立页面，完成正文学习后再进入题库练习与复盘。
 
-1. `http.Handler` 和 `http.HandlerFunc` 有什么关系？
-2. 为什么写 JSON 响应前要先设置 `Content-Type` 和状态码？
-3. `r.PathValue("id")`、`r.URL.Query()` 和 `r.Header.Get()` 分别读取请求的哪一部分？
-4. 为什么本篇用 `http.MaxBytesReader` 限制请求体大小？
-5. `/healthz` 和 `/readyz` 有什么区别？
+[查看本章练习题与面试题](../../questions/stage-02-go-backend/09-go-net-http.md)
 
-### 实操题
-
-1. 给 `GET /api/v1/todos` 增加 `status=bad` 的测试，确认返回 `400` 和 `invalid_status`。
-2. 给 `POST /api/v1/todos` 增加空标题测试，确认返回 `400` 和 `invalid_title`。
-3. 新增 `GET /api/v1/todos/count`，返回当前 Todo 总数。Go 1.22+ 的 `ServeMux` 会按模式具体性匹配，但把字面量路径放在通配路径之前，仍然是更清晰的编码习惯。
-4. 给 access log 增加 `query` 字段，观察 `GET /api/v1/todos?status=done` 的日志输出。
-5. 把 `TODO_API_ADDR` 改成 `127.0.0.1:18081` 启动，验证端口切换是否成功。
-
-### 思考题
-
-1. 标准库 `ServeMux` 已经支持 Method 和 Path 参数，为什么团队仍可能选择 Gin？
-2. 如果前端希望错误响应里包含 `request_id`，你会放在 Header、Body，还是两者都放？为什么？
-3. 如果 Todo API 被部署成 3 个副本，内存存储会带来什么问题？
-4. `server.Shutdown` 和直接 `os.Exit(0)` 的差异是什么？
-
-## 10. 本章面试题
-
-### 1. Go 的 `http.Handler` 是什么？
-
-**一句话结论**：`http.Handler` 是 Go 标准库对 HTTP 处理能力的最小抽象，只要求实现 `ServeHTTP(ResponseWriter, *Request)`。
-
-**展开解释**：无论是 `ServeMux`、自定义 Handler，还是 Gin 这类框架，最终都要能作为 `http.Handler` 交给 `http.Server`。这使得标准库、框架和中间件可以组合在同一套模型里。
-
-**深入追问**：`http.HandlerFunc` 是适配器类型，它让普通函数也能实现 `Handler` 接口。理解这一点后，中间件的 `func(http.Handler) http.Handler` 形式就很自然了。
-
-### 2. `ServeMux` 做什么？
-
-**一句话结论**：`ServeMux` 根据请求 Method 和 Path 把请求分发给对应 Handler。
-
-**展开解释**：本篇使用 `mux.HandleFunc("GET /api/v1/todos/{id}", h.getTodo)` 注册路由，Handler 内用 `r.PathValue("id")` 读取路径参数。它解决的是“一个 HTTP server 上有多个接口，如何找到对应处理函数”的问题。
-
-**深入追问**：第三方框架通常会在路由匹配、路由分组、中间件链、参数绑定和错误处理上提供更多便利。标准库更透明，框架更高效，团队应理解差异后选择。
-
-### 3. Handler 层和 Service 层应该如何分工？
-
-**一句话结论**：Handler 负责 HTTP 协议转换，Service 负责业务规则。
-
-**展开解释**：Handler 解析路径参数、查询参数、Header 和 JSON Body，然后调用 Service。Service 负责标题校验、状态过滤和调用 Repository。这样 CLI、HTTP API、后台任务和未来 Controller 都能复用业务规则。
-
-**深入追问**：如果把业务规则写在 Handler 中，后续换 Gin、加 gRPC 或写测试都会重复逻辑。清晰分层不是为了目录好看，而是为了降低变更成本。
-
-### 4. 为什么生产 HTTP 服务要设置 `ReadHeaderTimeout`？
-
-**一句话结论**：它限制客户端发送请求头的时间，避免慢连接长期占用服务资源。
-
-**展开解释**：没有 `ReadHeaderTimeout` 时，恶意或异常客户端可以慢慢发送 Header，让连接一直占用。生产服务应显式设置 Header、读、写和空闲超时，配合网关、负载均衡和监控使用。
-
-**深入追问**：不同超时保护不同阶段：`ReadHeaderTimeout` 保护 Header，`ReadTimeout` 保护请求读取，`WriteTimeout` 保护响应写出，`IdleTimeout` 控制 keep-alive 空闲连接。
-
-### 5. 中间件的执行顺序如何理解？
-
-**一句话结论**：中间件像洋葱一样层层包装，最外层最先接收请求，最后完成收尾。
-
-**展开解释**：本篇中 request ID 在最外层，先给请求生成 ID；access log 包装内部 Handler，等请求处理完后记录状态码和耗时；recover 包住路由和业务处理，捕获内部 panic 并返回 `500`。
-
-**深入追问**：顺序设计很重要。日志如果在 recover 外层，就能记录 panic 后的 `500`；request ID 如果在最外层，后续日志和错误都能拿到同一个 ID。注意：如果 Handler 在 panic 前已经写出了响应头，状态码就不能再可靠改写，这也是 Handler 应尽量先完成业务操作、最后统一写响应的原因之一。
-
-### 6. `/healthz` 和 `/readyz` 有什么区别？
-
-**一句话结论**：`/healthz` 判断进程是否活着，`/readyz` 判断服务是否准备好接流量。
-
-**展开解释**：本篇的 `/healthz` 只返回 `ok`，适合作为存活检查；`/readyz` 会触发服务层轻量访问，后续接入数据库时应检查数据库连接。Kubernetes 中 readiness 失败会让 Pod 暂时不接流量，而 liveness 失败可能触发重启。
-
-**深入追问**：不要把重依赖检查都塞进 liveness，否则数据库短暂波动可能导致所有 API Pod 被重启，造成故障扩大。
-
-## 11. 本章总结
+## 10. 本章总结
 
 本篇完成了 Todo 平台从 Go 业务代码到 HTTP API 的关键升级。你学习了 `http.Handler`、`HandlerFunc`、`ServeMux`、`Request`、`ResponseWriter`、JSON 编解码、中间件、健康检查、HTTP 超时和优雅关闭。
 
@@ -1765,7 +1696,7 @@ TODO_API_ADDR=127.0.0.1:18080 ./bin/todo-api config-check
 
 能力价值上，你不只是会调用框架，而是理解 Go HTTP 服务的底层模型。这会让你在第 10 篇学习 Gin 时知道框架到底帮你省掉了什么，也能在排查生产问题时回到标准库模型定位问题。
 
-## 12. 下一章衔接
+## 11. 下一章衔接
 
 下一篇进入 **Go Web API 开发：Gin 框架**。
 

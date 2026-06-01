@@ -54,7 +54,7 @@ Kubernetes 排障不要先猜原因，先收集证据。最常用的四类证据
 
 最小排障起手式：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-dev get deploy,rs,pod,svc,endpointslices,pvc
 kubectl -n todo-dev get events --sort-by=.lastTimestamp | tail -30
 kubectl -n todo-dev logs deployment/todo-platform --tail=80
@@ -76,7 +76,7 @@ Pod 的 `STATUS` 是压缩后的展示，不是完整诊断结果。真正排障
 
 查看完整字段：
 
-```bash
+```bash linenums="0"
 POD=$(kubectl -n todo-dev get pod -l app.kubernetes.io/name=todo-platform -o jsonpath='{.items[0].metadata.name}')
 kubectl -n todo-dev get pod "${POD}" -o jsonpath='{range .status.containerStatuses[*]}name={.name} state={.state} lastState={.lastState} restarts={.restartCount}{"\n"}{end}'
 ```
@@ -89,13 +89,13 @@ Event 是控制面和 kubelet 留下的短期现场记录。很多问题只看�
 
 按时间排序查看：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-dev get events --sort-by=.lastTimestamp
 ```
 
 只看某个 Pod 的事件：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-dev describe pod "${POD}"
 ```
 
@@ -113,7 +113,7 @@ kubectl -n todo-dev describe pod "${POD}"
 
 Service 本身只是稳定入口，真正转发到哪里由 EndpointSlice 决定。Service 不通时，先看 selector 是否能选中 Pod，再看 EndpointSlice 是否有地址。
 
-```bash
+```bash linenums="0"
 kubectl -n todo-dev get svc todo-platform -o wide
 kubectl -n todo-dev get endpointslice -l kubernetes.io/service-name=todo-platform -o yaml
 kubectl -n todo-dev get pod -l app.kubernetes.io/name=todo-platform --show-labels
@@ -128,7 +128,7 @@ DNS 排障要分两层：
 
 如果用户看到的是 Ingress 或 Gateway 返回 `502`，排障不要停在 Service。继续检查 Ingress Controller 或 Gateway Controller 的 Pod 和日志。以前面 Traefik 入口为例：
 
-```bash
+```bash linenums="0"
 kubectl get pods -A | grep -i traefik
 kubectl -n traefik get pods -l app.kubernetes.io/name=traefik
 kubectl -n traefik logs deployment/traefik --tail=100
@@ -141,7 +141,7 @@ kubectl -n todo-dev get ingress,httproute
 
 PVC 排障的核心是“请求是否能绑定到可用存储”。PVC `Pending` 时，不要只看 Pod，要看 PVC、StorageClass 和事件。
 
-```bash
+```bash linenums="0"
 kubectl -n todo-dev get pvc
 kubectl get storageclass
 kubectl -n todo-dev describe pvc todo-trouble-data
@@ -161,7 +161,7 @@ kubectl -n todo-dev describe pvc todo-trouble-data
 
 验证工具：
 
-```bash
+```bash linenums="0"
 k9s version
 stern --version
 kubectl debug --help | head
@@ -224,7 +224,7 @@ sequenceDiagram
 
 第 30 篇之后，Todo Platform 的 dev 环境由 Argo CD 管理。排障时你可能会直接执行：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-dev set image deployment/todo-platform todo-api=todo-api:v0.1.2-observability
 ```
 
@@ -288,7 +288,7 @@ kubectl -n todo-dev set image deployment/todo-platform todo-api=todo-api:v0.1.2-
 
 确认前置环境：
 
-```bash
+```bash linenums="0"
 pwd
 test -d deployments/gitops/envs/dev
 test -d observability/prometheus
@@ -304,20 +304,20 @@ argocd app get todo-platform-dev
 
 如果 `argocd app list` 提示未登录或找不到 Argo CD server，先按第 30 篇方式打开端口转发并登录。终端 A 保持端口转发运行：
 
-```bash
+```bash linenums="0"
 kubectl -n argocd port-forward service/argocd-server 8080:443
 ```
 
 终端 B 登录并确认应用名称：
 
-```bash
+```bash linenums="0"
 argocd login 127.0.0.1:8080 --insecure
 argocd app get todo-platform-dev
 ```
 
 确认工具版本：
 
-```bash
+```bash linenums="0"
 kubectl version --client
 kind version
 helm version --short
@@ -329,7 +329,7 @@ jq --version
 
 确认本篇用到的公共镜像 tag 可以访问：
 
-```bash
+```bash linenums="0"
 docker manifest inspect registry.cn-guangzhou.aliyuncs.com/yleoer/pause:3.10 >/dev/null
 docker manifest inspect registry.cn-guangzhou.aliyuncs.com/yleoer/busybox:1.36.1-1 >/dev/null
 docker manifest inspect registry.cn-guangzhou.aliyuncs.com/yleoer/agnhost:2.53 >/dev/null
@@ -339,7 +339,7 @@ docker manifest inspect nicolaka/netshoot:v0.14 >/dev/null
 
 如果网络环境无法访问 Docker Hub 或 `registry.k8s.io`，先从企业镜像代理拉取等价镜像，再加载到 kind 集群，或者把 YAML 中的镜像地址替换为企业内部镜像仓库：
 
-```bash
+```bash linenums="0"
 docker pull <your-registry>/<image>:<tag>
 kind load docker-image <your-registry>/<image>:<tag> --name todo-gitops
 ```
@@ -350,13 +350,13 @@ kind load docker-image <your-registry>/<image>:<tag> --name todo-gitops
 
 创建故障演练目录：
 
-```bash
+```bash linenums="0"
 mkdir -p troubleshooting/k8s
 ```
 
 最终目录如下：
 
-```text
+```text linenums="0"
 troubleshooting/
 └── k8s/
     ├── 01-pending-pod.yaml
@@ -373,7 +373,7 @@ troubleshooting/
 
 创建 `troubleshooting/k8s/01-pending-pod.yaml`：
 
-```bash
+```bash linenums="0"
 cat > troubleshooting/k8s/01-pending-pod.yaml <<'YAML'
 apiVersion: v1
 kind: Pod
@@ -406,7 +406,7 @@ YAML
 
 创建 `troubleshooting/k8s/02-broken-service.yaml`：
 
-```bash
+```bash linenums="0"
 cat > troubleshooting/k8s/02-broken-service.yaml <<'YAML'
 apiVersion: v1
 kind: Service
@@ -434,7 +434,7 @@ YAML
 
 创建 `troubleshooting/k8s/03-pvc-missing-storageclass.yaml`：
 
-```bash
+```bash linenums="0"
 cat > troubleshooting/k8s/03-pvc-missing-storageclass.yaml <<'YAML'
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -489,7 +489,7 @@ YAML
 
 创建 `troubleshooting/k8s/04-dns-broken.yaml`：
 
-```bash
+```bash linenums="0"
 cat > troubleshooting/k8s/04-dns-broken.yaml <<'YAML'
 apiVersion: v1
 kind: Pod
@@ -531,7 +531,7 @@ YAML
 
 创建 `troubleshooting/k8s/05-oom-demo.yaml`：
 
-```bash
+```bash linenums="0"
 cat > troubleshooting/k8s/05-oom-demo.yaml <<'YAML'
 apiVersion: v1
 kind: Pod
@@ -570,7 +570,7 @@ YAML
 
 创建 `troubleshooting/k8s/99-cleanup.sh`：
 
-```bash
+```bash linenums="0"
 cat > troubleshooting/k8s/99-cleanup.sh <<'BASH'
 #!/usr/bin/env bash
 set -euo pipefail
@@ -597,7 +597,7 @@ chmod +x troubleshooting/k8s/99-cleanup.sh
 
 先确认 Todo Platform 当前是健康的：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-dev get deploy todo-platform
 kubectl -n todo-dev rollout status deployment/todo-platform --timeout=180s
 kubectl -n todo-dev get pod -l app.kubernetes.io/name=todo-platform -o wide
@@ -607,20 +607,20 @@ kubectl -n todo-dev get endpointslice -l kubernetes.io/service-name=todo-platfor
 
 打开本地访问：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-dev port-forward service/todo-platform 18080:http
 ```
 
 另一个终端验证健康检查：
 
-```bash
+```bash linenums="0"
 curl -i http://127.0.0.1:18080/healthz
 curl -i http://127.0.0.1:18080/readyz
 ```
 
 预期输出：
 
-```text
+```text linenums="0"
 HTTP/1.1 200 OK
 ...
 ```
@@ -631,7 +631,7 @@ HTTP/1.1 200 OK
 
 注入故障：
 
-```bash
+```bash linenums="0"
 kubectl apply -f troubleshooting/k8s/01-pending-pod.yaml
 kubectl -n todo-dev get pod todo-pending-demo -w
 ```
@@ -640,7 +640,7 @@ kubectl -n todo-dev get pod todo-pending-demo -w
 
 排查：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-dev describe pod todo-pending-demo
 kubectl -n todo-dev get events --field-selector involvedObject.name=todo-pending-demo --sort-by=.lastTimestamp
 kubectl get nodes --show-labels
@@ -648,13 +648,13 @@ kubectl get nodes --show-labels
 
 判断标准：Event 中出现类似输出：
 
-```text
+```text linenums="0"
 Warning  FailedScheduling  default-scheduler  0/1 nodes are available: 1 node(s) didn't match Pod's node affinity/selector.
 ```
 
 修复：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-dev delete pod todo-pending-demo
 ```
 
@@ -666,7 +666,7 @@ kubectl -n todo-dev delete pod todo-pending-demo
 
 注入故障：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-dev set image deployment/todo-platform todo-api=todo-api:not-exist-33
 sleep 3
 kubectl -n todo-dev rollout status deployment/todo-platform --timeout=60s
@@ -674,7 +674,7 @@ kubectl -n todo-dev rollout status deployment/todo-platform --timeout=60s
 
 `rollout status` 可能超时，这是预期结果。排查：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-dev get pod -l app.kubernetes.io/name=todo-platform
 BAD_POD=$(kubectl -n todo-dev get pod -l app.kubernetes.io/name=todo-platform --sort-by=.metadata.creationTimestamp --no-headers | tail -1 | awk '{print $1}')
 kubectl -n todo-dev describe pod "${BAD_POD}"
@@ -683,7 +683,7 @@ kubectl -n todo-dev get events --sort-by=.lastTimestamp | grep -E 'ErrImagePull|
 
 预期关键词：
 
-```text
+```text linenums="0"
 ErrImagePull
 ImagePullBackOff
 Failed to pull image "todo-api:not-exist-33"
@@ -691,20 +691,20 @@ Failed to pull image "todo-api:not-exist-33"
 
 修复时首选 GitOps 恢复：
 
-```bash
+```bash linenums="0"
 argocd app sync todo-platform-dev --timeout 300
 kubectl -n todo-dev rollout status deployment/todo-platform --timeout=180s
 ```
 
 如果你的 Argo CD Application 名称不同，先执行：
 
-```bash
+```bash linenums="0"
 argocd app list
 ```
 
 如果现场无法立刻完成 Argo CD CLI 登录，可以先用 Kubernetes 回滚作为止血动作：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-dev rollout undo deployment/todo-platform
 kubectl -n todo-dev rollout status deployment/todo-platform --timeout=180s
 ```
@@ -715,7 +715,7 @@ kubectl -n todo-dev rollout status deployment/todo-platform --timeout=180s
 
 注入故障，让 Todo API 进程收到错误子命令后退出：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-dev patch deployment todo-platform --type='json' \
   -p='[{"op":"add","path":"/spec/template/spec/containers/0/args","value":["not-a-real-command"]}]'
 kubectl -n todo-dev rollout status deployment/todo-platform --timeout=60s
@@ -725,7 +725,7 @@ kubectl -n todo-dev rollout status deployment/todo-platform --timeout=60s
 
 排查：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-dev get pod -l app.kubernetes.io/name=todo-platform
 CRASH_POD=$(kubectl -n todo-dev get pod -l app.kubernetes.io/name=todo-platform --sort-by=.metadata.creationTimestamp --no-headers | tail -1 | awk '{print $1}')
 kubectl -n todo-dev describe pod "${CRASH_POD}"
@@ -735,21 +735,21 @@ kubectl -n todo-dev get pod "${CRASH_POD}" -o jsonpath='{.status.containerStatus
 
 预期关键词：
 
-```text
+```text linenums="0"
 Back-off restarting failed container
 Error exitCode=1
 ```
 
 修复时首选 GitOps 恢复：
 
-```bash
+```bash linenums="0"
 argocd app sync todo-platform-dev --timeout 300
 kubectl -n todo-dev rollout status deployment/todo-platform --timeout=180s
 ```
 
 如果现场无法立刻完成 Argo CD CLI 登录，可以先执行：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-dev rollout undo deployment/todo-platform
 kubectl -n todo-dev rollout status deployment/todo-platform --timeout=180s
 ```
@@ -762,14 +762,14 @@ kubectl -n todo-dev rollout status deployment/todo-platform --timeout=180s
 
 注入故障：
 
-```bash
+```bash linenums="0"
 kubectl apply -f troubleshooting/k8s/05-oom-demo.yaml
 kubectl -n todo-dev get pod todo-oom-demo -w
 ```
 
 等 Pod 重启后按 `Ctrl+C`。排查：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-dev describe pod todo-oom-demo
 kubectl -n todo-dev get pod todo-oom-demo -o jsonpath='{.status.containerStatuses[0].lastState.terminated.reason}{" exitCode="}{.status.containerStatuses[0].lastState.terminated.exitCode}{" restarts="}{.status.containerStatuses[0].restartCount}{"\n"}'
 kubectl -n todo-dev top pod todo-oom-demo
@@ -777,26 +777,26 @@ kubectl -n todo-dev top pod todo-oom-demo
 
 预期关键词：
 
-```text
+```text linenums="0"
 OOMKilled exitCode=137
 ```
 
 如果 Metrics Server 未安装，`kubectl top` 会失败。第 31 篇已经部署 Prometheus，你也可以在 Grafana 中查看容器内存：
 
-```promql
+```promql linenums="0"
 container_memory_working_set_bytes{namespace="todo-dev", pod="todo-oom-demo"}
 ```
 
 如果排查的是请求变慢而不是容器退出，还要同时看 CPU 使用和 throttling。CPU throttling 不一定触发重启，但会显著拉高 P95/P99 延迟：
 
-```promql
+```promql linenums="0"
 rate(container_cpu_usage_seconds_total{namespace="todo-dev", pod="todo-oom-demo"}[5m])
 rate(container_cpu_cfs_throttled_periods_total{namespace="todo-dev", pod="todo-oom-demo"}[5m])
 ```
 
 修复：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-dev delete pod todo-oom-demo
 ```
 
@@ -808,7 +808,7 @@ kubectl -n todo-dev delete pod todo-oom-demo
 
 注入故障：
 
-```bash
+```bash linenums="0"
 kubectl apply -f troubleshooting/k8s/02-broken-service.yaml
 kubectl -n todo-dev get svc todo-broken-service
 kubectl -n todo-dev get endpointslice -l kubernetes.io/service-name=todo-broken-service
@@ -816,7 +816,7 @@ kubectl -n todo-dev get endpointslice -l kubernetes.io/service-name=todo-broken-
 
 从临时 Pod 访问：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-dev run todo-curl-once \
   --rm -i --restart=Never \
   --image=curlimages/curl:8.16.0 \
@@ -825,13 +825,13 @@ kubectl -n todo-dev run todo-curl-once \
 
 预期结果是请求失败。不同 CNI、kube-proxy 模式和超时设置下，输出可能是 timeout、connection refused 或 no route to host。示例之一如下：
 
-```text
+```text linenums="0"
 curl: (28) Operation timed out after 3000 milliseconds with 0 bytes received
 ```
 
 排查：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-dev get svc todo-broken-service -o jsonpath='{.spec.selector}{"\n"}'
 kubectl -n todo-dev get pod -l app.kubernetes.io/name=todo-platform --show-labels
 kubectl -n todo-dev describe svc todo-broken-service
@@ -842,7 +842,7 @@ kubectl -n todo-dev get endpointslice -l kubernetes.io/service-name=todo-broken-
 
 修复：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-dev patch service todo-broken-service --type='json' \
   -p='[{"op":"replace","path":"/spec/selector/app.kubernetes.io~1name","value":"todo-platform"}]'
 kubectl -n todo-dev get endpointslice -l kubernetes.io/service-name=todo-broken-service
@@ -850,7 +850,7 @@ kubectl -n todo-dev get endpointslice -l kubernetes.io/service-name=todo-broken-
 
 再次验证：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-dev run todo-curl-once \
   --rm -i --restart=Never \
   --image=curlimages/curl:8.16.0 \
@@ -861,26 +861,26 @@ kubectl -n todo-dev run todo-curl-once \
 
 注入故障：
 
-```bash
+```bash linenums="0"
 kubectl apply -f troubleshooting/k8s/04-dns-broken.yaml
 kubectl -n todo-dev wait --for=condition=Ready pod/todo-dns-client --timeout=120s
 ```
 
 验证 DNS 失败：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-dev exec todo-dns-client -- nslookup kubernetes.default.svc.cluster.local
 ```
 
 预期关键词：
 
-```text
+```text linenums="0"
 connection timed out; no servers could be reached
 ```
 
 排查：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-dev get pod todo-dns-client -o jsonpath='{.spec.dnsPolicy}{"\n"}{.spec.dnsConfig}{"\n"}'
 kubectl -n todo-dev get networkpolicy
 kubectl -n kube-system get svc kube-dns
@@ -891,7 +891,7 @@ kubectl -n kube-system get pod -l k8s-app=kube-dns
 
 修复方式一，删除故障 Pod，重新创建使用默认集群 DNS 的调试 Pod：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-dev delete pod todo-dns-client
 kubectl -n todo-dev run todo-dns-client \
   --image=registry.cn-guangzhou.aliyuncs.com/yleoer/busybox:1.36.1-1 \
@@ -905,7 +905,7 @@ kubectl -n todo-dev exec todo-dns-client -- nslookup kubernetes.default.svc.clus
 
 示例策略如下：
 
-```yaml
+```yaml linenums="0"
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -936,7 +936,7 @@ spec:
 
 注入故障：
 
-```bash
+```bash linenums="0"
 kubectl apply -f troubleshooting/k8s/03-pvc-missing-storageclass.yaml
 kubectl -n todo-dev get pvc todo-trouble-data
 kubectl -n todo-dev get pod todo-pvc-demo
@@ -944,7 +944,7 @@ kubectl -n todo-dev get pod todo-pvc-demo
 
 排查：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-dev describe pvc todo-trouble-data
 kubectl -n todo-dev describe pod todo-pvc-demo
 kubectl get storageclass
@@ -953,21 +953,21 @@ kubectl -n todo-dev get events --sort-by=.lastTimestamp | grep -E 'todo-trouble-
 
 预期关键词：
 
-```text
+```text linenums="0"
 storageclass.storage.k8s.io "does-not-exist" not found
 pod has unbound immediate PersistentVolumeClaims
 ```
 
 修复：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-dev delete pod todo-pvc-demo
 kubectl -n todo-dev delete pvc todo-trouble-data
 ```
 
 如果要改成可工作的 PVC，先确认默认 StorageClass：
 
-```bash
+```bash linenums="0"
 kubectl get storageclass
 ```
 
@@ -977,20 +977,20 @@ kubectl get storageclass
 
 创建一个请求 ID：
 
-```bash
+```bash linenums="0"
 REQ_ID="trouble-$(date +%s)"
 curl -i -H "X-Request-ID: ${REQ_ID}" http://127.0.0.1:18080/healthz
 ```
 
 用 `stern` 观察 Todo 相关日志：
 
-```bash
+```bash linenums="0"
 stern -n todo-dev 'todo-platform|todo-.*demo' --since 10m --tail 50
 ```
 
 如果第 32 篇 Loki 还在，也可以用 LogQL 查同一个请求：
 
-```logql
+```logql linenums="0"
 {namespace="todo-dev", app="todo-platform"} | json | request_id="trouble-..."
 ```
 
@@ -1000,7 +1000,7 @@ stern -n todo-dev 'todo-platform|todo-.*demo' --since 10m --tail 50
 
 第 16 篇之后 Todo API 镜像通常是 distroless 风格，容器里没有 shell。不要为了排障把生产镜像改成带 shell 的大镜像，可以用临时容器：
 
-```bash
+```bash linenums="0"
 POD=$(kubectl -n todo-dev get pod -l app.kubernetes.io/name=todo-platform -o jsonpath='{.items[0].metadata.name}')
 kubectl -n todo-dev debug -it "${POD}" \
   --image=nicolaka/netshoot:v0.14 \
@@ -1010,7 +1010,7 @@ kubectl -n todo-dev debug -it "${POD}" \
 
 进入临时容器后可以执行：
 
-```bash
+```bash linenums="0"
 dig todo-platform.todo-dev.svc.cluster.local
 curl -i http://todo-platform.todo-dev.svc.cluster.local:18080/healthz
 ss -tnp
@@ -1018,7 +1018,7 @@ ss -tnp
 
 退出：
 
-```bash
+```bash linenums="0"
 exit
 ```
 
@@ -1028,7 +1028,7 @@ exit
 
 启动：
 
-```bash
+```bash linenums="0"
 k9s -n todo-dev
 ```
 
@@ -1051,7 +1051,7 @@ k9s 是提速工具，不是唯一入口。正式复盘中仍要把关键 `kubec
 
 完成全部故障演练后，你应该能看到以下典型输出：
 
-```text
+```text linenums="0"
 todo-pending-demo     0/1     Pending              0
 todo-platform-...     0/1     ImagePullBackOff     0
 todo-platform-...     0/1     CrashLoopBackOff     3
@@ -1061,7 +1061,7 @@ todo-trouble-data     Pending
 
 修复后，基线应用应恢复：
 
-```text
+```text linenums="0"
 deployment.apps/todo-platform successfully rolled out
 NAME            TYPE        CLUSTER-IP      PORT(S)
 todo-platform   ClusterIP   10.96.x.x       18080/TCP
@@ -1069,7 +1069,7 @@ todo-platform   ClusterIP   10.96.x.x       18080/TCP
 
 健康检查返回：
 
-```text
+```text linenums="0"
 HTTP/1.1 200 OK
 ```
 
@@ -1077,7 +1077,7 @@ HTTP/1.1 200 OK
 
 **第一层：GitOps 应用恢复健康**
 
-```bash
+```bash linenums="0"
 argocd app get todo-platform-dev
 kubectl -n todo-dev rollout status deployment/todo-platform --timeout=180s
 ```
@@ -1086,7 +1086,7 @@ kubectl -n todo-dev rollout status deployment/todo-platform --timeout=180s
 
 如果 `argocd app get` 失败，先回到 5.2 节完成 Argo CD CLI 登录；如果需要先恢复业务，再执行：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-dev rollout undo deployment/todo-platform
 kubectl -n todo-dev rollout status deployment/todo-platform --timeout=180s
 ```
@@ -1095,7 +1095,7 @@ kubectl -n todo-dev rollout status deployment/todo-platform --timeout=180s
 
 **第二层：Pod 没有异常状态**
 
-```bash
+```bash linenums="0"
 kubectl -n todo-dev get pod
 kubectl -n todo-dev get events --sort-by=.lastTimestamp | tail -30
 ```
@@ -1104,7 +1104,7 @@ kubectl -n todo-dev get events --sort-by=.lastTimestamp | tail -30
 
 **第三层：Service 有后端**
 
-```bash
+```bash linenums="0"
 kubectl -n todo-dev get endpointslice -l kubernetes.io/service-name=todo-platform
 ```
 
@@ -1112,7 +1112,7 @@ kubectl -n todo-dev get endpointslice -l kubernetes.io/service-name=todo-platfor
 
 **第四层：健康检查可访问**
 
-```bash
+```bash linenums="0"
 curl -i http://127.0.0.1:18080/healthz
 curl -i http://127.0.0.1:18080/readyz
 ```
@@ -1121,7 +1121,7 @@ curl -i http://127.0.0.1:18080/readyz
 
 **第五层：可观测性数据恢复**
 
-```bash
+```bash linenums="0"
 kubectl -n todo-dev logs deployment/todo-platform --tail=30
 kubectl -n monitoring get deployment monitoring-grafana
 kubectl -n observability get pods
@@ -1133,20 +1133,20 @@ kubectl -n observability get pods
 
 清理本篇创建的故障资源：
 
-```bash
+```bash linenums="0"
 ./troubleshooting/k8s/99-cleanup.sh
 ```
 
 让 Argo CD 恢复 Todo Platform：
 
-```bash
+```bash linenums="0"
 argocd app sync todo-platform-dev --timeout 300
 kubectl -n todo-dev rollout status deployment/todo-platform --timeout=180s
 ```
 
 如果清理现场时 Argo CD CLI 暂时不可用，先执行本地回滚止血：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-dev rollout undo deployment/todo-platform
 kubectl -n todo-dev rollout status deployment/todo-platform --timeout=180s
 ```
@@ -1155,7 +1155,7 @@ kubectl -n todo-dev rollout status deployment/todo-platform --timeout=180s
 
 确认无残留：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-dev get pod,svc,pvc,networkpolicy | grep -E 'todo-(pending|broken|pvc|dns|oom|trouble)' || true
 ```
 
@@ -1167,7 +1167,7 @@ kubectl -n todo-dev get pod,svc,pvc,networkpolicy | grep -E 'todo-(pending|broke
 
 - **现象**：
 
-  ```text
+  ```text linenums="0"
   NAME                READY   STATUS    RESTARTS   AGE
   todo-pending-demo   0/1     Pending   0          2m
   ```
@@ -1175,7 +1175,7 @@ kubectl -n todo-dev get pod,svc,pvc,networkpolicy | grep -E 'todo-(pending|broke
 - **原因**：资源请求超过节点容量；`nodeSelector` 或 affinity 不匹配；节点有 taint 而 Pod 没有 toleration；PVC 未绑定也可能让 Pod 等待。
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   kubectl -n todo-dev describe pod todo-pending-demo
   kubectl describe node
   kubectl -n todo-dev get pvc
@@ -1190,7 +1190,7 @@ kubectl -n todo-dev get pod,svc,pvc,networkpolicy | grep -E 'todo-(pending|broke
 
 - **现象**：
 
-  ```text
+  ```text linenums="0"
   Warning  Failed  kubelet  Failed to pull image "todo-api:not-exist-33"
   Warning  BackOff kubelet  Back-off pulling image "todo-api:not-exist-33"
   ```
@@ -1198,7 +1198,7 @@ kubectl -n todo-dev get pod,svc,pvc,networkpolicy | grep -E 'todo-(pending|broke
 - **原因**：镜像 tag 不存在；仓库地址写错；私有仓库缺少 `imagePullSecrets`；kind 节点没有加载本地镜像；`imagePullPolicy: Always` 导致必须远程拉取。
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   kubectl -n todo-dev describe pod "${BAD_POD}"
   kubectl -n todo-dev get deployment todo-platform -o jsonpath='{.spec.template.spec.containers[0].image}{"\n"}'
   kubectl -n todo-dev get secret
@@ -1213,14 +1213,14 @@ kubectl -n todo-dev get pod,svc,pvc,networkpolicy | grep -E 'todo-(pending|broke
 
 - **现象**：
 
-  ```text
+  ```text linenums="0"
   Warning  BackOff  kubelet  Back-off restarting failed container todo-api
   ```
 
 - **原因**：应用启动参数错误；必需环境变量缺失；配置校验失败；探针过早杀掉容器；依赖服务不可用；进程启动后 panic 或退出。
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   kubectl -n todo-dev logs "${CRASH_POD}" --previous --tail=100
   kubectl -n todo-dev describe pod "${CRASH_POD}"
   kubectl -n todo-dev get pod "${CRASH_POD}" -o jsonpath='{.status.containerStatuses[0].lastState}{"\n"}'
@@ -1235,7 +1235,7 @@ kubectl -n todo-dev get pod,svc,pvc,networkpolicy | grep -E 'todo-(pending|broke
 
 - **现象**：
 
-  ```text
+  ```text linenums="0"
   curl: (28) Operation timed out after 3000 milliseconds with 0 bytes received
   ```
 
@@ -1244,7 +1244,7 @@ kubectl -n todo-dev get pod,svc,pvc,networkpolicy | grep -E 'todo-(pending|broke
 - **原因**：Service selector 选不中 Pod；Pod readiness 未通过，EndpointSlice 没有 ready endpoint；targetPort 名称不匹配；NetworkPolicy 阻断。
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   kubectl -n todo-dev get svc todo-platform -o yaml
   kubectl -n todo-dev get endpointslice -l kubernetes.io/service-name=todo-platform -o yaml
   kubectl -n todo-dev get pod -l app.kubernetes.io/name=todo-platform --show-labels
@@ -1261,7 +1261,7 @@ kubectl -n todo-dev get pod,svc,pvc,networkpolicy | grep -E 'todo-(pending|broke
 
 - **现象**：
 
-  ```text
+  ```text linenums="0"
   pod has unbound immediate PersistentVolumeClaims
   storageclass.storage.k8s.io "does-not-exist" not found
   ```
@@ -1269,7 +1269,7 @@ kubectl -n todo-dev get pod,svc,pvc,networkpolicy | grep -E 'todo-(pending|broke
 - **原因**：StorageClass 不存在；没有默认 StorageClass；访问模式不匹配；PV 容量不足；Secret/ConfigMap volume 缺失；节点挂载失败。
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   kubectl -n todo-dev describe pvc todo-trouble-data
   kubectl get storageclass
   kubectl get pv
@@ -1325,7 +1325,7 @@ flowchart TD
 
 建议把每次演练按下面模板写成事故复盘记录。模板不追求长，而是要求证据完整、责任清晰：
 
-```markdown
+```markdown linenums="0"
 ## 事故复盘：<标题>
 
 - 时间线：<告警时间、确认时间、止血时间、恢复时间>
@@ -1354,70 +1354,13 @@ flowchart TD
 | GitOps 恢复 | 能用 Argo CD 把临时故障注入恢复为 Git 期望状态 |
 | 复盘能力 | 能写出症状、影响范围、根因、修复、预防措施 |
 
-## 9. 本章练习题
+## 9. 练习题与面试题
 
-**基础题**
+本章练习题和面试题已拆分到独立页面，完成正文学习后再进入题库练习与复盘。
 
-1. Pod `STATUS` 显示 `Pending` 时，为什么不能只看 `kubectl logs`？
-2. `CrashLoopBackOff` 和 `ImagePullBackOff` 的本质区别是什么？
-3. 为什么 Service DNS 能解析，但请求仍然可能超时？
-4. PVC `Pending` 时，应该同时检查哪几个对象？
-5. 为什么 distroless 镜像中没有 shell 不是缺陷？
+[查看本章练习题与面试题](../../questions/stage-05-production-engineering/33-k8s-troubleshooting.md)
 
-**实操题**
-
-1. 用本篇 YAML 注入 `Pending` 故障，并写出 Event 中的关键原因。验收标准：能指出具体调度约束。
-2. 用 `stern` 同时观察 Todo API 和故障演练 Pod 日志。验收标准：能过滤出 `todo-*` 相关日志。
-3. 使用 `kubectl debug` 进入 Todo API Pod 的临时容器并执行一次 DNS 查询。验收标准：能解析 `todo-platform.todo-dev.svc.cluster.local`。
-
-**思考题**
-
-1. 如果生产环境出现 `OOMKilled`，你会如何判断是代码泄漏、流量突增还是 limit 设置不合理？
-2. 如果 Argo CD 自动把你手工修复的 Deployment 改回故障状态，你会如何调整修复流程？
-
-## 10. 本章面试题
-
-### 面试题 1：Pod 一直 Pending，你会怎么排查？
-
-**一句话结论**：先看 `describe pod` 的 Event，再按调度约束、资源请求、污点容忍和 PVC 绑定逐层排查。
-
-**展开解释**：Pending 表示 Pod 还没有成功调度或必要依赖没准备好。`kubectl logs` 通常没用，因为容器可能还没启动。要先看 `FailedScheduling`，确认是 CPU/内存不足、nodeSelector/affinity 不匹配、taint 没有 toleration，还是 PVC 未绑定。如果是 PVC，继续看 PVC 和 StorageClass 的 Event。
-
-**深入追问**：为什么 requests 会影响调度？调度器根据 requests 计算节点是否有可分配资源，limits 不直接决定能不能调度。
-
-### 面试题 2：CrashLoopBackOff 怎么定位根因？
-
-**一句话结论**：看上一次容器日志、退出码、lastState 和 Event，判断是应用退出、配置错误、探针问题还是依赖不可用。
-
-**展开解释**：CrashLoopBackOff 是 kubelet 重启失败容器后的退避状态。关键命令是 `kubectl logs POD --previous`，因为当前容器可能刚重启没有日志。还要看 `lastState.terminated.reason`、`exitCode`、restart count 和 Event。对于 Todo API，常见原因包括启动参数错误、JWT Secret 缺失或配置校验失败。
-
-**深入追问**：如果日志为空怎么办？检查容器是否还没启动成功、入口命令是否不存在、镜像是否 distroless、是否需要看 kubelet Event 或容器 runtime 错误。
-
-### 面试题 3：如何排查 Kubernetes Service 不通？
-
-**一句话结论**：按 DNS、Service、EndpointSlice、Pod readiness、端口和 NetworkPolicy 的顺序排查。
-
-**展开解释**：先确认 Service 名称能否解析，再看 Service selector 是否匹配 Pod label。EndpointSlice 为空通常说明 selector 错误或 Pod 未 Ready。EndpointSlice 有地址但请求失败时，再看 targetPort 名称、容器监听端口和 NetworkPolicy。Ingress 502 还要继续检查 Ingress Controller 日志和后端 Service。
-
-**深入追问**：为什么 EndpointSlice 比 Endpoints 更值得看？新版本 Kubernetes 主要使用 EndpointSlice 表达后端切片，能承载更多 endpoint 和更丰富条件。
-
-### 面试题 4：OOMKilled 与 CPU Throttling 有什么区别？
-
-**一句话结论**：OOMKilled 是内存超过 limit 被杀，CPU Throttling 是 CPU 使用超过 limit 后被限速。
-
-**展开解释**：OOMKilled 会导致容器退出并重启，常见 exit code 是 137。CPU Throttling 不一定让容器退出，但会让请求变慢，P95/P99 延迟升高。排查内存看 `lastState`、`container_memory_working_set_bytes`；排查 CPU throttling 看 `container_cpu_cfs_throttled_periods_total` 和延迟指标。
-
-**深入追问**：生产中为什么不建议不给 limit？没有 limit 会增加节点资源争抢和驱逐风险；但 limit 过低又会造成 OOM 或 throttling，需要结合压测和历史指标设计。
-
-### 面试题 5：GitOps 环境中如何处理线上紧急修复？
-
-**一句话结论**：可以用临时操作止血，但永久修复必须回到 Git，并通过 Argo CD 同步。
-
-**展开解释**：GitOps 的期望状态在 Git，不在某个人的终端里。生产故障时可以临时扩容、回滚镜像或修改配置止血，但要记录操作，并尽快把修复提交到 GitOps 仓库。否则 Argo CD self-heal 可能覆盖手工修复，或者长期留下实际状态与 Git 不一致的 drift。
-
-**深入追问**：如何降低紧急修复风险？使用预定义 runbook、最小权限、审计日志、变更窗口、回滚命令和事后复盘。
-
-## 11. 本章总结
+## 10. 本章总结
 
 本篇把第 29-32 篇的交付和可观测性能力整合成真实排障流程。知识上，你理解了 Pod 状态、事件、日志、指标、Trace、Service、EndpointSlice、DNS、NetworkPolicy、PVC 和 StorageClass 在排障中的位置。
 
@@ -1425,7 +1368,7 @@ flowchart TD
 
 能力价值上，你已经从“会部署 Kubernetes 应用”推进到“能在应用出问题时定位、修复、验证和复盘”。这正是企业级云原生工程师和平台工程师的分水岭。
 
-## 12. 下一章衔接
+## 11. 下一章衔接
 
 阶段五到这里完成了 CI/CD、GitOps、监控、日志、Trace 和生产排障闭环。下一篇第 34 篇会进入阶段六：Kubernetes API 扩展机制。
 

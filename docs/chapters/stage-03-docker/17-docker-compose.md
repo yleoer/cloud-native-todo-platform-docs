@@ -34,17 +34,17 @@
 
 如果你还没有构建镜像，请在应用仓库根目录先执行：
 
-```bash
+```bash linenums="0"
 docker build -f api/Dockerfile -t todo-api:v0.1.0 .
 ```
 
 预期能看到本地镜像：
 
-```bash
+```bash linenums="0"
 docker image ls todo-api:v0.1.0
 ```
 
-```text
+```text linenums="0"
 REPOSITORY   TAG       IMAGE ID       CREATED          SIZE
 todo-api     v0.1.0    ...            ...              ...
 ```
@@ -82,7 +82,7 @@ Compose 不是把命令变短这么简单。它把“本地环境应该长什么
 
 本篇会把前两篇的成果串起来：
 
-```text
+```text linenums="0"
 第 15 篇：手动 docker run
   -> 理解网络、端口、数据卷、环境变量
 
@@ -108,7 +108,7 @@ Docker Compose 文件是一个声明式 YAML，用来描述一组容器服务如
 
 一个最小 Compose 文件如下：
 
-```yaml
+```yaml linenums="0"
 services:
   hello:
     image: registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23
@@ -117,7 +117,7 @@ services:
 
 运行：
 
-```bash
+```bash linenums="0"
 docker compose up
 ```
 
@@ -125,13 +125,13 @@ docker compose up
 
 现代 Compose Specification 不再要求写顶层 `version: "3"`。本篇使用 `compose.yaml` 文件名，并使用 Docker Compose v2 的空格命令：
 
-```bash
+```bash linenums="0"
 docker compose version
 ```
 
 不要使用旧式连字符命令作为默认写法：
 
-```text
+```text linenums="0"
 docker-compose
 ```
 
@@ -159,7 +159,7 @@ Compose 会为项目创建网络。同一网络内的服务可以通过服务名
 
 本篇 API 访问 PostgreSQL 的 DSN 是：
 
-```text
+```text linenums="0"
 postgres://todo:todo_password@postgres:5432/todo_platform?sslmode=disable
 ```
 
@@ -167,7 +167,7 @@ postgres://todo:todo_password@postgres:5432/todo_platform?sslmode=disable
 
 API 访问 Redis 时使用：
 
-```text
+```text linenums="0"
 redis:6379
 ```
 
@@ -177,7 +177,7 @@ redis:6379
 
 容器可以删除和重建，但数据库数据不能跟着容器一起消失。本篇使用两个命名数据卷：
 
-```yaml
+```yaml linenums="0"
 volumes:
   postgres-data:
   redis-data:
@@ -185,7 +185,7 @@ volumes:
 
 然后挂载到 PostgreSQL 和 Redis：
 
-```yaml
+```yaml linenums="0"
 services:
   postgres:
     volumes:
@@ -211,13 +211,13 @@ Compose 中有两个容易混淆的概念：
 
 例如 `.env` 中有：
 
-```text
+```text linenums="0"
 POSTGRES_PORT=15432
 ```
 
 Compose 文件中可以这样使用它：
 
-```yaml
+```yaml linenums="0"
 ports:
   - "127.0.0.1:${POSTGRES_PORT:-15432}:5432"
 ```
@@ -232,7 +232,7 @@ ports:
 
 因此本篇会为 PostgreSQL 和 Redis 增加健康检查：
 
-```yaml
+```yaml linenums="0"
 healthcheck:
   test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
   interval: 5s
@@ -243,7 +243,7 @@ healthcheck:
 
 然后让 `migrate` 等待 PostgreSQL 健康：
 
-```yaml
+```yaml linenums="0"
 depends_on:
   postgres:
     condition: service_healthy
@@ -251,7 +251,7 @@ depends_on:
 
 再让 `api` 等待迁移任务成功：
 
-```yaml
+```yaml linenums="0"
 depends_on:
   migrate:
     condition: service_completed_successfully
@@ -263,7 +263,7 @@ depends_on:
 
 Traefik 是一个反向代理和入口网关。本篇用它模拟后续 Kubernetes Ingress 的入口层：
 
-```text
+```text linenums="0"
 浏览器 / curl
   -> 127.0.0.1:18080
   -> Traefik
@@ -302,7 +302,7 @@ flowchart TD
 
 Compose 为项目网络提供内置 DNS。同一个网络中的容器可以解析服务名：
 
-```text
+```text linenums="0"
 api 容器内：
 postgres -> postgres 容器 IP
 redis    -> redis 容器 IP
@@ -310,7 +310,7 @@ redis    -> redis 容器 IP
 
 这就是为什么 API 的 DSN 使用 `postgres:5432`，而不是 `127.0.0.1:15432`：
 
-```text
+```text linenums="0"
 宿主机访问 PostgreSQL：
 127.0.0.1:15432 -> postgres 容器 5432
 
@@ -341,7 +341,7 @@ flowchart LR
 
 数据库迁移不应该和 API 主进程混在一起启动。更稳妥的方式是把迁移作为独立的一次性服务：
 
-```text
+```text linenums="0"
 postgres healthy
   -> migrate 执行 todo-api migrate
   -> migrate 成功退出
@@ -360,7 +360,7 @@ postgres healthy
 
 Traefik 通过 Docker Provider 读取容器标签。API 服务上会有这些标签：
 
-```yaml
+```yaml linenums="0"
 labels:
   - "traefik.enable=true"
   - "traefik.http.routers.todo-api.rule=PathPrefix(`/`)"
@@ -400,7 +400,7 @@ labels:
 
 检查版本：
 
-```bash
+```bash linenums="0"
 docker version
 docker compose version
 docker image inspect todo-api:v0.1.0
@@ -408,13 +408,13 @@ docker image inspect todo-api:v0.1.0
 
 如果 `todo-api:v0.1.0` 不存在，回到仓库根目录构建：
 
-```bash
+```bash linenums="0"
 docker build -f api/Dockerfile -t todo-api:v0.1.0 .
 ```
 
 如果你的网络无法拉取 `registry.cn-guangzhou.aliyuncs.com/yleoer/postgres:18-alpine`、`registry.cn-guangzhou.aliyuncs.com/yleoer/redis:8.2-alpine`、`registry.cn-guangzhou.aliyuncs.com/yleoer/traefik:v3.6` 或概念示例中的 `registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23`，先确认 Docker Hub 访问和镜像代理配置。发布课程前应使用以下命令验证标签可拉取：
 
-```bash
+```bash linenums="0"
 docker manifest inspect registry.cn-guangzhou.aliyuncs.com/yleoer/postgres:18-alpine
 docker manifest inspect registry.cn-guangzhou.aliyuncs.com/yleoer/redis:8.2-alpine
 docker manifest inspect registry.cn-guangzhou.aliyuncs.com/yleoer/traefik:v3.6
@@ -425,7 +425,7 @@ docker manifest inspect registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23
 
 本篇会在应用仓库中新增以下文件：
 
-```text
+```text linenums="0"
 cloud-native-todo-platform/
 ├── api/
 │   ├── Dockerfile
@@ -449,7 +449,7 @@ cloud-native-todo-platform/
 
 如果 `.gitignore` 还没有忽略本地 `.env`，请补充：
 
-```gitignore
+```gitignore linenums="0"
 deployments/docker-compose/.env
 ```
 
@@ -457,19 +457,19 @@ deployments/docker-compose/.env
 
 先创建 Compose 配置目录。Linux / macOS / WSL2：
 
-```bash
+```bash linenums="0"
 mkdir -p deployments/docker-compose
 ```
 
 Windows PowerShell：
 
-```powershell
+```powershell linenums="0"
 New-Item -ItemType Directory -Force deployments\docker-compose
 ```
 
 在 `deployments/docker-compose/.env.example` 中写入：
 
-```text
+```text linenums="0"
 COMPOSE_PROJECT_NAME=todo-platform
 
 TODO_API_VERSION=v0.1.0
@@ -491,7 +491,7 @@ TODO_JWT_SECRET=0123456789abcdef0123456789abcdef
 
 在 `deployments/docker-compose/compose.yaml` 中写入：
 
-```yaml
+```yaml linenums="0"
 # 结构：项目名 → API 环境变量锚点 → 5 个服务 → 网络 → 数据卷
 name: ${COMPOSE_PROJECT_NAME:-todo-platform}
 
@@ -625,7 +625,7 @@ volumes:
 
 在 `deployments/docker-compose/README.md` 中写入：
 
-```markdown
+```markdown linenums="0"
 # Todo Platform Docker Compose
 
 ## Start
@@ -669,7 +669,7 @@ Windows 用户请参考主文档中的 PowerShell 命令。
 
 确认当前目录和镜像：
 
-```bash
+```bash linenums="0"
 test -f go.mod
 test -f api/Dockerfile
 docker image inspect todo-api:v0.1.0
@@ -677,25 +677,25 @@ docker image inspect todo-api:v0.1.0
 
 如果镜像不存在，构建镜像：
 
-```bash
+```bash linenums="0"
 docker build -f api/Dockerfile -t todo-api:v0.1.0 .
 ```
 
 进入 Compose 目录：
 
-```bash
+```bash linenums="0"
 cd deployments/docker-compose
 ```
 
 Windows PowerShell：
 
-```powershell
+```powershell linenums="0"
 Set-Location deployments\docker-compose
 ```
 
 复制本地 `.env` 并生成管理员密码哈希。Linux / macOS / WSL2：
 
-```bash
+```bash linenums="0"
 cp .env.example .env
 HASH=$(docker run --rm todo-api:v0.1.0 hash-password "change-me-123")
 printf "\nTODO_AUTH_USERS='admin=%s'\n" "$HASH" >> .env
@@ -703,7 +703,7 @@ printf "\nTODO_AUTH_USERS='admin=%s'\n" "$HASH" >> .env
 
 Windows PowerShell：
 
-```powershell
+```powershell linenums="0"
 Copy-Item .env.example .env -Force
 $hash = docker run --rm todo-api:v0.1.0 hash-password "change-me-123"
 Add-Content -Path .env -Value ""
@@ -714,7 +714,7 @@ Add-Content -Path .env -Value "TODO_AUTH_USERS='admin=$hash'"
 
 检查 Compose 解析结果：
 
-```bash
+```bash linenums="0"
 docker compose --env-file .env config
 docker compose --env-file .env config --services
 ```
@@ -723,40 +723,40 @@ Compose 默认会自动加载当前目录下的 `.env` 文件。本篇显式使�
 
 启动完整环境：
 
-```bash
+```bash linenums="0"
 docker compose --env-file .env up -d
 ```
 
 查看服务状态：
 
-```bash
+```bash linenums="0"
 docker compose --env-file .env ps
 docker compose --env-file .env ps -a
 ```
 
 查看迁移日志：
 
-```bash
+```bash linenums="0"
 docker compose --env-file .env logs migrate
 ```
 
 验证 PostgreSQL 和 Redis：
 
-```bash
+```bash linenums="0"
 docker compose --env-file .env exec postgres pg_isready -U todo -d todo_platform
 docker compose --env-file .env exec redis redis-cli -a todo_redis_password ping
 ```
 
 验证 API 就绪：
 
-```bash
+```bash linenums="0"
 curl -i http://127.0.0.1:18080/healthz
 curl -i http://127.0.0.1:18080/readyz
 ```
 
 登录并创建 Todo。Linux / macOS / WSL2：
 
-```bash
+```bash linenums="0"
 TOKEN=$(curl -s \
   -H 'Content-Type: application/json' \
   -d '{"username":"admin","password":"change-me-123"}' \
@@ -773,7 +773,7 @@ curl -i \
 
 Windows PowerShell：
 
-```powershell
+```powershell linenums="0"
 $login = curl.exe -s -H "Content-Type: application/json" -d "{\"username\":\"admin\",\"password\":\"change-me-123\"}" http://127.0.0.1:18080/api/v2/auth/login | ConvertFrom-Json
 $token = $login.data.token
 curl.exe -i -H "Authorization: Bearer $token" -H "Content-Type: application/json" -d "{\"title\":\"compose smoke test\"}" http://127.0.0.1:18080/api/v2/todos
@@ -781,13 +781,13 @@ curl.exe -i -H "Authorization: Bearer $token" -H "Content-Type: application/json
 
 查看 API 日志：
 
-```bash
+```bash linenums="0"
 docker compose --env-file .env logs --tail 80 api
 ```
 
 查看 Traefik Dashboard：
 
-```text
+```text linenums="0"
 http://127.0.0.1:18090/dashboard/
 ```
 
@@ -797,7 +797,7 @@ Dashboard 只是本地调试入口，生产环境不能使用 `--api.insecure=tr
 
 `docker compose --env-file .env config --services` 应输出：
 
-```text
+```text linenums="0"
 postgres
 redis
 migrate
@@ -807,7 +807,7 @@ traefik
 
 `docker compose --env-file .env ps` 应看到类似结果：
 
-```text
+```text linenums="0"
 NAME                         IMAGE                 SERVICE    STATUS
 todo-platform-postgres-1     registry.cn-guangzhou.aliyuncs.com/yleoer/postgres:18-alpine    postgres   Up ... (healthy)
 todo-platform-redis-1        registry.cn-guangzhou.aliyuncs.com/yleoer/redis:8.2-alpine      redis      Up ... (healthy)
@@ -818,31 +818,31 @@ todo-platform-traefik-1      registry.cn-guangzhou.aliyuncs.com/yleoer/traefik:v
 
 如果默认 `ps` 没有显示已经退出的 `migrate` 容器，请执行：
 
-```bash
+```bash linenums="0"
 docker compose --env-file .env ps -a
 ```
 
 迁移日志应出现成功信息，具体文本以你的实现为准：
 
-```text
+```text linenums="0"
 ... migration completed
 ```
 
 PostgreSQL 健康检查：
 
-```text
+```text linenums="0"
 /var/run/postgresql:5432 - accepting connections
 ```
 
 Redis 健康检查：
 
-```text
+```text linenums="0"
 PONG
 ```
 
 `curl -i http://127.0.0.1:18080/readyz` 应返回 `200 OK`：
 
-```text
+```text linenums="0"
 HTTP/1.1 200 OK
 Content-Type: application/json
 ...
@@ -850,7 +850,7 @@ Content-Type: application/json
 
 创建 Todo 成功时，应看到 `201 Created` 或项目实现中约定的成功响应：
 
-```text
+```text linenums="0"
 HTTP/1.1 201 Created
 Content-Type: application/json
 ...
@@ -862,7 +862,7 @@ Content-Type: application/json
 
 完成本篇最小验收，需要全部通过：
 
-```bash
+```bash linenums="0"
 docker compose --env-file .env config --services
 docker compose --env-file .env ps
 docker compose --env-file .env ps -a
@@ -885,7 +885,7 @@ docker compose --env-file .env logs migrate
 
 完成进阶验收，建议继续执行：
 
-```bash
+```bash linenums="0"
 docker compose --env-file .env exec postgres psql -U todo -d todo_platform -c "\dt"
 docker compose --env-file .env exec redis redis-cli -a todo_redis_password INFO persistence
 docker volume ls --filter name=todo-platform
@@ -896,7 +896,7 @@ docker compose --env-file .env config | grep -E "postgres:5432|redis:6379"
 
 Windows PowerShell：
 
-```powershell
+```powershell linenums="0"
 docker compose --env-file .env exec postgres psql -U todo -d todo_platform -c "\dt"
 docker compose --env-file .env exec redis redis-cli -a todo_redis_password INFO persistence
 docker volume ls --filter name=todo-platform
@@ -911,37 +911,37 @@ docker compose --env-file .env config | Select-String "postgres:5432|redis:6379"
 
 日常停止环境但保留数据：
 
-```bash
+```bash linenums="0"
 docker compose --env-file .env down
 ```
 
 彻底清空实验数据：
 
-```bash
+```bash linenums="0"
 docker compose --env-file .env down -v
 ```
 
 删除本地 `.env`：
 
-```bash
+```bash linenums="0"
 rm -f .env
 ```
 
 Windows PowerShell：
 
-```powershell
+```powershell linenums="0"
 Remove-Item .env -ErrorAction SilentlyContinue
 ```
 
 如果你只想重启 API，不要删除数据库和 Redis：
 
-```bash
+```bash linenums="0"
 docker compose --env-file .env restart api
 ```
 
 如果你修改了 `compose.yaml` 或 `.env`，建议重新创建容器：
 
-```bash
+```bash linenums="0"
 docker compose --env-file .env up -d --force-recreate
 ```
 
@@ -953,13 +953,13 @@ docker compose --env-file .env up -d --force-recreate
 
 - **现象**：
 
-  ```text
+  ```text linenums="0"
   invalid interpolation format for services.api.environment.TODO_AUTH_USERS
   ```
 
   或者 API 能启动，但登录返回：
 
-  ```text
+  ```text linenums="0"
   HTTP/1.1 401 Unauthorized
   ```
 
@@ -967,7 +967,7 @@ docker compose --env-file .env up -d --force-recreate
 
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   docker compose --env-file .env config | grep TODO_AUTH_USERS
   docker compose --env-file .env logs --tail 80 api
   ```
@@ -976,7 +976,7 @@ docker compose --env-file .env up -d --force-recreate
 
 - **修复**：
 
-  ```bash
+  ```bash linenums="0"
   HASH=$(docker run --rm todo-api:v0.1.0 hash-password "change-me-123")
   printf "\nTODO_AUTH_USERS='admin=%s'\n" "$HASH" >> .env
   docker compose --env-file .env up -d --force-recreate api
@@ -984,7 +984,7 @@ docker compose --env-file .env up -d --force-recreate
 
   Windows PowerShell：
 
-  ```powershell
+  ```powershell linenums="0"
   $hash = docker run --rm todo-api:v0.1.0 hash-password "change-me-123"
   Add-Content -Path .env -Value "TODO_AUTH_USERS='admin=$hash'"
   docker compose --env-file .env up -d --force-recreate api
@@ -996,13 +996,13 @@ docker compose --env-file .env up -d --force-recreate
 
 - **现象**：
 
-  ```text
+  ```text linenums="0"
   dial tcp 127.0.0.1:5432: connect: connection refused
   ```
 
   或：
 
-  ```text
+  ```text linenums="0"
   dial tcp: lookup todo-postgres: no such host
   ```
 
@@ -1010,7 +1010,7 @@ docker compose --env-file .env up -d --force-recreate
 
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   docker compose --env-file .env config | grep -E "TODO_DATABASE_DSN|TODO_REDIS_ADDR"
   docker compose --env-file .env exec api /app/todo-api config-check
   docker compose --env-file .env ps
@@ -1020,14 +1020,14 @@ docker compose --env-file .env up -d --force-recreate
 
 - **修复**：修改 `compose.yaml` 中 API 环境变量：
 
-  ```yaml
+  ```yaml linenums="0"
   TODO_DATABASE_DSN: "postgres://${POSTGRES_USER:-todo}:${POSTGRES_PASSWORD:-todo_password}@postgres:5432/${POSTGRES_DB:-todo_platform}?sslmode=disable"
   TODO_REDIS_ADDR: "redis:6379"
   ```
 
   然后重建 API：
 
-  ```bash
+  ```bash linenums="0"
   docker compose --env-file .env up -d --force-recreate api
   ```
 
@@ -1037,7 +1037,7 @@ docker compose --env-file .env up -d --force-recreate
 
 - **现象**：
 
-  ```text
+  ```text linenums="0"
   dependency failed to start: container todo-platform-migrate-1 exited (1)
   ```
 
@@ -1047,7 +1047,7 @@ docker compose --env-file .env up -d --force-recreate
 
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   docker compose --env-file .env logs migrate
   docker compose --env-file .env exec postgres pg_isready -U todo -d todo_platform
   docker compose --env-file .env exec postgres psql -U todo -d todo_platform -c "\dt"
@@ -1057,7 +1057,7 @@ docker compose --env-file .env up -d --force-recreate
 
 - **修复**：修正迁移脚本或配置后重新运行：
 
-  ```bash
+  ```bash linenums="0"
   docker compose --env-file .env up -d postgres
   docker compose --env-file .env up --force-recreate migrate
   docker compose --env-file .env up -d api traefik
@@ -1065,7 +1065,7 @@ docker compose --env-file .env up -d --force-recreate
 
   如果只是教学实验数据污染，可以清空数据卷后重来：
 
-  ```bash
+  ```bash linenums="0"
   docker compose --env-file .env down -v
   docker compose --env-file .env up -d
   ```
@@ -1076,13 +1076,13 @@ docker compose --env-file .env up -d --force-recreate
 
 - **现象**：
 
-  ```text
+  ```text linenums="0"
   Bind for 127.0.0.1:18080 failed: port is already allocated
   ```
 
   或：
 
-  ```text
+  ```text linenums="0"
   Ports are not available: exposing port TCP 127.0.0.1:15432
   ```
 
@@ -1090,20 +1090,20 @@ docker compose --env-file .env up -d --force-recreate
 
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   docker ps --format "table {{.Names}}\t{{.Ports}}"
   docker compose --env-file .env ps
   ```
 
   Windows PowerShell 可查看端口占用：
 
-  ```powershell
+  ```powershell linenums="0"
   netstat -ano | Select-String ":18080|:15432|:16379|:18090"
   ```
 
 - **修复**：修改 `.env` 中的本地端口，例如：
 
-  ```text
+  ```text linenums="0"
   TODO_HTTP_PORT=18081
   POSTGRES_PORT=15433
   REDIS_PORT=16380
@@ -1112,7 +1112,7 @@ docker compose --env-file .env up -d --force-recreate
 
   然后重启：
 
-  ```bash
+  ```bash linenums="0"
   docker compose --env-file .env up -d --force-recreate
   ```
 
@@ -1122,13 +1122,13 @@ docker compose --env-file .env up -d --force-recreate
 
 - **现象**：
 
-  ```text
+  ```text linenums="0"
   HTTP/1.1 502 Bad Gateway
   ```
 
   Traefik 日志里可能出现：
 
-  ```text
+  ```text linenums="0"
   service "todo-api" error: unable to find the IP address
   ```
 
@@ -1136,7 +1136,7 @@ docker compose --env-file .env up -d --force-recreate
 
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   docker compose --env-file .env ps
   docker compose --env-file .env logs --tail 80 api
   docker compose --env-file .env logs --tail 80 traefik
@@ -1147,7 +1147,7 @@ docker compose --env-file .env up -d --force-recreate
 
 - **修复**：修正 API 监听地址或 Traefik 标签后重建：
 
-  ```bash
+  ```bash linenums="0"
   docker compose --env-file .env up -d --force-recreate api traefik
   ```
 
@@ -1205,7 +1205,7 @@ docker compose --env-file .env up -d --force-recreate
 
 在 `docs/docker/chapter-17-compose-record.md` 中记录：
 
-```markdown
+```markdown linenums="0"
 # 第 17 篇 Docker Compose 本地编排记录
 
 ## 基础信息
@@ -1257,70 +1257,13 @@ docker compose --env-file .env up -d --force-recreate
 - 清空数据重置：
 ```
 
-## 9. 本章练习题
+## 9. 练习题与面试题
 
-### 基础题
+本章练习题和面试题已拆分到独立页面，完成正文学习后再进入题库练习与复盘。
 
-1. Compose 文件中 `services`、`networks`、`volumes` 分别描述什么？请结合本篇的 `postgres`、`redis`、`api` 举例。
-2. 为什么 API 容器访问数据库时应该使用 `postgres:5432`，而不是 `127.0.0.1:15432`？
-3. `.env` 文件和 `environment` 字段有什么区别？为什么 `.env` 不应该提交？
-4. `docker compose down` 和 `docker compose down -v` 有什么区别？哪一个会删除 PostgreSQL 数据？
-5. `migrate` 服务为什么适合设计成一次性任务，而不是和 API 主进程写在一起？
+[查看本章练习题与面试题](../../questions/stage-03-docker/17-docker-compose.md)
 
-### 实操题
-
-1. 把 `.env` 中 `TODO_HTTP_PORT` 改为 `18081`，重新执行 `docker compose --env-file .env up -d --force-recreate`，验证 `http://127.0.0.1:18081/readyz` 可访问。实验结束后改回 `18080`。
-2. 故意把 `TODO_DATABASE_DSN` 中的 `postgres:5432` 改成 `127.0.0.1:5432`，重建 API 并观察日志中的连接错误。记录错误后恢复正确配置。
-3. 执行 `docker compose --env-file .env down` 后重新 `up -d`，确认 Todo 数据是否仍在；再执行 `down -v` 清空数据，观察 PostgreSQL 表和数据变化。
-
-### 思考题
-
-1. 如果要在 CI 中复用本篇 Compose 文件，你会保留 Traefik 吗？哪些服务可以复用，哪些配置应该覆盖？
-2. 本篇使用 Docker socket 让 Traefik 自动发现服务。生产环境中你会如何降低这类权限风险？可以结合后续第 26 篇安全上下文和第 41 篇 Operator 权限最小化一起思考。
-
-## 10. 本章面试题
-
-### 面试题 1：Docker Compose 解决什么问题？它和 Dockerfile、`docker run` 的关系是什么？
-
-**一句话结论**：Dockerfile 定义镜像怎么构建，`docker run` 启动单个容器，Docker Compose 用声明式 YAML 管理一组容器如何一起运行。
-
-**展开解释**：第 16 篇的 Dockerfile 产出 `todo-api:v0.1.0`。如果只用 `docker run`，启动 PostgreSQL、Redis、迁移和 API 需要多条命令，并且网络、端口、数据卷和环境变量容易不一致。Compose 把这些参数集中到 `compose.yaml` 中，让本地开发环境可以复现、审查和版本管理。
-
-**追问方向**：Compose 能替代 Kubernetes 吗？回答时要说明 Compose 适合本地开发和轻量联调，生产环境通常需要 Kubernetes 提供调度、自愈、扩缩容、准入控制、滚动发布和资源管理。
-
-### 面试题 2：Compose 中容器之间为什么使用服务名访问？
-
-**一句话结论**：同一 Compose 网络内，服务名会被 Docker DNS 解析到对应容器，因此容器之间应使用服务名和容器内部端口通信。
-
-**展开解释**：宿主机访问 PostgreSQL 用 `127.0.0.1:15432`，这是端口映射；API 容器访问 PostgreSQL 用 `postgres:5432`，这是容器网络内访问。容器内的 `127.0.0.1` 只指向容器自己，不会指向宿主机或其他服务。
-
-**追问方向**：如果容器 IP 变化会怎样？回答时要说明服务名比容器 IP 稳定，容器重建后 IP 可能变化，但 Compose 网络中的服务名仍可解析到当前容器。
-
-### 面试题 3：`.env` 和 `environment` 有什么区别？
-
-**一句话结论**：`.env` 主要给 Compose 文件做变量插值，`environment` 才是设置容器内部环境变量。
-
-**展开解释**：`.env` 中的 `POSTGRES_PORT=15432` 可以替换 `ports` 中的 `${POSTGRES_PORT:-15432}`，但它不一定自动进入容器。Todo API 真正需要读取的 `TODO_DATABASE_DSN`、`TODO_REDIS_ADDR`、`TODO_JWT_SECRET`、`TODO_AUTH_USERS` 应明确写在 `environment` 中。
-
-**追问方向**：为什么 `.env` 不能提交？回答时要说明 `.env` 可能包含真实密码、JWT Secret、管理员密码哈希和个人端口设置，应提交 `.env.example`，真实值由本地或密钥系统注入。
-
-### 面试题 4：`depends_on` 和 `healthcheck` 分别解决什么问题？
-
-**一句话结论**：`depends_on` 描述服务启动依赖，`healthcheck` 判断服务是否真的可用，两者结合才能处理基础启动顺序。
-
-**展开解释**：容器进程启动不代表数据库已经接受连接。PostgreSQL 需要 `pg_isready` 判断健康，Redis 需要 `redis-cli ping` 判断健康。`migrate` 等待 PostgreSQL healthy，API 等待 PostgreSQL、Redis healthy 和 migrate 成功完成，可以避免常见的启动竞态。
-
-**追问方向**：这能保证生产依赖永远可用吗？回答时要说明不能。`depends_on` 只影响启动阶段，运行期间依赖故障仍需要应用重试、健康探针、监控告警和编排平台自愈。
-
-### 面试题 5：为什么本篇把数据库迁移设计成独立 `migrate` 服务？
-
-**一句话结论**：迁移是一次性运维任务，和长期运行的 API 主进程职责不同，独立服务更容易控制顺序、观察日志和迁移到 Kubernetes Job。
-
-**展开解释**：`migrate` 使用同一个 `todo-api:v0.1.0` 镜像，但覆盖命令为 `migrate`。它等待 PostgreSQL healthy 后执行，成功后退出。API 依赖 `service_completed_successfully`，只有迁移成功才启动。这样能避免 API 启动后才发现表不存在。
-
-**追问方向**：如果多个副本同时执行迁移怎么办？回答时要说明本地 Compose 只有一个 `migrate` 服务；生产环境要使用 Job、迁移锁、幂等迁移和发布流程约束，避免多个实例并发修改 schema。
-
-## 11. 本章总结
+## 10. 本章总结
 
 本篇把第 15 篇的手工 Docker 命令和第 16 篇的 `todo-api:v0.1.0` 镜像整合成了一套可复现的 Docker Compose 本地环境。你编写了 `compose.yaml`、`.env.example` 和本地 README，用一条命令启动 PostgreSQL、Redis、迁移任务、API 和 Traefik。
 
@@ -1328,7 +1271,7 @@ docker compose --env-file .env up -d --force-recreate
 
 本篇的关键收获不是“少敲命令”，而是把本地开发环境变成工程资产。只要 Compose 文件可信，团队就能围绕同一份环境排查问题、编写文档、接入 CI，并平滑过渡到 Kubernetes。
 
-## 12. 下一章衔接
+## 11. 下一章衔接
 
 第 18 篇会进入容器运行原理。我们会基于本篇启动的容器观察 namespace、cgroups、UnionFS、容器进程、挂载点和网络隔离。到那时你会看到：Compose 负责把服务编排起来，但每个容器的底层仍然依赖 Linux 内核能力和 OCI 运行时。
 

@@ -92,13 +92,13 @@ CRD 的常用层级可以先记成下面这张速查表，后面看完整 YAML �
 
 安装完成后，API server 会把新资源加入 discovery：
 
-```bash
+```bash linenums="0"
 kubectl api-resources --api-group=platform.todo.example.com
 ```
 
 你随后才能创建这样的自定义资源：
 
-```yaml
+```yaml linenums="0"
 apiVersion: platform.todo.example.com/v1alpha1
 kind: TodoApp
 metadata:
@@ -139,7 +139,7 @@ spec:
 
 CRD 里启用 status subresource：
 
-```yaml
+```yaml linenums="0"
 subresources:
   status: {}
 ```
@@ -152,7 +152,7 @@ subresources:
 
 CRD 的 `additionalPrinterColumns` 可以把关键字段展示到表格输出：
 
-```yaml
+```yaml linenums="0"
 additionalPrinterColumns:
   - name: Image
     type: string
@@ -168,7 +168,7 @@ additionalPrinterColumns:
 
 CRD 的 `versions` 是 API 版本承诺，不是随手写的文件版本号。一个 CRD 可以同时 served 多个版本，但只能有一个 storage 版本：
 
-```yaml
+```yaml linenums="0"
 versions:
   - name: v1alpha1
     served: true
@@ -218,7 +218,7 @@ CRD 安装成功后，API server 会开始接受 `platform.todo.example.com/v1al
 
 当你提交一个 CR 实例时，API server 会根据 CRD schema 做校验。比如 `TodoApp.spec.replicas` 定义为整数，且 `minimum: 1`、`maximum: 10`，那么下面这个对象会被拒绝：
 
-```yaml
+```yaml linenums="0"
 spec:
   replicas: 0
 ```
@@ -235,7 +235,7 @@ spec:
 
 这就是 Operator 开发中常见 RBAC 的来源：
 
-```yaml
+```yaml linenums="0"
 resources:
   - todoapps
 verbs:
@@ -310,7 +310,7 @@ CRD 版本升级最容易踩坑的地方是把“修改 YAML 文件”误以为�
 
 确认前置环境：
 
-```bash
+```bash linenums="0"
 pwd
 test -d operator/api-model || echo "skip: Ch34 api-model not found"
 kubectl config current-context
@@ -321,7 +321,7 @@ jq --version
 
 PowerShell：
 
-```powershell
+```powershell linenums="0"
 Get-Location
 if (-not (Test-Path operator/api-model)) { "skip: Ch34 api-model not found" }
 kubectl config current-context
@@ -337,13 +337,13 @@ jq --version
 
 创建目录：
 
-```bash
+```bash linenums="0"
 mkdir -p operator/crds/base operator/crds/versions operator/samples
 ```
 
 PowerShell：
 
-```powershell
+```powershell linenums="0"
 New-Item -ItemType Directory -Force -Path operator/crds/base
 New-Item -ItemType Directory -Force -Path operator/crds/versions
 New-Item -ItemType Directory -Force -Path operator/samples
@@ -351,7 +351,7 @@ New-Item -ItemType Directory -Force -Path operator/samples
 
 最终目录如下：
 
-```text
+```text linenums="0"
 operator/
 ├── crds/
 │   ├── base/
@@ -374,7 +374,7 @@ operator/
 
 创建 `operator/crds/base/todoapps.platform.todo.example.com.yaml`：
 
-```bash
+```bash linenums="0"
 cat > operator/crds/base/todoapps.platform.todo.example.com.yaml <<'YAML'
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
@@ -562,7 +562,7 @@ YAML
 
 创建 `operator/crds/base/tododatabases.platform.todo.example.com.yaml`：
 
-```bash
+```bash linenums="0"
 cat > operator/crds/base/tododatabases.platform.todo.example.com.yaml <<'YAML'
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
@@ -724,7 +724,7 @@ YAML
 
 创建 `operator/crds/base/todocaches.platform.todo.example.com.yaml`：
 
-```bash
+```bash linenums="0"
 cat > operator/crds/base/todocaches.platform.todo.example.com.yaml <<'YAML'
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
@@ -873,7 +873,7 @@ YAML
 
 创建 `operator/samples/todoapp.yaml`：
 
-```bash
+```bash linenums="0"
 cat > operator/samples/todoapp.yaml <<'YAML'
 apiVersion: platform.todo.example.com/v1alpha1
 kind: TodoApp
@@ -901,7 +901,7 @@ YAML
 
 创建 `operator/samples/tododatabase.yaml`：
 
-```bash
+```bash linenums="0"
 cat > operator/samples/tododatabase.yaml <<'YAML'
 apiVersion: platform.todo.example.com/v1alpha1
 kind: TodoDatabase
@@ -923,7 +923,7 @@ YAML
 
 创建 `operator/samples/todocache.yaml`：
 
-```bash
+```bash linenums="0"
 cat > operator/samples/todocache.yaml <<'YAML'
 apiVersion: platform.todo.example.com/v1alpha1
 kind: TodoCache
@@ -946,7 +946,7 @@ YAML
 
 创建 `operator/crds/versions/todoapps-versioning-notes.md`，这份文件只记录版本演进思路，不是可以直接 apply 的 CRD：
 
-```bash
+```bash linenums="0"
 cat > operator/crds/versions/todoapps-versioning-notes.md <<'EOF'
 # TodoApp v1beta1 versioning notes
 
@@ -987,13 +987,13 @@ EOF
 
 先确认本地文件存在：
 
-```bash
+```bash linenums="0"
 ls operator/crds/base
 ```
 
 先让 API server 做一次 server-side dry-run：
 
-```bash
+```bash linenums="0"
 kubectl apply --dry-run=server -f operator/crds/base
 ```
 
@@ -1001,7 +1001,7 @@ kubectl apply --dry-run=server -f operator/crds/base
 
 安装三个 CRD：
 
-```bash
+```bash linenums="0"
 kubectl apply --server-side -f operator/crds/base
 ```
 
@@ -1009,7 +1009,7 @@ kubectl apply --server-side -f operator/crds/base
 
 等待 CRD Established：
 
-```bash
+```bash linenums="0"
 kubectl wait --for=condition=Established crd/todoapps.platform.todo.example.com --timeout=60s
 kubectl wait --for=condition=Established crd/tododatabases.platform.todo.example.com --timeout=60s
 kubectl wait --for=condition=Established crd/todocaches.platform.todo.example.com --timeout=60s
@@ -1021,13 +1021,13 @@ kubectl wait --for=condition=Established crd/todocaches.platform.todo.example.co
 
 查看 API resource：
 
-```bash
+```bash linenums="0"
 kubectl api-resources --api-group=platform.todo.example.com
 ```
 
 预期能看到：
 
-```text
+```text linenums="0"
 NAME            SHORTNAMES   APIVERSION                            NAMESPACED   KIND
 todoapps        tda          platform.todo.example.com/v1alpha1     true         TodoApp
 todocaches      tcache       platform.todo.example.com/v1alpha1     true         TodoCache
@@ -1036,7 +1036,7 @@ tododatabases   tdb          platform.todo.example.com/v1alpha1     true        
 
 查看 schema 文档：
 
-```bash
+```bash linenums="0"
 kubectl explain todoapp.spec
 kubectl explain todoapp.spec.image
 kubectl explain tododatabase.spec.storage.size
@@ -1047,13 +1047,13 @@ kubectl explain todocache.spec.memoryProfile
 
 用 `jq` 检查 CRD 的命名信息：
 
-```bash
+```bash linenums="0"
 kubectl get crd -o json | jq -r '.items[] | select(.spec.group=="platform.todo.example.com") | "\(.spec.names.kind)\t\(.spec.names.plural)"'
 ```
 
 预期输出：
 
-```text
+```text linenums="0"
 TodoApp         todoapps
 TodoCache       todocaches
 TodoDatabase    tododatabases
@@ -1061,14 +1061,14 @@ TodoDatabase    tododatabases
 
 查看当前存储版本：
 
-```bash
+```bash linenums="0"
 kubectl get crd todoapps.platform.todo.example.com \
   -o jsonpath='{.status.storedVersions}{"\n"}'
 ```
 
 单版本 CRD 的输出应类似：
 
-```text
+```text linenums="0"
 ["v1alpha1"]
 ```
 
@@ -1078,7 +1078,7 @@ kubectl get crd todoapps.platform.todo.example.com \
 
 应用三个样例：
 
-```bash
+```bash linenums="0"
 kubectl apply -f operator/samples/todoapp.yaml
 kubectl apply -f operator/samples/tododatabase.yaml
 kubectl apply -f operator/samples/todocache.yaml
@@ -1086,13 +1086,13 @@ kubectl apply -f operator/samples/todocache.yaml
 
 查看表格输出：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-dev get todoapp,tododatabase,todocache
 ```
 
 也可以使用 short name：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-dev get tda,tdb,tcache
 ```
 
@@ -1102,7 +1102,7 @@ kubectl -n todo-dev get tda,tdb,tcache
 
 验证缺少必填字段 `spec.image` 会被拒绝：
 
-```bash
+```bash linenums="0"
 kubectl apply --dry-run=server -f - <<'YAML'
 apiVersion: platform.todo.example.com/v1alpha1
 kind: TodoApp
@@ -1118,7 +1118,7 @@ YAML
 
 验证 `replicas` 低于最小值会被拒绝：
 
-```bash
+```bash linenums="0"
 kubectl apply --dry-run=server -f - <<'YAML'
 apiVersion: platform.todo.example.com/v1alpha1
 kind: TodoApp
@@ -1133,13 +1133,13 @@ YAML
 
 预期错误包含：
 
-```text
+```text linenums="0"
 spec.replicas: Invalid value: 0: spec.replicas in body should be greater than or equal to 1
 ```
 
 验证数据库版本不符合约束会被拒绝：
 
-```bash
+```bash linenums="0"
 kubectl apply --dry-run=server -f - <<'YAML'
 apiVersion: platform.todo.example.com/v1alpha1
 kind: TodoDatabase
@@ -1159,7 +1159,7 @@ YAML
 
 验证缓存枚举不合法会被拒绝：
 
-```bash
+```bash linenums="0"
 kubectl apply --dry-run=server -f - <<'YAML'
 apiVersion: platform.todo.example.com/v1alpha1
 kind: TodoCache
@@ -1177,7 +1177,7 @@ YAML
 
 验证 CEL 跨字段校验会拦截缺少 host 的 Ingress：
 
-```bash
+```bash linenums="0"
 kubectl apply --dry-run=server -f - <<'YAML'
 apiVersion: platform.todo.example.com/v1alpha1
 kind: TodoApp
@@ -1197,7 +1197,7 @@ YAML
 
 尝试通过主资源 patch 写入 status：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-dev patch todoapp todo-platform --type=merge \
   -p '{"status":{"readyReplicas":2}}'
 
@@ -1209,21 +1209,21 @@ kubectl -n todo-dev get todoapp todo-platform \
 
 通过 `/status` 子资源模拟 Controller 回写状态：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-dev patch todoapp todo-platform --subresource=status --type=merge \
   -p '{"status":{"observedGeneration":1,"readyReplicas":2,"url":"https://todo.dev.local","conditions":[{"type":"Available","status":"True","reason":"AllComponentsReady","message":"CRD status subresource is working.","observedGeneration":1,"lastTransitionTime":"2026-05-29T10:00:00Z"}]}}'
 ```
 
 查看结果：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-dev get todoapp todo-platform
 kubectl -n todo-dev describe todoapp todo-platform
 ```
 
 同样可以给数据库和缓存回写状态：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-dev patch tododatabase todo-postgres --subresource=status --type=merge \
   -p '{"status":{"observedGeneration":1,"phase":"Ready","endpoint":"todo-postgres.todo-dev.svc.cluster.local:5432","ready":true,"conditions":[{"type":"Ready","status":"True","reason":"DatabaseReady","message":"Database contract is accepted.","observedGeneration":1,"lastTransitionTime":"2026-05-29T10:00:00Z"}]}}'
 
@@ -1233,7 +1233,7 @@ kubectl -n todo-dev patch todocache todo-redis --subresource=status --type=merge
 
 再次查看：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-dev get todoapp,tododatabase,todocache
 ```
 
@@ -1243,13 +1243,13 @@ kubectl -n todo-dev get todoapp,tododatabase,todocache
 
 编辑 `TodoApp`：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-dev edit todoapp todo-platform
 ```
 
 可以把 `spec.replicas` 从 `2` 改为 `3`，保存后查看 generation：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-dev get todoapp todo-platform \
   -o jsonpath='generation={.metadata.generation} observed={.status.observedGeneration}{"\n"}'
 ```
@@ -1258,14 +1258,14 @@ kubectl -n todo-dev get todoapp todo-platform \
 
 删除一个 CR 实例：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-dev delete todocache todo-redis
 kubectl -n todo-dev get todocache
 ```
 
 再恢复它：
 
-```bash
+```bash linenums="0"
 kubectl apply -f operator/samples/todocache.yaml
 ```
 
@@ -1273,7 +1273,7 @@ kubectl apply -f operator/samples/todocache.yaml
 
 安装 CRD 后：
 
-```text
+```text linenums="0"
 customresourcedefinition.apiextensions.k8s.io/todoapps.platform.todo.example.com serverside-applied
 customresourcedefinition.apiextensions.k8s.io/tododatabases.platform.todo.example.com serverside-applied
 customresourcedefinition.apiextensions.k8s.io/todocaches.platform.todo.example.com serverside-applied
@@ -1281,7 +1281,7 @@ customresourcedefinition.apiextensions.k8s.io/todocaches.platform.todo.example.c
 
 API discovery：
 
-```text
+```text linenums="0"
 todoapps        tda      platform.todo.example.com/v1alpha1   true   TodoApp
 todocaches      tcache   platform.todo.example.com/v1alpha1   true   TodoCache
 tododatabases   tdb      platform.todo.example.com/v1alpha1   true   TodoDatabase
@@ -1289,7 +1289,7 @@ tododatabases   tdb      platform.todo.example.com/v1alpha1   true   TodoDatabas
 
 创建 CR 后：
 
-```text
+```text linenums="0"
 todoapp.platform.todo.example.com/todo-platform created
 tododatabase.platform.todo.example.com/todo-postgres created
 todocache.platform.todo.example.com/todo-redis created
@@ -1299,13 +1299,13 @@ todocache.platform.todo.example.com/todo-redis created
 
 非法输入 dry-run：
 
-```text
+```text linenums="0"
 The TodoApp "invalid-replicas" is invalid: spec.replicas: Invalid value: 0...
 ```
 
 status 回写后：
 
-```text
+```text linenums="0"
 NAME            IMAGE                            REPLICAS   READY   AVAILABLE   AGE
 todo-platform   todo-api:v0.1.2-observability    2          2       True        ...
 ```
@@ -1314,7 +1314,7 @@ todo-platform   todo-api:v0.1.2-observability    2          2       True        
 
 **第一层：CRD 已安装**
 
-```bash
+```bash linenums="0"
 kubectl get crd todoapps.platform.todo.example.com
 kubectl get crd tododatabases.platform.todo.example.com
 kubectl get crd todocaches.platform.todo.example.com
@@ -1324,7 +1324,7 @@ kubectl get crd todocaches.platform.todo.example.com
 
 **第二层：schema 可解释**
 
-```bash
+```bash linenums="0"
 kubectl explain todoapp.spec.image
 kubectl explain tododatabase.spec.storage.size
 kubectl explain todocache.spec.memoryProfile
@@ -1334,7 +1334,7 @@ kubectl explain todocache.spec.memoryProfile
 
 **第三层：CR 实例可操作**
 
-```bash
+```bash linenums="0"
 kubectl -n todo-dev get todoapp,tododatabase,todocache
 kubectl -n todo-dev describe todoapp todo-platform
 ```
@@ -1343,7 +1343,7 @@ kubectl -n todo-dev describe todoapp todo-platform
 
 **第四层：schema 校验生效**
 
-```bash
+```bash linenums="0"
 kubectl apply --dry-run=server -f - <<'YAML'
 apiVersion: platform.todo.example.com/v1alpha1
 kind: TodoApp
@@ -1360,7 +1360,7 @@ YAML
 
 **第五层：status subresource 可用**
 
-```bash
+```bash linenums="0"
 kubectl -n todo-dev patch todoapp todo-platform --subresource=status --type=merge \
   -p '{"status":{"observedGeneration":1,"readyReplicas":2}}'
 
@@ -1376,7 +1376,7 @@ kubectl -n todo-dev get todoapp todo-platform \
 
 如果你要清理 CR 实例：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-dev delete todoapp todo-platform --ignore-not-found
 kubectl -n todo-dev delete tododatabase todo-postgres --ignore-not-found
 kubectl -n todo-dev delete todocache todo-redis --ignore-not-found
@@ -1384,13 +1384,13 @@ kubectl -n todo-dev delete todocache todo-redis --ignore-not-found
 
 如果你要清理 CRD，先备份当前 CR 实例：
 
-```bash
+```bash linenums="0"
 kubectl get todoapp,tododatabase,todocache -n todo-dev -o yaml > todo-cr-backup.yaml
 ```
 
 确认备份文件存在后，再删除 CRD：
 
-```bash
+```bash linenums="0"
 kubectl delete crd todoapps.platform.todo.example.com --ignore-not-found
 kubectl delete crd tododatabases.platform.todo.example.com --ignore-not-found
 kubectl delete crd todocaches.platform.todo.example.com --ignore-not-found
@@ -1400,13 +1400,13 @@ kubectl delete crd todocaches.platform.todo.example.com --ignore-not-found
 
 如果只想删除本地实验文件：
 
-```bash
+```bash linenums="0"
 rm -rf operator/crds operator/samples
 ```
 
 PowerShell：
 
-```powershell
+```powershell linenums="0"
 Remove-Item -Recurse -Force operator/crds,operator/samples
 ```
 
@@ -1416,14 +1416,14 @@ Remove-Item -Recurse -Force operator/crds,operator/samples
 
 - **现象**：
 
-  ```text
+  ```text linenums="0"
   The CustomResourceDefinition "todoapps" is invalid: metadata.name: Invalid value...
   ```
 
 - **原因**：CRD 的 `metadata.name` 必须是 `<plural>.<group>`，例如 `todoapps.platform.todo.example.com`。
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   grep -n 'name: todoapps.platform.todo.example.com\|group: platform.todo.example.com\|plural: todoapps' \
     operator/crds/base/todoapps.platform.todo.example.com.yaml
   ```
@@ -1437,14 +1437,14 @@ Remove-Item -Recurse -Force operator/crds,operator/samples
 
 - **现象**：
 
-  ```text
+  ```text linenums="0"
   strict decoding error: unknown field "spec.versions[0].openAPIV3Schema"
   ```
 
 - **原因**：`openAPIV3Schema` 必须位于 `spec.versions[].schema.openAPIV3Schema` 下，而不是直接放在 version 下。
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   kubectl explain crd.spec.versions.schema.openAPIV3Schema
   ```
 
@@ -1455,14 +1455,14 @@ Remove-Item -Recurse -Force operator/crds,operator/samples
 
 - **现象**：
 
-  ```text
+  ```text linenums="0"
   spec.replicas: Invalid value: 0: spec.replicas in body should be greater than or equal to 1
   ```
 
 - **原因**：CRD schema 中配置了 `minimum: 1`，用户提交了非法值。
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   kubectl explain todoapp.spec.replicas
   ```
 
@@ -1475,7 +1475,7 @@ Remove-Item -Recurse -Force operator/crds,operator/samples
 - **原因**：additional printer columns 读取的是 status 字段；还没有 Controller 或手动 status patch 回写状态。
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   kubectl -n todo-dev get todoapp todo-platform -o jsonpath='{.status}{"\n"}'
   ```
 
@@ -1488,7 +1488,7 @@ Remove-Item -Recurse -Force operator/crds,operator/samples
 - **原因**：CRD 是自定义资源类型定义。删除类型定义会删除该类型下的实例数据。
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   kubectl get crd | grep platform.todo.example.com
   ```
 
@@ -1509,7 +1509,7 @@ Remove-Item -Recurse -Force operator/crds,operator/samples
 
 6. **删除 CRD 前必须有备份和恢复计划**。删除 CRD 会删除所有同类型 CR，影响范围通常比删除单个 Deployment 大。生产环境至少要先导出 CR、确认 GitOps 源、准备恢复命令，并让业务方知道 API 类型会短暂不可用。
 
-   ```bash
+   ```bash linenums="0"
    kubectl get todoapp,tododatabase,todocache -A -o yaml > todo-cr-backup.yaml
    ```
 
@@ -1567,73 +1567,13 @@ flowchart TD
 | printer columns | `kubectl get todoapp,tododatabase,todocache` 能展示关键列 |
 | 版本演进 | 能说明 `served`、`storage`、`deprecated` 和 storage version 迁移风险 |
 
-## 9. 本章练习题
+## 9. 练习题与面试题
 
-**基础题**
+本章练习题和面试题已拆分到独立页面，完成正文学习后再进入题库练习与复盘。
 
-1. CRD 的 `metadata.name` 为什么必须是 `<plural>.<group>`？
-2. `served: true` 和 `storage: true` 分别代表什么？
-3. `status` subresource 启用后，主资源写入 status 为什么会被忽略？
-4. `additionalPrinterColumns` 适合展示哪些字段？不适合展示哪些字段？
-5. 为什么不能把所有配置都放进 `spec.values`？
+[查看本章练习题与面试题](../../questions/stage-06-platform-operator/35-crd-design.md)
 
-**实操题**
-
-1. 为 `TodoApp.spec.resources.profile` 增加 `xlarge` 会带来什么兼容性影响？先只修改本地文件，不要 apply。验收标准：能说明枚举扩展和 Controller 映射的关系。
-2. 给 `TodoDatabase` 增加 `spec.backup.encryption.enabled` 字段。验收标准：字段类型为 boolean，默认值为 true 或 false，并能用 `kubectl explain` 查看。
-3. 创建一个非法 `TodoCache`，把 `replicas` 设置为 5。验收标准：server-side dry-run 被 API server 拒绝。
-4. 用 status subresource 给 `TodoDatabase` 写入 `Degraded` condition。验收标准：`kubectl describe tododatabase todo-postgres` 能看到对应状态。
-5. 删除 `TodoApp.spec.ingress.host`，只保留 `ingress.enabled: true`。验收标准：能解释为什么 OpenAPI 的普通 required 不够用，以及 CEL 规则如何拦截这个输入。
-
-**思考题**
-
-1. 如果 `TodoDatabase.spec.version` 从字符串改成整数，会影响哪些已有用户和工具？
-2. 如果 Controller 只看 `spec`，从不回写 `status.conditions`，SRE 排障会遇到什么问题？
-3. 哪些校验适合放在 OpenAPI schema，哪些适合放在 CEL，哪些必须交给 validating admission webhook？
-
-## 10. 本章面试题
-
-### 面试题 1：CRD 的 `served` 和 `storage` 有什么区别？
-
-**一句话结论**：`served` 决定某个 API 版本是否对客户端可访问，`storage` 决定新写入对象以哪个版本存入后端存储。
-
-**展开解释**：一个 CRD 可以同时 served 多个版本，但只能有一个 storage 版本。客户端可以请求任意 served 版本；API server 会根据 conversion 策略返回对应版本。修改 storage version 不会自动迁移已有对象。
-
-**深入追问**：什么时候能删除旧版本？确认没有客户端依赖旧版本，并完成存储版本迁移，旧版本不再出现在 `status.storedVersions` 后，才能从 CRD 中移除。
-
-### 面试题 2：OpenAPI schema 为什么对 Operator 很重要？
-
-**一句话结论**：schema 把明显错误拦在 API server 写入阶段，减少 Controller 运行时分支和排障成本。
-
-**展开解释**：类型、必填、枚举、正则、范围和默认值都可以在 schema 中表达。这样 GitOps 同步时就能发现错误，`kubectl explain` 也能生成字段文档。Controller 可以更专注于调谐合法输入。
-
-**深入追问**：OpenAPI、CEL 和 webhook 怎么分工？类型、枚举、范围和简单字段结构优先放 OpenAPI；同一对象内的跨字段关系优先用 CEL；需要查其他资源、访问外部系统或做复杂业务判断时，再使用 validating admission webhook。
-
-### 面试题 3：status subresource 解决了什么问题？
-
-**一句话结论**：它把用户写 `spec` 和 Controller 写 `status` 的路径、权限和冲突边界分开。
-
-**展开解释**：启用 status subresource 后，主资源的写入会忽略 status，Controller 必须通过 `/status` 更新状态。RBAC 可以单独授权 `todoapps/status`，避免普通用户伪造 Ready 状态。
-
-**深入追问**：没有 status subresource 会怎样？Controller 和用户都更新同一个主对象，容易互相覆盖；权限也难以精细控制。
-
-### 面试题 4：为什么 additional printer columns 是 API 设计的一部分？
-
-**一句话结论**：因为 `kubectl get` 是 SRE 高频入口，列设计直接影响排障效率。
-
-**展开解释**：好的 printer columns 会展示健康度、版本、规格、容量和关键端点。它们让人不用反复 `kubectl get -o yaml` 就能判断系统状态。列太多会降低可读性，列太少又缺乏运维价值。
-
-**深入追问**：如果 Ready 列为空代表什么？可能是 Controller 尚未回写 status，也可能是 jsonPath 写错，或 condition 类型与列定义不一致。
-
-### 面试题 5：CRD 版本升级时最容易犯什么错？
-
-**一句话结论**：最容易把字段破坏性变更当成普通 YAML 修改，忽略已有 CR、GitOps 配置和 storage version。
-
-**展开解释**：删除字段、改类型、收窄枚举、改变默认值都可能破坏已有用户。即使添加新版本，也要考虑 conversion、storedVersions、客户端兼容和回滚路径。
-
-**深入追问**：如何安全废弃字段？先保留旧字段并标注 deprecated，在新字段可用后让 Controller 同时兼容两者，发布迁移文档，最后在新 API 版本中移除。
-
-## 11. 本章总结
+## 10. 本章总结
 
 本篇把第 34 篇的 API 模型草案变成了真正的 Kubernetes API。你编写并安装了 `TodoApp`、`TodoDatabase`、`TodoCache` 三个 CRD，定义了 OpenAPI schema、status subresource 和 additional printer columns，并用 `kubectl explain`、server-side dry-run、自定义资源创建和 status patch 验证了它们。
 
@@ -1643,7 +1583,7 @@ flowchart TD
 
 还要提前记住一个阶段六边界：第 38-41 篇主线会优先实现 `TodoApp` Controller，把应用交付到 Deployment 和 Service；`TodoDatabase` 与 `TodoCache` 已经作为平台 API 契约定义好，但对应 Controller 会作为作品集扩展方向保留。这样设计是为了先把一个可运行、可测试、可发布的 Operator 主链路做扎实。
 
-## 12. 下一章衔接
+## 11. 下一章衔接
 
 下一篇第 36 篇会进入 Controller 机制：Informer 与 Workqueue。我们会围绕本篇的三个 CRD 继续追问：
 

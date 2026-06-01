@@ -57,7 +57,7 @@ CI/CD 的价值不只是“自动化省时间”，而是把团队约定变成�
 
 阶段四已经准备好流水线输入：
 
-```text
+```text linenums="0"
 第 16 篇：api/Dockerfile 多阶段构建
 第 21-24 篇：基础 Kubernetes YAML（内存模式起步，第 24 篇接入 PostgreSQL）
 第 26 篇：RBAC、SecurityContext、Pod Security 安全基线
@@ -68,7 +68,7 @@ CI/CD 的价值不只是“自动化省时间”，而是把团队约定变成�
 
 本篇会在应用仓库新增：
 
-```text
+```text linenums="0"
 .github/
 ├── ci/
 │   └── helm-values-ci.yaml
@@ -97,7 +97,7 @@ flowchart LR
 
 CI 是把代码变更尽快集成到主干前的自动检查。对 Todo Platform 来说，CI 至少包括：
 
-```text
+```text linenums="0"
 go vet -> go test -> govulncheck -> helm lint -> kustomize render
 ```
 
@@ -114,7 +114,7 @@ CD 有两层含义：
 
 最小 workflow 长这样：
 
-```yaml
+```yaml linenums="0"
 name: Todo Platform CI/CD
 
 on:
@@ -148,7 +148,7 @@ jobs:
 
 本篇使用三类触发器：
 
-```yaml
+```yaml linenums="0"
 on:
   pull_request:
     branches: [main]
@@ -172,7 +172,7 @@ push 到 main 说明变更已经通过审查，可以执行镜像推送这类需
 
 GitHub Actions 会为每次 workflow run 创建 `GITHUB_TOKEN`。不要默认给它写权限，而是按 job 设置最小权限：
 
-```yaml
+```yaml linenums="0"
 permissions:
   contents: read
 
@@ -191,7 +191,7 @@ jobs:
 
 镜像 tag 应该同时服务于人和机器：
 
-```text
+```text linenums="0"
 ghcr.io/OWNER/REPO/todo-api:sha-<commit-sha>
 ghcr.io/OWNER/REPO/todo-api:main
 ghcr.io/OWNER/REPO/todo-api:latest
@@ -199,7 +199,7 @@ ghcr.io/OWNER/REPO/todo-api:latest
 
 `latest` 方便演示，但不能作为生产回滚依据。生产发布至少要记录 commit SHA tag 和 digest：
 
-```text
+```text linenums="0"
 ghcr.io/acme/todo-platform/todo-api:sha-9f1e2d...
 digest: sha256:...
 ```
@@ -210,7 +210,7 @@ digest 是镜像内容的不可变标识。后续排障时，你要能回答：�
 
 本篇默认不直接部署到长期集群，而是在 GitHub Actions runner 上创建临时 kind 集群：
 
-```text
+```text linenums="0"
 install tools -> kind create cluster -> load image -> server-side dry-run -> apply dev overlay -> health check
 ```
 
@@ -256,7 +256,7 @@ sequenceDiagram
 
 本篇 workflow 拆成三个 job：
 
-```text
+```text linenums="0"
 validate -> build-image -> deploy-kind
 ```
 
@@ -278,7 +278,7 @@ CI 构建慢通常来自三类重复工作：
 
 本篇使用 `actions/setup-go@v6` 的 Go 缓存，并使用 Docker Buildx 的 GitHub Actions cache：
 
-```yaml
+```yaml linenums="0"
 cache-from: type=gha
 cache-to: type=gha,mode=max
 ```
@@ -289,7 +289,7 @@ cache-to: type=gha,mode=max
 
 推送 GHCR 时，workflow 需要：
 
-```yaml
+```yaml linenums="0"
 permissions:
   contents: read
   packages: write
@@ -297,7 +297,7 @@ permissions:
 
 登录方式：
 
-```yaml
+```yaml linenums="0"
 - uses: docker/login-action@v3
   with:
     registry: ghcr.io
@@ -353,7 +353,7 @@ permissions:
 
 确认应用仓库已经具备以下文件。下面命令在应用仓库根目录执行，也就是 `go.mod` 所在目录：
 
-```bash
+```bash linenums="0"
 test -f go.mod
 test -f api/Dockerfile
 test -d deployments/helm/todo-platform
@@ -377,7 +377,7 @@ test -d deployments/kustomize/overlays/dev
 
 如果本机已经安装 Go，可以先安装 `actionlint`。这里固定到 v1.7.12，便于复现本章检查结果：
 
-```bash
+```bash linenums="0"
 go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
 actionlint -version
 ```
@@ -386,13 +386,13 @@ actionlint -version
 
 以下命令默认在 Todo Platform 应用仓库根目录执行。创建 CI/CD 目录：
 
-```bash
+```bash linenums="0"
 mkdir -p .github/workflows .github/ci
 ```
 
 完成后目录如下：
 
-```text
+```text linenums="0"
 .github/
 ├── ci/
 │   └── helm-values-ci.yaml
@@ -404,7 +404,7 @@ mkdir -p .github/workflows .github/ci
 
 创建 CI 专用 Helm values。它只用于模板渲染和本地 kind 验证，不包含真实生产 Secret：
 
-```bash
+```bash linenums="0"
 cat > .github/ci/helm-values-ci.yaml <<'YAML'
 replicaCount: 1
 
@@ -438,13 +438,13 @@ YAML
 
 确认 `api/Dockerfile` 声明了 workflow 通过 `build-args` 传入的参数。第 16 篇的 Dockerfile 已经把这些参数写入 OCI 镜像标签：
 
-```bash
+```bash linenums="0"
 grep -n "^ARG" api/Dockerfile
 ```
 
 期望至少看到：
 
-```text
+```text linenums="0"
 ARG VERSION
 ARG COMMIT
 ARG BUILD_DATE
@@ -456,7 +456,7 @@ ARG BUILD_DATE
 
 创建 GitHub Actions workflow：
 
-```bash
+```bash linenums="0"
 cat > .github/workflows/todo-platform-ci-cd.yml <<'YAML'
 name: Todo Platform CI/CD
 
@@ -753,19 +753,19 @@ YAML
 
 先在本地做 YAML 语法检查，避免提交明显错误：
 
-```bash
+```bash linenums="0"
 git diff -- .github/workflows/todo-platform-ci-cd.yml
 ```
 
 如果你本机安装了 `yq`，可以检查 workflow 能被解析：
 
-```bash
+```bash linenums="0"
 yq '.jobs | keys' .github/workflows/todo-platform-ci-cd.yml
 ```
 
 如果你本机安装了 `actionlint`，再检查 GitHub Actions 语义：
 
-```bash
+```bash linenums="0"
 actionlint .github/workflows/todo-platform-ci-cd.yml
 ```
 
@@ -773,7 +773,7 @@ actionlint .github/workflows/todo-platform-ci-cd.yml
 
 提交到功能分支并创建 Pull Request：
 
-```bash
+```bash linenums="0"
 git add .github/ci/helm-values-ci.yaml .github/workflows/todo-platform-ci-cd.yml
 git commit -m "add todo platform ci cd workflow"
 git push -u origin feature/todo-platform-cicd
@@ -783,7 +783,7 @@ git push -u origin feature/todo-platform-cicd
 
 PR 合并到 `main` 后，`push` 事件会触发完整链路：
 
-```text
+```text linenums="0"
 validate -> build-image -> deploy-kind
 ```
 
@@ -791,7 +791,7 @@ validate -> build-image -> deploy-kind
 
 PR 阶段的 Actions 页面应看到：
 
-```text
+```text linenums="0"
 Todo Platform CI/CD / Validate code and manifests
 ✓ Checkout repository
 ✓ Set up Go
@@ -808,7 +808,7 @@ Todo Platform CI/CD / Validate code and manifests
 
 合并到 main 后应看到三个 job：
 
-```text
+```text linenums="0"
 Validate code and manifests   Success
 Build and push image          Success
 Deploy to temporary kind      Success
@@ -816,13 +816,13 @@ Deploy to temporary kind      Success
 
 `Build and push image` 的 summary 中应出现 digest：
 
-```text
+```text linenums="0"
 Built digest: sha256:...
 ```
 
 `Deploy to temporary kind` 中应出现：
 
-```text
+```text linenums="0"
 deployment.apps/todo-platform successfully rolled out
 ok
 ```
@@ -831,7 +831,7 @@ ok
 
 第一层：确认 PR 门禁生效。
 
-```text
+```text linenums="0"
 GitHub -> Pull requests -> Checks -> Todo Platform CI/CD
 ```
 
@@ -839,7 +839,7 @@ GitHub -> Pull requests -> Checks -> Todo Platform CI/CD
 
 第二层：确认镜像进入 GHCR。
 
-```text
+```text linenums="0"
 GitHub -> Packages -> todo-api
 ```
 
@@ -849,7 +849,7 @@ GitHub -> Packages -> todo-api
 
 在 `deploy-kind` job 日志中搜索：
 
-```text
+```text linenums="0"
 kind load docker-image
 ci-dev-image
 kubectl apply --dry-run=server
@@ -860,7 +860,7 @@ rollout status deployment/todo-platform
 
 第四层：确认健康检查真的访问了服务。
 
-```text
+```text linenums="0"
 curl -fsS http://127.0.0.1:18085/healthz
 curl -fsS http://127.0.0.1:18085/readyz
 ```
@@ -871,7 +871,7 @@ curl -fsS http://127.0.0.1:18085/readyz
 
 检查 workflow：
 
-```bash
+```bash linenums="0"
 grep -n "permissions:" .github/workflows/todo-platform-ci-cd.yml
 grep -n "packages: write" .github/workflows/todo-platform-ci-cd.yml
 ```
@@ -884,7 +884,7 @@ grep -n "packages: write" .github/workflows/todo-platform-ci-cd.yml
 
 本地如需删除实验文件：
 
-```bash
+```bash linenums="0"
 rm -f .github/ci/helm-values-ci.yaml
 rm -f .github/workflows/todo-platform-ci-cd.yml
 ```
@@ -897,14 +897,14 @@ rm -f .github/workflows/todo-platform-ci-cd.yml
 
 - **现象**：
 
-  ```text
+  ```text linenums="0"
   No checks have been run
   ```
 
 - **原因**：workflow 文件不在 `.github/workflows/`；文件后缀不是 `.yml` / `.yaml`；PR 目标分支不是 `main`；仓库没有启用 GitHub Actions。
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   test -f .github/workflows/todo-platform-ci-cd.yml
   git branch --show-current
   git status --short
@@ -919,14 +919,14 @@ rm -f .github/workflows/todo-platform-ci-cd.yml
 
 - **现象**：
 
-  ```text
+  ```text linenums="0"
   denied: permission_denied: write_package
   ```
 
 - **原因**：`build-image` job 缺少 `packages: write`；仓库或组织限制了 GitHub Actions 写 package；使用了错误 registry 或 token。
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   grep -n "packages: write" .github/workflows/todo-platform-ci-cd.yml
   grep -n "docker/login-action" .github/workflows/todo-platform-ci-cd.yml
   ```
@@ -940,7 +940,7 @@ rm -f .github/workflows/todo-platform-ci-cd.yml
 
 - **现象**：
 
-  ```text
+  ```text linenums="0"
   failed to compute cache key: "/go.mod" not found
   unable to prepare context: path "api/Dockerfile" not found
   ```
@@ -948,7 +948,7 @@ rm -f .github/workflows/todo-platform-ci-cd.yml
 - **原因**：Docker build context 写错；仓库目录结构和课程不一致；`.dockerignore` 误排除了 `go.mod`、`api/` 或 `configs/`。
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   test -f go.mod
   test -f api/Dockerfile
   grep -n "context:" .github/workflows/todo-platform-ci-cd.yml
@@ -962,7 +962,7 @@ rm -f .github/workflows/todo-platform-ci-cd.yml
 
 - **现象**：
 
-  ```text
+  ```text linenums="0"
   evalsymlink failure on .../.secrets/todo-api-auth.env
   no such file or directory
   ```
@@ -970,7 +970,7 @@ rm -f .github/workflows/todo-platform-ci-cd.yml
 - **原因**：第 28 篇 overlay 使用 `secretGenerator.envs` 引用 `.secrets/todo-api-auth.env`，但 CI runner 是干净环境，不会自动拥有本地 Secret 文件。
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   grep -n "secretGenerator" -A5 deployments/kustomize/overlays/dev/kustomization.yaml
   grep -n "Prepare Kustomize local secrets" -A8 .github/workflows/todo-platform-ci-cd.yml
   ```
@@ -982,14 +982,14 @@ rm -f .github/workflows/todo-platform-ci-cd.yml
 
 - **现象**：
 
-  ```text
+  ```text linenums="0"
   error: deployment "todo-platform" exceeded its progress deadline
   ```
 
 - **原因**：镜像没有正确加载到 kind；Deployment 中镜像名没有被替换成新镜像；健康检查路径失败；应用启动依赖缺失。
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   kubectl -n todo-dev get pods
   kubectl -n todo-dev describe pod -l app.kubernetes.io/name=todo-platform
   kubectl -n todo-dev logs deployment/todo-platform --tail=80
@@ -1015,7 +1015,7 @@ rm -f .github/workflows/todo-platform-ci-cd.yml
 
 如果团队暂时还没有接入云厂商 OIDC，至少要把真实集群部署限制在受保护 environment 中。下面是一个可复制的最小 `deploy-prod` job 骨架，它依赖 `prod` environment 中的 `KUBECONFIG_B64` Secret；后续接入 OIDC 时，可以只替换 `Configure kubeconfig` 这一步：
 
-```yaml
+```yaml linenums="0"
 deploy-prod:
   name: Deploy to production
   runs-on: ubuntu-24.04
@@ -1097,70 +1097,13 @@ deploy-prod:
 - workflow 权限符合最小权限：默认 `contents: read`，只有构建镜像 job 使用 `packages: write`。
 - 能解释为什么本篇没有直接部署生产集群，以及第 30 篇 GitOps 会如何改进。
 
-## 9. 本章练习题
+## 9. 练习题与面试题
 
-基础题：
+本章练习题和面试题已拆分到独立页面，完成正文学习后再进入题库练习与复盘。
 
-1. CI 和 CD 的核心区别是什么？为什么 PR 上通常只做 CI 门禁？
-2. GitHub Actions 中 workflow、job、step、runner 分别是什么？
-3. 为什么推送 GHCR 需要 `packages: write`，而 Go 测试 job 不需要？
-4. 为什么生产发布不应该只依赖 `latest` 镜像标签？
-5. kind 临时集群验证和真实集群部署分别解决什么问题？
+[查看本章练习题与面试题](../../questions/stage-05-production-engineering/29-cicd.md)
 
-实操题：
-
-1. 给 workflow 增加 `go test ./... -run Test` 的单独 step，并故意让一个测试失败。验收标准：PR check 失败，且不会进入 `build-image` job。
-2. 把 `deploy-kind` 临时 overlay 里的 `images.name` 故意改错，观察镜像没有被替换时的日志，再恢复。验收标准：能从 `/tmp/todo-dev-image.yaml` 定位 Kustomize 镜像覆盖没有命中。
-3. 为 workflow 增加 `workflow_dispatch` 输入 `environment`，允许选择 `dev` 或 `test` overlay。验收标准：手动触发时能根据输入渲染不同 overlay。
-
-思考题：
-
-1. 如果你的团队有 dev、staging、prod 三个集群，你会让 CI 直接部署，还是让 CI 更新 GitOps 仓库？为什么？
-2. 如果一次发布包含数据库迁移和镜像升级，流水线应该如何设计回滚、备份和人工审批？
-
-## 10. 本章面试题
-
-### 面试题 1：你会如何设计一个 Go 服务的 CI/CD 流水线？
-
-**一句话结论**：先做无权限 PR 门禁，再在主干构建不可变镜像并推送 registry，最后通过受控环境部署或 GitOps 同步。
-
-**展开解释**：PR 阶段执行 `go vet`、`go test`、漏洞扫描、Dockerfile 和 Kubernetes manifest 渲染检查。合并到 main 后构建镜像，打 commit SHA tag，推送 registry，记录 digest。部署阶段可以用临时集群验证，也可以通过 environment 审批部署到 dev/staging/prod。生产更推荐 GitOps，让集群控制器从 Git 拉取期望状态。
-
-**深入追问**：要讨论权限隔离、Secret 暴露、镜像 digest、并发部署控制、失败回滚、数据库迁移、审计和告警联动，而不是只说“写个 GitHub Actions”。
-
-### 面试题 2：为什么 CI/CD 中不要滥用 `pull_request_target`？
-
-**一句话结论**：`pull_request_target` 运行在目标仓库上下文，可能拥有更高权限；如果执行 PR 中的未可信代码，会造成 Secret 泄露。
-
-**展开解释**：普通 `pull_request` 对外部 fork 的 Secret 访问受限，这是为了保护仓库。`pull_request_target` 适合做打标签、评论等不执行外部代码的维护动作。如果在这个事件中 checkout PR 代码并执行脚本，攻击者可以通过修改脚本读取 Token 或 Secret。
-
-**深入追问**：安全做法是把 PR 验证设计成无 Secret、只读权限；需要写权限的动作只在受保护分支 push 后执行，并配合 CODEOWNERS 和分支保护。
-
-### 面试题 3：镜像 tag 和 digest 在发布中分别有什么作用？
-
-**一句话结论**：tag 方便人类识别版本，digest 精确标识镜像内容；生产回滚和审计应以 digest 为准。
-
-**展开解释**：`main`、`latest` 这类 tag 可能移动，`sha-<commit>` 更稳定但仍然是 tag。digest 是 registry 对镜像内容生成的不可变哈希。发布记录中保存 digest，能保证后续排查时知道 Pod 运行的具体镜像内容。
-
-**深入追问**：Kubernetes 可以直接使用 digest 拉取镜像。很多团队会让 CI 生成镜像 digest，再更新 Helm values 或 Kustomize images 字段，由 GitOps 同步到集群。
-
-### 面试题 4：CI 直接部署和 GitOps 部署有什么区别？
-
-**一句话结论**：CI 直接部署是流水线主动改集群；GitOps 是流水线改 Git，集群控制器从 Git 同步。
-
-**展开解释**：CI 直接部署简单直接，但流水线需要持有集群凭据，变更历史散在 workflow 日志中。GitOps 把 Git 作为唯一事实来源，Argo CD / Flux 负责同步、漂移检测和回滚，适合多环境和生产审计。
-
-**深入追问**：小团队或 dev 环境可以 CI 直连；生产多集群通常更适合 GitOps。关键不是选哪个名词，而是权限边界、审批、审计、回滚和漂移治理是否清楚。
-
-### 面试题 5：如何排查 GitHub Actions 中镜像推送失败？
-
-**一句话结论**：先看 registry 登录，再看 token 权限、镜像名称、package 权限和组织策略。
-
-**展开解释**：GHCR 推送通常需要 `docker/login-action` 登录 `ghcr.io`，用户名用 `github.actor`，密码用 `secrets.GITHUB_TOKEN`，job 权限包含 `packages: write`。镜像名应是 `ghcr.io/OWNER/REPO/...`。组织可能限制 Actions 创建 package 或访问 package。
-
-**深入追问**：如果推送第三方 registry，还要检查 PAT 权限、Secret 是否在当前 event 可用、PR 是否来自 fork、是否误把 Secret 打印到日志。
-
-## 11. 本章总结
+## 10. 本章总结
 
 本篇把 Todo Platform 从“手工执行交付命令”推进到“由 GitHub Actions 自动执行交付门禁”。你学习了 CI/CD 的边界、GitHub Actions 的 workflow/job/step 模型、`GITHUB_TOKEN` 最小权限、GHCR 镜像推送、镜像标签策略和 kind 临时集群部署验证。
 
@@ -1168,7 +1111,7 @@ deploy-prod:
 
 能力价值上，你现在能把“我本机能跑”升级成“每次提交都自动证明能跑”。这是进入生产工程的第一道门：没有可靠流水线，后面的 GitOps、监控、日志、链路追踪和生产排障都会缺少可信入口。
 
-## 12. 下一章衔接
+## 11. 下一章衔接
 
 第 30 篇会进入 GitOps 与 Argo CD。本篇的 CI/CD 流水线已经能测试、构建、推镜像和验证 Kubernetes 交付物；下一篇会进一步回答一个生产问题：**如果不希望 CI 直接持有生产集群写权限，怎样让 Git 成为部署事实来源，并由 Argo CD 自动同步到集群？**
 

@@ -40,7 +40,7 @@
 
 本篇结束时，你至少应该能独立完成下面这组任务：
 
-```bash
+```bash linenums="0"
 ip -br addr
 ip route
 ss -lntp
@@ -100,7 +100,7 @@ sudo tcpdump -i lo -nn 'tcp port 18080' -c 6
 
 当你执行：
 
-```bash
+```bash linenums="0"
 curl http://localhost:18080/healthz
 ```
 
@@ -154,7 +154,7 @@ IP 地址用于定位网络中的主机或接口。
 
 同一个 IP、同一种协议、同一个端口，通常只能被一个进程监听。如果两个进程都想监听 `127.0.0.1:18080`，第二个进程会失败，并出现类似：
 
-```text
+```text linenums="0"
 listen tcp 127.0.0.1:18080: bind: address already in use
 ```
 
@@ -162,13 +162,13 @@ listen tcp 127.0.0.1:18080: bind: address already in use
 
 人更容易记住域名，机器需要 IP 地址。DNS 负责把域名解析为 IP。
 
-```bash
+```bash linenums="0"
 dig example.com
 ```
 
 输出可能包含一个或多个 A / AAAA 记录。具体 IP 会随 DNS、地区和时间变化，下面只表示输出形态：
 
-```text
+```text linenums="0"
 example.com.  300  IN  A  <IP address>
 ```
 
@@ -176,7 +176,7 @@ example.com.  300  IN  A  <IP address>
 
 Linux 中可以用：
 
-```bash
+```bash linenums="0"
 getent hosts localhost
 ```
 
@@ -186,7 +186,7 @@ getent hosts localhost
 
 HTTP 请求由方法、路径、Header 和可选 Body 组成。响应由状态码、Header 和 Body 组成。
 
-```text
+```text linenums="0"
 GET /healthz HTTP/1.1
 Host: 127.0.0.1:18080
 User-Agent: curl/8.x
@@ -250,25 +250,25 @@ flowchart TD
 
 `Connection refused` 通常表示目标主机可达，但目标端口没有进程监听，或者被系统明确拒绝。
 
-```text
+```text linenums="0"
 curl: (7) Failed to connect to 127.0.0.1 port 18080: Connection refused
 ```
 
 优先检查：
 
-```bash
+```bash linenums="0"
 ss -lntp | grep 18080
 ```
 
 `Connection timed out` 通常表示请求发出去了，但长时间没有响应。原因可能是防火墙丢弃、路由不通、云安全组未放行、目标机器不可达。
 
-```text
+```text linenums="0"
 curl: (28) Failed to connect to 10.0.0.10 port 18080 after 10000 ms: Timeout was reached
 ```
 
 优先检查：
 
-```bash
+```bash linenums="0"
 ping 10.0.0.10
 sudo tcpdump -i any -nn 'host 10.0.0.10 and tcp port 18080'
 ```
@@ -282,7 +282,7 @@ sudo tcpdump -i any -nn 'host 10.0.0.10 and tcp port 18080'
 
 判断 HTTP 服务是否可用，应使用：
 
-```bash
+```bash linenums="0"
 curl -i http://127.0.0.1:18080/healthz
 ```
 
@@ -316,7 +316,7 @@ curl -i http://127.0.0.1:18080/healthz
 
 端口冲突可以用固定顺序处理：先确认端口被谁占用，再判断是否属于本实验，最后决定停止旧进程还是换端口。
 
-```bash
+```bash linenums="0"
 sudo ss -lntp 'sport = :18080'
 ps -fp <PID>
 ```
@@ -344,13 +344,13 @@ sequenceDiagram
 
 Linux 本机回环请求通常抓 `lo` 网卡：
 
-```bash
+```bash linenums="0"
 sudo tcpdump -i lo -nn 'tcp port 18080' -c 6
 ```
 
 如果不知道包会经过哪张网卡，可以先用 `-i any`：
 
-```bash
+```bash linenums="0"
 sudo tcpdump -i any -nn 'tcp port 18080' -c 6
 ```
 
@@ -384,7 +384,7 @@ sudo tcpdump -i any -nn 'tcp port 18080' -c 6
 
 建议在第 1 篇创建的仓库中执行：
 
-```bash
+```bash linenums="0"
 cd ~/workspace/cloud-native-todo-platform
 ```
 
@@ -400,20 +400,20 @@ cd ~/workspace/cloud-native-todo-platform
 
 安装网络排障工具：
 
-```bash
+```bash linenums="0"
 sudo apt update
 sudo apt install -y curl wget dnsutils iproute2 net-tools lsof tcpdump traceroute
 ```
 
 确认 Go 在当前终端可用：
 
-```bash
+```bash linenums="0"
 go version
 ```
 
 预期输出类似：
 
-```text
+```text linenums="0"
 go version go1.26.2 linux/amd64
 ```
 
@@ -421,7 +421,7 @@ go version go1.26.2 linux/amd64
 
 本实验会创建：
 
-```text
+```text linenums="0"
 cloud-native-todo-platform/
 ├── api/
 │   └── cmd/
@@ -736,7 +736,7 @@ network-clean:
 
 先确认你在课程仓库根目录：
 
-```bash
+```bash linenums="0"
 pwd
 ls
 ```
@@ -745,7 +745,7 @@ ls
 
 如果仓库还没有 Go module，先初始化：
 
-```bash
+```bash linenums="0"
 test -f go.mod || go mod init github.com/your-name/cloud-native-todo-platform
 ```
 
@@ -753,19 +753,19 @@ test -f go.mod || go mod init github.com/your-name/cloud-native-todo-platform
 
 创建目录：
 
-```bash
+```bash linenums="0"
 mkdir -p api/cmd/todo-network-demo bin scripts
 ```
 
 将 5.4 中的 Go 代码、检查脚本和 Makefile 分别保存到对应文件，然后赋予脚本执行权限：
 
-```bash
+```bash linenums="0"
 chmod +x scripts/check-network-demo.sh
 ```
 
 格式化并编译服务：
 
-```bash
+```bash linenums="0"
 gofmt -w api/cmd/todo-network-demo/main.go
 go mod tidy
 go build -o bin/todo-network-demo ./api/cmd/todo-network-demo
@@ -773,13 +773,13 @@ go build -o bin/todo-network-demo ./api/cmd/todo-network-demo
 
 在第一个终端启动服务：
 
-```bash
+```bash linenums="0"
 TODO_ADDR=127.0.0.1:18080 ./bin/todo-network-demo
 ```
 
 保持第一个终端运行，不要关闭。另开第二个终端执行访问检查：
 
-```bash
+```bash linenums="0"
 curl -i http://127.0.0.1:18080/healthz
 curl -i http://127.0.0.1:18080/readyz
 curl -i http://localhost:18080/todos
@@ -791,7 +791,7 @@ curl -i http://127.0.0.1:18080/not-found
 
 查看地址、路由和监听端口：
 
-```bash
+```bash linenums="0"
 ip -br addr
 ip route
 ss -lnt 'sport = :18080'
@@ -802,7 +802,7 @@ sudo ss -lntp 'sport = :18080'
 
 检查 DNS 和系统解析：
 
-```bash
+```bash linenums="0"
 getent hosts localhost
 dig +short example.com
 nslookup localhost
@@ -812,13 +812,13 @@ nslookup localhost
 
 运行检查脚本：
 
-```bash
+```bash linenums="0"
 ./scripts/check-network-demo.sh
 ```
 
 制造端口冲突。保持第一个终端中的服务运行，不要关闭；然后另开终端再次启动同端口服务：
 
-```bash
+```bash linenums="0"
 TODO_ADDR=127.0.0.1:18080 ./bin/todo-network-demo
 ```
 
@@ -826,13 +826,13 @@ TODO_ADDR=127.0.0.1:18080 ./bin/todo-network-demo
 
 观察 `127.0.0.1` 与 `0.0.0.0` 的差异。先按 `Ctrl+C` 停止第一个终端中的服务，再监听所有 IPv4 网卡：
 
-```bash
+```bash linenums="0"
 TODO_ADDR=0.0.0.0:18080 ./bin/todo-network-demo
 ```
 
 另一个终端查看监听地址：
 
-```bash
+```bash linenums="0"
 ss -lnt 'sport = :18080'
 ```
 
@@ -840,25 +840,25 @@ ss -lnt 'sport = :18080'
 
 使用 `tcpdump` 抓取本机 HTTP 请求。第一个终端运行服务后，在第二个终端启动抓包：
 
-```bash
+```bash linenums="0"
 sudo tcpdump -i lo -nn 'tcp port 18080' -c 6
 ```
 
 第三个终端发起请求：
 
-```bash
+```bash linenums="0"
 curl -i http://127.0.0.1:18080/healthz
 ```
 
 如果你的环境中 `lo` 抓不到包，可以改用：
 
-```bash
+```bash linenums="0"
 sudo tcpdump -i any -nn 'tcp port 18080' -c 6
 ```
 
 生成排障报告：
 
-```bash
+```bash linenums="0"
 make -f Makefile.network network-report
 ```
 
@@ -866,7 +866,7 @@ make -f Makefile.network network-report
 
 健康检查预期类似：
 
-```http
+```http linenums="0"
 HTTP/1.1 200 OK
 Content-Type: application/json
 Date: Wed, 27 May 2026 06:00:00 GMT
@@ -879,7 +879,7 @@ Content-Length: <length>
 
 就绪检查预期类似：
 
-```http
+```http linenums="0"
 HTTP/1.1 200 OK
 Content-Type: application/json
 
@@ -888,13 +888,13 @@ Content-Type: application/json
 
 Todo 列表预期类似：
 
-```json
+```json linenums="0"
 {"items":[{"id":1,"title":"Learn Linux networking","completed":false},{"id":2,"title":"Trace HTTP requests with curl","completed":false},{"id":3,"title":"Capture packets with tcpdump","completed":false}]}
 ```
 
 未知路径预期类似：
 
-```http
+```http linenums="0"
 HTTP/1.1 404 Not Found
 Content-Type: application/json
 
@@ -903,26 +903,26 @@ Content-Type: application/json
 
 端口监听预期类似：
 
-```text
+```text linenums="0"
 LISTEN 0 4096 127.0.0.1:18080 0.0.0.0:*
 ```
 
 端口冲突预期类似：
 
-```text
+```text linenums="0"
 listen failed addr=127.0.0.1:18080 error=listen tcp 127.0.0.1:18080: bind: address already in use
 ```
 
 tcpdump 预期能看到类似：
 
-```text
+```text linenums="0"
 IP 127.0.0.1.54321 > 127.0.0.1.18080: Flags [S], seq ...
 IP 127.0.0.1.18080 > 127.0.0.1.54321: Flags [S.], seq ...
 ```
 
 检查脚本预期输出：
 
-```text
+```text linenums="0"
 [OK] command exists: curl
 [OK] command exists: ss
 [OK] command exists: ip
@@ -940,13 +940,13 @@ Network demo check completed.
 
 验证前请确认服务正在另一个终端中运行：
 
-```bash
+```bash linenums="0"
 TODO_ADDR=127.0.0.1:18080 ./bin/todo-network-demo
 ```
 
 然后在当前终端集中执行下面命令。以下命令假设服务已经在另一个终端中运行；`go build` 只验证代码可编译，不影响已经运行的服务进程。
 
-```bash
+```bash linenums="0"
 go build -o bin/todo-network-demo ./api/cmd/todo-network-demo
 curl -fsS http://127.0.0.1:18080/healthz
 curl -fsS http://127.0.0.1:18080/readyz
@@ -975,19 +975,19 @@ test -f network-debug-report.txt
 
 停止服务：
 
-```text
+```text linenums="0"
 在运行服务的终端按 Ctrl+C
 ```
 
 确认没有残留进程：
 
-```bash
+```bash linenums="0"
 pgrep -af todo-network-demo || true
 ```
 
 如果还有残留进程，先确认 PID 属于本实验，再停止：
 
-```bash
+```bash linenums="0"
 ps -fp <PID>
 kill <PID>
 ```
@@ -996,13 +996,13 @@ kill <PID>
 
 清理临时文件：
 
-```bash
+```bash linenums="0"
 rm -f /tmp/todo-network-demo.pcap network-debug-report.txt
 ```
 
 本篇创建的源码建议保留：
 
-```text
+```text linenums="0"
 api/cmd/todo-network-demo/main.go
 scripts/check-network-demo.sh
 Makefile.network
@@ -1010,7 +1010,7 @@ Makefile.network
 
 `bin/todo-network-demo` 是编译产物，可以按需删除：
 
-```bash
+```bash linenums="0"
 rm -f bin/todo-network-demo
 ```
 
@@ -1022,7 +1022,7 @@ rm -f bin/todo-network-demo
 
 - **现象**：
 
-  ```text
+  ```text linenums="0"
   curl: (7) Failed to connect to 127.0.0.1 port 18080: Connection refused
   ```
 
@@ -1030,7 +1030,7 @@ rm -f bin/todo-network-demo
 
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   ss -lnt 'sport = :18080'
   pgrep -af todo-network-demo || true
   ```
@@ -1039,7 +1039,7 @@ rm -f bin/todo-network-demo
 
 - **修复**：
 
-  ```bash
+  ```bash linenums="0"
   TODO_ADDR=127.0.0.1:18080 ./bin/todo-network-demo
   ```
 
@@ -1049,7 +1049,7 @@ rm -f bin/todo-network-demo
 
 - **现象**：
 
-  ```text
+  ```text linenums="0"
   curl: (28) Failed to connect to 10.0.0.10 port 18080 after 10000 ms: Timeout was reached
   ```
 
@@ -1057,7 +1057,7 @@ rm -f bin/todo-network-demo
 
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   ip route
   ping -c 3 10.0.0.10
   sudo tcpdump -i any -nn 'host 10.0.0.10 and tcp port 18080'
@@ -1073,7 +1073,7 @@ rm -f bin/todo-network-demo
 
 - **现象**：
 
-  ```text
+  ```text linenums="0"
   curl: (6) Could not resolve host: todo.local
   ```
 
@@ -1081,7 +1081,7 @@ rm -f bin/todo-network-demo
 
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   getent hosts todo.local
   dig todo.local
   nslookup todo.local
@@ -1098,7 +1098,7 @@ rm -f bin/todo-network-demo
 
 - **现象**：
 
-  ```text
+  ```text linenums="0"
   # 服务器本机成功
   curl http://127.0.0.1:18080/healthz
 
@@ -1110,7 +1110,7 @@ rm -f bin/todo-network-demo
 
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   ss -lntp 'sport = :18080'
   ip -br addr
   sudo tcpdump -i any -nn 'tcp port 18080'
@@ -1126,7 +1126,7 @@ rm -f bin/todo-network-demo
 
 - **现象**：
 
-  ```text
+  ```text linenums="0"
   sudo tcpdump -i lo -nn 'tcp port 18080' -c 6
   # 长时间没有任何包
   ```
@@ -1135,7 +1135,7 @@ rm -f bin/todo-network-demo
 
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   ip -br addr
   sudo tcpdump -i any -nn 'tcp port 18080' -c 6
   curl -i http://127.0.0.1:18080/healthz
@@ -1179,26 +1179,26 @@ rm -f bin/todo-network-demo
 
 验收命令分三个终端执行。终端一启动服务并保持运行：
 
-```bash
+```bash linenums="0"
 make -f Makefile.network network-build
 TODO_ADDR=127.0.0.1:18080 ./bin/todo-network-demo
 ```
 
 终端二启动抓包并等待请求：
 
-```bash
+```bash linenums="0"
 sudo tcpdump -i lo -nn 'tcp port 18080' -c 6
 ```
 
 如果 `lo` 抓不到包，可以改为：
 
-```bash
+```bash linenums="0"
 sudo tcpdump -i any -nn 'tcp port 18080' -c 6
 ```
 
 终端三执行 HTTP 检查和报告生成：
 
-```bash
+```bash linenums="0"
 curl -i http://127.0.0.1:18080/healthz
 ./scripts/check-network-demo.sh
 make -f Makefile.network network-report
@@ -1219,70 +1219,13 @@ cat network-debug-report.txt
 | 抓包观察 | 能用 `tcpdump` 看到本机 HTTP 请求经过回环网卡 |
 | 排障记录 | 能生成并解释 `network-debug-report.txt` |
 
-## 9. 本章练习题
+## 9. 练习题与面试题
 
-### 基础题
+本章练习题和面试题已拆分到独立页面，完成正文学习后再进入题库练习与复盘。
 
-1. `127.0.0.1` 和 `0.0.0.0` 有什么区别？
-2. 为什么 `ping` 成功不代表 HTTP 服务一定可用？
-3. `Connection refused` 和 `Connection timed out` 的含义有什么不同？
-4. `ss -lntp` 中的 `LISTEN` 表示什么？
-5. `dig` 和 `getent hosts` 的结果为什么可能不同？
+[查看本章练习题与面试题](../../questions/stage-01-foundation/04-linux-network.md)
 
-### 实操题
-
-1. 将 Todo Demo 改为监听 `127.0.0.1:18081`，并用 `curl` 验证。当 `ss -lnt 'sport = :18081'` 能看到 `LISTEN`，说明操作成功。
-2. 保持一个服务占用 `18080`，再次启动同端口服务，记录错误并找出 PID。当你能解释 `address already in use` 来自哪个进程时，说明操作成功。
-3. 使用 `TODO_READY=false` 启动服务，观察 `/readyz` 返回的 HTTP 状态码。当 `curl -i` 显示 `503 Service Unavailable`，说明操作成功。
-
-### 思考题
-
-1. 如果服务在服务器本机访问正常，但从公司网络访问超时，你会按什么顺序排查？
-2. Kubernetes 中 Pod 正常但 Service 不通时，本篇哪些命令和思路仍然适用？
-
-## 10. 本章面试题
-
-### 1. TCP 和 HTTP 是什么关系？
-
-**一句话结论**：TCP 负责可靠传输字节流，HTTP 定义应用层请求和响应格式。
-
-**展开解释**：大多数 HTTP/1.1 和 HTTP/2 请求运行在 TCP 之上。TCP 连接成功只说明目标 IP 和端口可达，不代表业务正常；HTTP 状态码、响应头和响应体才能说明应用层结果。
-
-**深入追问**：排障时如果 TCP 连接失败，优先看 DNS、路由、端口监听、防火墙；如果 TCP 成功但 HTTP 返回 500，再看应用日志和依赖状态。
-
-### 2. 如何判断一个 Linux 服务是否监听了端口？
-
-**一句话结论**：用 `ss -lntp` 或 `lsof` 查看目标端口是否处于 `LISTEN`。
-
-**展开解释**：例如 `sudo ss -lntp 'sport = :18080'`。如果看到 `LISTEN`，说明有进程监听该 TCP 端口。还要关注监听地址：`127.0.0.1` 只接受本机访问，`0.0.0.0` 表示监听所有 IPv4 网卡。
-
-**深入追问**：在 Kubernetes 中，对应要进入 Pod 或容器中检查应用是否监听 `containerPort`，再看 Service 的 `targetPort` 是否映射正确。
-
-### 3. `Connection refused` 和 `Connection timed out` 怎么排查？
-
-**一句话结论**：`refused` 优先查端口监听，`timed out` 优先查网络路径和防火墙。
-
-**展开解释**：`Connection refused` 通常表示目标主机可达但端口没有监听；`Connection timed out` 常见于包被防火墙、安全组、路由或 ACL 丢弃。前者用 `ss`、`lsof` 查端口，后者用 `ip route`、防火墙命令和 `tcpdump` 查包是否到达。
-
-**深入追问**：在云环境中还要检查安全组、NACL、负载均衡后端健康状态；在 Kubernetes 中还要检查 NetworkPolicy、Service Endpoints 和 Ingress Controller 日志。
-
-### 4. DNS 排查时为什么不能只看 `dig`？
-
-**一句话结论**：`dig` 查询 DNS 服务器，应用程序通常走系统解析流程，两者可能不一致。
-
-**展开解释**：系统解析可能先读取 `/etc/hosts`，再查询 DNS，还可能受 NSS、缓存、容器 DNS 配置影响。因此排查应用解析问题时，应同时看 `getent hosts`、`/etc/hosts`、`dig` 或 `nslookup`。
-
-**深入追问**：在 Kubernetes 中还要检查 CoreDNS、Pod 的 `/etc/resolv.conf`、Service 名称、Namespace 和 DNS search domain。
-
-### 5. tcpdump 在生产环境中怎么安全使用？
-
-**一句话结论**：抓包前要授权，抓包时要限制范围，抓包文件要按敏感数据处理。
-
-**展开解释**：生产抓包应限制 host、port、协议、包数量和时间窗口，避免全量抓包。HTTP 明文包可能包含 Token、Cookie、用户数据；即使 HTTPS 看不到正文，也可能暴露 IP、端口、SNI 等元数据。
-
-**深入追问**：抓包通常用于证明请求是否到达、响应是否发出、握手是否完成。它不能替代应用日志、指标和链路追踪，最好与这些证据一起使用。
-
-## 11. 本章总结
+## 10. 本章总结
 
 本篇建立了后端服务网络排障的基础模型。你学习了 TCP/IP、端口、DNS、HTTP 的关系，理解了 `127.0.0.1`、`0.0.0.0`、内网 IP 和域名的区别，也掌握了 `ip`、`ss`、`curl`、`dig`、`getent`、`tcpdump` 这些工具分别适合排查哪一层问题。
 
@@ -1290,6 +1233,6 @@ cat network-debug-report.txt
 
 能力价值上，你现在可以把“访问不了”拆解成 DNS、路由、端口、HTTP、应用日志等可验证问题。后续学习 Docker 端口映射、Kubernetes Service、Ingress、CoreDNS、NetworkPolicy 和生产故障排查时，本篇方法会反复复用。
 
-## 12. 下一章衔接
+## 11. 下一章衔接
 
 下一篇进入 **第 5 篇：Git 基础与团队协作**。本篇已经产生了 Go 服务源码、检查脚本、Makefile 和排障报告；下一篇会学习如何用 Git 管理这些实验成果，让每次修改都有提交记录、分支、审查和可追溯的历史。

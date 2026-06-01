@@ -71,7 +71,7 @@
 
 阶段四正在把 Todo Platform 从“容器化服务”迁移到 Kubernetes 应用交付：
 
-```text
+```text linenums="0"
 第 20 篇：kind 集群和基础对象
 第 21 篇：Todo API Deployment + Probe + HPA
 第 22 篇：Service + Ingress + Gateway API
@@ -192,7 +192,7 @@ Deployment 的 Pod template 引用了 ConfigMap / Secret。新的 Pod 被创建�
 
 如果引用的 ConfigMap / Secret 不存在，Pod 通常会卡在 `CreateContainerConfigError`。这类错误优先看：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-workloads describe pod <pod-name>
 kubectl -n todo-workloads get configmap
 kubectl -n todo-workloads get secret
@@ -217,7 +217,7 @@ ConfigMap / Secret 更新后有两个不同结果：
 
 `envFrom` 很方便，能把整个 ConfigMap 或 Secret 的 key 全部变成环境变量：
 
-```yaml
+```yaml linenums="0"
 envFrom:
   - configMapRef:
       name: todo-api-config
@@ -229,7 +229,7 @@ envFrom:
 
 显式 key 引用更啰嗦，但审查更清楚：
 
-```yaml
+```yaml linenums="0"
 env:
   - name: TODO_ENV
     valueFrom:
@@ -288,7 +288,7 @@ Kubernetes 不会因为 ConfigMap / Secret 更新而自动重建 Deployment Pod�
 
 确认当前集群与 Namespace：
 
-```bash
+```bash linenums="0"
 kubectl config current-context
 docker image inspect todo-api:v0.1.0 >/dev/null
 kubectl get namespace todo-workloads
@@ -302,7 +302,7 @@ kubectl -n todo-workloads get service todo-api
 
 本篇继续使用第 21 篇创建的 `deployments/k8s-base/`，并增加一个多环境示例目录：
 
-```text
+```text linenums="0"
 deployments/
 └── k8s-base/
     ├── todo-api-configmap.yaml
@@ -321,7 +321,7 @@ deployments/
 
 创建目录：
 
-```bash
+```bash linenums="0"
 mkdir -p deployments/k8s-base/environments/dev
 mkdir -p deployments/k8s-base/environments/test
 mkdir -p deployments/k8s-base/environments/prod
@@ -331,7 +331,7 @@ mkdir -p deployments/k8s-base/environments/prod
 
 本篇会生成 `todo-api-secret.local.yaml` 作为本地实验 Secret。先确认本地仓库会忽略这类文件，避免误提交到 Git：
 
-```bash
+```bash linenums="0"
 grep -Fq 'deployments/k8s-base/*.local.yaml' .gitignore 2>/dev/null || \
   printf '\ndeployments/k8s-base/*.local.yaml\n' >> .gitignore
 git status --short
@@ -343,7 +343,7 @@ git status --short
 
 创建非敏感配置 `deployments/k8s-base/todo-api-configmap.yaml`：
 
-```bash
+```bash linenums="0"
 cat > deployments/k8s-base/todo-api-configmap.yaml <<'YAML'
 apiVersion: v1
 kind: ConfigMap
@@ -366,7 +366,7 @@ YAML
 
 创建用于演示文件挂载和热更新的 ConfigMap `deployments/k8s-base/todo-api-config-file.yaml`：
 
-```bash
+```bash linenums="0"
 cat > deployments/k8s-base/todo-api-config-file.yaml <<'YAML'
 apiVersion: v1
 kind: ConfigMap
@@ -386,7 +386,7 @@ YAML
 
 生成本地实验 Secret。`hash-password` 子命令来自第 14 篇，并在第 16 篇镜像构建实验中验证过；如果下面命令提示找不到镜像或子命令，请先回到第 16 篇重新构建 `todo-api:v0.1.0`。
 
-```bash
+```bash linenums="0"
 HASH=$(docker run --rm todo-api:v0.1.0 hash-password "change-me-123")
 
 kubectl -n todo-workloads create secret generic todo-api-auth \
@@ -400,7 +400,7 @@ kubectl -n todo-workloads create secret generic todo-api-auth \
 
 这里使用 `kubectl create secret --dry-run=client -o yaml` 生成 YAML，它会把值写入 `data` 字段并自动做 base64 编码。手写 Secret 时也可以使用 `stringData` 写明文，API Server 会在保存时转换成 `data`。例如：
 
-```yaml
+```yaml linenums="0"
 apiVersion: v1
 kind: Secret
 metadata:
@@ -415,7 +415,7 @@ stringData:
 
 更新 Todo API Deployment，让容器从 ConfigMap / Secret 注入环境变量，并挂载 `runtime-notes.txt`：
 
-```bash
+```bash linenums="0"
 cat > deployments/k8s-base/todo-api-deployment.yaml <<'YAML'
 apiVersion: apps/v1
 kind: Deployment
@@ -502,7 +502,7 @@ YAML
 
 dev 配置：
 
-```bash
+```bash linenums="0"
 cat > deployments/k8s-base/environments/dev/todo-api-configmap.yaml <<'YAML'
 apiVersion: v1
 kind: ConfigMap
@@ -522,7 +522,7 @@ YAML
 
 test 配置：
 
-```bash
+```bash linenums="0"
 cat > deployments/k8s-base/environments/test/todo-api-configmap.yaml <<'YAML'
 apiVersion: v1
 kind: ConfigMap
@@ -542,7 +542,7 @@ YAML
 
 prod 配置：
 
-```bash
+```bash linenums="0"
 cat > deployments/k8s-base/environments/prod/todo-api-configmap.yaml <<'YAML'
 apiVersion: v1
 kind: ConfigMap
@@ -568,7 +568,7 @@ YAML
 
 先用 server-side dry-run 让 API Server 检查 YAML。这样可以在真正修改集群前提前发现字段拼写、API 版本或对象格式错误：
 
-```bash
+```bash linenums="0"
 kubectl apply --dry-run=server -f deployments/k8s-base/todo-api-configmap.yaml
 kubectl apply --dry-run=server -f deployments/k8s-base/todo-api-config-file.yaml
 kubectl apply --dry-run=server -f deployments/k8s-base/todo-api-secret.local.yaml
@@ -577,7 +577,7 @@ kubectl apply --dry-run=server -f deployments/k8s-base/todo-api-deployment.yaml
 
 确认无误后应用 ConfigMap、Secret 和 Deployment：
 
-```bash
+```bash linenums="0"
 kubectl apply -f deployments/k8s-base/todo-api-configmap.yaml
 kubectl apply -f deployments/k8s-base/todo-api-config-file.yaml
 kubectl apply -f deployments/k8s-base/todo-api-secret.local.yaml
@@ -591,7 +591,7 @@ kubectl -n todo-workloads wait pod \
 
 查看对象：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-workloads get configmap todo-api-config todo-api-config-file
 kubectl -n todo-workloads get secret todo-api-auth
 kubectl -n todo-workloads get pods -l app.kubernetes.io/name=todo-api
@@ -599,7 +599,7 @@ kubectl -n todo-workloads get pods -l app.kubernetes.io/name=todo-api
 
 查看 Deployment 引用关系：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-workloads describe deployment todo-api
 ```
 
@@ -609,7 +609,7 @@ kubectl -n todo-workloads describe deployment todo-api
 
 获取一个 Todo API Pod 名称：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-workloads wait pod \
   -l app.kubernetes.io/name=todo-api \
   --for=condition=Ready \
@@ -625,7 +625,7 @@ Deployment 配置了 `replicas: 2`，集群里通常会有两个 Running Pod。�
 
 查看非敏感环境变量：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-workloads exec "$POD" -- printenv TODO_ENV
 kubectl -n todo-workloads exec "$POD" -- printenv TODO_API_ADDR
 kubectl -n todo-workloads exec "$POD" -- printenv TODO_RELEASE
@@ -633,7 +633,7 @@ kubectl -n todo-workloads exec "$POD" -- printenv TODO_RELEASE
 
 预期输出类似：
 
-```text
+```text linenums="0"
 dev
 0.0.0.0:18080
 chapter-23-config
@@ -641,32 +641,32 @@ chapter-23-config
 
 不要在日常排障中直接打印 Secret 值。本地实验可以只验证 key 存在：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-workloads exec "$POD" -- sh -c 'test -n "$TODO_JWT_SECRET" && echo "jwt secret exists"'
 kubectl -n todo-workloads exec "$POD" -- sh -c 'test -n "$TODO_AUTH_USERS" && echo "auth users exists"'
 ```
 
 查看挂载的 ConfigMap 文件：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-workloads exec "$POD" -- cat /app/runtime-config/runtime-notes.txt
 ```
 
 预期输出包含：
 
-```text
+```text linenums="0"
 config version: chapter-23-initial
 ```
 
 验证 API 仍然可访问：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-workloads port-forward service/todo-api 18082:80
 ```
 
 另开一个终端执行：
 
-```bash
+```bash linenums="0"
 curl -s http://127.0.0.1:18082/healthz
 curl -s http://127.0.0.1:18082/readyz
 ```
@@ -677,7 +677,7 @@ curl -s http://127.0.0.1:18082/readyz
 
 修改 `todo-api-config-file`：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-workloads patch configmap todo-api-config-file \
   --type merge \
   -p '{"data":{"runtime-notes.txt":"config version: chapter-23-updated\nowner: platform-team\npurpose: demonstrate ConfigMap volume update\n"}}'
@@ -685,14 +685,14 @@ kubectl -n todo-workloads patch configmap todo-api-config-file \
 
 等待 kubelet 同步挂载文件。通常几十秒内会更新，最慢可能需要一两分钟：
 
-```bash
+```bash linenums="0"
 sleep 30
 kubectl -n todo-workloads exec "$POD" -- cat /app/runtime-config/runtime-notes.txt
 ```
 
 如果看到：
 
-```text
+```text linenums="0"
 config version: chapter-23-updated
 ```
 
@@ -702,7 +702,7 @@ config version: chapter-23-updated
 
 修改 `todo-api-config` 中的 `TODO_RELEASE`：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-workloads patch configmap todo-api-config \
   --type merge \
   -p '{"data":{"TODO_RELEASE":"chapter-23-env-updated"}}'
@@ -710,13 +710,13 @@ kubectl -n todo-workloads patch configmap todo-api-config \
 
 查看当前 Pod 中的环境变量：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-workloads exec "$POD" -- printenv TODO_RELEASE
 ```
 
 你大概率仍然会看到旧值：
 
-```text
+```text linenums="0"
 chapter-23-config
 ```
 
@@ -724,7 +724,7 @@ chapter-23-config
 
 重启 Deployment：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-workloads rollout restart deployment/todo-api
 kubectl -n todo-workloads rollout status deployment/todo-api --timeout=180s
 kubectl -n todo-workloads wait pod \
@@ -735,7 +735,7 @@ kubectl -n todo-workloads wait pod \
 
 重新获取新 Pod 名称并验证：
 
-```bash
+```bash linenums="0"
 POD="$(kubectl -n todo-workloads get pod \
   -l app.kubernetes.io/name=todo-api \
   --field-selector=status.phase=Running \
@@ -745,7 +745,7 @@ kubectl -n todo-workloads exec "$POD" -- printenv TODO_RELEASE
 
 预期输出：
 
-```text
+```text linenums="0"
 chapter-23-env-updated
 ```
 
@@ -753,7 +753,7 @@ chapter-23-env-updated
 
 查看 Secret 元信息：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-workloads describe secret todo-api-auth
 ```
 
@@ -761,20 +761,20 @@ kubectl -n todo-workloads describe secret todo-api-auth
 
 下面命令会输出 base64 编码后的 Secret 数据：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-workloads get secret todo-api-auth -o yaml
 ```
 
 不要把这类输出贴到 issue、聊天工具或日志系统里。base64 可以很容易还原，例如：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-workloads get secret todo-api-auth \
   -o jsonpath='{.data.TODO_JWT_SECRET}' | base64 -d
 ```
 
 Linux 和 WSL2 通常使用 `base64 -d`；macOS 默认 `base64` 常用 `base64 -D`。如果命令报参数错误，换成：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-workloads get secret todo-api-auth \
   -o jsonpath='{.data.TODO_JWT_SECRET}' | base64 -D
 ```
@@ -783,7 +783,7 @@ kubectl -n todo-workloads get secret todo-api-auth \
 
 还可以检查当前身份是否有读取 Secret 的权限：
 
-```bash
+```bash linenums="0"
 kubectl auth can-i get secrets -n todo-workloads
 kubectl auth can-i list secrets -n todo-workloads
 ```
@@ -794,14 +794,14 @@ kubectl auth can-i list secrets -n todo-workloads
 
 第 22 篇已经用过 TLS Secret：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-workloads get secret todo-api-local-tls
 kubectl -n todo-workloads describe secret todo-api-local-tls
 ```
 
 私有镜像仓库通常使用 `dockerconfigjson` Secret。下面是命令形态示例，不要直接填真实凭据：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-workloads create secret docker-registry todo-registry-cred \
   --docker-server=registry.example.com \
   --docker-username='<username>' \
@@ -812,7 +812,7 @@ kubectl -n todo-workloads create secret docker-registry todo-registry-cred \
 
 Deployment 使用私有镜像时，会通过 `imagePullSecrets` 引用它：
 
-```yaml
+```yaml linenums="0"
 spec:
   imagePullSecrets:
     - name: todo-registry-cred
@@ -824,7 +824,7 @@ spec:
 
 完成实验后，可以用下面这组命令集中确认结果：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-workloads get configmap todo-api-config todo-api-config-file
 kubectl -n todo-workloads get secret todo-api-auth
 kubectl -n todo-workloads get deployment todo-api
@@ -857,7 +857,7 @@ kubectl auth can-i get secrets -n todo-workloads
 
 方式一：连同 Todo API 工作负载一起清理，适合结束本地实验：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-workloads delete deployment todo-api --ignore-not-found
 kubectl delete -f deployments/k8s-base/todo-api-config-file.yaml --ignore-not-found
 kubectl delete -f deployments/k8s-base/todo-api-configmap.yaml --ignore-not-found
@@ -868,7 +868,7 @@ kubectl delete -f deployments/k8s-base/todo-api-secret.local.yaml --ignore-not-f
 
 不要误删第 22 篇的 TLS Secret，除非你也准备清理入口层资源：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-workloads get secret
 ```
 
@@ -878,14 +878,14 @@ kubectl -n todo-workloads get secret
 
 - **现象**：
 
-  ```text
+  ```text linenums="0"
   todo-api-xxxxx   0/1   CreateContainerConfigError
   ```
 
 - **常见原因**：Deployment 引用了不存在的 ConfigMap 或 Secret。
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   kubectl -n todo-workloads describe pod <pod-name>
   kubectl -n todo-workloads get configmap
   kubectl -n todo-workloads get secret
@@ -893,7 +893,7 @@ kubectl -n todo-workloads get secret
 
 - **修复**：先创建缺失对象，再重启 Deployment。
 
-  ```bash
+  ```bash linenums="0"
   kubectl apply -f deployments/k8s-base/todo-api-configmap.yaml
   kubectl apply -f deployments/k8s-base/todo-api-secret.local.yaml
   kubectl -n todo-workloads rollout restart deployment/todo-api
@@ -905,13 +905,13 @@ kubectl -n todo-workloads get secret
 - **原因**：应用通过环境变量读取配置，环境变量不会热更新。
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   kubectl -n todo-workloads exec <pod-name> -- printenv TODO_RELEASE
   ```
 
 - **修复**：
 
-  ```bash
+  ```bash linenums="0"
   kubectl -n todo-workloads rollout restart deployment/todo-api
   kubectl -n todo-workloads rollout status deployment/todo-api
   ```
@@ -922,7 +922,7 @@ kubectl -n todo-workloads get secret
 - **原因**：kubelet 同步有延迟；使用 `subPath` 挂载单个文件时不会获得同样的自动更新行为；Pod 可能已经重建。
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   kubectl -n todo-workloads get configmap todo-api-config-file -o yaml
   kubectl -n todo-workloads exec <pod-name> -- ls -l /app/runtime-config
   kubectl -n todo-workloads exec <pod-name> -- cat /app/runtime-config/runtime-notes.txt
@@ -936,13 +936,13 @@ kubectl -n todo-workloads get secret
 - **原因**：bcrypt 哈希包含 `$`，如果没有正确引用，Shell 可能把它当成变量展开。
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   kubectl -n todo-workloads get secret todo-api-auth -o jsonpath='{.data.TODO_AUTH_USERS}' | base64 -d
   ```
 
 - **修复**：生成 Secret 时用双引号包住整体，并确认 `HASH` 变量已经正确生成。
 
-  ```bash
+  ```bash linenums="0"
   HASH=$(docker run --rm todo-api:v0.1.0 hash-password "change-me-123")
   kubectl -n todo-workloads create secret generic todo-api-auth \
     --from-literal=TODO_AUTH_USERS="admin=$HASH" \
@@ -1007,72 +1007,13 @@ kubectl -n todo-workloads get secret
 - 能使用 `kubectl auth can-i get secrets -n todo-workloads` 检查 Secret 读取权限。
 - 能写出 dev / test / prod 配置差异表。
 
-## 9. 本章练习题
+## 9. 练习题与面试题
 
-基础题：
+本章练习题和面试题已拆分到独立页面，完成正文学习后再进入题库练习与复盘。
 
-1. ConfigMap 和 Secret 的职责边界是什么？
-2. 为什么 Secret 的 base64 不是加密？
-3. `envFrom` 和 `configMapKeyRef` 有什么区别？
-4. ConfigMap 作为环境变量和作为卷挂载时，更新行为有什么不同？
-5. TLS Secret 为什么通常和 Ingress / Gateway 放在同一个 Namespace？
+[查看本章练习题与面试题](../../questions/stage-04-kubernetes/23-k8s-config-secret.md)
 
-实操题：
-
-1. 把 `TODO_LOG_LEVEL` 从 `info` 改成 `debug`，观察旧 Pod 环境变量不变，重启后新 Pod 生效。
-2. 新增一个 ConfigMap key：`TODO_FEATURE_EXPERIMENTAL=true`，通过 `envFrom` 注入后验证 Pod 中能看到该变量。
-3. 故意删除 `todo-api-auth` Secret，重启 Deployment，观察 Pod 错误；再恢复 Secret 并让服务 Ready。
-4. 创建一个 `test` 版本 ConfigMap，并把 `TODO_ENV` 切换为 `test`，通过 rollout restart 验证生效。
-
-思考题：
-
-1. 如果生产环境要求 Secret 每 90 天轮换一次，你会如何设计流程，避免服务中断？
-2. 如果多个团队共用一个集群，谁应该有读取 Secret 的权限？应用开发、SRE、CI/CD 系统、Ingress Controller 的权限边界有什么不同？
-3. 如果配置文件热更新后应用没有重新加载，你会选择改应用支持 reload，还是统一滚动重启？为什么？
-
-## 10. 本章面试题
-
-### 面试题 1：ConfigMap 和 Secret 的区别是什么？
-
-**一句话结论**：ConfigMap 保存非敏感配置，Secret 保存敏感配置，但 Secret 的安全还依赖 RBAC、etcd 加密和密钥管理流程。
-
-**展开解释**：ConfigMap 适合运行环境、日志级别、功能开关、配置文件模板等内容。Secret 适合密码、Token、私钥、JWT Secret、镜像拉取凭据等敏感数据。Secret 默认是 base64 编码，不等于加密，拥有读取权限的人可以还原原文。
-
-**深入追问**：生产环境应限制 Secret 读取权限，开启 etcd 加密，避免把 Secret 打进日志或 Git，并建立密钥轮换流程。
-
-### 面试题 2：ConfigMap 更新后，Pod 会自动使用新配置吗？
-
-**一句话结论**：不一定。环境变量不会热更新，卷挂载文件会更新，但应用是否重新加载取决于程序实现。
-
-**展开解释**：容器启动时环境变量已经固定，ConfigMap / Secret 后续变化不会改变进程环境。通过 volume 挂载的 ConfigMap 文件会由 kubelet 周期性更新，但如果应用只在启动时读取文件，仍然需要重启应用。
-
-**深入追问**：常见做法是在配置变化后触发 Deployment 滚动重启，或者用 Helm / Kustomize 生成配置 hash annotation，让 Pod template 变化并产生新 ReplicaSet。
-
-### 面试题 3：`envFrom` 有什么风险？
-
-**一句话结论**：`envFrom` 简洁，但会把对象里的所有 key 都注入容器，配置边界不如逐项引用清晰。
-
-**展开解释**：如果 ConfigMap 中新增了一个 key，使用 `envFrom` 的容器会自动得到这个环境变量。对于统一前缀、同一应用专用的配置对象，这很方便；对于共享 ConfigMap 或敏感边界严格的团队，逐项 `configMapKeyRef` / `secretKeyRef` 更容易审查。
-
-**深入追问**：生产中可以约定每个 ConfigMap 只服务一个应用，并用命名规范、代码评审和策略工具限制配置扩散。
-
-### 面试题 4：Kubernetes Secret 如何做生产加固？
-
-**一句话结论**：用最小权限 RBAC 控制读取，开启 etcd 静态加密，避免明文入 Git，并接入外部密钥管理和轮换流程。
-
-**展开解释**：Secret 对象本身不是完整安全方案。需要限制谁能 `get/list/watch` Secret，避免管理员之外的角色批量读取；etcd 存储层应启用 encryption at rest；GitOps 场景应使用 Sealed Secrets 或 External Secrets；应用日志和审计日志必须脱敏。
-
-**深入追问**：Secret 轮换要考虑应用是否支持多密钥、旧 Token 失效策略、滚动重启顺序和回滚风险。
-
-### 面试题 5：镜像拉取 Secret 和应用 Secret 有什么区别？
-
-**一句话结论**：镜像拉取 Secret 给 kubelet 拉镜像使用，应用 Secret 注入容器给应用进程使用。
-
-**展开解释**：`kubernetes.io/dockerconfigjson` Secret 通常通过 `imagePullSecrets` 引用，作用在 Pod 拉取私有镜像阶段。应用 Secret 例如 `TODO_JWT_SECRET` 通过环境变量或文件挂载进入容器，被业务进程读取。二者的读取者、权限边界和泄露影响不同。
-
-**深入追问**：生产中镜像拉取 Secret 可以绑定到 ServiceAccount，应用 Secret 则应按 Namespace 和应用拆分，避免一个应用读取另一个应用的密钥。
-
-## 11. 本章总结
+## 10. 本章总结
 
 本篇把 Todo API 的 Kubernetes 部署从“Deployment 里直接写配置值”推进到“ConfigMap / Secret 管理配置来源”。你学习了 ConfigMap 与 Secret 的职责边界，掌握了 `envFrom`、`configMapKeyRef`、`secretKeyRef` 和卷挂载的用法，也验证了环境变量和挂载文件在配置更新时的不同表现。
 
@@ -1080,7 +1021,7 @@ kubectl -n todo-workloads get secret
 
 能力价值上，你已经能排查 Kubernetes 配置类故障：对象缺失、key 写错、Secret 引用失败、配置更新不生效、base64 误解和权限边界不清。这些问题在生产集群里非常常见，也是 Kubernetes 应用交付的核心能力。
 
-## 12. 下一章衔接
+## 11. 下一章衔接
 
 第 24 篇会进入 Kubernetes 存储，把 PostgreSQL 迁移进集群，并用 PVC 保存数据库数据。本篇的 ConfigMap / Secret 会直接被下一章复用：数据库用户名、密码、数据库名、连接地址会进入 Secret 和 ConfigMap；PostgreSQL Pod 会依赖 PVC；Todo API 会通过配置切换到集群内数据库。
 

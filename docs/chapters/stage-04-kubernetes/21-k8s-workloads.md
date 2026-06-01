@@ -67,7 +67,7 @@
 
 阶段三到阶段四的主线正在从“容器化交付物”变成“集群工作负载”：
 
-```text
+```text linenums="0"
 第 16 篇：todo-api:v0.1.0 镜像
 第 17 篇：Docker Compose 本地多服务编排
 第 20 篇：kind 集群 + 镜像导入
@@ -102,7 +102,7 @@ Pod 是 Kubernetes 的最小调度单元，但它不是“永远运行”的保�
 
 `kubectl get pod` 只给你摘要，真正排查要看：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-workloads describe pod <pod-name>
 kubectl -n todo-workloads logs <pod-name>
 kubectl -n todo-workloads get events --sort-by=.lastTimestamp
@@ -187,7 +187,7 @@ Deployment 的滚动更新不是“一次性删旧再建新”，而是逐步创
 
 关键字段：
 
-```yaml
+```yaml linenums="0"
 strategy:
   type: RollingUpdate
   rollingUpdate:
@@ -205,7 +205,7 @@ Deployment 每次 Pod template 变化都会产生一个新 revision。回滚本�
 
 常用命令：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-workloads rollout history deployment/todo-api
 kubectl -n todo-workloads rollout undo deployment/todo-api
 ```
@@ -218,7 +218,7 @@ Service 并不直接检查你的 HTTP 端点。它通过 selector 找到 Pod，�
 
 排查 Service 转发时，至少看三层：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-workloads get pod -l app.kubernetes.io/name=todo-api
 kubectl -n todo-workloads get endpoints todo-api
 kubectl -n todo-workloads describe pod <pod-name>
@@ -272,7 +272,7 @@ Ch20 当前默认 kind 节点镜像是 `registry.cn-guangzhou.aliyuncs.com/yleoe
 
 确认当前环境：
 
-```bash
+```bash linenums="0"
 docker version
 kind version
 kubectl version --client
@@ -284,33 +284,33 @@ kubectl config current-context
 
 确认 Todo API 镜像：
 
-```bash
+```bash linenums="0"
 docker image inspect todo-api:v0.1.0
 ```
 
 如果镜像不存在，回到应用仓库根目录构建：
 
-```bash
+```bash linenums="0"
 docker build -f api/Dockerfile -t todo-api:v0.1.0 .
 ```
 
 把镜像导入 kind 节点：
 
-```bash
+```bash linenums="0"
 KIND_CLUSTER=todo-k8s
 kind load docker-image todo-api:v0.1.0 --name "$KIND_CLUSTER"
 ```
 
 如果你的网络无法让 kind 节点直接从 Docker Hub 拉取 Alpine，也可以提前导入可选示例用到的镜像：
 
-```bash
+```bash linenums="0"
 docker pull registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23
 kind load docker-image registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23 --name "$KIND_CLUSTER"
 ```
 
 切换到本篇使用的 context：
 
-```bash
+```bash linenums="0"
 kubectl config use-context "kind-$KIND_CLUSTER"
 kubectl get nodes
 ```
@@ -319,13 +319,13 @@ kubectl get nodes
 
 在应用仓库根目录创建 Kubernetes 基础 YAML 目录：
 
-```bash
+```bash linenums="0"
 mkdir -p deployments/k8s-base
 ```
 
 本篇完成后，目录结构应类似：
 
-```text
+```text linenums="0"
 deployments/k8s-base
 ├── namespace.yaml
 ├── todo-api-secret.local.yaml # ← 本地生成，不提交公开仓库
@@ -342,7 +342,7 @@ deployments/k8s-base
 
 创建 Namespace：
 
-```bash
+```bash linenums="0"
 cat > deployments/k8s-base/namespace.yaml <<'YAML'
 apiVersion: v1
 kind: Namespace
@@ -355,7 +355,7 @@ YAML
 
 先应用 Namespace，后续 Secret 需要写入这个 Namespace：
 
-```bash
+```bash linenums="0"
 kubectl apply -f deployments/k8s-base/namespace.yaml
 ```
 
@@ -363,7 +363,7 @@ kubectl apply -f deployments/k8s-base/namespace.yaml
 
 Linux / macOS / WSL2：
 
-```bash
+```bash linenums="0"
 HASH=$(docker run --rm todo-api:v0.1.0 hash-password "change-me-123")
 
 docker run --rm todo-api:v0.1.0 hash-password "preflight-check" >/dev/null
@@ -397,7 +397,7 @@ kubectl -n todo-workloads create secret generic todo-api-auth \
 
 创建 Deployment：
 
-```bash
+```bash linenums="0"
 cat > deployments/k8s-base/todo-api-deployment.yaml <<'YAML'
 # 结构概览：
 # 1. metadata/labels：统一应用标签，供 Service、HPA、查询命令使用
@@ -487,7 +487,7 @@ YAML
 
 创建 Service：
 
-```bash
+```bash linenums="0"
 cat > deployments/k8s-base/todo-api-service.yaml <<'YAML'
 apiVersion: v1
 kind: Service
@@ -511,7 +511,7 @@ YAML
 
 创建 HPA：
 
-```bash
+```bash linenums="0"
 cat > deployments/k8s-base/todo-api-hpa.yaml <<'YAML'
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
@@ -543,7 +543,7 @@ YAML
 
 创建 Job、CronJob、DaemonSet 示例：
 
-```bash
+```bash linenums="0"
 cat > deployments/k8s-base/workload-extras.yaml <<'YAML'
 # 结构概览：
 # 1. Job：一次性运行 todo-api config-check
@@ -653,7 +653,7 @@ YAML
 
 写入本地 README：
 
-```bash
+```bash linenums="0"
 cat > deployments/k8s-base/README.md <<'MD'
 # Todo API Kubernetes Base
 
@@ -688,7 +688,7 @@ MD
 
 先部署 Namespace、Secret、Deployment 和 Service：
 
-```bash
+```bash linenums="0"
 kubectl apply -f deployments/k8s-base/namespace.yaml
 kubectl apply -f deployments/k8s-base/todo-api-secret.local.yaml
 kubectl apply -f deployments/k8s-base/todo-api-deployment.yaml
@@ -697,19 +697,19 @@ kubectl apply -f deployments/k8s-base/todo-api-service.yaml
 
 等待 Deployment 发布完成：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-workloads rollout status deployment/todo-api --timeout=180s
 ```
 
 查看 Deployment、ReplicaSet、Pod 和 Service：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-workloads get deployment,replicaset,pod,service -o wide
 ```
 
 查看 Pod 标签和探针状态：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-workloads get pods --show-labels
 POD="$(kubectl -n todo-workloads get pod -l app.kubernetes.io/name=todo-api -o jsonpath='{.items[0].metadata.name}')"
 kubectl -n todo-workloads describe pod "$POD"
@@ -717,19 +717,19 @@ kubectl -n todo-workloads describe pod "$POD"
 
 查看日志：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-workloads logs "$POD" --tail=80
 ```
 
 通过 Service 做本地访问。这个命令会占用当前终端：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-workloads port-forward service/todo-api 18082:80
 ```
 
 在另一个终端访问：
 
-```bash
+```bash linenums="0"
 curl -i http://127.0.0.1:18082/healthz
 curl -i http://127.0.0.1:18082/readyz
 ```
@@ -738,7 +738,7 @@ curl -i http://127.0.0.1:18082/readyz
 
 手动扩容到 3 副本：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-workloads scale deployment/todo-api --replicas=3
 kubectl -n todo-workloads rollout status deployment/todo-api --timeout=120s
 kubectl -n todo-workloads get pods -l app.kubernetes.io/name=todo-api -o wide
@@ -746,7 +746,7 @@ kubectl -n todo-workloads get pods -l app.kubernetes.io/name=todo-api -o wide
 
 执行一次正常滚动更新。本篇用环境变量变化触发新 revision，真实生产通常使用新的镜像 tag 或 digest：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-workloads set env deployment/todo-api TODO_RELEASE=chapter-21-v2
 kubectl -n todo-workloads rollout status deployment/todo-api --timeout=180s
 kubectl -n todo-workloads rollout history deployment/todo-api
@@ -755,21 +755,21 @@ kubectl -n todo-workloads get replicasets -l app.kubernetes.io/name=todo-api
 
 模拟一次失败发布：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-workloads set image deployment/todo-api todo-api=todo-api:not-exist
 kubectl -n todo-workloads rollout status deployment/todo-api --timeout=60s
 ```
 
 上面的 `rollout status` 预计会超时，因为新 Pod 拉不到镜像。查看状态：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-workloads get pods
 kubectl -n todo-workloads get events --sort-by=.lastTimestamp | tail -n 20
 ```
 
 执行回滚：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-workloads rollout undo deployment/todo-api
 kubectl -n todo-workloads rollout status deployment/todo-api --timeout=180s
 kubectl -n todo-workloads get pods -l app.kubernetes.io/name=todo-api
@@ -777,7 +777,7 @@ kubectl -n todo-workloads get pods -l app.kubernetes.io/name=todo-api
 
 应用 HPA：
 
-```bash
+```bash linenums="0"
 kubectl apply -f deployments/k8s-base/todo-api-hpa.yaml
 kubectl -n todo-workloads get hpa todo-api
 kubectl -n todo-workloads describe hpa todo-api
@@ -785,7 +785,7 @@ kubectl -n todo-workloads describe hpa todo-api
 
 如果你还没有安装 metrics-server，HPA 的 `TARGETS` 可能显示 `<unknown>`。本篇固定使用 metrics-server `v0.8.1`，避免 `latest` 漂移导致同一章节在不同时间安装到不同版本。在 kind 本地实验中可以按下面方式安装 metrics-server：
 
-```bash
+```bash linenums="0"
 curl -L -o components.yaml https://github.com/kubernetes-sigs/metrics-server/releases/download/v0.8.1/components.yaml
 sed -i 's|registry.k8s.io/metrics-server/|registry.cn-guangzhou.aliyuncs.com/yleoer/|g' components.yaml
 kubectl apply -f components.yaml
@@ -804,7 +804,7 @@ kubectl top nodes
 
 可选：制造一点访问负载，观察 HPA。这个实验用于观察 HPA 指标变化，不保证每台机器都一定触发扩容，因为 Todo API 的 `/healthz` 很轻量，kind 节点资源和本机性能差异也会影响结果：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-workloads run hpa-load \
   --image=registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23 \
   --restart=Never \
@@ -815,13 +815,13 @@ kubectl -n todo-workloads get hpa todo-api --watch
 
 这个 Pod 会持续向 `/healthz` 发送请求，中间没有 `sleep`，只用于观察 HPA 指标变化。停止观察时按 `Ctrl+C`，然后清理负载 Pod：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-workloads delete pod hpa-load --ignore-not-found
 ```
 
 观察 Job、CronJob、DaemonSet：
 
-```bash
+```bash linenums="0"
 kubectl apply -f deployments/k8s-base/workload-extras.yaml
 kubectl -n todo-workloads get job,cronjob,daemonset,pod
 kubectl -n todo-workloads logs job/todo-api-config-check
@@ -836,13 +836,13 @@ kubectl -n todo-workloads logs -l app.kubernetes.io/name=node-heartbeat --tail=2
 
 Deployment 发布成功时：
 
-```text
+```text linenums="0"
 deployment "todo-api" successfully rolled out
 ```
 
 工作负载列表类似：
 
-```text
+```text linenums="0"
 NAME                       READY   UP-TO-DATE   AVAILABLE   AGE
 deployment.apps/todo-api   2/2     2            2           60s
 
@@ -859,7 +859,7 @@ service/todo-api   ClusterIP   10.96.xxx.xxx   <none>        80/TCP
 
 `/readyz` 应返回：
 
-```text
+```text linenums="0"
 HTTP/1.1 200 OK
 Content-Type: application/json
 ...
@@ -867,7 +867,7 @@ Content-Type: application/json
 
 失败发布时可能看到：
 
-```text
+```text linenums="0"
 ErrImagePull
 ImagePullBackOff
 ```
@@ -876,7 +876,7 @@ ImagePullBackOff
 
 HPA 在 metrics-server 不可用时常见输出：
 
-```text
+```text linenums="0"
 NAME       REFERENCE             TARGETS         MINPODS   MAXPODS   REPLICAS
 todo-api   Deployment/todo-api   <unknown>/60%   2         5         2
 ```
@@ -887,7 +887,7 @@ metrics-server 可用并完成一轮采集后，`TARGETS` 会显示类似 `3%/60
 
 执行以下命令：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-workloads get deployment todo-api
 kubectl -n todo-workloads get replicasets -l app.kubernetes.io/name=todo-api
 kubectl -n todo-workloads get pods -l app.kubernetes.io/name=todo-api
@@ -910,20 +910,20 @@ curl -i http://127.0.0.1:18082/readyz
 
 如果你还要继续第 22 篇，可以保留 `todo-workloads` Namespace。若要清理本篇所有资源：
 
-```bash
+```bash linenums="0"
 kubectl delete namespace todo-workloads --ignore-not-found
 ```
 
 如果只想清理可选示例：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-workloads delete -f deployments/k8s-base/workload-extras.yaml --ignore-not-found
 kubectl -n todo-workloads delete pod hpa-load --ignore-not-found
 ```
 
 如果不再使用 metrics-server：
 
-```bash
+```bash linenums="0"
 kubectl delete -f components.yaml --ignore-not-found
 ```
 
@@ -935,14 +935,14 @@ kubectl delete -f components.yaml --ignore-not-found
 
 - **现象**：
 
-  ```text
+  ```text linenums="0"
   todo-api-xxxxx   0/1   ImagePullBackOff
   ```
 
 - **原因**：kind 节点内部没有 `todo-api:v0.1.0` 镜像；镜像 tag 写错；或 `imagePullPolicy` 强制远程拉取。
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   kubectl -n todo-workloads describe pod <pod-name>
   docker image inspect todo-api:v0.1.0
   kind get clusters
@@ -950,7 +950,7 @@ kubectl delete -f components.yaml --ignore-not-found
 
 - **修复**：
 
-  ```bash
+  ```bash linenums="0"
   kind load docker-image todo-api:v0.1.0 --name todo-k8s
   kubectl -n todo-workloads rollout restart deployment/todo-api
   kubectl -n todo-workloads rollout status deployment/todo-api
@@ -962,14 +962,14 @@ kubectl delete -f components.yaml --ignore-not-found
 
 - **现象**：
 
-  ```text
+  ```text linenums="0"
   todo-api-xxxxx   0/1   CreateContainerConfigError
   ```
 
 - **原因**：Deployment 引用了不存在的 Secret；Secret key 写错；Namespace 不一致。
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   kubectl -n todo-workloads describe pod <pod-name>
   kubectl -n todo-workloads get secret todo-api-auth
   kubectl -n todo-workloads describe deployment todo-api
@@ -977,7 +977,7 @@ kubectl delete -f components.yaml --ignore-not-found
 
 - **修复**：重新生成并应用 Secret：
 
-  ```bash
+  ```bash linenums="0"
   HASH=$(docker run --rm todo-api:v0.1.0 hash-password "change-me-123")
   kubectl -n todo-workloads create secret generic todo-api-auth \
     --from-literal=TODO_JWT_SECRET=0123456789abcdef0123456789abcdef \
@@ -992,14 +992,14 @@ kubectl delete -f components.yaml --ignore-not-found
 
 - **现象**：
 
-  ```text
+  ```text linenums="0"
   todo-api-xxxxx   0/1   Running
   ```
 
 - **原因**：readinessProbe 失败；应用没有监听 `0.0.0.0:18080`；`/readyz` 返回非 200；Service 端口和容器端口写错。
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   kubectl -n todo-workloads describe pod <pod-name>
   kubectl -n todo-workloads logs <pod-name> --tail=100
   kubectl -n todo-workloads get endpoints todo-api
@@ -1014,7 +1014,7 @@ kubectl delete -f components.yaml --ignore-not-found
 
 - **现象**：
 
-  ```text
+  ```text linenums="0"
   Waiting for deployment "todo-api" rollout to finish...
   ```
 
@@ -1023,7 +1023,7 @@ kubectl delete -f components.yaml --ignore-not-found
 - **原因**：新 ReplicaSet 的 Pod 无法 Ready，常见原因是镜像不存在、Probe 配错、Secret 缺失或资源不足。
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   kubectl -n todo-workloads rollout status deployment/todo-api --timeout=60s
   kubectl -n todo-workloads get replicasets -l app.kubernetes.io/name=todo-api
   kubectl -n todo-workloads get pods
@@ -1032,7 +1032,7 @@ kubectl delete -f components.yaml --ignore-not-found
 
 - **修复**：
 
-  ```bash
+  ```bash linenums="0"
   kubectl -n todo-workloads rollout undo deployment/todo-api
   kubectl -n todo-workloads rollout status deployment/todo-api
   ```
@@ -1043,14 +1043,14 @@ kubectl delete -f components.yaml --ignore-not-found
 
 - **现象**：
 
-  ```text
+  ```text linenums="0"
   TARGETS <unknown>/60%
   ```
 
 - **原因**：常见原因分三类：metrics-server 未安装或 metrics API 不可用；Deployment 缺少 `resources.requests.cpu`；负载太轻或刚安装 metrics-server，指标还没有完成首轮采集。kind 中还可能是 metrics-server 连接 kubelet 时证书校验失败。
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   kubectl get apiservice v1beta1.metrics.k8s.io
   kubectl -n kube-system get deployment metrics-server
   kubectl -n kube-system logs deployment/metrics-server --tail=100
@@ -1068,7 +1068,7 @@ kubectl delete -f components.yaml --ignore-not-found
 - **原因**：Job 的 Pod 已被 `ttlSecondsAfterFinished` 清理；Job 还没有创建 Pod；或者 Job 失败重试中。
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   kubectl -n todo-workloads get job,pod
   kubectl -n todo-workloads describe job todo-api-config-check
   kubectl -n todo-workloads get events --sort-by=.lastTimestamp | tail -n 20
@@ -1079,14 +1079,14 @@ kubectl delete -f components.yaml --ignore-not-found
 
 - **现象**：
 
-  ```text
+  ```text linenums="0"
   exec: "sh": executable file not found in $PATH
   ```
 
 - **原因**：第 16 篇构建的运行镜像使用 distroless，镜像里通常没有 shell、包管理器和调试工具。这是安全设计，不是 Kubernetes 故障。
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   kubectl -n todo-workloads logs <pod-name> --tail=100
   kubectl -n todo-workloads describe pod <pod-name>
   kubectl -n todo-workloads exec <pod-name> -- /app/todo-api config-check
@@ -1142,80 +1142,13 @@ kubectl delete -f components.yaml --ignore-not-found
 - 能说清 readinessProbe 和 livenessProbe 配错会导致什么生产事故。
 - 能根据 Events 判断问题在镜像、Secret、Probe、资源还是 HPA 指标链路。
 
-## 9. 本章练习题
+## 9. 练习题与面试题
 
-基础题：
+本章练习题和面试题已拆分到独立页面，完成正文学习后再进入题库练习与复盘。
 
-1. Pod phase 和 container state 有什么区别？
-2. Deployment、ReplicaSet、Pod 三者是什么关系？
-3. `maxSurge` 和 `maxUnavailable` 分别影响滚动更新的哪一部分？
-4. `startupProbe`、`readinessProbe`、`livenessProbe` 分别应该检查什么？
-5. 为什么 HPA 需要 CPU request？
+[查看本章练习题与面试题](../../questions/stage-04-kubernetes/21-k8s-workloads.md)
 
-实操题：
-
-1. 把 `replicas` 改成 `4`，执行 `kubectl apply`，观察 ReplicaSet 和 Pod 数量变化。
-2. 把 `readinessProbe.path` 临时改成 `/not-found`，观察 Service Endpoints 是否为空；实验结束后恢复。
-3. 把 `resources.requests.cpu` 从 `50m` 改成 `10m`，在 metrics-server 可用时观察 HPA 是否更容易扩容；实验结束后恢复。
-4. 将 CronJob 的 `suspend` 改为 `false`，等待一次调度后观察 Job；实验结束后改回 `true`。
-
-思考题：
-
-1. 如果一次滚动更新中，新版本 readiness 一直失败，但旧版本仍然可用，你会如何判断是否需要回滚？
-2. 如果服务 CPU 很低但延迟很高，HPA 只看 CPU 有什么问题？
-3. 数据库迁移应该用 Job、Init Container，还是放在应用启动逻辑里？分别有什么风险？
-
-## 10. 本章面试题
-
-### 面试题 1：Deployment 和 Pod 的区别是什么？
-
-**一句话结论**：Pod 是实际运行单元，Deployment 是管理 Pod 副本、滚动更新和回滚的控制器入口。
-
-**展开解释**：裸 Pod 创建后，如果节点故障或需要发布新版本，Kubernetes 不会像 Deployment 那样自动维持副本和管理历史 revision。Deployment 通过 ReplicaSet 保持期望副本数，并在 Pod template 变化时创建新 ReplicaSet，实现滚动更新和回滚。
-
-**深入追问**：生产中通常不直接管理 ReplicaSet，因为它缺少 Deployment 的发布语义。手工删除 Pod 通常只是触发控制器重建，不等于发布新版本。
-
-### 面试题 2：readinessProbe 和 livenessProbe 配错会怎样？
-
-**一句话结论**：readiness 配错会影响是否接流量，liveness 配错会导致容器被反复重启。
-
-**展开解释**：readinessProbe 失败时，Pod 可以继续运行，但不会进入 Service 的可用后端；livenessProbe 失败时，kubelet 会重启容器。如果把依赖数据库的深度检查放进 liveness，数据库短暂抖动可能把所有 API Pod 重启，造成更大事故。
-
-**深入追问**：startupProbe 可以保护启动慢的应用，避免 liveness 过早介入。生产中还要给探针设置合理的 timeout、period、failureThreshold，并结合应用日志和指标验证。
-
-### 面试题 3：Kubernetes 滚动更新为什么可能卡住？
-
-**一句话结论**：新 Pod 没有变 Ready 时，Deployment 会等待，不会贸然删掉旧 Pod。
-
-**展开解释**：滚动更新要满足 `maxSurge` 和 `maxUnavailable` 约束。新 ReplicaSet 的 Pod 如果镜像拉取失败、Probe 失败、Secret 缺失或资源不足，就无法 Ready。此时 Deployment 可能保持旧 Pod 继续服务，同时 `rollout status` 卡住或超时。
-
-**深入追问**：排查时先看 `kubectl rollout status`，再看 ReplicaSet、Pod、Events 和日志。恢复时可以修正配置继续发布，也可以 `kubectl rollout undo` 回滚。
-
-### 面试题 4：HPA 为什么需要 metrics-server 和 resources.requests？
-
-**一句话结论**：metrics-server 提供当前资源使用量，CPU request 提供计算利用率的基准。
-
-**展开解释**：HPA 不是直接猜测负载，它从 metrics API 读取 Pod CPU / memory 指标，再和目标值比较。CPU 利用率通常是“当前 CPU 使用量 / CPU request”。如果没有 metrics-server，HPA 没有数据；如果没有 CPU request，HPA 无法计算百分比。
-
-**深入追问**：CPU HPA 不适合所有业务。IO 密集、队列消费、延迟敏感服务可能需要自定义指标、外部指标或 KEDA，同时还要考虑扩容冷启动和下游容量。
-
-### 面试题 5：Job、CronJob、DaemonSet 分别适合什么？
-
-**一句话结论**：Job 适合一次性任务，CronJob 适合定时任务，DaemonSet 适合节点级常驻进程。
-
-**展开解释**：数据库迁移、批量修复、一次性导入更适合 Job；日报、清理过期数据、定期巡检适合 CronJob；日志采集、监控 agent、网络插件适合 DaemonSet。它们的控制目标和 Deployment 不同，不应混用。
-
-**深入追问**：Job 和 CronJob 要关注幂等、重试、超时和历史清理；DaemonSet 要关注权限、节点选择、滚动更新和对宿主机的影响。
-
-### 面试题 6：为什么生产发布不建议只用 `latest` 或复用同一个 tag？
-
-**一句话结论**：可变 tag 会让“这次发布到底运行了什么镜像”变得不可审计、不可复现。
-
-**展开解释**：如果多个构建都推送到同一个 tag，集群中不同节点可能缓存了不同内容，回滚也无法确认回到哪个二进制。更好的做法是使用 Git SHA、构建号或 digest，并把镜像扫描、SBOM、签名和发布记录关联起来。
-
-**深入追问**：Kubernetes 的 `imagePullPolicy`、节点缓存、私有仓库代理都会影响镜像拉取行为。生产发布应使用不可变引用，并由 CI/CD 修改 Deployment 的镜像字段。
-
-## 11. 本章总结
+## 10. 本章总结
 
 本篇把 Todo API 从“已导入 kind 节点的容器镜像”推进到“由 Kubernetes 工作负载控制器管理的服务”。你编写了 Deployment、Service、HPA、Job、CronJob 和 DaemonSet YAML，理解了 Pod 生命周期、ReplicaSet、滚动更新、回滚、探针、资源限制和 HPA 指标链路。
 
@@ -1223,6 +1156,6 @@ kubectl delete -f components.yaml --ignore-not-found
 
 能力价值上，你现在不只是会“apply 一个 YAML”，而是能判断发布是否健康、服务是否接流量、为什么 HPA 不工作、以及失败发布应该如何回滚。
 
-## 12. 下一章衔接
+## 11. 下一章衔接
 
 第 22 篇会在本篇 Deployment 和 ClusterIP Service 的基础上，继续学习 Service 类型、Traefik Ingress、HTTPS 和 Gateway API 对比。到那时，Todo API 不再只靠 `kubectl port-forward` 临时访问，而会通过更接近真实团队的入口流量模型暴露出来。

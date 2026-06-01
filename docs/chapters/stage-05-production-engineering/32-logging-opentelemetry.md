@@ -58,7 +58,7 @@
 
 本篇承接前面几篇产物：
 
-```text
+```text linenums="0"
 第 14 篇：Todo API 已输出 JSON 结构化日志和 request_id
 第 30 篇：Argo CD 管理 todo-dev 环境
 第 31 篇：Prometheus / Grafana 已提供指标、告警和 Grafana 入口
@@ -66,7 +66,7 @@
 
 本篇新增的产物会放在 `observability/` 下：
 
-```text
+```text linenums="0"
 observability/
 ├── alloy/
 │   └── alloy-values.yaml
@@ -105,7 +105,7 @@ flowchart LR
 
 结构化日志是机器可解析的日志。它通常使用 JSON 格式，每个字段都有稳定名字：
 
-```json
+```json linenums="0"
 {
   "time": "2026-05-29T10:15:31Z",
   "level": "INFO",
@@ -127,19 +127,19 @@ flowchart LR
 
 Loki 是 Grafana 生态中的日志系统。它的设计理念是“像 Prometheus 一样给日志打 label”，但不全文索引所有日志内容。查询语言叫 LogQL：
 
-```logql
+```logql linenums="0"
 {namespace="todo-dev", app="todo-platform"} |= "http request"
 ```
 
 解析 JSON 后按字段过滤：
 
-```logql
+```logql linenums="0"
 {namespace="todo-dev", app="todo-platform"} | json | request_id="todo-demo-1748504131"
 ```
 
 统计 5 分钟内错误日志数量：
 
-```logql
+```logql linenums="0"
 sum by (level) (
   count_over_time({namespace="todo-dev", app="todo-platform"} | json | level="ERROR" [5m])
 )
@@ -164,7 +164,7 @@ OpenTelemetry 是一套可观测性标准和 SDK。它不等于某个后端系�
 
 一次请求对应一个 Trace，Trace 里有多个 Span：
 
-```text
+```text linenums="0"
 Trace: 3f9a2d6f0b7b4e7d9c8a6d1f2e3c4b5a
 └── Span: HTTP POST /api/v2/todos
     ├── Span: auth verify
@@ -178,7 +178,7 @@ Trace: 3f9a2d6f0b7b4e7d9c8a6d1f2e3c4b5a
 
 上下文传播让多个服务知道“这是同一次请求”。W3C Trace Context 使用 `traceparent` Header：
 
-```text
+```text linenums="0"
 traceparent: 00-3f9a2d6f0b7b4e7d9c8a6d1f2e3c4b5a-7a1b2c3d4e5f6789-01
 ```
 
@@ -256,13 +256,13 @@ OTLP 是协议，Alloy 是接收和转发代理，Tempo 是存储后端。把这
 
 示例日志：
 
-```json
+```json linenums="0"
 {"msg":"http request","request_id":"todo-demo-1748504131","trace_id":"3f9a2d6f0b7b4e7d9c8a6d1f2e3c4b5a","span_id":"7a1b2c3d4e5f6789","status":200}
 ```
 
 LogQL 查询：
 
-```logql
+```logql linenums="0"
 {namespace="todo-dev", app="todo-platform"} | json | request_id="todo-demo-1748504131"
 ```
 
@@ -318,7 +318,7 @@ Todo API 仍沿用前面章节的默认运行方式：如果 `TODO_DATABASE_DSN`
 
 先确认前置环境：
 
-```bash
+```bash linenums="0"
 pwd
 test -f go.mod
 test -f api/cmd/todo-api/main.go
@@ -332,7 +332,7 @@ kubectl -n todo-dev get deploy,svc,pod
 
 检查本地工具：
 
-```bash
+```bash linenums="0"
 go version
 helm version --short
 kubectl version --client
@@ -347,14 +347,14 @@ Kubernetes 默认允许跨 namespace 出站流量，所以没有配置 deny-all 
 
 创建目录：
 
-```bash
+```bash linenums="0"
 mkdir -p api/internal/observability
 mkdir -p observability/alloy observability/loki observability/tempo observability/otel observability/grafana
 ```
 
 最终目录如下：
 
-```text
+```text linenums="0"
 cloud-native-todo-platform/
 ├── api/
 │   ├── cmd/
@@ -385,7 +385,7 @@ cloud-native-todo-platform/
 
 #### 5.4.1 增加 OpenTelemetry 依赖
 
-```bash
+```bash linenums="0"
 go get go.opentelemetry.io/otel@v1.44.0
 go get go.opentelemetry.io/otel/sdk@v1.44.0
 go get go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc@v1.44.0
@@ -399,7 +399,7 @@ go mod tidy
 
 创建 `api/internal/observability/tracing.go`：
 
-```bash
+```bash linenums="0"
 cat > api/internal/observability/tracing.go <<'GO'
 package observability
 
@@ -474,7 +474,7 @@ GO
 
 更新 `api/internal/handler/gin/middleware.go`，在 import 中增加 OTel trace 包：
 
-```go
+```go linenums="0"
 import (
 	"context"
 	"log/slog"
@@ -493,7 +493,7 @@ import (
 
 在文件中增加一个小函数：
 
-```go
+```go linenums="0"
 func traceFields(ctx context.Context) []any {
 	spanContext := trace.SpanContextFromContext(ctx)
 	if !spanContext.IsValid() {
@@ -508,7 +508,7 @@ func traceFields(ctx context.Context) []any {
 
 把 `AccessLog` 中的 `logger.Info("http request", ...)` 改成先组装字段：
 
-```go
+```go linenums="0"
 attrs := []any{
 	"method", c.Request.Method,
 	"path", c.Request.URL.Path,
@@ -524,7 +524,7 @@ logger.Info("http request", attrs...)
 
 把 `AuditLog` 中的审计日志也改成同样模式：
 
-```go
+```go linenums="0"
 attrs := []any{
 	"user", username,
 	"method", c.Request.Method,
@@ -542,7 +542,7 @@ logger.Info("audit event", attrs...)
 
 更新 `api/internal/handler/gin/handler.go`，在已有 import 中新增 `otelgin`：
 
-```go
+```go linenums="0"
 import (
 	"log/slog"
 	"net/http"
@@ -560,7 +560,7 @@ import (
 
 把基础中间件注册改成：
 
-```go
+```go linenums="0"
 router.Use(
 	RequestID(),
 	otelgin.Middleware("todo-api"),
@@ -577,14 +577,14 @@ router.Use(
 
 本篇先接入 HTTP server Span。为了让 Tempo 瀑布图至少能看到一层业务处理耗时，可以继续在 `createTodo` 这类关键写操作里增加一个手动 Span。先在 `api/internal/handler/gin/handler.go` 的 import 中额外增加：
 
-```go
+```go linenums="0"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 ```
 
 然后找到 `createTodo` 函数，在调用 service 之前创建业务 Span，并把新的 `ctx` 传给下游：
 
-```go
+```go linenums="0"
 ctx, span := otel.Tracer("todo-api").Start(c.Request.Context(), "todo.create")
 span.SetAttributes(attribute.String("todo.operation", "create"))
 defer span.End()
@@ -598,7 +598,7 @@ todo, err := h.service.Create(ctx, input.Title)
 
 更新 `api/cmd/todo-api/main.go` import，新增 observability 包：
 
-```go
+```go linenums="0"
 import (
 	"context"
 	"errors"
@@ -628,7 +628,7 @@ import (
 
 在 `serve` 函数创建 `ctx` 后，初始化 tracing：
 
-```go
+```go linenums="0"
 	serviceName := strings.TrimSpace(os.Getenv("TODO_OTEL_SERVICE_NAME"))
 	if serviceName == "" {
 		serviceName = "todo-api"
@@ -656,7 +656,7 @@ import (
 
 创建 `observability/loki/loki-values.yaml`：
 
-```bash
+```bash linenums="0"
 cat > observability/loki/loki-values.yaml <<'YAML'
 deploymentMode: SingleBinary
 
@@ -711,7 +711,7 @@ YAML
 
 创建 `observability/tempo/tempo-values.yaml`：
 
-```bash
+```bash linenums="0"
 cat > observability/tempo/tempo-values.yaml <<'YAML'
 tempo:
   reportingEnabled: false
@@ -744,7 +744,7 @@ Tempo 单体 chart `1.24.4` 中，`reportingEnabled`、`retention` 和 `receiver
 
 创建 `observability/alloy/alloy-values.yaml`：
 
-```bash
+```bash linenums="0"
 cat > observability/alloy/alloy-values.yaml <<'YAML'
 controller:
   type: daemonset
@@ -874,7 +874,7 @@ Alloy 的日志流水线只把 `level` 提升为 Loki label，`request_id` 和 `
 
 第 31 篇的 Grafana sidecar 已启用 datasource 自动发现。创建 `observability/grafana/todo-observability-datasources.yaml`：
 
-```bash
+```bash linenums="0"
 cat > observability/grafana/todo-observability-datasources.yaml <<'YAML'
 apiVersion: v1
 kind: ConfigMap
@@ -924,7 +924,7 @@ YAML
 
 创建 `observability/grafana/todo-logs-dashboard-configmap.yaml`：
 
-```bash
+```bash linenums="0"
 cat > observability/grafana/todo-logs-dashboard-configmap.yaml <<'YAML'
 apiVersion: v1
 kind: ConfigMap
@@ -996,7 +996,7 @@ Dashboard 只是入口。真正的排障仍建议在 Grafana Explore 中按时�
 
 创建 `observability/otel/todo-otel-env-patch.yaml`，作为修改 dev overlay 时的参考片段：
 
-```bash
+```bash linenums="0"
 cat > observability/otel/todo-otel-env-patch.yaml <<'YAML'
 # Add these literals to deployments/gitops/envs/dev/kustomization.yaml
 configMapGenerator:
@@ -1010,7 +1010,7 @@ YAML
 
 随后手工打开 `deployments/gitops/envs/dev/kustomization.yaml`，在已有 `configMapGenerator` 的 `literals` 中追加：
 
-```yaml
+```yaml linenums="0"
       - TODO_OTEL_SERVICE_NAME=todo-api
       - TODO_OTEL_EXPORTER_OTLP_ENDPOINT=alloy.observability.svc.cluster.local:4317
 ```
@@ -1021,14 +1021,14 @@ YAML
 
 #### 5.5.1 本地验证 OpenTelemetry 代码
 
-```bash
+```bash linenums="0"
 go test ./api/internal/observability ./api/internal/handler/gin ./api/cmd/todo-api
 go build -o bin/todo-api ./api/cmd/todo-api
 ```
 
 本地不设置 `TODO_OTEL_EXPORTER_OTLP_ENDPOINT` 时，应用不会导出 Trace，但应能正常启动：
 
-```bash
+```bash linenums="0"
 HASH=$(./bin/todo-api hash-password "change-me-123")
 TODO_JWT_SECRET=0123456789abcdef0123456789abcdef \
 TODO_AUTH_USERS="admin=${HASH}" \
@@ -1037,7 +1037,7 @@ TODO_AUTH_USERS="admin=${HASH}" \
 
 另开终端请求健康检查：
 
-```bash
+```bash linenums="0"
 curl -i -H "X-Request-ID: local-otel-check" http://127.0.0.1:18080/healthz
 ```
 
@@ -1047,14 +1047,14 @@ curl -i -H "X-Request-ID: local-otel-check" http://127.0.0.1:18080/healthz
 
 添加 Grafana Helm 仓库：
 
-```bash
+```bash linenums="0"
 helm repo add grafana https://grafana.github.io/helm-charts
 helm repo update grafana
 ```
 
 先在本地渲染一次 Helm 模板，提前发现 values 键名、River 语法或 Service 名称变化：
 
-```bash
+```bash linenums="0"
 helm template loki grafana/loki \
   --version 7.0.0 \
   --namespace observability \
@@ -1073,7 +1073,7 @@ helm template alloy grafana/alloy \
 
 安装 Loki：
 
-```bash
+```bash linenums="0"
 helm upgrade --install loki grafana/loki \
   --version 7.0.0 \
   --namespace observability \
@@ -1086,7 +1086,7 @@ helm upgrade --install loki grafana/loki \
 
 安装 Tempo：
 
-```bash
+```bash linenums="0"
 helm upgrade --install tempo grafana/tempo \
   --version 1.24.4 \
   --namespace observability \
@@ -1098,7 +1098,7 @@ helm upgrade --install tempo grafana/tempo \
 
 安装 Alloy：
 
-```bash
+```bash linenums="0"
 helm upgrade --install alloy grafana/alloy \
   --version 1.8.2 \
   --namespace observability \
@@ -1110,7 +1110,7 @@ helm upgrade --install alloy grafana/alloy \
 
 确认工作负载：
 
-```bash
+```bash linenums="0"
 kubectl -n observability get pods
 kubectl -n observability get svc
 kubectl -n observability rollout status daemonset/alloy --timeout=300s
@@ -1122,7 +1122,7 @@ kubectl -n observability rollout status deployment/tempo --timeout=300s
 
 确认 Loki gateway Service 名称，后续 Alloy 和 Grafana 数据源会使用这个地址：
 
-```bash
+```bash linenums="0"
 kubectl -n observability get svc loki-gateway
 kubectl -n observability get svc -l app.kubernetes.io/instance=loki
 ```
@@ -1131,7 +1131,7 @@ kubectl -n observability get svc -l app.kubernetes.io/instance=loki
 
 #### 5.5.3 应用 Grafana 数据源和 Dashboard
 
-```bash
+```bash linenums="0"
 kubectl apply --server-side --dry-run=server -f observability/grafana/todo-observability-datasources.yaml
 kubectl apply --server-side --dry-run=server -f observability/grafana/todo-logs-dashboard-configmap.yaml
 kubectl apply -f observability/grafana/todo-observability-datasources.yaml
@@ -1140,14 +1140,14 @@ kubectl apply -f observability/grafana/todo-logs-dashboard-configmap.yaml
 
 等待 Grafana sidecar 重新加载：
 
-```bash
+```bash linenums="0"
 kubectl -n monitoring logs deployment/monitoring-grafana -c grafana-sc-datasources --tail=50
 kubectl -n monitoring logs deployment/monitoring-grafana -c grafana-sc-dashboard --tail=50
 ```
 
 同时确认第 31 篇安装的 Grafana 镜像版本。如果 dashboard import 提示 `schemaVersion` 不兼容，可以在当前 Grafana UI 中重新导出 dashboard，再把导出的 `schemaVersion` 回写到 ConfigMap。
 
-```bash
+```bash linenums="0"
 kubectl -n monitoring get deployment monitoring-grafana -o jsonpath='{.spec.template.spec.containers[0].image}{"\n"}'
 ```
 
@@ -1155,14 +1155,14 @@ kubectl -n monitoring get deployment monitoring-grafana -o jsonpath='{.spec.temp
 
 构建新镜像并加载到 kind：
 
-```bash
+```bash linenums="0"
 docker build -t todo-api:v0.1.2-observability -f api/Dockerfile .
 kind load docker-image todo-api:v0.1.2-observability --name todo-gitops
 ```
 
 更新 `deployments/gitops/envs/dev/kustomization.yaml`：
 
-```yaml
+```yaml linenums="0"
 images:
   - name: todo-api
     newName: todo-api
@@ -1171,14 +1171,14 @@ images:
 
 同时确认 `configMapGenerator` 的 `literals` 中包含：
 
-```yaml
+```yaml linenums="0"
       - TODO_OTEL_SERVICE_NAME=todo-api
       - TODO_OTEL_EXPORTER_OTLP_ENDPOINT=alloy.observability.svc.cluster.local:4317
 ```
 
 提交并推送变更，让 Argo CD 同步：
 
-```bash
+```bash linenums="0"
 git add go.mod go.sum api/cmd/todo-api/main.go api/internal/handler/gin api/internal/observability observability/ deployments/gitops/envs/dev/kustomization.yaml
 git commit -m "接入 Todo API 日志与 OpenTelemetry 链路追踪"
 CURRENT_BRANCH=$(git branch --show-current)
@@ -1194,13 +1194,13 @@ kubectl -n todo-dev rollout status deployment/todo-platform --timeout=180s
 
 打开 Todo API port-forward：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-dev port-forward service/todo-platform 18080:http
 ```
 
 另开终端生成请求：
 
-```bash
+```bash linenums="0"
 REQ_ID="todo-otel-$(date +%s)"
 curl -s -H "X-Request-ID: ${REQ_ID}" http://127.0.0.1:18080/healthz
 echo "${REQ_ID}"
@@ -1208,7 +1208,7 @@ echo "${REQ_ID}"
 
 生成一次带认证的业务请求：
 
-```bash
+```bash linenums="0"
 TOKEN=$(curl -s \
   -H 'Content-Type: application/json' \
   -d '{"username":"admin","password":"change-me-123"}' \
@@ -1229,13 +1229,13 @@ echo "${REQ_ID}"
 
 打开 Loki 端口：
 
-```bash
+```bash linenums="0"
 kubectl -n observability port-forward service/loki-gateway 3100:80
 ```
 
 查询最近 15 分钟日志。这里使用 `/query_range`，因为我们要查一段时间内产生的日志行，而不是只查某一个瞬时时刻：
 
-```bash
+```bash linenums="0"
 curl -G 'http://127.0.0.1:3100/loki/api/v1/query_range' \
   --data-urlencode 'query={namespace="todo-dev", app="todo-platform"} | json | line_format "{{.request_id}} {{.trace_id}} {{.msg}}"' \
   --data-urlencode 'limit=5' \
@@ -1245,7 +1245,7 @@ curl -G 'http://127.0.0.1:3100/loki/api/v1/query_range' \
 
 按 request_id 查询：
 
-```bash
+```bash linenums="0"
 curl -G 'http://127.0.0.1:3100/loki/api/v1/query_range' \
   --data-urlencode "query={namespace=\"todo-dev\", app=\"todo-platform\"} | json | request_id=\"${REQ_ID}\"" \
   --data-urlencode 'limit=5' \
@@ -1255,7 +1255,7 @@ curl -G 'http://127.0.0.1:3100/loki/api/v1/query_range' \
 
 如果你安装了 `jq`，可以从日志正文提取 Trace ID：
 
-```bash
+```bash linenums="0"
 TRACE_ID=$(curl -sG 'http://127.0.0.1:3100/loki/api/v1/query_range' \
   --data-urlencode "query={namespace=\"todo-dev\", app=\"todo-platform\"} | json | request_id=\"${REQ_ID}\"" \
   --data-urlencode 'limit=1' \
@@ -1269,7 +1269,7 @@ echo "${TRACE_ID}"
 
 实际排障中更推荐在 Grafana Explore 里查询：
 
-```logql
+```logql linenums="0"
 {namespace="todo-dev", app="todo-platform"} | json | request_id="todo-create-..."
 ```
 
@@ -1277,13 +1277,13 @@ echo "${TRACE_ID}"
 
 打开 Tempo 端口：
 
-```bash
+```bash linenums="0"
 kubectl -n observability port-forward service/tempo 3200:3100
 ```
 
 如果已经拿到 Trace ID：
 
-```bash
+```bash linenums="0"
 test -n "${TRACE_ID}"
 curl -s "http://127.0.0.1:3200/api/traces/${TRACE_ID}" \
   | jq -r '.batches[].scopeSpans[].spans[].name'
@@ -1295,19 +1295,19 @@ curl -s "http://127.0.0.1:3200/api/traces/${TRACE_ID}" \
 
 打开 Grafana：
 
-```bash
+```bash linenums="0"
 kubectl -n monitoring port-forward service/monitoring-grafana 3000:80
 ```
 
 访问：
 
-```text
+```text linenums="0"
 http://127.0.0.1:3000
 ```
 
 在 `Explore -> Loki` 中执行：
 
-```logql
+```logql linenums="0"
 {namespace="todo-dev", app="todo-platform"} | json | request_id="todo-create-..."
 ```
 
@@ -1317,7 +1317,7 @@ http://127.0.0.1:3000
 
 Go 测试输出类似：
 
-```text
+```text linenums="0"
 ok  	cloud-native-todo-platform/api/internal/observability	0.10s
 ok  	cloud-native-todo-platform/api/internal/handler/gin	0.32s
 ok  	cloud-native-todo-platform/api/cmd/todo-api	0.18s
@@ -1325,7 +1325,7 @@ ok  	cloud-native-todo-platform/api/cmd/todo-api	0.18s
 
 observability namespace 中应看到：
 
-```text
+```text linenums="0"
 NAME                         READY   STATUS    RESTARTS   AGE
 pod/alloy-xxxxx              2/2     Running   0          2m
 pod/loki-0                   2/2     Running   0          3m
@@ -1334,13 +1334,13 @@ pod/tempo-xxxxxxxxxx-xxxxx   1/1     Running   0          2m
 
 Todo API 日志中应出现：
 
-```json
+```json linenums="0"
 {"level":"INFO","msg":"http request","method":"POST","path":"/api/v2/todos","status":201,"request_id":"todo-create-1748504131","trace_id":"3f9a2d6f0b7b4e7d9c8a6d1f2e3c4b5a","span_id":"7a1b2c3d4e5f6789"}
 ```
 
 Loki 查询应返回日志结果：
 
-```json
+```json linenums="0"
 {
   "status": "success",
   "data": {
@@ -1363,7 +1363,7 @@ Loki 查询应返回日志结果：
 
 Tempo 查询应返回 Span 名称，例如：
 
-```text
+```text linenums="0"
 GET /healthz
 POST /api/v2/todos
 todo.create
@@ -1371,7 +1371,7 @@ todo.create
 
 Grafana 中应能看到：
 
-```text
+```text linenums="0"
 Explore -> Loki: 查询 request_id 能看到日志
 日志详情: 包含 trace_id
 点击 TraceID: 跳转到 Tempo Trace 瀑布图
@@ -1382,7 +1382,7 @@ Dashboard: Todo Logs and Traces 有日志量和日志列表
 
 **第一层：应用日志含关联字段**
 
-```bash
+```bash linenums="0"
 kubectl -n todo-dev logs deployment/todo-platform --tail=50 | grep -E 'request_id|trace_id'
 ```
 
@@ -1390,7 +1390,7 @@ kubectl -n todo-dev logs deployment/todo-platform --tail=50 | grep -E 'request_i
 
 **第二层：Alloy 配置加载成功**
 
-```bash
+```bash linenums="0"
 kubectl -n observability logs daemonset/alloy --tail=80
 kubectl -n observability get svc alloy -o jsonpath='{.spec.ports[*].name}{"\n"}'
 ```
@@ -1399,7 +1399,7 @@ kubectl -n observability get svc alloy -o jsonpath='{.spec.ports[*].name}{"\n"}'
 
 **第三层：Loki 有日志**
 
-```bash
+```bash linenums="0"
 kubectl -n observability port-forward service/loki-gateway 3100:80
 curl -G 'http://127.0.0.1:3100/loki/api/v1/query_range' \
   --data-urlencode 'query={namespace="todo-dev", app="todo-platform"}' \
@@ -1412,7 +1412,7 @@ curl -G 'http://127.0.0.1:3100/loki/api/v1/query_range' \
 
 **第四层：Tempo 有 Trace**
 
-```bash
+```bash linenums="0"
 kubectl -n observability port-forward service/tempo 3200:3100
 curl -s "http://127.0.0.1:3200/api/traces/${TRACE_ID}" | head
 ```
@@ -1421,7 +1421,7 @@ curl -s "http://127.0.0.1:3200/api/traces/${TRACE_ID}" | head
 
 **第五层：Grafana 数据源存在**
 
-```bash
+```bash linenums="0"
 kubectl -n monitoring get configmap todo-observability-datasources -o jsonpath='{.metadata.labels.grafana_datasource}{"\n"}'
 kubectl -n monitoring logs deployment/monitoring-grafana -c grafana-sc-datasources --tail=80
 ```
@@ -1430,7 +1430,7 @@ kubectl -n monitoring logs deployment/monitoring-grafana -c grafana-sc-datasourc
 
 **第六层：Grafana Dashboard 导入**
 
-```bash
+```bash linenums="0"
 kubectl -n monitoring get configmap todo-logs-dashboard -o jsonpath='{.metadata.labels.grafana_dashboard}{"\n"}'
 kubectl -n monitoring logs deployment/monitoring-grafana -c grafana-sc-dashboard --tail=80
 ```
@@ -1441,7 +1441,7 @@ kubectl -n monitoring logs deployment/monitoring-grafana -c grafana-sc-dashboard
 
 在 Grafana Explore 中执行：
 
-```logql
+```logql linenums="0"
 {namespace="todo-dev", app="todo-platform"} | json | request_id="todo-create-..."
 ```
 
@@ -1451,14 +1451,14 @@ kubectl -n monitoring logs deployment/monitoring-grafana -c grafana-sc-dashboard
 
 只删除本篇 Grafana 配置：
 
-```bash
+```bash linenums="0"
 kubectl delete -f observability/grafana/todo-logs-dashboard-configmap.yaml --ignore-not-found
 kubectl delete -f observability/grafana/todo-observability-datasources.yaml --ignore-not-found
 ```
 
 卸载 Alloy、Tempo、Loki：
 
-```bash
+```bash linenums="0"
 helm uninstall alloy -n observability
 helm uninstall tempo -n observability
 helm uninstall loki -n observability
@@ -1469,7 +1469,7 @@ kubectl delete namespace observability --ignore-not-found
 
 如需撤销 Todo API 代码改动，使用 Git revert：
 
-```bash
+```bash linenums="0"
 git log --oneline --max-count=5
 git revert <本篇提交 SHA>
 git push
@@ -1482,14 +1482,14 @@ argocd app sync todo-platform-dev --timeout 300
 
 - **现象**：
 
-  ```json
+  ```json linenums="0"
   {"status":"success","data":{"resultType":"streams","result":[]}}
   ```
 
 - **原因**：Alloy 没有发现 `todo-dev` Pod；River 配置语法错误导致 Alloy Pod `CrashLoopBackOff`；relabel 规则没有匹配 label；Loki gateway 地址错误；Todo API 没有产生日志。
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   kubectl -n observability logs daemonset/alloy --tail=100
   kubectl -n observability logs daemonset/alloy --tail=100 | grep -i -E 'error|river|parse'
   kubectl -n observability get pod -l app.kubernetes.io/name=alloy
@@ -1507,14 +1507,14 @@ argocd app sync todo-platform-dev --timeout 300
 
 - **现象**：
 
-  ```json
+  ```json linenums="0"
   {"msg":"http request","request_id":"todo-otel-123","status":200}
   ```
 
 - **原因**：`otelgin.Middleware` 没有注册；中间件顺序不对；`AccessLog` 没有从 `context.Context` 读取 SpanContext；应用仍运行旧镜像。
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   grep -n 'otelgin.Middleware' api/internal/handler/gin/handler.go
   grep -n 'traceFields' api/internal/handler/gin/middleware.go
   kubectl -n todo-dev get deployment todo-platform -o jsonpath='{.spec.template.spec.containers[0].image}{"\n"}'
@@ -1528,7 +1528,7 @@ argocd app sync todo-platform-dev --timeout 300
 
 - **现象**：
 
-  ```text
+  ```text linenums="0"
   echo "${TRACE_ID}"
 
   trace not found
@@ -1537,7 +1537,7 @@ argocd app sync todo-platform-dev --timeout 300
 - **原因**：从 Loki `stream` label 中读取 `trace_id`，但 `trace_id` 实际留在 JSON 日志正文；`TODO_OTEL_EXPORTER_OTLP_ENDPOINT` 没有注入；Alloy Service 没有暴露 `4317`；Alloy OTLP receiver 或 Tempo exporter 配置错误；Tempo 未 Ready。
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   curl -sG 'http://127.0.0.1:3100/loki/api/v1/query_range' \
     --data-urlencode "query={namespace=\"todo-dev\", app=\"todo-platform\"} | json | request_id=\"${REQ_ID}\"" \
     --data-urlencode 'limit=1' \
@@ -1560,7 +1560,7 @@ argocd app sync todo-platform-dev --timeout 300
 - **原因**：Loki datasource 的 derived field 没有被加载；正则没有匹配 JSON 日志；`datasourceUid` 不是 `tempo`；Grafana sidecar 没有识别 datasource ConfigMap。
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   kubectl -n monitoring get configmap todo-observability-datasources -o yaml
   kubectl -n monitoring logs deployment/monitoring-grafana -c grafana-sc-datasources --tail=80
   ```
@@ -1576,7 +1576,7 @@ argocd app sync todo-platform-dev --timeout 300
 - **原因**：每个请求的 `request_id` 和 `trace_id` 都不同，作为 label 会生成海量日志流。
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   grep -n 'stage.labels' observability/alloy/alloy-values.yaml -A10
   ```
 
@@ -1643,70 +1643,13 @@ flowchart TD
 | 排障能力 | 能定位日志为空、Trace 缺失、derived field 失效、高基数 label |
 | 生产意识 | 能说明日志脱敏、采样、保留、成本和访问控制风险 |
 
-## 9. 本章练习题
+## 9. 练习题与面试题
 
-**基础题**
+本章练习题和面试题已拆分到独立页面，完成正文学习后再进入题库练习与复盘。
 
-1. `request_id` 和 `trace_id` 有什么区别？为什么生产环境中两者可以同时存在？
-2. 为什么 Loki 不建议把 `request_id` 做成 label？
-3. OpenTelemetry SDK、OTLP、Tempo 三者分别负责什么？
-4. Promtail 和 Grafana Alloy 的关系是什么？为什么本篇实验不再使用 Promtail？
-5. `traceparent` Header 中包含哪些关键信息？
+[查看本章练习题与面试题](../../questions/stage-05-production-engineering/32-logging-opentelemetry.md)
 
-**实操题**
-
-1. 在 Grafana Explore 中按某个 `request_id` 查询 Todo API 日志，并跳转到 Tempo Trace。验收标准：能看到对应 HTTP Span。
-2. 为 `readyz` 或登录接口增加一个手动 Span。验收标准：Tempo 中能看到新增 Span 名称，并且它挂在对应 HTTP server Span 下面。
-3. 把 LogQL 面板改成只统计 `level="ERROR"` 的日志数。验收标准：Dashboard 中出现错误日志计数曲线。
-
-**思考题**
-
-1. 如果一次用户投诉只提供了时间窗口和用户名，没有 `request_id`，你会如何缩小日志和 Trace 搜索范围？
-2. 如果业务方希望所有请求 100% Trace 采样并保留 90 天，你会如何评估成本和替代方案？
-
-## 10. 本章面试题
-
-### 面试题 1：日志、指标和 Trace 分别解决什么问题？
-
-**一句话结论**：指标看趋势和告警，日志看事件上下文，Trace 看一次请求的跨组件路径和耗时分布。
-
-**展开解释**：指标适合回答“错误率是否升高、P95 是否变慢、资源是否打满”；日志适合回答“某次请求当时发生了什么、错误信息是什么、用户和请求 ID 是什么”；Trace 适合回答“请求经过哪些服务或函数、每一步耗时多少、慢点在哪”。生产排障通常先看指标定位时间窗口，再用日志和 Trace 找根因。
-
-**深入追问**：如果只能先接一种数据，怎么选？一般先接指标和关键日志，再接 Trace；但微服务链路复杂时，Trace 的优先级会提高。
-
-### 面试题 2：为什么 Loki 不像 Elasticsearch 那样全文索引所有日志？
-
-**一句话结论**：Loki 主要索引 label，通过更低索引成本换取与 Prometheus/Grafana 更自然的云原生日志查询模式。
-
-**展开解释**：Elasticsearch 适合复杂全文检索和字段分析，但索引成本高。Loki 更强调用低基数 label 先筛选日志流，再通过 pipeline 解析内容。这样更适合 SRE 通过 namespace、app、pod、level、时间窗口查问题。代价是 label 设计很关键，复杂全文分析能力不如 ELK。
-
-**深入追问**：什么时候仍然选择 ELK？需要强全文检索、审计分析、复杂聚合、多业务数据分析时，ELK/EFK 仍然很有价值。
-
-### 面试题 3：OpenTelemetry 中 Trace、Span 和 Context Propagation 是什么？
-
-**一句话结论**：Trace 表示一次完整请求链路，Span 表示链路中的一个操作，Context Propagation 负责把 Trace 上下文传到下游。
-
-**展开解释**：一个 Trace 有一个 Trace ID，包含多个 Span。每个 Span 有 Span ID、父 Span、开始结束时间、属性和状态。HTTP 请求通过 `traceparent` Header 传播上下文，下游服务读取后创建子 Span。没有上下文传播，各服务即使都生成 Trace，也无法拼成一条完整链路。
-
-**深入追问**：消息队列场景怎么传播？需要把 trace context 注入消息 Header，消费者再提取上下文创建消费 Span。
-
-### 面试题 4：如何把日志和 Trace 关联起来？
-
-**一句话结论**：应用在日志中写入 `trace_id`，Grafana Loki datasource 用 derived field 把 `trace_id` 链接到 Tempo。
-
-**展开解释**：OpenTelemetry 中间件把当前 Span 放进请求 context，日志中间件从 context 读取 SpanContext，把 `trace_id` 和 `span_id` 写入 JSON 日志。Loki 采集日志后，Grafana 用正则从日志中提取 Trace ID，并根据 Tempo datasource uid 跳转到 Trace。`request_id` 适合从用户反馈定位日志，`trace_id` 适合从日志跳到 Trace。
-
-**深入追问**：为什么不只用 request_id？Trace 后端通常按 Trace ID 查询；request_id 是团队自定义字段，不一定符合 Trace 系统的索引和传播标准。
-
-### 面试题 5：Trace 采样策略怎么设计？
-
-**一句话结论**：采样策略要平衡排障价值和成本，通常不会对高流量服务长期 100% 采样。
-
-**展开解释**：本地实验 100% 采样方便学习，但生产高流量服务会产生大量 Span。常见策略包括固定比例采样、父级采样、错误请求全采样、慢请求尾采样、按租户或路由差异化采样。尾采样通常由 OpenTelemetry Collector 的 `tail_sampling` processor 实现，它会缓存最近一段时间的 Span，再根据错误、延迟或属性决定保留哪些 Trace；排障价值更高，但对 Collector 内存和吞吐要求也更高。
-
-**深入追问**：采样后会不会影响指标？Trace 采样不应该替代指标。请求量、错误率和延迟 SLO 仍应由指标系统完整统计。
-
-## 11. 本章总结
+## 10. 本章总结
 
 本篇把 Todo Platform 的可观测性从指标扩展到日志和 Trace。知识上，你理解了结构化日志、Loki、LogQL、Promtail 与 Alloy 的演进关系、OpenTelemetry Trace/Span/Context Propagation、Tempo 与 Jaeger 的定位，以及 ELK/EFK 与 Loki/Tempo 的取舍。
 
@@ -1714,7 +1657,7 @@ flowchart TD
 
 能力价值上，这一章让你具备了中高级云原生排障的关键能力：当指标报警出现时，你不再只看 Pod 状态或猜测代码问题，而是能通过日志和 Trace 还原一次请求的上下文、路径和耗时分布。
 
-## 12. 下一章衔接
+## 11. 下一章衔接
 
 第 31 篇提供指标，第 32 篇提供日志和 Trace。下一篇第 33 篇会把这些工具放到真实故障场景中：Pod `Pending`、`CrashLoopBackOff`、`ImagePullBackOff`、OOMKilled、Service 不通、DNS 异常、PVC 挂载失败。
 

@@ -20,7 +20,7 @@
 
 建议在 `cloud-native-todo-platform` 仓库中形成以下结构：
 
-```text
+```text linenums="0"
 cloud-native-todo-platform/
 ├── README.md
 ├── Makefile                       # 建议：统一验收入口
@@ -71,7 +71,7 @@ cloud-native-todo-platform/
 
 创建 `docs/stage-01-acceptance.md`：
 
-````bash
+````bash linenums="0"
 mkdir -p docs
 
 cat > docs/stage-01-acceptance.md <<'EOF'
@@ -153,7 +153,7 @@ EOF
 
 创建 `scripts/check-foundation.sh`：
 
-```bash
+```bash linenums="0"
 mkdir -p scripts
 
 cat > scripts/check-foundation.sh <<'EOF'
@@ -262,7 +262,7 @@ chmod +x scripts/check-foundation.sh
 
 运行：
 
-```bash
+```bash linenums="0"
 ./scripts/check-foundation.sh
 ```
 
@@ -272,7 +272,7 @@ chmod +x scripts/check-foundation.sh
 
 如果仓库已有 `Makefile`，追加以下目标；如果还没有，可以先创建一个最小版本：
 
-```makefile
+```makefile linenums="0"
 .PHONY: check-foundation
 
 check-foundation:
@@ -281,7 +281,7 @@ check-foundation:
 
 运行：
 
-```bash
+```bash linenums="0"
 make check-foundation
 ```
 
@@ -291,7 +291,7 @@ make check-foundation
 
 在项目 `README.md` 中增加阶段一成果说明：
 
-````markdown
+````markdown linenums="0"
 ## Stage 01 Foundation
 
 This repository has completed the foundation stage:
@@ -332,7 +332,7 @@ make check-foundation
 
 验收路径建议如下：
 
-```bash
+```bash linenums="0"
 git status --short --branch
 go env GOPROXY
 grep -n '^GO_PROXY_REQUIRED=https://goproxy.cn,direct$' scripts/versions.conf

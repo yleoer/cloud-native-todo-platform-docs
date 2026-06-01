@@ -31,7 +31,7 @@
 
 出版前还应单独复核以下高风险兼容点：
 
-```bash
+```bash linenums="0"
 # GitHub Actions 版本号必须真实存在。
 git ls-remote --tags https://github.com/actions/checkout.git refs/tags/v6
 git ls-remote --tags https://github.com/actions/setup-go.git refs/tags/v6
@@ -66,14 +66,14 @@ kubectl kustomize config/default >/tmp/todo-operator-rendered.yaml
 
 如果你从阶段五一路做到阶段六，最容易出错的是“以为还在同一条环境线”。建议在第 39 篇开始前执行：
 
-```bash
+```bash linenums="0"
 kubectl version
 kubectl api-resources | grep -i mutatingadmissionpolicy || true
 ```
 
 如果服务端不是 v1.36.x，或者没有 `MutatingAdmissionPolicy`，则跳过该可选实验，或重建课程锁定集群：
 
-```bash
+```bash linenums="0"
 kind delete cluster --name todo-operator-e2e
 kind create cluster --name todo-operator-e2e --image registry.cn-guangzhou.aliyuncs.com/yleoer/node:v1.36.0
 ```
@@ -84,7 +84,7 @@ kind create cluster --name todo-operator-e2e --image registry.cn-guangzhou.aliyu
 
 出版前建议统一收集以下命令输出：
 
-```bash
+```bash linenums="0"
 go version
 docker version --format '{{.Server.Version}}'
 kubectl version
@@ -97,7 +97,7 @@ go list -m k8s.io/client-go
 
 在 `operator/kubebuilder/` 中验证生成链路：
 
-```bash
+```bash linenums="0"
 make generate
 make manifests
 git diff -- api config
@@ -110,7 +110,7 @@ go test ./...
 
 envtest 需要下载本地 API server 和 etcd 二进制，首次运行可能较慢。弱网或企业内网环境建议：
 
-```bash
+```bash linenums="0"
 make envtest
 go test ./test/envtest -v
 ```
@@ -128,7 +128,7 @@ CI 中建议缓存 Go module、`bin/` 工具目录和 envtest 二进制，避免
 
 Webhook 相关问题通常不是 Reconciler 逻辑错误，而是证书、Service、Endpoint、CA 注入或 namespace selector 问题。出版前至少验证：
 
-```bash
+```bash linenums="0"
 kubectl -n cert-manager get pod
 kubectl -n todo-operator-system get certificate,issuer,secret
 kubectl -n todo-operator-system get svc,endpointslice
@@ -149,7 +149,7 @@ Helm 的 `crds/` 目录适合首次安装 CRD，但不会像普通模板一样�
 
 出版前验证：
 
-```bash
+```bash linenums="0"
 helm lint operator/helm/todo-operator
 helm template todo-operator operator/helm/todo-operator --include-crds >/tmp/todo-operator.yaml
 kubectl apply --dry-run=server -f /tmp/todo-operator.yaml
@@ -168,7 +168,7 @@ CRD 变更应单独检查：
 
 以下命令只适合本地 kind 或一次性 dev 集群：
 
-```bash
+```bash linenums="0"
 kubectl delete crd todoapps.platform.todo.example.com --ignore-not-found
 kubectl delete namespace todo-operator-system --ignore-not-found
 kind delete cluster --name todo-operator-e2e
@@ -186,7 +186,7 @@ rm -rf operator/crds operator/samples
 
 ## 8. 出版版记录模板
 
-```text
+```text linenums="0"
 验收日期：
 操作系统：
 Go 版本：

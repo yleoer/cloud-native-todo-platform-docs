@@ -38,7 +38,7 @@
 
 本篇结束时，你至少应该能独立完成下面这组命令：
 
-```bash
+```bash linenums="0"
 ./scripts/dev.sh
 ./scripts/check.sh
 curl -fsS http://127.0.0.1:18080/healthz
@@ -105,7 +105,7 @@ Shell 是用户和操作系统之间的命令解释器。Bash 是 Linux 世界�
 
 脚本第一行通常是 shebang：
 
-```bash
+```bash linenums="0"
 #!/usr/bin/env bash
 ```
 
@@ -115,20 +115,20 @@ Shell 是用户和操作系统之间的命令解释器。Bash 是 Linux 世界�
 
 Shell 变量定义时，等号两侧不能有空格：
 
-```bash
+```bash linenums="0"
 name="todo"
 printf '%s\n' "$name"
 ```
 
 环境变量可以传给子进程。下面命令只对本次脚本执行生效：
 
-```bash
+```bash linenums="0"
 TODO_PORT=18081 ./scripts/dev.sh
 ```
 
 脚本里常用默认值写法：
 
-```bash
+```bash linenums="0"
 PORT="${TODO_PORT:-18080}"
 ```
 
@@ -152,7 +152,7 @@ PORT="${TODO_PORT:-18080}"
 
 处理多个参数时，`case` 比一串 `if` 更清晰：
 
-```bash
+```bash linenums="0"
 case "$1" in
   --logs) clean_logs=true ;;
   --all) clean_all=true ;;
@@ -167,7 +167,7 @@ esac
 
 Shell 中，退出码决定命令是否成功：
 
-```bash
+```bash linenums="0"
 true
 echo $?
 0
@@ -200,7 +200,7 @@ CI/CD 判断脚本是否通过，主要看退出码。如果 `check.sh` 发现�
 
 循环常用于批量检查命令或文件：
 
-```bash
+```bash linenums="0"
 for cmd in bash git go curl; do
   command -v "$cmd" >/dev/null || echo "missing: $cmd"
 done
@@ -208,7 +208,7 @@ done
 
 函数用于把重复逻辑命名：
 
-```bash
+```bash linenums="0"
 log() {
   printf '[check] %s\n' "$*"
 }
@@ -220,13 +220,13 @@ log() {
 
 管道把前一个命令的输出交给后一个命令：
 
-```bash
+```bash linenums="0"
 tail -n 50 .todo-platform/logs/todo-dev.log | grep -i error
 ```
 
 日志排查中常见组合如下：
 
-```bash
+```bash linenums="0"
 grep -R "address already in use" .todo-platform/logs
 find .todo-platform -type f -maxdepth 3 -print
 awk '{print $1}' access.log | sort | uniq -c | sort -nr
@@ -254,7 +254,7 @@ flowchart LR
 
 生产脚本常见开头如下：
 
-```bash
+```bash linenums="0"
 set -Eeuo pipefail
 ```
 
@@ -267,7 +267,7 @@ set -Eeuo pipefail
 
 没有 `pipefail` 时，下面这种命令可能看起来成功：
 
-```bash
+```bash linenums="0"
 grep "ERROR" missing.log | wc -l
 ```
 
@@ -275,7 +275,7 @@ grep "ERROR" missing.log | wc -l
 
 但严格模式不是万能的。允许失败的命令要显式处理：
 
-```bash
+```bash linenums="0"
 if ! curl -fsS "$url" >/dev/null; then
   echo "health check failed" >&2
   exit 1
@@ -286,7 +286,7 @@ fi
 
 `.env` 可以让开发者不用每次输入端口和开关：
 
-```text
+```text linenums="0"
 TODO_HOST=127.0.0.1
 TODO_PORT=18080
 TODO_REQUIRE_SHELLCHECK=false
@@ -305,7 +305,7 @@ TODO_REQUIRE_SHELLCHECK=false
 
 幂等性是指同一操作执行多次，结果仍然可预期。
 
-```bash
+```bash linenums="0"
 mkdir -p .todo-platform/logs
 mkdir -p .todo-platform/logs
 ```
@@ -314,7 +314,7 @@ mkdir -p .todo-platform/logs
 
 清理脚本更需要防御式设计。下面这种命令很危险：
 
-```bash
+```bash linenums="0"
 rm -rf "$target"
 ```
 
@@ -365,7 +365,7 @@ Shell 不会替代 Docker、Kubernetes、Helm 或 Operator，但它会出现在�
 
 确认工具版本：
 
-```bash
+```bash linenums="0"
 bash --version | head -n 1
 git --version
 go version
@@ -374,14 +374,14 @@ curl --version | head -n 1
 
 如果要在本地启用 ShellCheck：
 
-```bash
+```bash linenums="0"
 sudo apt update
 sudo apt install -y shellcheck
 ```
 
 进入项目仓库：
 
-```bash
+```bash linenums="0"
 cd ~/workspace/cloud-native-todo-platform
 ```
 
@@ -389,7 +389,7 @@ cd ~/workspace/cloud-native-todo-platform
 
 实验完成后的结构如下：
 
-```text
+```text linenums="0"
 cloud-native-todo-platform/
 ├── .env.example
 ├── .gitignore
@@ -1059,7 +1059,7 @@ jobs:
 
 从项目根目录开始：
 
-```bash
+```bash linenums="0"
 pwd
 git status --short --branch
 mkdir -p scripts .github/workflows
@@ -1067,7 +1067,7 @@ mkdir -p scripts .github/workflows
 
 创建 `.env.example`，并确保本地运行时目录和 `.env` 不进入 Git：
 
-```bash
+```bash linenums="0"
 printf 'TODO_HOST=127.0.0.1\nTODO_PORT=18080\nTODO_REQUIRE_SHELLCHECK=false\n' > .env.example
 touch .gitignore
 grep -qxF '.todo-platform/' .gitignore || printf '%s\n' '.todo-platform/' >> .gitignore
@@ -1078,14 +1078,14 @@ grep -qxF '.env' .gitignore || printf '%s\n' '.env' >> .gitignore
 
 授予执行权限：
 
-```bash
+```bash linenums="0"
 chmod +x scripts/dev.sh scripts/check.sh scripts/clean.sh
 ls -l scripts/*.sh
 ```
 
 先检查语法：
 
-```bash
+```bash linenums="0"
 bash -n scripts/dev.sh
 bash -n scripts/check.sh
 bash -n scripts/clean.sh
@@ -1093,13 +1093,13 @@ bash -n scripts/clean.sh
 
 启动服务：
 
-```bash
+```bash linenums="0"
 ./scripts/dev.sh
 ```
 
 检查服务：
 
-```bash
+```bash linenums="0"
 ./scripts/check.sh
 curl -fsS http://127.0.0.1:18080/healthz
 curl -fsS http://127.0.0.1:18080/todos
@@ -1107,7 +1107,7 @@ curl -fsS http://127.0.0.1:18080/todos
 
 测试 `.env` 和环境变量覆盖：
 
-```bash
+```bash linenums="0"
 printf 'TODO_HOST=127.0.0.1\nTODO_PORT=18081\nTODO_REQUIRE_SHELLCHECK=false\n' > .env
 ./scripts/clean.sh --all
 ./scripts/dev.sh
@@ -1116,7 +1116,7 @@ printf 'TODO_HOST=127.0.0.1\nTODO_PORT=18081\nTODO_REQUIRE_SHELLCHECK=false\n' >
 
 命令行环境变量优先级高于 `.env`：
 
-```bash
+```bash linenums="0"
 ./scripts/clean.sh --all
 TODO_PORT=18082 ./scripts/dev.sh
 TODO_PORT=18082 ./scripts/check.sh
@@ -1124,14 +1124,14 @@ TODO_PORT=18082 ./scripts/check.sh
 
 清理运行时文件：
 
-```bash
+```bash linenums="0"
 ./scripts/clean.sh --logs
 ./scripts/clean.sh --all
 ```
 
 提交前检查：
 
-```bash
+```bash linenums="0"
 git status --short
 git diff -- .gitignore .env.example scripts .github/workflows/scripts-check.yml
 git add .gitignore .env.example scripts/dev.sh scripts/check.sh scripts/clean.sh
@@ -1139,13 +1139,13 @@ git add .gitignore .env.example scripts/dev.sh scripts/check.sh scripts/clean.sh
 
 如果你决定启用 GitHub Actions，再额外添加：
 
-```bash
+```bash linenums="0"
 git add .github/workflows/scripts-check.yml
 ```
 
 提交示例：
 
-```bash
+```bash linenums="0"
 git commit -m "chore: add shell automation scripts"
 ```
 
@@ -1153,7 +1153,7 @@ git commit -m "chore: add shell automation scripts"
 
 `./scripts/dev.sh` 输出类似：
 
-```text
+```text linenums="0"
 [dev] building todo dev server
 [dev] starting todo dev server on http://127.0.0.1:18080
 [dev] started: pid=12345
@@ -1164,7 +1164,7 @@ git commit -m "chore: add shell automation scripts"
 
 `./scripts/check.sh` 输出类似：
 
-```text
+```text linenums="0"
 [check] root: /home/user/workspace/cloud-native-todo-platform
 [check][ok] bash found: /usr/bin/bash
 [check][ok] git found: /usr/bin/git
@@ -1190,13 +1190,13 @@ git commit -m "chore: add shell automation scripts"
 
 `curl -fsS http://127.0.0.1:18080/healthz` 输出类似：
 
-```json
+```json linenums="0"
 {"service":"todo-dev-server","status":"ok"}
 ```
 
 `./scripts/clean.sh --all` 输出类似：
 
-```text
+```text linenums="0"
 [clean] stopping process 12345
 [clean] process 12345 stopped
 [clean] removing logs: /home/user/workspace/cloud-native-todo-platform/.todo-platform/logs
@@ -1208,7 +1208,7 @@ git commit -m "chore: add shell automation scripts"
 
 从项目根目录执行：
 
-```bash
+```bash linenums="0"
 test -f .env.example
 test -x scripts/dev.sh
 test -x scripts/check.sh
@@ -1236,19 +1236,19 @@ curl -fsS http://127.0.0.1:18080/healthz
 
 只清理运行时文件：
 
-```bash
+```bash linenums="0"
 ./scripts/clean.sh --all
 ```
 
 保留脚本但删除本地 `.env`：
 
-```bash
+```bash linenums="0"
 rm -f .env
 ```
 
 如果你要完全重做本章实验，并且确认当前目录是课程项目根目录：
 
-```bash
+```bash linenums="0"
 pwd
 git status --short
 rm -rf .todo-platform
@@ -1257,7 +1257,7 @@ rm -f .env
 
 如果脚本文件已经提交到 Git，优先用 Git 管理回退，而不是手工删除：
 
-```bash
+```bash linenums="0"
 git status --short
 git restore --staged scripts .env.example .github/workflows/scripts-check.yml
 ```
@@ -1270,7 +1270,7 @@ git restore --staged scripts .env.example .github/workflows/scripts-check.yml
 
 - **现象**：
 
-  ```text
+  ```text linenums="0"
   bash: ./scripts/dev.sh: Permission denied
   ```
 
@@ -1278,7 +1278,7 @@ git restore --staged scripts .env.example .github/workflows/scripts-check.yml
 
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   ls -l scripts/dev.sh
   ```
 
@@ -1286,7 +1286,7 @@ git restore --staged scripts .env.example .github/workflows/scripts-check.yml
 
 - **修复**：
 
-  ```bash
+  ```bash linenums="0"
   chmod +x scripts/dev.sh scripts/check.sh scripts/clean.sh
   ```
 
@@ -1296,7 +1296,7 @@ git restore --staged scripts .env.example .github/workflows/scripts-check.yml
 
 - **现象**：
 
-  ```text
+  ```text linenums="0"
   TODO_PORT: command not found
   ```
 
@@ -1304,7 +1304,7 @@ git restore --staged scripts .env.example .github/workflows/scripts-check.yml
 
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   bash -n scripts/dev.sh
   grep -n ' = ' scripts/*.sh
   ```
@@ -1313,7 +1313,7 @@ git restore --staged scripts .env.example .github/workflows/scripts-check.yml
 
 - **修复**：
 
-  ```bash
+  ```bash linenums="0"
   TODO_PORT=18080
   ```
 
@@ -1323,13 +1323,13 @@ git restore --staged scripts .env.example .github/workflows/scripts-check.yml
 
 - **现象**：
 
-  ```text
+  ```text linenums="0"
   [check][fail] health check failed; run ./scripts/dev.sh first
   ```
 
   或者：
 
-  ```text
+  ```text linenums="0"
   [check][fail] invalid TODO_PORT: abc
   ```
 
@@ -1337,7 +1337,7 @@ git restore --staged scripts .env.example .github/workflows/scripts-check.yml
 
 - **排查**：
 
-   ```bash
+   ```bash linenums="0"
    ./scripts/dev.sh
    ./scripts/check.sh
    curl -v http://127.0.0.1:18080/healthz
@@ -1350,7 +1350,7 @@ git restore --staged scripts .env.example .github/workflows/scripts-check.yml
 
 - **修复**：
 
-  ```bash
+  ```bash linenums="0"
   ./scripts/clean.sh --all
   ./scripts/dev.sh
   ./scripts/check.sh
@@ -1358,7 +1358,7 @@ git restore --staged scripts .env.example .github/workflows/scripts-check.yml
 
   如果使用了自定义端口，启动和检查必须使用同一个端口：
 
-  ```bash
+  ```bash linenums="0"
   TODO_PORT=18081 ./scripts/dev.sh
   TODO_PORT=18081 ./scripts/check.sh
   ```
@@ -1369,13 +1369,13 @@ git restore --staged scripts .env.example .github/workflows/scripts-check.yml
 
 - **现象**：
 
-```text
+```text linenums="0"
 ./scripts/check.sh: line 42: jq: command not found
 ```
 
 或者：
 
-```text
+```text linenums="0"
 date: invalid date 'next monday'
 ```
 
@@ -1383,7 +1383,7 @@ date: invalid date 'next monday'
 
 - **排查**：
 
-```bash
+```bash linenums="0"
 cat /etc/os-release
 bash --version | head -n 1
 command -v jq || true
@@ -1400,13 +1400,13 @@ date --version | head -n 1
 
 - **现象**：
 
-  ```text
+  ```text linenums="0"
   rm: cannot remove '/important/path': Permission denied
   ```
 
   或者 CI 日志中出现：
 
-  ```text
+  ```text linenums="0"
   TODO_TOKEN=real-token
   ```
 
@@ -1414,7 +1414,7 @@ date --version | head -n 1
 
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   grep -n 'rm -rf' scripts/*.sh
   grep -n 'set -x\|TOKEN\|PASSWORD\|SECRET' scripts/*.sh .env.example
   git grep -n -E 'TOKEN|PASSWORD|SECRET|BEGIN .*PRIVATE KEY' || true
@@ -1459,7 +1459,7 @@ date --version | head -n 1
 
 验收命令：
 
-```bash
+```bash linenums="0"
 test -f .env.example
 test -x scripts/dev.sh
 test -x scripts/check.sh
@@ -1483,73 +1483,13 @@ curl -fsS http://127.0.0.1:18080/healthz
 | 退出码 | 成功返回 `0`，失败返回非 `0` |
 | 安全性 | `.env` 和 `.todo-platform/` 不进入 Git，删除路径受限制，清理进程前有身份校验思路 |
 
-## 9. 本章练习题
+## 9. 练习题与面试题
 
-### 基础题
+本章练习题和面试题已拆分到独立页面，完成正文学习后再进入题库练习与复盘。
 
-1. Shell 和 Bash 有什么区别？
-2. 为什么变量赋值不能写成 `PORT = 18080`？
-3. `"$@"` 和 `$@` 有什么区别？
-4. `exit 0` 和 `exit 1` 在 CI/CD 中分别意味着什么？
+[查看本章练习题与面试题](../../questions/stage-01-foundation/06-shell-scripting.md)
 
-### 实操题
-
-1. 给 `check.sh` 增加 `--no-health` 参数，只检查依赖和文件，不访问 HTTP 服务。
-2. 给 `dev.sh` 增加 `TODO_LOG_LEVEL` 环境变量，并把值传给 Go 服务。
-3. 编写 `scripts/logs.sh`，支持 `--tail 50` 查看最近 50 行日志。
-4. 故意占用 `18080` 端口，记录 `dev.sh` 的失败输出和排查步骤。
-5. 安装 ShellCheck，修复它对 3 个脚本给出的告警。
-6. 把 `.github/workflows/scripts-check.yml` 加入分支，创建 PR/MR 并观察检查结果。
-
-### 思考题
-
-1. 为什么 Shell 脚本适合“编排命令”，但不适合承载复杂业务逻辑？
-2. 为什么 `.env.example` 可以提交，而 `.env` 不应该提交？
-3. 如果 `clean.sh` 要操作 Kubernetes 命名空间，应该增加哪些防误操作保护？
-
-## 10. 本章面试题
-
-### 1. Shell 脚本中的退出码有什么作用？
-
-**一句话结论**：退出码是脚本和自动化系统之间的成功或失败契约。
-
-**展开解释**：约定 `0` 表示成功，非 `0` 表示失败。CI/CD、Makefile、部署脚本和 Kubernetes hook 都会根据退出码决定是否继续执行。脚本如果发现错误但最后返回 `0`，自动化系统会误判为成功。
-
-**深入追问**：如果某一步允许失败，不应该依赖 `set -e`，而应显式使用 `if ! command; then ... fi` 记录原因并决定是否退出。
-
-### 2. 为什么 Shell 变量建议加双引号？
-
-**一句话结论**：双引号可以避免空格、换行和通配符导致参数被拆分或展开。
-
-**展开解释**：例如文件名包含空格时，`rm $file` 可能被拆成多个参数，而 `rm "$file"` 会把它作为一个整体。未引用变量是 Shell 脚本中最常见的生产风险之一。
-
-**深入追问**：即使变量来自可信来源，也建议默认加双引号；只有明确需要单词拆分或通配符展开时才例外。
-
-### 3. `set -Eeuo pipefail` 解决什么问题？
-
-**一句话结论**：它让脚本更早暴露失败、未定义变量和管道中的隐藏错误。
-
-**展开解释**：`-e` 让命令失败时退出，`-E` 让函数中的错误也触发 `ERR` trap，`-u` 使用未定义变量时报错，`pipefail` 让管道中任一命令失败都导致整体失败。这些选项能减少错误被吞掉的概率。
-
-**深入追问**：严格模式不是万能的。条件判断、允许失败的命令、后台进程和复杂管道仍需要显式处理，否则可能出现误退出或漏报。
-
-### 4. 如何设计一个健康检查脚本？
-
-**一句话结论**：先检查依赖和配置，再发起真实请求，最后用退出码表达结果。
-
-**展开解释**：健康检查脚本应检查必要命令是否存在、脚本权限是否正确、目标地址是否一致，然后用 `curl -fsS /healthz` 验证服务。失败时要输出可排查的信息，例如 URL、日志路径和下一步建议。
-
-**深入追问**：用于 CI 的健康检查不应依赖开发者本机状态；用于 Kubernetes 的 readinessProbe 还应检查服务依赖是否可用。
-
-### 5. Shell 脚本有哪些常见安全问题？
-
-**一句话结论**：主要风险是未引用变量、危险删除、命令注入和密钥泄露。
-
-**展开解释**：未引用变量会导致路径拆分；`rm -rf "$dir"` 如果缺少白名单可能误删；`eval` 或拼接用户输入可能造成命令注入；`set -x` 和 `echo "$TOKEN"` 可能把密钥写入 CI 日志。
-
-**深入追问**：生产脚本应使用路径白名单、最小权限、secret scanning、ShellCheck 和 PR Review。涉及 kube-context、namespace 或生产集群时，还应增加显式确认和环境保护。
-
-## 11. 本章总结
+## 10. 本章总结
 
 本篇建立了课程项目的 Shell 自动化基础。你学习了 Shell、Bash、shebang、变量、环境变量、位置参数、条件判断、循环、函数、管道、退出码和 `set -Eeuo pipefail`，也理解了 `.env` 管理、幂等性和安全删除的边界。
 
@@ -1557,7 +1497,7 @@ curl -fsS http://127.0.0.1:18080/healthz
 
 能力价值上，你已经不只是会输入命令，而是能把团队共识沉淀成可复用、可审查、可进入 CI 的自动化入口。后续 Go、Docker、Kubernetes 和 Operator 章节都会建立在这个能力之上。
 
-## 12. 下一章衔接
+## 11. 下一章衔接
 
 下一篇进入 **第 7 篇：Go 语言基础与命令行程序**。本篇的 `dev.sh` 先生成了一个最小 Go HTTP 服务；下一篇会开始正式编写 Go 代码，用命令行方式管理 Todo 数据。
 

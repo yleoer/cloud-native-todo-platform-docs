@@ -4,7 +4,7 @@
 
 答案不是一个工具，而是一条分层链路：
 
-```text
+```text linenums="0"
 Docker CLI / kubectl
   -> Docker Engine / kubelet
   -> containerd
@@ -80,7 +80,7 @@ Docker CLI / kubectl
 
 第 16 篇产出了 `todo-api:v0.1.0` 镜像，第 17 篇用 Docker Compose 在开发机上运行它，第 18 篇解释了这个容器的 Linux 底层机制。本篇会把它放到 Kubernetes 运行时视角下观察：
 
-```text
+```text linenums="0"
 第 16 篇：构建 todo-api:v0.1.0 镜像
 第 17 篇：用 Docker Compose 运行 Todo Platform
 第 18 篇：拆开容器进程、namespace、cgroup 和 rootfs
@@ -106,7 +106,7 @@ OCI 是 Open Container Initiative 的缩写。它不是一个运行容器的程�
 
 最小理解可以是：
 
-```text
+```text linenums="0"
 image-spec：镜像是什么
 runtime-spec：怎么把 rootfs 和 config.json 变成进程
 distribution-spec：镜像怎么在仓库中传输
@@ -118,7 +118,7 @@ distribution-spec：镜像怎么在仓库中传输
 
 OCI 镜像不是一个单独 tar 包，而是一组可寻址对象。核心结构如下：
 
-```text
+```text linenums="0"
 image index
 └── manifest
     ├── config
@@ -127,7 +127,7 @@ image index
 
 一个简化的 manifest 长这样：
 
-```json
+```json linenums="0"
 {
   "schemaVersion": 2,
   "mediaType": "application/vnd.oci.image.manifest.v1+json",
@@ -156,7 +156,7 @@ image index
 
 第 16 篇中你执行过：
 
-```bash
+```bash linenums="0"
 docker image inspect todo-api:v0.1.0 --format '{{json .Config.Labels}}'
 docker image inspect todo-api:v0.1.0 --format '{{.Id}}'
 ```
@@ -167,7 +167,7 @@ docker image inspect todo-api:v0.1.0 --format '{{.Id}}'
 
 OCI runtime-spec 关注的是“如何启动容器进程”。它不负责拉镜像，也不负责解析 registry。它需要一个 bundle：
 
-```text
+```text linenums="0"
 bundle/
 ├── config.json
 └── rootfs/
@@ -178,7 +178,7 @@ bundle/
 
 `config.json` 是运行时配置文件，里面描述要启动什么进程、挂载哪些目录、使用哪些 namespace、cgroup 如何设置。一个极简示意如下：
 
-```json
+```json linenums="0"
 {
   "ociVersion": "1.2.0",
   "process": {
@@ -259,7 +259,7 @@ containerd 里有几个重要对象：
 
 最容易踩的坑是 namespace。Kubernetes 管理的容器通常在 containerd 的 `k8s.io` namespace 中，所以你需要写：
 
-```bash
+```bash linenums="0"
 ctr -n k8s.io containers ls
 ```
 
@@ -280,7 +280,7 @@ Pod 在 CRI 中会先有一个 PodSandbox。你可以把它理解为“Pod 的�
 
 简化流程：
 
-```text
+```text linenums="0"
 kubelet 收到 Pod
   -> CRI RunPodSandbox
   -> CNI 配置 Pod 网络
@@ -314,7 +314,7 @@ kubelet 收到 Pod
 
 执行：
 
-```bash
+```bash linenums="0"
 docker run --rm registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23 sh -c 'echo hello'
 ```
 
@@ -340,7 +340,7 @@ Docker 提供的是开发者体验：`docker build`、`docker run`、`docker log
 
 执行：
 
-```bash
+```bash linenums="0"
 kubectl apply -f runtime-probe.yaml
 ```
 
@@ -385,7 +385,7 @@ Kubernetes 的 Pod 不是单个容器。Pod 是共享网络、部分命名空间
 
 普通 Linux 容器运行时中，你经常会看到一个 pause 容器。它的作用是持有 Pod 的网络 namespace 等基础资源，让业务容器加入这个环境。
 
-```text
+```text linenums="0"
 Pod runtime-probe
 ├── PodSandbox / pause
 └── container main
@@ -393,7 +393,7 @@ Pod runtime-probe
 
 当你执行：
 
-```bash
+```bash linenums="0"
 crictl pods
 crictl ps
 ```
@@ -413,7 +413,7 @@ containerd 不直接成为每个容器进程的父进程，而是通过 containe
 
 在节点上查看进程树时，你可能看到：
 
-```text
+```text linenums="0"
 containerd
 └── containerd-shim-runc-v2
     └── runtime-probe 容器进程
@@ -433,7 +433,7 @@ containerd
 
 这三层不是互相替代，而是排障时逐层下钻：
 
-```text
+```text linenums="0"
 kubectl describe pod
   -> 事件显示镜像拉取失败
 crictl images / crictl pull
@@ -487,7 +487,7 @@ ctr -n k8s.io content ls / snapshots ls
 
 环境自检：
 
-```bash
+```bash linenums="0"
 docker version
 kubectl version --client
 kind version
@@ -497,7 +497,7 @@ command -v tree || echo "tree not installed; use find runtime-lab -maxdepth 2 -p
 
 可选检查 `nerdctl`：
 
-```bash
+```bash linenums="0"
 command -v nerdctl && nerdctl version || echo "nerdctl not installed; optional section can be skipped"
 ```
 
@@ -515,20 +515,20 @@ command -v nerdctl && nerdctl version || echo "nerdctl not installed; optional s
 
 在任意学习目录创建实验文件：
 
-```bash
+```bash linenums="0"
 mkdir -p runtime-lab/k8s runtime-lab/notes
 tree runtime-lab
 ```
 
 如果你的环境没有安装 `tree`，可以用下面的命令替代：
 
-```bash
+```bash linenums="0"
 find runtime-lab -maxdepth 2 -print
 ```
 
 预期目录：
 
-```text
+```text linenums="0"
 runtime-lab
 ├── k8s
 └── notes
@@ -538,7 +538,7 @@ runtime-lab
 
 创建 `runtime-probe` Pod：
 
-```bash
+```bash linenums="0"
 cat > runtime-lab/k8s/runtime-probe.yaml <<'YAML'
 apiVersion: v1
 kind: Namespace
@@ -596,7 +596,7 @@ YAML
 
 创建观察记录模板：
 
-```bash
+```bash linenums="0"
 cat > runtime-lab/notes/runtime-observation.md <<'MD'
 # 第 19 篇运行时观察记录
 
@@ -647,7 +647,7 @@ MD
 
 设置实验变量：
 
-```bash
+```bash linenums="0"
 KIND_CLUSTER=todo-runtime
 KIND_NODE_IMAGE="${KIND_NODE_IMAGE:-registry.cn-guangzhou.aliyuncs.com/yleoer/node:v1.35.0@sha256:452d707d4862f52530247495d180205e029056831160e22870e37e3f6c1ac31f}"
 ```
@@ -656,13 +656,13 @@ KIND_NODE_IMAGE="${KIND_NODE_IMAGE:-registry.cn-guangzhou.aliyuncs.com/yleoer/no
 
 如果课程版本锁已经提供了更新的 `KIND_NODE_IMAGE`，这里会优先使用环境变量中的值。创建集群：
 
-```bash
+```bash linenums="0"
 kind get clusters | grep -qx "$KIND_CLUSTER" || kind create cluster --name "$KIND_CLUSTER" --image "$KIND_NODE_IMAGE"
 ```
 
 确认 kubectl 指向这个集群：
 
-```bash
+```bash linenums="0"
 kubectl config current-context
 kubectl cluster-info --context "kind-$KIND_CLUSTER"
 kubectl get nodes -o wide
@@ -672,19 +672,19 @@ kubectl get nodes -o wide
 
 应用 YAML：
 
-```bash
+```bash linenums="0"
 kubectl apply -f runtime-lab/k8s/runtime-probe.yaml
 ```
 
 等待 Pod Ready：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-runtime wait --for=condition=Ready pod/runtime-probe --timeout=120s
 ```
 
 查看 Kubernetes 层状态：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-runtime get pod runtime-probe -o wide
 kubectl -n todo-runtime describe pod runtime-probe
 kubectl -n todo-runtime logs runtime-probe --tail=5
@@ -696,7 +696,7 @@ kubectl -n todo-runtime logs runtime-probe --tail=5
 
 kind 的节点本身是一个 Docker 容器。找到它：
 
-```bash
+```bash linenums="0"
 echo "KIND_CLUSTER=${KIND_CLUSTER:?not set, run section 5.5.1 first}"
 NODE="$(docker ps --filter "name=${KIND_CLUSTER}-control-plane" --format '{{.Names}}' | head -n 1)"
 echo "$NODE"
@@ -704,7 +704,7 @@ echo "$NODE"
 
 进入节点检查运行时工具：
 
-```bash
+```bash linenums="0"
 docker exec "$NODE" crictl version
 docker exec "$NODE" ctr version
 docker exec "$NODE" runc --version || true
@@ -730,20 +730,20 @@ docker exec "$NODE" ctr plugins ls | grep -E 'cri|snapshot' || true
 
 查看 PodSandbox：
 
-```bash
+```bash linenums="0"
 docker exec "$NODE" crictl pods --namespace todo-runtime
 ```
 
 提取 PodSandbox ID：
 
-```bash
+```bash linenums="0"
 POD_ID="$(docker exec "$NODE" crictl pods --namespace todo-runtime --name runtime-probe -q | head -n 1)"
 echo "$POD_ID"
 ```
 
 查看 PodSandbox 详情：
 
-```bash
+```bash linenums="0"
 docker exec "$NODE" crictl inspectp "$POD_ID" | grep -E '"name"|"namespace"|"state"|"podSandboxId"|"runtimeHandler"' | head -n 20
 ```
 
@@ -751,20 +751,20 @@ docker exec "$NODE" crictl inspectp "$POD_ID" | grep -E '"name"|"namespace"|"sta
 
 查看这个 PodSandbox 下的业务容器：
 
-```bash
+```bash linenums="0"
 docker exec "$NODE" crictl ps --pod "$POD_ID"
 ```
 
 提取容器 ID：
 
-```bash
+```bash linenums="0"
 CONTAINER_ID="$(docker exec "$NODE" crictl ps --pod "$POD_ID" -q | head -n 1)"
 echo "$CONTAINER_ID"
 ```
 
 查看容器详情、日志和进程：
 
-```bash
+```bash linenums="0"
 docker exec "$NODE" crictl inspect "$CONTAINER_ID" | grep -E '"name"|"state"|"pid"|"imageRef"|"runtimeType"' | head -n 30
 docker exec "$NODE" crictl logs "$CONTAINER_ID" | tail -n 10
 docker exec "$NODE" crictl exec "$CONTAINER_ID" ps -o pid,ppid,comm
@@ -776,37 +776,37 @@ docker exec "$NODE" crictl exec "$CONTAINER_ID" ps -o pid,ppid,comm
 
 查看 containerd namespace：
 
-```bash
+```bash linenums="0"
 docker exec "$NODE" ctr namespaces ls
 ```
 
 Kubernetes 管理的对象在 `k8s.io` namespace 中。查看 container 对象：
 
-```bash
+```bash linenums="0"
 docker exec "$NODE" ctr -n k8s.io containers ls | grep "$CONTAINER_ID"
 ```
 
 如果这里没有输出，先不要急着判断 containerd 异常。CRI 返回的容器 ID 可能是 containerd 完整 ID 的前缀，不同运行时版本里的展示格式也可能略有差异。可以先列出相关 container，再根据 Pod 名、容器名或镜像反向确认：
 
-```bash
+```bash linenums="0"
 docker exec "$NODE" ctr -n k8s.io containers ls | grep -E 'runtime-probe|alpine|main'
 ```
 
 查看 task，也就是真正运行中的进程：
 
-```bash
+```bash linenums="0"
 docker exec "$NODE" ctr -n k8s.io tasks ls | grep "$CONTAINER_ID"
 ```
 
 查看 OCI spec 关键字段：
 
-```bash
+```bash linenums="0"
 docker exec "$NODE" ctr -n k8s.io containers info "$CONTAINER_ID" | grep -E '"ociVersion"|"args"|"env"|"namespaces"|"cgroupsPath"|"readonly"' | head -n 40
 ```
 
 查看镜像和 snapshot：
 
-```bash
+```bash linenums="0"
 docker exec "$NODE" ctr -n k8s.io images ls | grep alpine
 docker exec "$NODE" ctr -n k8s.io snapshots ls | head -n 20
 ```
@@ -817,19 +817,19 @@ docker exec "$NODE" ctr -n k8s.io snapshots ls | head -n 20
 
 宿主机 Docker 能看到 kind 节点容器：
 
-```bash
+```bash linenums="0"
 docker ps --filter "name=${KIND_CLUSTER}-control-plane"
 ```
 
 但它通常看不到 `runtime-probe` 业务容器，因为业务容器在 kind 节点内部的 containerd 中：
 
-```bash
+```bash linenums="0"
 docker ps --filter "name=runtime-probe"
 ```
 
 继续用 CRI 观察才是正确入口：
 
-```bash
+```bash linenums="0"
 docker exec "$NODE" crictl pods --namespace todo-runtime --name runtime-probe
 docker exec "$NODE" crictl ps --pod "$POD_ID"
 ```
@@ -840,25 +840,25 @@ docker exec "$NODE" crictl ps --pod "$POD_ID"
 
 如果你已经完成第 16 篇，先确认本地有 `todo-api:v0.1.0`：
 
-```bash
+```bash linenums="0"
 docker image inspect todo-api:v0.1.0 --format '{{.Id}} {{.Config.Entrypoint}} {{.Config.Cmd}}'
 ```
 
 把镜像加载到 kind 节点：
 
-```bash
+```bash linenums="0"
 kind load docker-image todo-api:v0.1.0 --name "$KIND_CLUSTER"
 ```
 
 在 CRI 层查看镜像：
 
-```bash
+```bash linenums="0"
 docker exec "$NODE" crictl images | grep todo-api
 ```
 
 在 containerd 层查看镜像：
 
-```bash
+```bash linenums="0"
 docker exec "$NODE" ctr -n k8s.io images ls | grep todo-api
 ```
 
@@ -880,7 +880,7 @@ docker exec "$NODE" ctr -n k8s.io images ls | grep todo-api
 
 如果本机已经安装 `nerdctl` 并且能访问本机 containerd，可以做一个不依赖 CNI 的最小实验：
 
-```bash
+```bash linenums="0"
 if command -v nerdctl >/dev/null 2>&1; then
   sudo nerdctl --net=none run -d --name runtime-nerdctl-demo registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23 sleep 300
   sudo nerdctl ps
@@ -897,7 +897,7 @@ fi
 
 打开记录模板，把关键结果填进去：
 
-```bash
+```bash linenums="0"
 cat runtime-lab/notes/runtime-observation.md
 ```
 
@@ -913,35 +913,35 @@ cat runtime-lab/notes/runtime-observation.md
 
 `kubectl get pod` 应看到 Pod 运行：
 
-```text
+```text linenums="0"
 NAME            READY   STATUS    RESTARTS   AGE   IP           NODE
 runtime-probe   1/1     Running   0          30s   10.244.0.5   todo-runtime-control-plane
 ```
 
 `crictl pods` 应看到 PodSandbox：
 
-```text
+```text linenums="0"
 POD ID              CREATED          STATE   NAME            NAMESPACE      ATTEMPT
 7b5c...             1 minute ago     Ready   runtime-probe   todo-runtime   0
 ```
 
 `crictl ps` 应看到业务容器：
 
-```text
+```text linenums="0"
 CONTAINER           IMAGE               CREATED          STATE    NAME   ATTEMPT   POD ID
 e83a...             registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23         1 minute ago     Running  main   0         7b5c...
 ```
 
 `ctr -n k8s.io tasks ls` 应能看到同一个容器 ID 的 task：
 
-```text
+```text linenums="0"
 TASK        PID      STATUS
 e83a...     12345    RUNNING
 ```
 
 导入 Todo API 镜像后，`crictl images` 应出现类似结果：
 
-```text
+```text linenums="0"
 IMAGE               TAG       IMAGE ID        SIZE
 todo-api            v0.1.0    sha256:...      ...
 ```
@@ -950,7 +950,7 @@ todo-api            v0.1.0    sha256:...      ...
 
 基础验证：
 
-```bash
+```bash linenums="0"
 NODE="$(docker ps --filter "name=${KIND_CLUSTER}-control-plane" --format '{{.Names}}' | head -n 1)"
 POD_ID="$(docker exec "$NODE" crictl pods --namespace todo-runtime --name runtime-probe -q | head -n 1)"
 CONTAINER_ID="$(docker exec "$NODE" crictl ps --pod "$POD_ID" -q | head -n 1)"
@@ -973,7 +973,7 @@ docker exec "$NODE" ctr -n k8s.io tasks ls | grep "$CONTAINER_ID"
 
 进阶验证：
 
-```bash
+```bash linenums="0"
 docker exec "$NODE" crictl inspect "$CONTAINER_ID" | grep -E '"pid"|"imageRef"'
 docker exec "$NODE" ctr -n k8s.io containers info "$CONTAINER_ID" | grep -E '"ociVersion"|"cgroupsPath"'
 docker exec "$NODE" crictl images | grep -E 'alpine|todo-api'
@@ -992,25 +992,25 @@ docker exec "$NODE" crictl images | grep -E 'alpine|todo-api'
 
 删除实验 Pod 和命名空间：
 
-```bash
+```bash linenums="0"
 kubectl delete -f runtime-lab/k8s/runtime-probe.yaml --ignore-not-found
 ```
 
 删除 kind 集群：
 
-```bash
+```bash linenums="0"
 kind delete cluster --name "$KIND_CLUSTER"
 ```
 
 可选删除实验目录：
 
-```bash
+```bash linenums="0"
 rm -rf runtime-lab
 ```
 
 确认没有残留 kind 节点：
 
-```bash
+```bash linenums="0"
 docker ps --filter "name=${KIND_CLUSTER}"
 kind get clusters
 ```
@@ -1023,7 +1023,7 @@ kind get clusters
 
 - **现象**：
 
-  ```text
+  ```text linenums="0"
   ERROR: failed to create cluster: failed to get docker info
   Cannot connect to the Docker daemon at unix:///var/run/docker.sock
   ```
@@ -1032,7 +1032,7 @@ kind get clusters
 
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   docker version
   docker info
   id
@@ -1042,7 +1042,7 @@ kind get clusters
 
 - **修复**：
 
-  ```bash
+  ```bash linenums="0"
   sudo systemctl start docker
   docker info
   kind create cluster --name todo-runtime --image "$KIND_NODE_IMAGE"
@@ -1056,7 +1056,7 @@ kind get clusters
 
 - **现象**：
 
-  ```text
+  ```text linenums="0"
   NAME            READY   STATUS             RESTARTS   AGE
   runtime-probe   0/1     ImagePullBackOff   0          2m
   ```
@@ -1065,7 +1065,7 @@ kind get clusters
 
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   kubectl -n todo-runtime describe pod runtime-probe
   docker exec "$NODE" crictl images | grep alpine || true
   docker exec "$NODE" crictl pull registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23
@@ -1075,7 +1075,7 @@ kind get clusters
 
 - **修复**：确认标签正确；配置 Docker / containerd 镜像代理；或者提前在宿主机拉取镜像后导入 kind：
 
-  ```bash
+  ```bash linenums="0"
   docker pull registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23
   kind load docker-image registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23 --name todo-runtime
   kubectl -n todo-runtime delete pod runtime-probe
@@ -1088,7 +1088,7 @@ kind get clusters
 
 - **现象**：
 
-  ```text
+  ```text linenums="0"
   docker exec "$NODE" ctr containers ls
   CONTAINER    IMAGE    RUNTIME
   ```
@@ -1097,7 +1097,7 @@ kind get clusters
 
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   docker exec "$NODE" ctr namespaces ls
   docker exec "$NODE" ctr -n k8s.io containers ls
   docker exec "$NODE" crictl pods --namespace todo-runtime --name runtime-probe
@@ -1107,7 +1107,7 @@ kind get clusters
 
 - **修复**：
 
-  ```bash
+  ```bash linenums="0"
   docker exec "$NODE" ctr -n k8s.io containers ls
   docker exec "$NODE" ctr -n k8s.io tasks ls
   docker exec "$NODE" ctr -n k8s.io images ls
@@ -1119,13 +1119,13 @@ kind get clusters
 
 - **现象**：
 
-  ```text
+  ```text linenums="0"
   FATA[0000] connect: connection refused
   ```
 
   或：
 
-  ```text
+  ```text linenums="0"
   WARN[0000] runtime connect using default endpoints
   ```
 
@@ -1133,7 +1133,7 @@ kind get clusters
 
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   docker exec "$NODE" crictl info
   docker exec "$NODE" ls -l /run/containerd/containerd.sock
   docker exec "$NODE" ctr version
@@ -1145,7 +1145,7 @@ kind get clusters
 
 - **修复**：使用本篇命令形式进入 kind 节点执行：
 
-  ```bash
+  ```bash linenums="0"
   docker exec "$NODE" crictl ps
   ```
 
@@ -1157,13 +1157,13 @@ kind get clusters
 
 - **现象**：
 
-  ```bash
+  ```bash linenums="0"
   docker ps --filter name=runtime-probe
   ```
 
   输出为空，但：
 
-  ```bash
+  ```bash linenums="0"
   kubectl -n todo-runtime get pod runtime-probe
   ```
 
@@ -1173,7 +1173,7 @@ kind get clusters
 
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   docker ps --filter "name=todo-runtime-control-plane"
   docker exec "$NODE" crictl pods --namespace todo-runtime --name runtime-probe
   docker exec "$NODE" crictl ps --pod "$POD_ID"
@@ -1182,7 +1182,7 @@ kind get clusters
 
 - **修复**：用正确工具观察正确层级：
 
-  ```bash
+  ```bash linenums="0"
   kubectl -n todo-runtime get pod
   docker exec "$NODE" crictl ps
   docker exec "$NODE" ctr -n k8s.io tasks ls
@@ -1241,70 +1241,13 @@ kind get clusters
 - 能完成可选 `nerdctl` 对照实验，或说明本机为什么不适合运行它。
 - 能写出 5-8 句话总结 Docker、containerd、runc、CRI 和 kubelet 的关系。
 
-## 9. 本章练习题
+## 9. 练习题与面试题
 
-### 9.1 基础题
+本章练习题和面试题已拆分到独立页面，完成正文学习后再进入题库练习与复盘。
 
-1. 用一句话分别解释 OCI image-spec、runtime-spec 和 distribution-spec。
-2. 为什么 Kubernetes 不应该依赖 Docker CLI 来启动 Pod？
-3. `crictl ps` 和 `ctr -n k8s.io tasks ls` 分别看的是哪一层？
-4. 为什么 `ctr containers ls` 可能为空，而 `ctr -n k8s.io containers ls` 能看到容器？
-5. PodSandbox 和业务容器有什么区别？
+[查看本章练习题与面试题](../../questions/stage-03-docker/19-oci-containerd-cri.md)
 
-### 9.2 实操题
-
-1. 把 `runtime-probe.yaml` 中的镜像改成一个不存在的标签，例如 `alpine:not-exist`，观察 `kubectl describe pod` 和 `crictl pull` 的错误。记录后恢复为 `registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23`。
-2. 删除 `CONTAINER_ID` 变量后重新通过 `crictl pods --name runtime-probe -q` 找回 `POD_ID`，再用 `crictl ps --pod "$POD_ID" -q` 找回容器 ID，并用 `ctr -n k8s.io tasks ls` 验证同一个 task。
-3. 如果本地存在 `todo-api:v0.1.0`，执行 `kind load docker-image`，并分别用 `crictl images` 和 `ctr -n k8s.io images ls` 验证。
-
-### 9.3 思考题
-
-1. 生产节点上为什么不建议直接用 `ctr` 删除 Kubernetes 管理的 container 或 snapshot？如果节点磁盘满了，应该如何设计更安全的处置流程？
-2. 如果一个团队同时使用 Docker Desktop、kind、containerd、CRI-O 和云厂商托管 Kubernetes，如何制定统一的镜像标签、digest、签名和运行时版本策略？
-
-## 10. 本章面试题
-
-### 1. Docker、containerd、runc 和 kubelet 的关系是什么？
-
-**一句话结论**：Docker 和 kubelet 都可以处在上层入口，containerd 负责运行时生命周期管理，runc 按 OCI runtime-spec 创建底层容器进程。
-
-**展开解释**：Docker 面向开发者，提供构建、运行、日志、网络和 Compose 等体验；Kubernetes 节点上由 kubelet 管理 Pod，kubelet 通过 CRI 调用 containerd；containerd 拉取镜像、管理快照和 task，再通过 shim 调用 runc；runc 最终设置 namespace、cgroup、mount 等 Linux 能力。
-
-**追问方向**：如果面试官问“Docker 被 Kubernetes 移除了吗”，要回答：Kubernetes 移除的是内置 dockershim 依赖，不是 OCI 镜像格式，也不是开发机 Docker 工具。
-
-### 2. OCI image-spec 和 runtime-spec 有什么区别？
-
-**一句话结论**：image-spec 描述镜像内容如何组织，runtime-spec 描述如何把 rootfs 和 `config.json` 启动成容器进程。
-
-**展开解释**：image-spec 关注 manifest、config、layer、digest 和多架构 image index；runtime-spec 关注 OCI bundle、进程参数、rootfs、mount、namespace、cgroup、capabilities、seccomp 等运行配置。containerd 可以把镜像拉取和解包成 snapshot，再生成运行时需要的 OCI spec 交给 runc。
-
-**追问方向**：可以继续说明 digest 为什么比 tag 更适合生产发布，以及第 16 篇 OCI Label 如何进入镜像 config。
-
-### 3. `crictl` 和 `ctr` 有什么区别？
-
-**一句话结论**：`crictl` 面向 CRI，用 Kubernetes 运行时语义看 Pod 和容器；`ctr` 面向 containerd，用底层对象语义看 container、task、image 和 snapshot。
-
-**展开解释**：排查 Kubernetes 节点时，`crictl pods`、`crictl ps`、`crictl logs` 更贴近 kubelet 看到的状态；`ctr -n k8s.io containers ls`、`tasks ls` 更贴近 containerd 内部状态。`ctr` 不追求用户友好，也不等同 Docker CLI。
-
-**追问方向**：如果 `ctr containers ls` 为空，要先检查 containerd namespace，Kubernetes 通常使用 `k8s.io`。
-
-### 4. PodSandbox 是什么，为什么需要它？
-
-**一句话结论**：PodSandbox 是 CRI 中表示 Pod 基础隔离环境的对象，通常先于业务容器创建。
-
-**展开解释**：Pod 不是一个普通容器，而是一组共享网络和生命周期的容器。运行时需要先创建 Pod 的基础环境，例如 pause 容器持有网络 namespace，然后业务容器再加入这个环境。网络初始化、CNI 配置失败时，问题往往出现在 PodSandbox 阶段。
-
-**追问方向**：可以讨论普通 Linux 容器运行时和沙箱运行时对 PodSandbox 的不同实现，例如轻量虚拟机运行时可能把 Sandbox 做成更强隔离边界。
-
-### 5. 为什么生产发布建议使用镜像 digest？
-
-**一句话结论**：digest 绑定内容，tag 只是可变引用；生产用 digest 更利于审计、回滚和供应链安全。
-
-**展开解释**：同一个 tag 可能被重新推送，导致不同节点在不同时间拉到不同内容。digest 是镜像内容摘要，只要内容变化 digest 就变化。结合 SBOM、签名、漏洞扫描和 OCI Label，可以建立“源码 commit -> 镜像 digest -> 部署版本 -> 节点实际运行内容”的追踪链路。
-
-**追问方向**：可以进一步讨论如何在 Kubernetes YAML、Helm values、GitOps 和 CI/CD 中记录 digest，并处理紧急漏洞修复和回滚。
-
-## 11. 本章总结
+## 10. 本章总结
 
 本章把阶段三 Docker 学习收束到容器运行时生态。你已经看到：Docker 是开发体验入口，containerd 是主流运行时守护进程，runc 是 OCI 低层执行器，CRI 是 kubelet 与运行时之间的标准接口。
 
@@ -1312,7 +1255,7 @@ kind get clusters
 
 项目成果上，你完成了 `runtime-lab`，并能把第 16 篇的 `todo-api:v0.1.0` 镜像导入 kind 节点 containerd。这为第 20 篇正式进入 Kubernetes 架构打好了运行时基础。
 
-## 12. 下一章衔接
+## 11. 下一章衔接
 
 第 20 篇开始进入阶段四 Kubernetes 应用交付。你会系统学习 Kubernetes 架构、API Server、etcd、Scheduler、Controller Manager、kubelet、kube-proxy、container runtime、kind 集群和 kubectl 基础操作。
 

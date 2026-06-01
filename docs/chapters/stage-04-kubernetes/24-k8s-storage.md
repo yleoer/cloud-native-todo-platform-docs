@@ -71,7 +71,7 @@
 
 阶段四正在把 Todo Platform 从“一个 Kubernetes API 服务”推进到“具备真实后端依赖的集群应用”：
 
-```text
+```text linenums="0"
 第 20 篇：kind 集群和基础对象
 第 21 篇：Todo API Deployment + Probe + HPA
 第 22 篇：Service + Ingress + Gateway API
@@ -109,7 +109,7 @@ PVC 是应用对存储资源的声明：我需要多大容量、什么访问模�
 
 最小 PVC 示例：
 
-```yaml
+```yaml linenums="0"
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
@@ -210,7 +210,7 @@ StatefulSet 需要一个 `serviceName`。通常这个 Service 是 Headless Servi
 
 PostgreSQL 官方镜像默认把数据放在 `/var/lib/postgresql/data` 下。本篇把 PVC 挂载到 `/var/lib/postgresql/data`，并显式设置：
 
-```text
+```text linenums="0"
 PGDATA=/var/lib/postgresql/data/pgdata
 ```
 
@@ -271,7 +271,7 @@ Kubernetes 中更清晰的做法是：
 
 确认当前 context 和集群版本：
 
-```bash
+```bash linenums="0"
 kubectl config current-context
 kubectl version
 kubectl get nodes
@@ -279,7 +279,7 @@ kubectl get nodes
 
 预期输出应包含 `kind-todo-k8s` 和 Ready 节点：
 
-```text
+```text linenums="0"
 kind-todo-k8s
 Client Version: v1.35.x
 ...
@@ -292,13 +292,13 @@ todo-k8s-control-plane   Ready    control-plane   ...   v1.35.0
 
 确认 kind 集群存在默认 StorageClass。PVC 后续会依赖它动态创建 PV：
 
-```bash
+```bash linenums="0"
 kubectl get storageclass
 ```
 
 预期输出中通常能看到 `standard`：
 
-```text
+```text linenums="0"
 NAME                 PROVISIONER             RECLAIMPOLICY   VOLUMEBINDINGMODE      ALLOWVOLUMEEXPANSION   AGE
 standard (default)   rancher.io/local-path   Delete          WaitForFirstConsumer   false                  ...
 ```
@@ -307,21 +307,21 @@ standard (default)   rancher.io/local-path   Delete          WaitForFirstConsume
 
 确认 Todo API 镜像已经导入 kind：
 
-```bash
+```bash linenums="0"
 docker image inspect todo-api:v0.1.0 >/dev/null
 kind load docker-image todo-api:v0.1.0 --name todo-k8s
 ```
 
 准备 PostgreSQL 镜像。网络正常时，kind 节点可以直接拉取 `registry.cn-guangzhou.aliyuncs.com/yleoer/postgres:18-alpine`；如果你所在网络访问 Docker Hub 不稳定，建议先在宿主机拉取并导入 kind，避免后续 PostgreSQL Pod 卡在 `ImagePullBackOff`：
 
-```bash
+```bash linenums="0"
 docker pull registry.cn-guangzhou.aliyuncs.com/yleoer/postgres:18-alpine
 kind load docker-image registry.cn-guangzhou.aliyuncs.com/yleoer/postgres:18-alpine --name todo-k8s
 ```
 
 确认第 23 篇的基础对象存在：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-workloads get deployment todo-api
 kubectl -n todo-workloads get configmap todo-api-config
 kubectl -n todo-workloads get secret todo-api-auth
@@ -334,13 +334,13 @@ kubectl -n todo-workloads get service todo-api
 
 本篇会继续使用第 21-23 篇的 Kubernetes 基础目录：
 
-```bash
+```bash linenums="0"
 mkdir -p deployments/k8s-base
 ```
 
 本篇完成后，目录结构应类似：
 
-```text
+```text linenums="0"
 deployments/k8s-base
 ├── namespace.yaml
 ├── todo-api-configmap.yaml
@@ -357,7 +357,7 @@ deployments/k8s-base
 
 确认本地 Secret 文件不会进入 Git：
 
-```bash
+```bash linenums="0"
 grep -F 'deployments/k8s-base/*.local.yaml' .gitignore || \
   printf '\ndeployments/k8s-base/*.local.yaml\n' >> .gitignore
 ```
@@ -366,7 +366,7 @@ grep -F 'deployments/k8s-base/*.local.yaml' .gitignore || \
 
 创建 PostgreSQL ConfigMap。这里保存非敏感配置：数据库名、数据目录和服务地址。
 
-```bash
+```bash linenums="0"
 cat > deployments/k8s-base/todo-postgres-configmap.yaml <<'YAML'
 apiVersion: v1
 kind: ConfigMap
@@ -387,7 +387,7 @@ YAML
 
 生成 PostgreSQL 本地实验 Secret。用户名和密码属于敏感信息，所以放在 Secret 中：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-workloads create secret generic todo-postgres-auth \
   --from-literal=POSTGRES_USER=todo \
   --from-literal=POSTGRES_PASSWORD=todo_password \
@@ -396,7 +396,7 @@ kubectl -n todo-workloads create secret generic todo-postgres-auth \
 
 生成 Todo API 数据库 DSN Secret。DSN 中包含数据库密码，因此不要放进 ConfigMap：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-workloads create secret generic todo-api-database \
   --from-literal=TODO_DATABASE_DSN="postgres://todo:todo_password@todo-postgres.todo-workloads.svc.cluster.local:5432/todo_platform?sslmode=disable" \
   --dry-run=client -o yaml > deployments/k8s-base/todo-api-database-secret.local.yaml
@@ -406,7 +406,7 @@ kubectl -n todo-workloads create secret generic todo-api-database \
 
 创建 PostgreSQL Service。一个 Headless Service 提供 StatefulSet 稳定身份，一个普通 ClusterIP Service 给 Todo API 访问：
 
-```bash
+```bash linenums="0"
 cat > deployments/k8s-base/todo-postgres-service.yaml <<'YAML'
 apiVersion: v1
 kind: Service
@@ -446,7 +446,7 @@ YAML
 
 创建 PostgreSQL StatefulSet。`volumeClaimTemplates` 会为 `todo-postgres-0` 自动创建 PVC：
 
-```bash
+```bash linenums="0"
 cat > deployments/k8s-base/todo-postgres-statefulset.yaml <<'YAML'
 # 结构概览：
 # 1. serviceName：绑定 Headless Service，提供稳定网络身份
@@ -530,7 +530,7 @@ YAML
 
 创建迁移 Job。它复用 Todo API 镜像，但只执行 `migrate` 命令：
 
-```bash
+```bash linenums="0"
 cat > deployments/k8s-base/todo-api-migrate-job.yaml <<'YAML'
 apiVersion: batch/v1
 kind: Job
@@ -564,7 +564,7 @@ YAML
 
 更新 Todo API Deployment，让它额外读取数据库 DSN Secret。下面保留第 23 篇的 ConfigMap / Secret 写法，只新增 `todo-api-database`：
 
-```bash
+```bash linenums="0"
 cat > deployments/k8s-base/todo-api-deployment.yaml <<'YAML'
 # 结构概览：
 # 1. envFrom：从 ConfigMap / Secret 注入运行配置、认证配置和数据库 DSN
@@ -651,7 +651,7 @@ YAML
 
 先用 API Server 做 YAML 语法和字段校验：
 
-```bash
+```bash linenums="0"
 kubectl apply --dry-run=server -f deployments/k8s-base/todo-postgres-configmap.yaml
 kubectl apply --dry-run=server -f deployments/k8s-base/todo-postgres-secret.local.yaml
 kubectl apply --dry-run=server -f deployments/k8s-base/todo-api-database-secret.local.yaml
@@ -663,7 +663,7 @@ kubectl apply --dry-run=server -f deployments/k8s-base/todo-api-deployment.yaml
 
 应用 PostgreSQL 配置、Secret 和 Service：
 
-```bash
+```bash linenums="0"
 kubectl apply -f deployments/k8s-base/todo-postgres-configmap.yaml
 kubectl apply -f deployments/k8s-base/todo-postgres-secret.local.yaml
 kubectl apply -f deployments/k8s-base/todo-api-database-secret.local.yaml
@@ -672,7 +672,7 @@ kubectl apply -f deployments/k8s-base/todo-postgres-service.yaml
 
 创建 PostgreSQL StatefulSet：
 
-```bash
+```bash linenums="0"
 kubectl apply -f deployments/k8s-base/todo-postgres-statefulset.yaml
 kubectl -n todo-workloads rollout status statefulset/todo-postgres --timeout=180s
 kubectl -n todo-workloads wait pod/todo-postgres-0 --for=condition=Ready --timeout=180s
@@ -680,7 +680,7 @@ kubectl -n todo-workloads wait pod/todo-postgres-0 --for=condition=Ready --timeo
 
 查看 PVC 与 Pod 状态：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-workloads get pod todo-postgres-0
 kubectl -n todo-workloads get pvc
 kubectl -n todo-workloads get pv
@@ -688,20 +688,20 @@ kubectl -n todo-workloads get pv
 
 确认 PostgreSQL 可以执行 SQL：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-workloads exec todo-postgres-0 -- \
   psql -U todo -d todo_platform -c "SELECT version();"
 ```
 
 验证 StatefulSet 的稳定网络身份。`hostname -f` 应该包含 Pod 序号和 Headless Service 名称：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-workloads exec todo-postgres-0 -- hostname -f
 ```
 
 删除旧迁移 Job，再执行本篇迁移。Job 是一次性对象，重复实验时先删掉旧对象更清楚：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-workloads delete job todo-api-migrate --ignore-not-found
 kubectl apply -f deployments/k8s-base/todo-api-migrate-job.yaml
 kubectl -n todo-workloads wait --for=condition=complete job/todo-api-migrate --timeout=120s
@@ -710,14 +710,14 @@ kubectl -n todo-workloads logs job/todo-api-migrate
 
 确认迁移后表已经创建：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-workloads exec todo-postgres-0 -- \
   psql -U todo -d todo_platform -c "\dt"
 ```
 
 把 Todo API Deployment 更新为数据库模式：
 
-```bash
+```bash linenums="0"
 kubectl apply -f deployments/k8s-base/todo-api-deployment.yaml
 kubectl -n todo-workloads rollout status deployment/todo-api --timeout=180s
 kubectl -n todo-workloads get pods -l app.kubernetes.io/name=todo-api
@@ -725,19 +725,19 @@ kubectl -n todo-workloads get pods -l app.kubernetes.io/name=todo-api
 
 打开一个终端做 Service 转发。这个命令会占用当前终端，验证完成后按 `Ctrl+C` 结束：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-workloads port-forward service/todo-api 18082:80
 ```
 
 另开一个终端验证 API 就绪：
 
-```bash
+```bash linenums="0"
 curl -i http://127.0.0.1:18082/readyz
 ```
 
 登录并通过 API 创建一条 Todo：
 
-```bash
+```bash linenums="0"
 TOKEN=$(curl -s \
   -H 'Content-Type: application/json' \
   -d '{"username":"admin","password":"change-me-123"}' \
@@ -754,7 +754,7 @@ curl -i \
 
 也可以直接从 PostgreSQL 查询这条 Todo：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-workloads exec todo-postgres-0 -- \
   psql -U todo -d todo_platform \
   -c "SELECT id, title, status FROM todos WHERE title = 'persist through Kubernetes PVC';"
@@ -762,7 +762,7 @@ kubectl -n todo-workloads exec todo-postgres-0 -- \
 
 现在删除 PostgreSQL Pod，模拟数据库 Pod 被重建。注意这里不是删除 PVC：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-workloads delete pod todo-postgres-0
 kubectl -n todo-workloads wait pod/todo-postgres-0 --for=condition=Ready --timeout=180s
 kubectl -n todo-workloads get pod todo-postgres-0
@@ -770,7 +770,7 @@ kubectl -n todo-workloads get pod todo-postgres-0
 
 再次查询数据。如果数据仍在，说明 PVC 已经保存了 PostgreSQL 数据目录：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-workloads exec todo-postgres-0 -- \
   psql -U todo -d todo_platform \
   -c "SELECT id, title, status FROM todos WHERE title = 'persist through Kubernetes PVC';"
@@ -778,7 +778,7 @@ kubectl -n todo-workloads exec todo-postgres-0 -- \
 
 最后通过 API 再查一次列表，确认 Todo API 也能从 PostgreSQL 读到数据：
 
-```bash
+```bash linenums="0"
 curl -s \
   -H "Authorization: Bearer $TOKEN" \
   http://127.0.0.1:18082/api/v2/todos | grep "persist through Kubernetes PVC"
@@ -788,7 +788,7 @@ curl -s \
 
 这里把当前数据库导出到本地临时 SQL 文件，再恢复到同一个 PostgreSQL 实例里的检查库。这个实验不是生产备份方案，但能让你看到“备份文件能否恢复”比“备份命令是否执行成功”更重要：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-workloads exec todo-postgres-0 -- \
   pg_dump -U todo -d todo_platform > todo-platform-backup.sql
 
@@ -805,7 +805,7 @@ kubectl -n todo-workloads exec todo-postgres-0 -- \
 
 验证完成后清理恢复检查库，避免后续实验误把它当成业务库：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-workloads exec todo-postgres-0 -- \
   dropdb -U todo todo_platform_restore_check
 ```
@@ -814,27 +814,27 @@ kubectl -n todo-workloads exec todo-postgres-0 -- \
 
 StatefulSet Ready 后，应看到：
 
-```text
+```text linenums="0"
 statefulset rolling update complete 1 pods at revision todo-postgres-...
 pod/todo-postgres-0 condition met
 ```
 
 PVC 应处于 `Bound`：
 
-```text
+```text linenums="0"
 NAME                             STATUS   VOLUME                                     CAPACITY   ACCESS MODES   STORAGECLASS   AGE
 postgres-data-todo-postgres-0    Bound    pvc-...                                    1Gi        RWO            standard       ...
 ```
 
 迁移 Job 应成功完成：
 
-```text
+```text linenums="0"
 job.batch/todo-api-migrate condition met
 ```
 
 表结构应包含 `todos`、`todo_events` 和 `schema_migrations`：
 
-```text
+```text linenums="0"
              List of relations
  Schema |       Name        | Type  | Owner
 --------+-------------------+-------+-------
@@ -845,20 +845,20 @@ job.batch/todo-api-migrate condition met
 
 `/readyz` 应返回 `200 OK`：
 
-```text
+```text linenums="0"
 HTTP/1.1 200 OK
 ...
 ```
 
 Headless Service 稳定身份验证应看到类似输出：
 
-```text
+```text linenums="0"
 todo-postgres-0.todo-postgres-headless.todo-workloads.svc.cluster.local
 ```
 
 删除并重建 `todo-postgres-0` 后，SQL 查询仍应看到刚才创建的 Todo：
 
-```text
+```text linenums="0"
  id |              title               | status
 ----+----------------------------------+---------
  1 | persist through Kubernetes PVC   | pending
@@ -866,7 +866,7 @@ todo-postgres-0.todo-postgres-headless.todo-workloads.svc.cluster.local
 
 恢复检查库中的计数应大于等于 `1`：
 
-```text
+```text linenums="0"
  count
 -------
      1
@@ -878,7 +878,7 @@ todo-postgres-0.todo-postgres-headless.todo-workloads.svc.cluster.local
 
 确认存储对象：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-workloads get statefulset todo-postgres
 kubectl -n todo-workloads get pod todo-postgres-0
 kubectl -n todo-workloads get pvc postgres-data-todo-postgres-0
@@ -892,7 +892,7 @@ kubectl -n todo-workloads get pvc postgres-data-todo-postgres-0
 
 确认数据库表：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-workloads exec todo-postgres-0 -- \
   psql -U todo -d todo_platform -c "\dt"
 ```
@@ -901,7 +901,7 @@ kubectl -n todo-workloads exec todo-postgres-0 -- \
 
 确认 API 已切换到数据库模式：
 
-```bash
+```bash linenums="0"
 POD=$(kubectl -n todo-workloads get pods \
   -l app.kubernetes.io/name=todo-api \
   -o jsonpath='{.items[0].metadata.name}')
@@ -913,7 +913,7 @@ kubectl -n todo-workloads exec "$POD" -- printenv TODO_DATABASE_DSN
 
 确认数据重建后仍在：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-workloads delete pod todo-postgres-0
 kubectl -n todo-workloads wait pod/todo-postgres-0 --for=condition=Ready --timeout=180s
 kubectl -n todo-workloads exec todo-postgres-0 -- \
@@ -925,7 +925,7 @@ kubectl -n todo-workloads exec todo-postgres-0 -- \
 
 确认备份文件可以恢复：
 
-```bash
+```bash linenums="0"
 test -s todo-platform-backup.sql
 ```
 
@@ -935,14 +935,14 @@ test -s todo-platform-backup.sql
 
 本篇产生了真实 PVC 数据。为了后续章节继续使用 Todo Platform，建议默认保留 PostgreSQL、PVC 和 API 数据库配置，只清理一次性迁移 Job：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-workloads delete job todo-api-migrate --ignore-not-found
 rm -f todo-platform-backup.sql
 ```
 
 如果你要彻底清理本篇数据库资源，先确认不再需要实验数据。下面命令会删除 StatefulSet、Service、Secret、ConfigMap 和 PVC；删除 PVC 后，数据库数据会消失：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-workloads delete statefulset todo-postgres --ignore-not-found
 kubectl -n todo-workloads delete service todo-postgres todo-postgres-headless --ignore-not-found
 kubectl -n todo-workloads delete configmap todo-postgres-config --ignore-not-found
@@ -960,7 +960,7 @@ kubectl -n todo-workloads delete pvc postgres-data-todo-postgres-0 --ignore-not-
 
 - **现象**：`kubectl get pvc` 显示：
 
-  ```text
+  ```text linenums="0"
   NAME                            STATUS    VOLUME   CAPACITY   ACCESS MODES   STORAGECLASS   AGE
   postgres-data-todo-postgres-0   Pending                                      standard       3m
   ```
@@ -968,7 +968,7 @@ kubectl -n todo-workloads delete pvc postgres-data-todo-postgres-0 --ignore-not-
 - **原因**：集群没有默认 StorageClass、StorageClass 不存在、动态供给器异常，或访问模式与存储类不匹配。
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   kubectl get storageclass
   kubectl -n todo-workloads describe pvc postgres-data-todo-postgres-0
   ```
@@ -982,14 +982,14 @@ kubectl -n todo-workloads delete pvc postgres-data-todo-postgres-0 --ignore-not-
 
 - **现象**：`kubectl get pods` 显示：
 
-  ```text
+  ```text linenums="0"
   todo-postgres-0   0/1   CrashLoopBackOff   3   2m
   ```
 
 - **原因**：常见原因包括 Secret 缺失、`POSTGRES_PASSWORD` 没有设置、数据目录权限异常，或旧数据目录与新初始化参数冲突。
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   kubectl -n todo-workloads describe pod todo-postgres-0
   kubectl -n todo-workloads logs todo-postgres-0
   kubectl -n todo-workloads get secret todo-postgres-auth
@@ -1004,20 +1004,20 @@ kubectl -n todo-workloads delete pvc postgres-data-todo-postgres-0 --ignore-not-
 
 - **现象**：
 
-  ```text
+  ```text linenums="0"
   job.batch/todo-api-migrate condition failed
   ```
 
   或：
 
-  ```text
+  ```text linenums="0"
   Warning  BackoffLimitExceeded  Job has reached the specified backoff limit
   ```
 
 - **原因**：PostgreSQL 还没有 Ready、DSN 写错、Service DNS 不通、迁移文件在镜像中不存在，或数据库认证失败。
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   kubectl -n todo-workloads logs job/todo-api-migrate
   kubectl -n todo-workloads get endpoints todo-postgres
   kubectl -n todo-workloads exec todo-postgres-0 -- pg_isready -U todo -d todo_platform
@@ -1035,7 +1035,7 @@ kubectl -n todo-workloads delete pvc postgres-data-todo-postgres-0 --ignore-not-
 - **原因**：Deployment 没有引用 `todo-api-database` Secret，或者 `TODO_DATABASE_DSN` key 写错。
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   POD=$(kubectl -n todo-workloads get pods \
     -l app.kubernetes.io/name=todo-api \
     -o jsonpath='{.items[0].metadata.name}')
@@ -1055,7 +1055,7 @@ kubectl -n todo-workloads delete pvc postgres-data-todo-postgres-0 --ignore-not-
 - **原因**：PVC 被删除后，绑定的 PV 可能按 `Delete` 回收策略删除底层数据。kind 默认 local-path 存储就是教学环境，不提供生产级数据保护。
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   kubectl -n todo-workloads get pvc
   kubectl get pv
   kubectl get storageclass standard -o yaml
@@ -1111,70 +1111,13 @@ kubectl -n todo-workloads delete pvc postgres-data-todo-postgres-0 --ignore-not-
 - 能解释为什么删除 PVC 与删除 Pod 的影响完全不同。
 - 能说明本篇方案为什么不是生产高可用 PostgreSQL。
 
-## 9. 本章练习题
+## 9. 练习题与面试题
 
-基础题：
+本章练习题和面试题已拆分到独立页面，完成正文学习后再进入题库练习与复盘。
 
-1. `emptyDir` 和 PVC 的生命周期有什么不同？
-2. PV 和 PVC 分别由谁关心？为什么 Pod 通常引用 PVC 而不是直接引用 PV？
-3. StorageClass 在动态供给中负责什么？
-4. StatefulSet 相比 Deployment 解决了哪些有状态服务问题？
-5. 为什么 PVC 不等于数据库备份？
+[查看本章练习题与面试题](../../questions/stage-04-kubernetes/24-k8s-storage.md)
 
-实操题：
-
-1. 不要直接修改 StatefulSet 的 `volumeClaimTemplates` 来扩容，这类字段通常不可原地更新。请先查看当前 StorageClass 是否允许扩容，再尝试 patch 已生成的 PVC：`kubectl -n todo-workloads patch pvc postgres-data-todo-postgres-0 -p '{"spec":{"resources":{"requests":{"storage":"2Gi"}}}}'`。验收标准：能说明当前 kind 默认 StorageClass 是否支持扩容，以及 `kubectl describe pvc` 中的事件含义。
-2. 故意把 `todo-api-database` Secret 中的 Service 名写成 `todo-postgres-wrong`，重新运行迁移 Job，记录失败日志，再恢复正确 DSN。验收标准：能从 Job 日志中定位 DNS 或连接错误。
-3. 删除 `todo-postgres-0` Pod，但不要删除 PVC，验证数据仍然存在；随后在确认不需要数据的前提下删除 PVC，再解释两次操作的结果差异。
-
-思考题：
-
-1. 如果团队要求 PostgreSQL 每天凌晨备份，并且能恢复到任意 15 分钟内的时间点，你会如何设计备份、WAL 归档、恢复演练和权限边界？
-2. 如果生产环境已经有云厂商托管 PostgreSQL，你还会把数据库放进 Kubernetes 吗？哪些场景适合放，哪些场景不适合？
-
-## 10. 本章面试题
-
-### 面试题 1：PV、PVC 和 StorageClass 的关系是什么？
-
-**一句话结论**：PVC 是应用的存储申请，PV 是集群提供的存储资源，StorageClass 定义如何动态创建 PV。
-
-**展开解释**：应用通常只声明 PVC：需要多大容量、什么访问模式、哪个存储类。Kubernetes 根据 PVC 和 StorageClass 创建或匹配 PV，并把 PVC 绑定到 PV。Pod 通过 PVC 挂载存储，不关心底层是云硬盘、本地盘还是网络存储。
-
-**深入追问**：如果 PVC 一直 `Pending`，要检查 StorageClass 是否存在、是否默认、provisioner 是否正常、访问模式是否支持，以及事件里是否有容量或权限错误。
-
-### 面试题 2：为什么数据库更适合用 StatefulSet，而不是 Deployment？
-
-**一句话结论**：StatefulSet 提供稳定 Pod 名称、稳定网络身份和与 Pod 绑定的 PVC 模板，更适合有状态服务。
-
-**展开解释**：Deployment 面向无状态副本，Pod 名称和副本替换都是临时的。数据库需要稳定身份和稳定数据目录，StatefulSet 的 `todo-postgres-0`、Headless Service DNS 和 `volumeClaimTemplates` 能把身份与存储关联起来。
-
-**深入追问**：StatefulSet 不是数据库高可用方案。它只是 Kubernetes 工作负载控制器，复制、备份、故障切换和一致性仍然要由数据库自身、Operator 或外部平台解决。
-
-### 面试题 3：删除 Pod、删除 StatefulSet 和删除 PVC 分别会发生什么？
-
-**一句话结论**：删除 Pod 会被 StatefulSet 重建并复用 PVC；删除 StatefulSet 会停止管理 Pod，但 PVC 通常仍在；删除 PVC 可能导致底层数据被删除。
-
-**展开解释**：StatefulSet 负责维持期望副本数，所以删除 `todo-postgres-0` 后会创建新的 `todo-postgres-0`。删除 StatefulSet 时，如果不级联删除 PVC，数据声明还在。删除 PVC 才是危险操作，因为 PV 的回收策略可能删除底层磁盘。
-
-**深入追问**：生产环境要用 RBAC、审批、备份和 ReclaimPolicy 约束 PVC 删除。误删 PVC 后，不能指望 Kubernetes 自动恢复数据，只能依赖备份或底层存储快照。
-
-### 面试题 4：为什么 PVC 不等于备份？
-
-**一句话结论**：PVC 是在线数据存储，备份是独立副本和恢复流程，两者解决的问题不同。
-
-**展开解释**：PVC 能让 Pod 重建后继续使用同一份数据，但如果数据被误删、表被错误迁移、底层存储损坏或 PVC 被删除，PVC 本身无法提供历史版本。备份需要离线或异地副本、保留策略、恢复命令和验证流程。
-
-**深入追问**：成熟方案通常结合逻辑备份、物理备份、WAL 归档和定期恢复演练，并用 RPO/RTO 指标定义业务可接受的损失范围。
-
-### 面试题 5：Kubernetes 中运行 PostgreSQL 的生产风险有哪些？
-
-**一句话结论**：核心风险是数据可靠性、故障切换、备份恢复、性能抖动、权限边界和运维复杂度。
-
-**展开解释**：数据库比无状态 API 更依赖磁盘性能、稳定网络、升级策略和恢复能力。Kubernetes 可以管理 Pod 和 PVC，但不会自动解决数据库复制、一致性、备份、慢查询和容量规划。没有数据库平台能力的团队，生产中更适合使用托管 PostgreSQL。
-
-**深入追问**：如果必须自建，应优先选择成熟 Operator，明确主从复制、自动故障切换、备份恢复、监控告警、版本升级和演练流程，而不是只写一个 StatefulSet。
-
-## 11. 本章总结
+## 10. 本章总结
 
 本篇把 Todo Platform 从“API 可以在 Kubernetes 中运行”推进到“核心业务数据可以通过 PostgreSQL 持久化”。你学习了 Volume、PV、PVC、StorageClass 和 StatefulSet 的职责边界，理解了 PVC 动态供给、StatefulSet 稳定身份、PostgreSQL 数据目录和迁移 Job 的运行链路。
 
@@ -1182,7 +1125,7 @@ kubectl -n todo-workloads delete pvc postgres-data-todo-postgres-0 --ignore-not-
 
 能力价值上，你已经能处理 Kubernetes 中最常见的有状态服务入门任务：申请持久存储、部署单实例数据库、执行迁移、切换应用配置、验证数据保留，并能区分“教学可用”和“生产可用”的边界。
 
-## 12. 下一章衔接
+## 11. 下一章衔接
 
 第 25 篇会进入 Kubernetes 网络原理，解释 Pod、Service、DNS、CNI、kube-proxy 和 NetworkPolicy 如何共同完成集群通信。本篇的 `todo-api -> todo-postgres` 访问链路会成为下一章的真实案例：如果 DNS 解析失败、Service 没有 Endpoints 或网络策略拦截，Todo API 就无法连接数据库。
 

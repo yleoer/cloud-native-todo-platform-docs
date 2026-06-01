@@ -23,7 +23,7 @@
 
 === "Linux / macOS / WSL2"
 
-    ```bash
+    ```bash linenums="0"
     docker version
     docker info
     docker context ls
@@ -34,7 +34,7 @@
 
 === "Windows PowerShell"
 
-    ```powershell
+    ```powershell linenums="0"
     docker version
     docker info
     docker context ls
@@ -52,7 +52,7 @@
 
 ## 3. 镜像命令速查
 
-```bash
+```bash linenums="0"
 docker pull registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23
 docker pull registry.cn-guangzhou.aliyuncs.com/yleoer/golang:1.26-bookworm
 docker image ls
@@ -76,25 +76,25 @@ docker image rm todo-api:v0.1.0
 
 基础构建：
 
-```bash
+```bash linenums="0"
 docker build -f api/Dockerfile -t todo-api:v0.1.0 .
 ```
 
 查看更详细构建输出：
 
-```bash
+```bash linenums="0"
 docker build --progress=plain -f api/Dockerfile -t todo-api:v0.1.0 .
 ```
 
 绕过缓存排查：
 
-```bash
+```bash linenums="0"
 docker build --no-cache -f api/Dockerfile -t todo-api:v0.1.0 .
 ```
 
 传入版本参数：
 
-```bash
+```bash linenums="0"
 docker build \
   -f api/Dockerfile \
   --build-arg VERSION=v0.1.0 \
@@ -104,7 +104,7 @@ docker build \
 
 Windows PowerShell 写法：
 
-```powershell
+```powershell linenums="0"
 docker build `
   -f api/Dockerfile `
   --build-arg VERSION=v0.1.0 `
@@ -122,7 +122,7 @@ docker build `
 
 适用环境：第 15 篇手工容器或第 16 篇单容器镜像验证，容器名使用 `todo-api`。第 17 篇 Compose 环境请优先使用第 8 节的 `docker compose ps/logs/exec/restart`。
 
-```bash
+```bash linenums="0"
 docker run --name todo-api -d todo-api:v0.1.0
 docker ps
 docker ps -a
@@ -140,7 +140,7 @@ docker rm todo-api
 
 查看退出码：
 
-```bash
+```bash linenums="0"
 docker inspect todo-api --format '{{.State.Status}} {{.State.ExitCode}} {{.State.Error}}'
 ```
 
@@ -161,14 +161,14 @@ docker inspect todo-api --format '{{.State.Status}} {{.State.ExitCode}} {{.State
 
 查看端口映射：
 
-```bash
+```bash linenums="0"
 docker port todo-api
 docker inspect todo-api --format '{{json .NetworkSettings.Ports}}'
 ```
 
 查看容器网络：
 
-```bash
+```bash linenums="0"
 docker network ls
 docker network inspect todo-net
 docker inspect todo-api --format '{{json .NetworkSettings.Networks}}'
@@ -176,14 +176,14 @@ docker inspect todo-api --format '{{json .NetworkSettings.Networks}}'
 
 在同一 Docker 网络中测试 DNS：
 
-```bash
+```bash linenums="0"
 docker run --rm --network todo-net registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23 nslookup todo-postgres
 docker run --rm --network todo-net registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23 nslookup todo-redis
 ```
 
 Compose 环境中测试服务名：
 
-```bash
+```bash linenums="0"
 docker run --rm --network todo-platform_todo-net registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23 nslookup postgres
 docker run --rm --network todo-platform_todo-net registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23 nslookup redis
 docker compose exec postgres pg_isready -U todo -d todo_platform
@@ -208,7 +208,7 @@ docker compose exec redis redis-cli -a todo_redis_password PING
 
 查看 volume：
 
-```bash
+```bash linenums="0"
 docker volume ls
 docker volume inspect todo-postgres-data
 docker inspect todo-postgres --format '{{json .Mounts}}'
@@ -216,7 +216,7 @@ docker inspect todo-postgres --format '{{json .Mounts}}'
 
 判断数据是否持久化：
 
-```bash
+```bash linenums="0"
 docker exec -it todo-postgres psql -U todo -d todo_platform -c '\dt'
 docker stop todo-postgres
 docker start todo-postgres
@@ -232,13 +232,13 @@ docker exec -it todo-postgres psql -U todo -d todo_platform -c '\dt'
 
 配置检查：
 
-```bash
+```bash linenums="0"
 docker compose config
 ```
 
 启动和查看：
 
-```bash
+```bash linenums="0"
 docker compose up -d
 docker compose ps
 docker compose logs --tail 100
@@ -247,27 +247,27 @@ docker compose logs -f api
 
 重建单个服务：
 
-```bash
+```bash linenums="0"
 docker compose up -d --build api
 ```
 
 进入服务容器：
 
-```bash
+```bash linenums="0"
 docker compose exec postgres psql -U todo -d todo_platform
 docker compose exec redis redis-cli -a todo_redis_password PING
 ```
 
 停止和清理：
 
-```bash
+```bash linenums="0"
 docker compose stop
 docker compose down
 ```
 
 只有确认要删除数据时才执行：
 
-```bash
+```bash linenums="0"
 docker compose down -v
 ```
 
@@ -282,26 +282,26 @@ Compose 排障优先顺序：
 
 观察进程模型：
 
-```bash
+```bash linenums="0"
 docker run --rm registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23 sh -c 'echo "hostname=$(hostname)"; ps -o pid,ppid,comm; cat /proc/1/cgroup'
 ```
 
 观察资源限制：
 
-```bash
+```bash linenums="0"
 docker run --rm --memory=64m --cpus=0.5 registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23 sh -c 'cat /proc/self/cgroup; echo ok'
 ```
 
 观察镜像层：
 
-```bash
+```bash linenums="0"
 docker history todo-api:v0.1.0
 docker image inspect todo-api:v0.1.0 --format '{{json .RootFS.Layers}}'
 ```
 
 进入已有容器的 namespace：
 
-```bash
+```bash linenums="0"
 docker run -d --name nsenter-demo registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23 sleep 1d
 PID="$(docker inspect -f '{{.State.Pid}}' nsenter-demo)"
 sudo nsenter -t "$PID" -p -m -u -i -n sh
@@ -313,14 +313,14 @@ sudo nsenter -t "$PID" -p -m -u -i -n sh
 
 查看 kind 节点：
 
-```bash
+```bash linenums="0"
 kind get clusters
 docker ps --filter name=kind
 ```
 
 进入 kind 节点观察 CRI：
 
-```bash
+```bash linenums="0"
 NODE="$(docker ps --filter name=kind-control-plane --format '{{.Names}}' | head -n 1)"
 docker exec -it "$NODE" crictl ps
 docker exec -it "$NODE" crictl pods
@@ -329,7 +329,7 @@ docker exec -it "$NODE" crictl images
 
 查看 containerd namespace：
 
-```bash
+```bash linenums="0"
 docker exec -it "$NODE" ctr namespaces ls
 docker exec -it "$NODE" ctr -n k8s.io containers ls
 docker exec -it "$NODE" ctr -n k8s.io tasks ls
@@ -349,14 +349,14 @@ docker exec -it "$NODE" ctr -n k8s.io tasks ls
 
 镜像安全检查：
 
-```bash
+```bash linenums="0"
 docker image inspect todo-api:v0.1.0 --format '{{.Config.User}}'
 docker history todo-api:v0.1.0
 ```
 
 如果安装了扫描工具：
 
-```bash
+```bash linenums="0"
 trivy image todo-api:v0.1.0
 docker scout cves todo-api:v0.1.0
 ```
@@ -375,25 +375,25 @@ docker scout cves todo-api:v0.1.0
 
 清理指定实验容器：
 
-```bash
+```bash linenums="0"
 docker rm -f todo-api todo-postgres todo-redis 2>/dev/null || true
 ```
 
 清理指定网络：
 
-```bash
+```bash linenums="0"
 docker network rm todo-net 2>/dev/null || true
 ```
 
 查看磁盘占用：
 
-```bash
+```bash linenums="0"
 docker system df
 ```
 
 谨慎清理未使用资源：
 
-```bash
+```bash linenums="0"
 docker system prune
 ```
 
@@ -404,7 +404,7 @@ docker system prune
 
 遇到问题时，用下面格式记录：
 
-```text
+```text linenums="0"
 现象：
 影响范围：
 当前环境：
@@ -425,7 +425,7 @@ docker system prune
 
 示例：
 
-```text
+```text linenums="0"
 Dockerfile 多阶段构建是什么？
 
 它把编译环境和运行环境拆成多个 stage。Go 服务可以在 golang 镜像中下载依赖、运行测试、编译二进制，然后只把二进制和必要配置复制到 distroless 或 slim 运行镜像。

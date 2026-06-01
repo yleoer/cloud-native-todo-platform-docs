@@ -19,7 +19,7 @@
 
 ## 2. 环境检查速查
 
-```bash
+```bash linenums="0"
 command -v go git docker kubectl kind helm bash
 
 go version
@@ -33,7 +33,7 @@ bash --version
 
 如果某个命令不存在，先判断是“没有安装”还是“安装了但 PATH 没生效”：
 
-```bash
+```bash linenums="0"
 echo "$PATH"
 which go || true
 ls -l /usr/local/go/bin/go 2>/dev/null || true
@@ -45,7 +45,7 @@ ls -l /usr/local/go/bin/go 2>/dev/null || true
 
 定位当前位置和目录内容：
 
-```bash
+```bash linenums="0"
 pwd
 ls -lah
 find . -maxdepth 2 -type f | sort
@@ -53,7 +53,7 @@ find . -maxdepth 2 -type f | sort
 
 查看权限和所有者：
 
-```bash
+```bash linenums="0"
 ls -l path/to/file
 ls -ld path/to/dir
 stat path/to/file
@@ -63,7 +63,7 @@ id
 
 安全修改权限：
 
-```bash
+```bash linenums="0"
 chmod 755 scripts/dev.sh
 chmod 640 config/app.env
 ```
@@ -73,7 +73,7 @@ chmod 640 config/app.env
 
 安全删除前先确认路径：
 
-```bash
+```bash linenums="0"
 TARGET="labs/linux-filesystem/todo-server/tmp/restore-test"
 pwd
 echo "$TARGET"
@@ -88,13 +88,13 @@ rm -rf "$TARGET"
 
 查看小文件：
 
-```bash
+```bash linenums="0"
 cat config/app.env
 ```
 
 查看大文件：
 
-```bash
+```bash linenums="0"
 less var/log/todo-platform/todo-api.log
 tail -n 100 var/log/todo-platform/todo-api.log
 tail -f var/log/todo-platform/todo-api.log
@@ -102,14 +102,14 @@ tail -f var/log/todo-platform/todo-api.log
 
 搜索错误：
 
-```bash
+```bash linenums="0"
 grep -n "ERROR" var/log/todo-platform/*.log
 grep -Rni "TODO_HTTP_ADDR" .
 ```
 
 查找最近修改过的文件：
 
-```bash
+```bash linenums="0"
 find . -type f -mtime -1 -print
 ```
 
@@ -117,14 +117,14 @@ find . -type f -mtime -1 -print
 
 查看进程：
 
-```bash
+```bash linenums="0"
 ps aux | grep todo
 pgrep -af todo
 ```
 
 查看资源：
 
-```bash
+```bash linenums="0"
 top
 htop
 free -h
@@ -134,7 +134,7 @@ du -sh var/log/todo-platform 2>/dev/null || true
 
 查看 systemd 服务：
 
-```bash
+```bash linenums="0"
 sudo systemctl status todo-process-demo --no-pager
 sudo journalctl -u todo-process-demo -n 100 --no-pager
 sudo systemctl restart todo-process-demo
@@ -142,7 +142,7 @@ sudo systemctl restart todo-process-demo
 
 查看端口归属：
 
-```bash
+```bash linenums="0"
 sudo ss -lntp | grep 18080 || true
 sudo lsof -iTCP:18080 -sTCP:LISTEN
 ```
@@ -154,21 +154,21 @@ sudo lsof -iTCP:18080 -sTCP:LISTEN
 
 判断服务是否可访问：
 
-```bash
+```bash linenums="0"
 curl -i http://127.0.0.1:18080/healthz
 curl -v --max-time 3 http://127.0.0.1:18080/healthz
 ```
 
 判断端口是否监听：
 
-```bash
+```bash linenums="0"
 ss -lnt | grep 18080 || true
 sudo ss -lntp 'sport = :18080'
 ```
 
 判断 DNS：
 
-```bash
+```bash linenums="0"
 getent hosts localhost
 dig example.com
 nslookup example.com
@@ -176,7 +176,7 @@ nslookup example.com
 
 抓取本机请求：
 
-```bash
+```bash linenums="0"
 sudo tcpdump -i lo -nn 'tcp port 18080' -c 10
 ```
 
@@ -197,7 +197,7 @@ sudo tcpdump -i lo -nn 'tcp port 18080' -c 10
 
 查看状态：
 
-```bash
+```bash linenums="0"
 git status --short --branch
 git log --oneline --decorate -n 10
 git branch --show-current
@@ -205,7 +205,7 @@ git branch --show-current
 
 创建分支：
 
-```bash
+```bash linenums="0"
 git switch main
 git pull --ff-only
 git switch -c docs/stage-01-foundation-portfolio
@@ -213,7 +213,7 @@ git switch -c docs/stage-01-foundation-portfolio
 
 提交：
 
-```bash
+```bash linenums="0"
 git add .
 git diff --check
 git commit -m "docs: update foundation stage" -m "Refs #3"
@@ -221,13 +221,13 @@ git commit -m "docs: update foundation stage" -m "Refs #3"
 
 推送：
 
-```bash
+```bash linenums="0"
 git push -u origin docs/stage-01-foundation-portfolio
 ```
 
 处理冲突：
 
-```bash
+```bash linenums="0"
 git status
 git diff
 # 编辑冲突文件，删除 <<<<<<< ======= >>>>>>> 标记
@@ -242,7 +242,7 @@ git rebase --continue
 
 脚本基本结构：
 
-```bash
+```bash linenums="0"
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
@@ -255,14 +255,14 @@ main "$@"
 
 检查语法：
 
-```bash
+```bash linenums="0"
 bash -n scripts/*.sh
 shellcheck scripts/*.sh
 ```
 
 检查退出码：
 
-```bash
+```bash linenums="0"
 ./scripts/check.sh
 echo "$?"
 ```
@@ -281,7 +281,7 @@ echo "$?"
 
 遇到问题时，按这个顺序收集信息：
 
-```bash
+```bash linenums="0"
 echo "==> where am I"
 pwd
 git status --short --branch
@@ -307,7 +307,7 @@ bash -n scripts/*.sh 2>/dev/null || true
 
 然后用一句话写出当前判断：
 
-```text
+```text linenums="0"
 现象：
 已确认：
 尚未确认：

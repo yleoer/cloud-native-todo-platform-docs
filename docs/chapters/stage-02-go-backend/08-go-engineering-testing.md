@@ -51,7 +51,7 @@ Go 工程化的目标不是把目录拆得很复杂，而是让“入口、配�
 
 **在项目中怎么用**：本课程采用下面的最小工程骨架：
 
-```text
+```text linenums="0"
 cloud-native-todo-platform/
 ├── go.mod
 ├── go.sum
@@ -87,7 +87,7 @@ cloud-native-todo-platform/
 
 **在项目中怎么用**：本章先使用环境变量实现最小配置加载。
 
-```go
+```go linenums="0"
 cfg := config.Load()
 fmt.Println(cfg.Port)
 ```
@@ -102,7 +102,7 @@ fmt.Println(cfg.Port)
 
 **在项目中怎么用**：
 
-```go
+```go linenums="0"
 log.Info("todo created", "component", "todo", "todo_id", item.ID)
 ```
 
@@ -116,7 +116,7 @@ log.Info("todo created", "component", "todo", "todo_id", item.ID)
 
 **在项目中怎么用**：
 
-```go
+```go linenums="0"
 if err != nil {
 	return Todo{}, fmt.Errorf("save todo: %w", err)
 }
@@ -132,7 +132,7 @@ if err != nil {
 
 **在项目中怎么用**：
 
-```bash
+```bash linenums="0"
 go test ./...
 go test ./... -cover
 go test ./internal/todo -bench BenchmarkServiceStats -benchmem
@@ -216,13 +216,13 @@ flowchart TB
 
 检查 Go 版本：
 
-```bash
+```bash linenums="0"
 go version
 ```
 
 预期输出类似。最后的 `linux/amd64`、`darwin/arm64` 或 `windows/amd64` 会随你的操作系统和 CPU 架构变化：
 
-```text
+```text linenums="0"
 go version go1.26.0 linux/amd64
 ```
 
@@ -232,19 +232,19 @@ go version go1.26.0 linux/amd64
 
 本章沿用第 7 篇创建的 Go module。先确认当前 module path：
 
-```bash
+```bash linenums="0"
 go list -m
 ```
 
 如果你完全按第 7 篇执行，预期输出是：
 
-```text
+```text linenums="0"
 cloud-native-todo-platform
 ```
 
 本章代码统一使用这个 module path，例如：
 
-```go
+```go linenums="0"
 import "cloud-native-todo-platform/internal/todo"
 ```
 
@@ -265,25 +265,25 @@ import "cloud-native-todo-platform/internal/todo"
 
 === "Linux / macOS / WSL2"
 
-    ```bash
+    ```bash linenums="0"
     mkdir -p cmd/todo-api internal/app internal/config internal/logger internal/todo test/integration
     ```
 
 === "Windows PowerShell"
 
-    ```powershell
+    ```powershell linenums="0"
     New-Item -ItemType Directory -Force cmd\todo-api, internal\app, internal\config, internal\logger, internal\todo, test\integration
     ```
 
 如果目录已经存在，上面的命令不会破坏已有目录。若你从第 7 篇继续且 `go.mod` 已存在，请跳过 `go mod init`；如果你是单独练习本篇，才需要初始化 module。课程推荐沿用第 7 篇的 module path：
 
-```bash
+```bash linenums="0"
 go mod init cloud-native-todo-platform
 ```
 
 最终结构如下：
 
-```text
+```text linenums="0"
 cloud-native-todo-platform/
 ├── go.mod
 ├── go.sum
@@ -313,7 +313,7 @@ cloud-native-todo-platform/
 
 创建 `internal/config/config.go`：
 
-```go
+```go linenums="0"
 package config
 
 import (
@@ -362,7 +362,7 @@ func getInt(key string, fallback int) int {
 
 创建 `internal/logger/logger.go`：
 
-```go
+```go linenums="0"
 package logger
 
 import (
@@ -396,7 +396,7 @@ func parseLevel(level string) slog.Level {
 
 创建 `internal/todo/model.go`：
 
-```go
+```go linenums="0"
 package todo
 
 import "time"
@@ -430,7 +430,7 @@ type Stats struct {
 
 创建 `internal/todo/repository.go`：
 
-```go
+```go linenums="0"
 package todo
 
 import (
@@ -494,7 +494,7 @@ func (r *MemoryRepository) List(ctx context.Context) ([]Todo, error) {
 
 创建 `internal/todo/service.go`：
 
-```go
+```go linenums="0"
 package todo
 
 import (
@@ -590,7 +590,7 @@ func (s *Service) Stats(ctx context.Context) (Stats, error) {
 
 创建 `internal/app/app.go`：
 
-```go
+```go linenums="0"
 package app
 
 import (
@@ -628,7 +628,7 @@ func (a *App) Health(ctx context.Context) error {
 
 创建 `cmd/todo-api/main.go`：
 
-```go
+```go linenums="0"
 package main
 
 import (
@@ -663,7 +663,7 @@ func main() {
 
 创建 `internal/todo/service_test.go`：
 
-```go
+```go linenums="0"
 package todo
 
 import (
@@ -792,7 +792,7 @@ func BenchmarkServiceStats(b *testing.B) {
 
 创建 `test/integration/app_test.go`：
 
-```go
+```go linenums="0"
 package integration
 
 import (
@@ -842,7 +842,7 @@ func TestAppCreatesTodo(t *testing.T) {
 
 先格式化全部 Go 代码，避免格式问题进入提交：
 
-```bash
+```bash linenums="0"
 go fmt ./...
 ```
 
@@ -850,7 +850,7 @@ go fmt ./...
 
 执行静态检查，提前发现不可达代码、格式化字符串错误等问题：
 
-```bash
+```bash linenums="0"
 go vet ./...
 ```
 
@@ -858,13 +858,13 @@ go vet ./...
 
 执行所有测试：
 
-```bash
+```bash linenums="0"
 go test ./...
 ```
 
 预期输出类似：
 
-```text
+```text linenums="0"
 ?   	cloud-native-todo-platform/cmd/todo-api	[no test files]
 ?   	cloud-native-todo-platform/internal/app	[no test files]
 ?   	cloud-native-todo-platform/internal/config	[no test files]
@@ -875,13 +875,13 @@ ok  	cloud-native-todo-platform/test/integration	0.004s
 
 查看覆盖率：
 
-```bash
+```bash linenums="0"
 go test ./... -cover
 ```
 
 预期输出类似：
 
-```text
+```text linenums="0"
 ok  	cloud-native-todo-platform/internal/todo	0.003s	coverage: 55.8% of statements
 ok  	cloud-native-todo-platform/test/integration	0.004s	coverage: 29.4% of statements
 ```
@@ -890,7 +890,7 @@ ok  	cloud-native-todo-platform/test/integration	0.004s	coverage: 29.4% of state
 
 生成覆盖率文件并查看函数级覆盖率：
 
-```bash
+```bash linenums="0"
 go test ./... -coverprofile coverage.out
 go tool cover -func coverage.out
 ```
@@ -899,13 +899,13 @@ go tool cover -func coverage.out
 
 运行 Benchmark：
 
-```bash
+```bash linenums="0"
 go test ./internal/todo -bench BenchmarkServiceStats -benchmem
 ```
 
 预期输出类似：
 
-```text
+```text linenums="0"
 BenchmarkServiceStats-8   	  100000	     12345 ns/op	   24576 B/op	       1 allocs/op
 PASS
 ok  	cloud-native-todo-platform/internal/todo	1.456s
@@ -913,13 +913,13 @@ ok  	cloud-native-todo-platform/internal/todo	1.456s
 
 启动 Todo API 工程骨架：
 
-```bash
+```bash linenums="0"
 go run ./cmd/todo-api
 ```
 
 预期输出类似：
 
-```text
+```text linenums="0"
 {"time":"2026-05-27T10:00:00.000000000Z","level":"INFO","msg":"todo api skeleton started","env":"dev","port":8080}
 todo api skeleton checked; future listener addr :8080
 ```
@@ -945,7 +945,7 @@ todo api skeleton checked; future listener addr :8080
 
 === "Linux / macOS / WSL2"
 
-    ```bash
+    ```bash linenums="0"
     unset TODO_API_ENV
     unset TODO_API_PORT
     unset TODO_API_LOG_LEVEL
@@ -954,7 +954,7 @@ todo api skeleton checked; future listener addr :8080
 
 === "Windows PowerShell"
 
-    ```powershell
+    ```powershell linenums="0"
     Remove-Item Env:TODO_API_ENV -ErrorAction SilentlyContinue
     Remove-Item Env:TODO_API_PORT -ErrorAction SilentlyContinue
     Remove-Item Env:TODO_API_LOG_LEVEL -ErrorAction SilentlyContinue
@@ -973,14 +973,14 @@ todo api skeleton checked; future listener addr :8080
 
 - **现象**：
 
-  ```text
+  ```text linenums="0"
   package cloud-native-todo-platform/internal/config is not in std
   ```
 
 - **原因**：代码里的 import path 和 `go.mod` 中的 module 名称不一致，Go 无法把它识别为当前项目内部包。
 - **排查**：查看当前 module 名称。
 
-  ```bash
+  ```bash linenums="0"
   go list -m
   ```
 
@@ -993,14 +993,14 @@ todo api skeleton checked; future listener addr :8080
 
 - **现象**：
 
-  ```text
+  ```text linenums="0"
   found packages todo (model.go) and todos (service_test.go) in internal/todo
   ```
 
 - **原因**：同一个目录下的 Go 文件必须属于同一个 package，除非测试文件使用 `todo_test` 这种外部测试包命名。这里把 `service_test.go` 误写成了 `package todos`。
 - **排查**：检查当前目录的 package 声明。
 
-  ```bash
+  ```bash linenums="0"
   rg "^package " internal/todo
   ```
 
@@ -1013,7 +1013,7 @@ todo api skeleton checked; future listener addr :8080
 
 - **现象**：
 
-  ```text
+  ```text linenums="0"
   --- FAIL: TestServiceCreate/empty_title
       service_test.go:50: Create() did not assign ID
   ```
@@ -1021,7 +1021,7 @@ todo api skeleton checked; future listener addr :8080
 - **原因**：测试已经匹配到预期错误，但没有 `return`，继续执行成功分支的断言，导致误判。
 - **排查**：查看测试中处理 `wantErr` 的分支。
 
-  ```bash
+  ```bash linenums="0"
   go test ./internal/todo -run TestServiceCreate -v
   ```
 
@@ -1034,14 +1034,14 @@ todo api skeleton checked; future listener addr :8080
 
 - **现象**：
 
-  ```text
+  ```text linenums="0"
   {"time":"...","level":"INFO","msg":"todo api skeleton started"}
   ```
 
 - **原因**：调用 `log.Info` 时只传了消息，没有追加键值对，日志平台无法按字段检索。
 - **排查**：检查日志调用是否是成对的 key/value。
 
-  ```bash
+  ```bash linenums="0"
   rg "log\\.Info|log\\.Error" cmd internal
   ```
 
@@ -1052,26 +1052,26 @@ todo api skeleton checked; future listener addr :8080
 
 - **现象**：
 
-  ```text
+  ```text linenums="0"
   cover: open coverage.out: The system cannot find the file specified.
   ```
 
 - **原因**：直接执行了 `go tool cover -func coverage.out`，但之前没有先执行 `go test ./... -coverprofile coverage.out` 生成覆盖率文件。
 - **排查**：确认当前目录是否存在覆盖率文件。
 
-  ```bash
+  ```bash linenums="0"
   ls coverage.out
   ```
 
   Windows PowerShell 使用：
 
-  ```powershell
+  ```powershell linenums="0"
   Get-ChildItem coverage.out
   ```
 
 - **修复**：先生成覆盖率文件，再查看函数级覆盖率。
 
-  ```bash
+  ```bash linenums="0"
   go test ./... -coverprofile coverage.out
   go tool cover -func coverage.out
   ```
@@ -1116,73 +1116,16 @@ todo api skeleton checked; future listener addr :8080
 - 执行 `go run ./cmd/todo-api`，终端输出 JSON 日志和启动提示。
 - 代码中没有真实密码、真实 IP、个人绝对路径或硬编码生产配置。
 
-## 9. 本章练习题
+## 9. 练习题与面试题
 
-### 基础题
+本章练习题和面试题已拆分到独立页面，完成正文学习后再进入题库练习与复盘。
 
-1. 为什么本课程把启动入口放在 `cmd/todo-api`，而不是把所有代码都写在 `main.go`？
-2. `internal/` 目录和普通目录相比有什么特殊含义？
-3. 结构化日志相比 `fmt.Println` 在生产排障中有什么优势？
-4. 为什么错误包装时要使用 `%w`，而不是只拼接字符串？
-5. 单元测试和集成测试的边界分别是什么？
+[查看本章练习题与面试题](../../questions/stage-02-go-backend/08-go-engineering-testing.md)
 
-### 实操题
-
-1. 给 `config.Config` 增加 `ShutdownTimeoutSeconds` 字段，并通过 `TODO_API_SHUTDOWN_TIMEOUT_SECONDS` 环境变量覆盖。当 `go run ./cmd/todo-api` 输出该字段时，说明操作成功。
-2. 给 `todo.Service` 增加 `MarkDone(ctx, id)` 方法，并补充表驱动测试。当 `go test ./internal/todo -run TestServiceMarkDone -v` 通过时，说明操作成功。
-3. 生成 HTML 覆盖率报告：执行 `go test ./... -coverprofile coverage.out` 和 `go tool cover -html coverage.out`。当浏览器中能看到 `internal/todo/service.go` 的覆盖行时，说明操作成功。
-
-### 思考题
-
-1. 如果团队要求所有日志都必须包含 `request_id`，你会把这个字段放在日志包、应用层，还是后续 HTTP 中间件里？为什么？
-2. 如果一个 PR 只提高了覆盖率数字，但没有新增关键业务断言，Reviewer 应该如何判断它是否有价值？
-
-## 10. 本章面试题
-
-### 面试题：你会如何设计一个 Go 后端项目的目录结构？
-
-**一句话结论**：我会把进程入口、内部业务包、应用组装、测试和部署配置分层组织，避免入口代码和业务逻辑混在一起。
-
-**展开解释**：常见做法是把可执行程序放在 `cmd/<app-name>`，把不希望外部依赖的业务实现放在 `internal/`，例如 `internal/config`、`internal/logger`、`internal/todo`。跨包集成测试可以放在 `test/`。这样启动入口只负责读取配置、创建日志和组装依赖，业务规则留在可测试的服务包中。
-
-**深入追问**：目录结构不应该一开始就过度复杂。小项目可以从 `cmd/` 和 `internal/` 开始，随着数据库、缓存、HTTP、队列等依赖增加，再拆分 repository、handler、middleware 等包。关键是依赖方向清晰，业务层不要反向依赖具体传输协议或部署平台。
-
-### 面试题：Go 项目中如何做配置管理？
-
-**一句话结论**：配置应该从代码中分离，通过环境变量、配置文件或配置中心注入，并在启动时集中加载和校验。
-
-**展开解释**：开发、测试、生产环境的端口、日志级别、数据库地址通常不同，因此不能硬编码在业务逻辑里。我通常会定义一个 `Config` 结构体，在启动阶段加载默认值和环境变量，并对关键字段做校验。业务代码只依赖配置对象，不直接调用 `os.Getenv`。
-
-**深入追问**：在 Kubernetes 中，非敏感配置可以来自 `ConfigMap`，敏感配置来自 `Secret`，镜像本身不应该包含环境特定配置。配置变更还要考虑回滚、审计和日志脱敏。
-
-### 面试题：如何理解单元测试、集成测试和覆盖率？
-
-**一句话结论**：单元测试验证小边界，集成测试验证组件协作，覆盖率是辅助指标，不是质量本身。
-
-**展开解释**：单元测试应该尽量隔离外部依赖，例如用 fake 仓储验证服务层规则。集成测试可以验证配置、应用组装、仓储和服务是否能协同工作。覆盖率能提示哪些代码路径没有被执行，但如果测试没有有效断言，覆盖率再高也不能说明业务正确。
-
-**深入追问**：真实项目里我会把核心业务规则、错误路径和边界条件作为优先测试对象。数据库、Redis、消息队列这类外部依赖会放到单独的集成测试或端到端测试中，并在 CI 中使用容器化依赖保证可复现。
-
-### 面试题：为什么要使用结构化日志？
-
-**一句话结论**：结构化日志让生产日志可以按字段检索、聚合和告警，比普通文本更适合排障。
-
-**展开解释**：普通文本日志适合人眼阅读，但日志平台很难可靠提取字段。结构化日志用 key/value 记录 `component`、`operation`、`user_id`、`todo_id`、`error` 等上下文，排障时可以快速筛选同一类问题，也方便后续和 tracing、metrics 关联。
-
-**深入追问**：结构化日志还要注意字段命名稳定和敏感信息脱敏。日志级别也要有边界：debug 用于开发定位，info 记录关键生命周期，warn 表示可恢复异常，error 表示需要关注的失败。
-
-### 面试题：Go 错误处理为什么强调包装和判断？
-
-**一句话结论**：错误包装保留上下文，错误判断保留机器可处理能力，两者结合才能既方便排障又方便分支处理。
-
-**展开解释**：`fmt.Errorf("save todo: %w", err)` 可以告诉我们失败发生在保存 Todo 的阶段，同时保留底层错误。调用方可以用 `errors.Is` 判断是否是参数错误、上下文取消或仓储错误，再决定返回什么 HTTP 状态码或日志级别。
-
-**深入追问**：不要在每一层都重复打印日志，否则同一个错误会被记录多次。通常在边界层记录日志，例如 HTTP Handler、任务入口或进程入口；内部层负责返回带上下文的错误。
-
-## 11. 本章总结
+## 10. 本章总结
 
 本章把 Todo 项目从“能运行的小程序”推进到“可持续演进的后端工程骨架”。你学习了 Go 项目目录边界、配置加载、结构化日志、错误包装、仓储接口、服务层、表驱动测试、集成测试、覆盖率和 Benchmark。小项目产出了 `cmd/todo-api`、`internal/config`、`internal/logger`、`internal/app` 和 `internal/todo`，并通过 `go test ./...` 验证。学完本章后，你已经能承担真实团队中“搭建 Go 服务骨架、拆分业务包、补齐基础测试、建立本地验证命令”的工作任务。
 
-## 12. 下一章衔接
+## 11. 下一章衔接
 
 下一章会在本章的工程骨架上加入 `net/http` 标准库 HTTP 服务。`cmd/todo-api` 会从“启动后打印日志”演进为真正监听端口的 API 进程，`internal/todo.Service` 会被 Handler 调用，配置、日志和测试命令也会继续复用。如果跳过本章直接写 HTTP，很容易把路由、业务规则、配置和日志全部塞进 `main.go`，后续接入 Gin、数据库和容器化时会很难维护。

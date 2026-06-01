@@ -57,7 +57,7 @@ Prometheus 与 Grafana 的价值不是让页面变好看，而是把系统行为
 
 本篇承接前面几篇产物：
 
-```text
+```text linenums="0"
 第 14 篇：Todo API v5 已具备生产风格配置、认证和结构化日志
 第 21 篇：Todo API 已部署为 Kubernetes Deployment / Service
 第 27 篇：Todo Platform Helm Chart 提供稳定标签和 Service 端口名
@@ -67,7 +67,7 @@ Prometheus 与 Grafana 的价值不是让页面变好看，而是把系统行为
 
 本篇会新增两类产物：
 
-```text
+```text linenums="0"
 api/internal/metrics/                  # Go 服务指标埋点
 observability/
 ├── grafana/
@@ -135,7 +135,7 @@ Prometheus 是一个拉取式时间序列数据库。它周期性访问目标的
 
 最小抓取配置大致长这样：
 
-```yaml
+```yaml linenums="0"
 scrape_configs:
   - job_name: todo-api
     metrics_path: /metrics
@@ -150,7 +150,7 @@ scrape_configs:
 
 `ServiceMonitor` 描述“到哪里抓指标”：
 
-```yaml
+```yaml linenums="0"
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
@@ -172,7 +172,7 @@ spec:
 
 `PrometheusRule` 描述“哪些查询要长期保存、哪些条件要告警”：
 
-```yaml
+```yaml linenums="0"
 apiVersion: monitoring.coreos.com/v1
 kind: PrometheusRule
 metadata:
@@ -260,19 +260,19 @@ PromQL 最容易混淆的是“当前值”和“一段时间内的变化”。
 
 瞬时向量表示某一时刻的一组时间序列：
 
-```promql
+```promql linenums="0"
 up{namespace="todo-dev"}
 ```
 
 范围向量表示每条时间序列在一段时间内的样本：
 
-```promql
+```promql linenums="0"
 todo_api_http_requests_total[5m]
 ```
 
 Counter 需要配合 `rate` 或 `increase` 才能看出速率或增量：
 
-```promql
+```promql linenums="0"
 sum(rate(todo_api_http_requests_total[5m]))
 ```
 
@@ -282,7 +282,7 @@ sum(rate(todo_api_http_requests_total[5m]))
 
 Prometheus histogram 会导出三类指标：
 
-```text
+```text linenums="0"
 todo_api_http_request_duration_seconds_bucket{le="0.1",...}
 todo_api_http_request_duration_seconds_sum{...}
 todo_api_http_request_duration_seconds_count{...}
@@ -290,7 +290,7 @@ todo_api_http_request_duration_seconds_count{...}
 
 分位数来自 `_bucket`，典型写法是：
 
-```promql
+```promql linenums="0"
 histogram_quantile(
   0.95,
   sum by (le) (rate(todo_api_http_request_duration_seconds_bucket[5m]))
@@ -303,7 +303,7 @@ histogram_quantile(
 
 复杂 PromQL 如果每个 dashboard 面板都实时计算，会带来两类问题：查询慢、写法散。Recording rules 把常用查询预先计算成新时间序列，例如：
 
-```promql
+```promql linenums="0"
 todo_api:p95_latency_seconds5m
 ```
 
@@ -342,7 +342,7 @@ Alerting rules 则基于 PromQL 判断是否触发告警。生产环境里不要
 
 先确认第 30 篇环境仍然可用：
 
-```bash
+```bash linenums="0"
 pwd
 test -f go.mod
 test -f api/internal/handler/gin/handler.go
@@ -359,7 +359,7 @@ kubectl -n todo-dev get deploy,svc,pod
 
 检查本地工具：
 
-```bash
+```bash linenums="0"
 go version
 docker version --format '{{.Server.Version}}'
 kind version
@@ -373,7 +373,7 @@ helm version --short
 
 创建本篇目录：
 
-```bash
+```bash linenums="0"
 mkdir -p api/internal/metrics
 mkdir -p observability/prometheus
 mkdir -p observability/grafana
@@ -381,7 +381,7 @@ mkdir -p observability/grafana
 
 最终目录如下：
 
-```text
+```text linenums="0"
 cloud-native-todo-platform/
 ├── api/
 │   └── internal/
@@ -412,7 +412,7 @@ cloud-native-todo-platform/
 
 安装 Prometheus Go client：
 
-```bash
+```bash linenums="0"
 go get github.com/prometheus/client_golang@v1.23.2
 go mod tidy
 ```
@@ -423,7 +423,7 @@ go mod tidy
 
 创建 `api/internal/metrics/http.go`：
 
-```bash
+```bash linenums="0"
 cat > api/internal/metrics/http.go <<'GO'
 package metrics
 
@@ -508,7 +508,7 @@ GO
 
 创建测试 `api/internal/metrics/http_test.go`：
 
-```bash
+```bash linenums="0"
 cat > api/internal/metrics/http_test.go <<'GO'
 package metrics
 
@@ -557,7 +557,7 @@ GO
 
 更新 `api/internal/handler/gin/handler.go` 的 import，新增 metrics 包：
 
-```go
+```go linenums="0"
 import (
 	"log/slog"
 	"net/http"
@@ -574,7 +574,7 @@ import (
 
 在 `NewRouter` 中注册 `/metrics`，并把指标中间件放在业务路由之前：
 
-```go
+```go linenums="0"
 router := gin.New()
 router.Use(RequestID(), AccessLog(logger), Recovery(logger), Timeout(defaultRequestTimeout), BodyLimit(maxBodyBytes), SecurityHeaders(), CORS(opts.AllowedOrigins))
 
@@ -593,7 +593,7 @@ router.POST("/api/v2/auth/login", h.login)
 
 修改后运行测试：
 
-```bash
+```bash linenums="0"
 go test ./api/internal/metrics ./api/internal/handler/gin
 ```
 
@@ -601,7 +601,7 @@ go test ./api/internal/metrics ./api/internal/handler/gin
 
 创建 `observability/prometheus/kube-prometheus-stack-values.yaml`：
 
-```bash
+```bash linenums="0"
 cat > observability/prometheus/kube-prometheus-stack-values.yaml <<'YAML'
 grafana:
   enabled: true
@@ -662,7 +662,7 @@ YAML
 
 创建 `observability/prometheus/todo-servicemonitor.yaml`：
 
-```bash
+```bash linenums="0"
 cat > observability/prometheus/todo-servicemonitor.yaml <<'YAML'
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
@@ -692,7 +692,7 @@ YAML
 
 如果你在前面章节中改过 Helm release 名称，先查看 Service 的真实 label：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-dev get svc todo-platform --show-labels
 kubectl -n todo-dev get svc todo-platform -o jsonpath='{.spec.ports[*].name}{"\n"}'
 ```
@@ -703,7 +703,7 @@ kubectl -n todo-dev get svc todo-platform -o jsonpath='{.spec.ports[*].name}{"\n
 
 创建 `observability/prometheus/todo-prometheus-rules.yaml`：
 
-```bash
+```bash linenums="0"
 cat > observability/prometheus/todo-prometheus-rules.yaml <<'YAML'
 apiVersion: monitoring.coreos.com/v1
 kind: PrometheusRule
@@ -765,7 +765,7 @@ YAML
 
 创建 `observability/grafana/todo-api-dashboard-configmap.yaml`：
 
-```bash
+```bash linenums="0"
 cat > observability/grafana/todo-api-dashboard-configmap.yaml <<'YAML'
 apiVersion: v1
 kind: ConfigMap
@@ -963,7 +963,7 @@ YAML
 
 创建 `observability/prometheus/todo-allow-prometheus-networkpolicy.yaml`：
 
-```bash
+```bash linenums="0"
 cat > observability/prometheus/todo-allow-prometheus-networkpolicy.yaml <<'YAML'
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -999,13 +999,13 @@ YAML
 
 先运行测试：
 
-```bash
+```bash linenums="0"
 go test ./api/internal/metrics ./api/internal/handler/gin
 ```
 
 启动本地 Todo API：
 
-```bash
+```bash linenums="0"
 HASH=$(docker run --rm todo-api:v0.1.0 hash-password "change-me-123")
 TODO_JWT_SECRET=0123456789abcdef0123456789abcdef \
 TODO_AUTH_USERS="admin=${HASH}" \
@@ -1016,7 +1016,7 @@ go run ./api/cmd/todo-api serve
 
 另开一个终端，访问健康检查和指标：
 
-```bash
+```bash linenums="0"
 curl -s http://127.0.0.1:18080/healthz
 curl -s http://127.0.0.1:18080/metrics | grep -E 'todo_api_http_requests_total|todo_api_http_request_duration_seconds_bucket|todo_api_http_in_flight_requests' | head
 ```
@@ -1027,14 +1027,14 @@ curl -s http://127.0.0.1:18080/metrics | grep -E 'todo_api_http_requests_total|t
 
 停止本地 `go run` 后，构建带指标的新镜像：
 
-```bash
+```bash linenums="0"
 docker build -t todo-api:v0.1.1-metrics -f api/Dockerfile .
 kind load docker-image todo-api:v0.1.1-metrics --name todo-gitops
 ```
 
 更新 dev GitOps overlay 的镜像 tag。打开 `deployments/gitops/envs/dev/kustomization.yaml`，把 `images` 中的 `newTag` 改为：
 
-```yaml
+```yaml linenums="0"
 images:
   - name: todo-api
     newName: todo-api
@@ -1045,7 +1045,7 @@ images:
 
 提交并推送 GitOps 变更，让 Argo CD 同步 dev 环境：
 
-```bash
+```bash linenums="0"
 git add go.mod go.sum api/internal/metrics api/internal/handler/gin/handler.go deployments/gitops/envs/dev/kustomization.yaml observability/
 git commit -m "接入 Todo API Prometheus 指标"
 CURRENT_BRANCH=$(git branch --show-current)
@@ -1061,7 +1061,7 @@ kubectl -n todo-dev rollout status deployment/todo-platform --timeout=180s
 
 如果你没有继续运行 Argo CD，也可以临时直接应用 dev overlay，但这会绕过第 30 篇的 GitOps 流程，只建议用于本地排错：
 
-```bash
+```bash linenums="0"
 kubectl apply -k deployments/gitops/envs/dev
 kubectl -n todo-dev rollout status deployment/todo-platform --timeout=180s
 ```
@@ -1070,7 +1070,7 @@ kubectl -n todo-dev rollout status deployment/todo-platform --timeout=180s
 
 添加 Helm 仓库并安装：
 
-```bash
+```bash linenums="0"
 helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
 helm repo update prometheus-community
 helm upgrade --install monitoring prometheus-community/kube-prometheus-stack \
@@ -1098,7 +1098,7 @@ helm upgrade --install monitoring prometheus-community/kube-prometheus-stack \
 
 确认核心 Pod：
 
-```bash
+```bash linenums="0"
 kubectl -n monitoring get pods
 kubectl -n monitoring rollout status deployment/monitoring-grafana --timeout=300s
 kubectl -n monitoring rollout status statefulset/prometheus-monitoring-kube-prometheus-prometheus --timeout=300s
@@ -1107,7 +1107,7 @@ kubectl -n monitoring rollout status statefulset/alertmanager-monitoring-kube-pr
 
 如果 StatefulSet 名称因为 chart 版本变化不同，先执行：
 
-```bash
+```bash linenums="0"
 kubectl -n monitoring get statefulset
 ```
 
@@ -1115,7 +1115,7 @@ kubectl -n monitoring get statefulset
 
 如果 10 分钟后仍未 Ready，先看 Pod 状态和事件：
 
-```bash
+```bash linenums="0"
 kubectl -n monitoring get pods -o wide
 kubectl -n monitoring describe pod -l app.kubernetes.io/name=grafana
 kubectl -n monitoring describe pod -l app.kubernetes.io/name=prometheus
@@ -1125,7 +1125,7 @@ kubectl -n monitoring describe pod -l app.kubernetes.io/name=prometheus
 
 确认 Grafana 实际镜像版本，后续 dashboard JSON 导入问题会用到它：
 
-```bash
+```bash linenums="0"
 kubectl -n monitoring get deployment monitoring-grafana -o jsonpath='{.spec.template.spec.containers[0].image}{"\n"}'
 ```
 
@@ -1133,7 +1133,7 @@ kubectl -n monitoring get deployment monitoring-grafana -o jsonpath='{.spec.temp
 
 先做 server-side dry-run。这里必须在安装 kube-prometheus-stack 之后执行，因为 `ServiceMonitor` 和 `PrometheusRule` 的 CRD 由 Prometheus Operator 安装：
 
-```bash
+```bash linenums="0"
 kubectl apply --server-side --dry-run=server -f observability/prometheus/todo-servicemonitor.yaml
 kubectl apply --server-side --dry-run=server -f observability/prometheus/todo-prometheus-rules.yaml
 kubectl apply --server-side --dry-run=server -f observability/prometheus/todo-allow-prometheus-networkpolicy.yaml
@@ -1142,7 +1142,7 @@ kubectl apply --server-side --dry-run=server -f observability/grafana/todo-api-d
 
 再正式应用监控对象：
 
-```bash
+```bash linenums="0"
 kubectl apply -f observability/prometheus/todo-servicemonitor.yaml
 kubectl apply -f observability/prometheus/todo-prometheus-rules.yaml
 kubectl apply -f observability/prometheus/todo-allow-prometheus-networkpolicy.yaml
@@ -1151,7 +1151,7 @@ kubectl apply -f observability/grafana/todo-api-dashboard-configmap.yaml
 
 确认对象存在：
 
-```bash
+```bash linenums="0"
 kubectl -n monitoring get servicemonitor todo-api
 kubectl -n monitoring get prometheusrule todo-api-rules
 kubectl -n todo-dev get networkpolicy todo-platform-allow-prometheus
@@ -1162,20 +1162,20 @@ kubectl -n monitoring get configmap todo-api-dashboard
 
 先确认 Service 能访问：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-dev port-forward service/todo-platform 18080:http
 ```
 
 另开终端：
 
-```bash
+```bash linenums="0"
 curl -s http://127.0.0.1:18080/healthz
 curl -s http://127.0.0.1:18080/metrics | grep todo_api_http_requests_total | head
 ```
 
 在集群内启动一个临时负载 Pod，每 0.2 秒访问一次 `/healthz`：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-dev run todo-load \
   --image=curlimages/curl:8.16.0 \
   --restart=Never \
@@ -1184,13 +1184,13 @@ kubectl -n todo-dev run todo-load \
 
 如果镜像 tag 不存在，或本地网络无法从 Docker Hub 拉取 `curlimages/curl`，可以保留前面的 `kubectl port-forward`，在本机另开一个 Bash 终端生成流量：
 
-```bash
+```bash linenums="0"
 while true; do curl -fsS http://127.0.0.1:18080/healthz >/dev/null; sleep 0.2; done
 ```
 
 如果使用集群内负载 Pod，查看负载 Pod 日志。如果没有输出且 Pod 仍在 Running，说明循环请求正常：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-dev get pod todo-load
 kubectl -n todo-dev logs todo-load --tail=5
 ```
@@ -1199,37 +1199,37 @@ kubectl -n todo-dev logs todo-load --tail=5
 
 打开 Prometheus：
 
-```bash
+```bash linenums="0"
 kubectl -n monitoring port-forward service/monitoring-kube-prometheus-prometheus 9090:9090
 ```
 
 访问：
 
-```text
+```text linenums="0"
 http://127.0.0.1:9090
 ```
 
 在 Prometheus UI 的 `Status -> Targets` 中搜索 `todo-api`。也可以直接用 API 检查：
 
-```bash
+```bash linenums="0"
 curl -s 'http://127.0.0.1:9090/api/v1/targets?state=active' | grep -o 'todo-api' | head
 ```
 
 打开 Grafana：
 
-```bash
+```bash linenums="0"
 kubectl -n monitoring port-forward service/monitoring-grafana 3000:80
 ```
 
 访问：
 
-```text
+```text linenums="0"
 http://127.0.0.1:3000
 ```
 
 登录信息：
 
-```text
+```text linenums="0"
 username: admin
 password: admin
 ```
@@ -1242,31 +1242,31 @@ password: admin
 
 先确认第 27 篇 Helm Chart 渲染出的容器名。后面的 CPU 和内存 PromQL 使用 `container="todo-api"` 过滤容器，如果你的输出不是 `todo-api`，需要同步调整 PromQL：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-dev get deployment todo-platform -o jsonpath='{.spec.template.spec.containers[*].name}{"\n"}'
 ```
 
 检查 Prometheus 是否抓到 Todo API：
 
-```promql
+```promql linenums="0"
 up{namespace="todo-dev", service="todo-platform"}
 ```
 
 查看 QPS：
 
-```promql
+```promql linenums="0"
 sum(rate(todo_api_http_requests_total[5m]))
 ```
 
 按状态码查看请求速率：
 
-```promql
+```promql linenums="0"
 sum by (status) (rate(todo_api_http_requests_total[5m]))
 ```
 
 查看 5xx 错误率：
 
-```promql
+```promql linenums="0"
 sum(rate(todo_api_http_requests_total{status=~"5.."}[5m]))
 /
 clamp_min(sum(rate(todo_api_http_requests_total[5m])), 1)
@@ -1274,7 +1274,7 @@ clamp_min(sum(rate(todo_api_http_requests_total[5m])), 1)
 
 查看 P95 延迟：
 
-```promql
+```promql linenums="0"
 histogram_quantile(
   0.95,
   sum by (le) (rate(todo_api_http_request_duration_seconds_bucket[5m]))
@@ -1283,13 +1283,13 @@ histogram_quantile(
 
 查看 recording rule：
 
-```promql
+```promql linenums="0"
 todo_api:p95_latency_seconds5m
 ```
 
 查看 Pod CPU：
 
-```promql
+```promql linenums="0"
 sum(rate(container_cpu_usage_seconds_total{namespace="todo-dev", pod=~"todo-platform-.*", container="todo-api"}[5m]))
 ```
 
@@ -1297,14 +1297,14 @@ sum(rate(container_cpu_usage_seconds_total{namespace="todo-dev", pod=~"todo-plat
 
 Go 测试输出类似：
 
-```text
+```text linenums="0"
 ok  	cloud-native-todo-platform/api/internal/metrics	0.12s
 ok  	cloud-native-todo-platform/api/internal/handler/gin	0.31s
 ```
 
 本地 `/metrics` 输出中应出现 Todo API 指标：
 
-```text
+```text linenums="0"
 # HELP todo_api_http_requests_total Total number of HTTP requests handled by Todo API.
 # TYPE todo_api_http_requests_total counter
 todo_api_http_requests_total{method="GET",route="/healthz",status="200"} 1
@@ -1315,7 +1315,7 @@ todo_api_http_request_duration_seconds_bucket{method="GET",route="/healthz",stat
 
 kube-prometheus-stack 安装成功后，核心工作负载类似：
 
-```text
+```text linenums="0"
 NAME                                                   READY   STATUS    RESTARTS   AGE
 pod/alertmanager-monitoring-kube-prometheus-alertmanager-0   2/2     Running   0          2m
 pod/monitoring-grafana-xxxxxxxxxx-xxxxx               3/3     Running   0          2m
@@ -1325,7 +1325,7 @@ pod/monitoring-kube-state-metrics-xxxxxxxxxx-xxxxx     1/1     Running   0      
 
 ServiceMonitor 和 PrometheusRule 应存在：
 
-```text
+```text linenums="0"
 NAME       AGE
 todo-api   30s
 
@@ -1335,13 +1335,13 @@ todo-api-rules   30s
 
 Prometheus 查询 `up{namespace="todo-dev", service="todo-platform"}` 应看到：
 
-```text
+```text linenums="0"
 up{endpoint="http", namespace="todo-dev", service="todo-platform", ...} 1
 ```
 
 Grafana dashboard 应显示：
 
-```text
+```text linenums="0"
 Dashboard: Todo API Overview
 QPS: > 0
 5xx Error Rate: 0%
@@ -1355,7 +1355,7 @@ Memory Working Set: 有曲线
 
 **第一层：应用指标端点**
 
-```bash
+```bash linenums="0"
 kubectl -n todo-dev port-forward service/todo-platform 18080:http
 curl -s http://127.0.0.1:18080/metrics | grep todo_api_http_requests_total
 curl -s http://127.0.0.1:18080/metrics | grep todo_api_http_request_duration_seconds_bucket
@@ -1365,7 +1365,7 @@ curl -s http://127.0.0.1:18080/metrics | grep todo_api_http_request_duration_sec
 
 **第二层：ServiceMonitor 选择到 Service**
 
-```bash
+```bash linenums="0"
 kubectl -n monitoring get servicemonitor todo-api -o yaml
 kubectl -n todo-dev get svc todo-platform --show-labels
 kubectl -n todo-dev get networkpolicy todo-platform-allow-prometheus -o yaml
@@ -1375,7 +1375,7 @@ kubectl -n todo-dev get networkpolicy todo-platform-allow-prometheus -o yaml
 
 **第三层：Prometheus Target 正常**
 
-```bash
+```bash linenums="0"
 kubectl -n monitoring port-forward service/monitoring-kube-prometheus-prometheus 9090:9090
 curl -s 'http://127.0.0.1:9090/api/v1/targets?state=active' | grep -E 'todo-api|todo-platform'
 ```
@@ -1384,7 +1384,7 @@ curl -s 'http://127.0.0.1:9090/api/v1/targets?state=active' | grep -E 'todo-api|
 
 **第四层：PromQL 有业务数据**
 
-```bash
+```bash linenums="0"
 curl -G 'http://127.0.0.1:9090/api/v1/query' \
   --data-urlencode 'query=sum(rate(todo_api_http_requests_total[5m]))'
 ```
@@ -1393,7 +1393,7 @@ curl -G 'http://127.0.0.1:9090/api/v1/query' \
 
 **第五层：Recording Rules 生效**
 
-```bash
+```bash linenums="0"
 curl -G 'http://127.0.0.1:9090/api/v1/query' \
   --data-urlencode 'query=todo_api:p95_latency_seconds5m'
 ```
@@ -1402,7 +1402,7 @@ curl -G 'http://127.0.0.1:9090/api/v1/query' \
 
 **第六层：Grafana Dashboard 导入**
 
-```bash
+```bash linenums="0"
 kubectl -n monitoring logs deployment/monitoring-grafana -c grafana-sc-dashboard --tail=50
 kubectl -n monitoring get configmap todo-api-dashboard -o jsonpath='{.metadata.labels.grafana_dashboard}{"\n"}'
 ```
@@ -1411,7 +1411,7 @@ kubectl -n monitoring get configmap todo-api-dashboard -o jsonpath='{.metadata.l
 
 **第七层：告警规则存在**
 
-```bash
+```bash linenums="0"
 curl -s 'http://127.0.0.1:9090/api/v1/rules' | grep TodoApiHighP95Latency
 curl -s 'http://127.0.0.1:9090/api/v1/alerts' | grep TodoApiHighP95Latency || true
 ```
@@ -1424,13 +1424,13 @@ curl -s 'http://127.0.0.1:9090/api/v1/alerts' | grep TodoApiHighP95Latency || tr
 
 只停止负载 Pod：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-dev delete pod todo-load --ignore-not-found
 ```
 
 删除本篇监控对象，但保留 kube-prometheus-stack：
 
-```bash
+```bash linenums="0"
 kubectl delete -f observability/grafana/todo-api-dashboard-configmap.yaml --ignore-not-found
 kubectl delete -f observability/prometheus/todo-prometheus-rules.yaml --ignore-not-found
 kubectl delete -f observability/prometheus/todo-servicemonitor.yaml --ignore-not-found
@@ -1439,7 +1439,7 @@ kubectl delete -f observability/prometheus/todo-allow-prometheus-networkpolicy.y
 
 卸载 kube-prometheus-stack：
 
-```bash
+```bash linenums="0"
 helm uninstall monitoring -n monitoring
 kubectl delete namespace monitoring --ignore-not-found
 ```
@@ -1448,7 +1448,7 @@ kubectl delete namespace monitoring --ignore-not-found
 
 如需撤销 Todo API 指标代码，使用 Git revert 回滚本篇提交：
 
-```bash
+```bash linenums="0"
 git log --oneline --max-count=5
 git revert <本篇提交 SHA>
 git push
@@ -1461,7 +1461,7 @@ argocd app sync todo-platform-dev --timeout 300
 
 - **现象**：Prometheus UI 的 `Status -> Targets` 中没有 `todo-api`，或 Target 存在但状态为 `down`。
 
-  ```text
+  ```text linenums="0"
   "activeTargets": []
   context deadline exceeded
   server returned HTTP status 403 Forbidden
@@ -1470,7 +1470,7 @@ argocd app sync todo-platform-dev --timeout 300
 - **原因**：ServiceMonitor 的 namespace、selector label 或端口名与 Service 不匹配；Prometheus 的 `serviceMonitorNamespaceSelector` 没有放开；或者第 27 篇 NetworkPolicy 只允许同 namespace 访问，导致 `monitoring` namespace 中的 Prometheus 无法连到 Todo API。
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   kubectl -n monitoring get servicemonitor todo-api -o yaml
   kubectl -n todo-dev get svc todo-platform --show-labels
   kubectl -n todo-dev get svc todo-platform -o jsonpath='{.spec.ports[*].name}{"\n"}'
@@ -1488,13 +1488,13 @@ argocd app sync todo-platform-dev --timeout 300
 
 - **现象**：
 
-  ```text
+  ```text linenums="0"
   404 page not found
   ```
 
   或者：
 
-  ```bash
+  ```bash linenums="0"
   curl -s http://127.0.0.1:18080/metrics | grep todo_api_
   # 没有输出
   ```
@@ -1502,7 +1502,7 @@ argocd app sync todo-platform-dev --timeout 300
 - **原因**：Gin Router 没有注册 `/metrics`；或者只新增了 metrics 包，但没有在 `NewRouter` 中 `router.Use(metrics.HTTPMetrics())`。
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   grep -n 'metrics.Handler' api/internal/handler/gin/handler.go
   grep -n 'metrics.HTTPMetrics' api/internal/handler/gin/handler.go
   go test ./api/internal/metrics ./api/internal/handler/gin
@@ -1517,14 +1517,14 @@ argocd app sync todo-platform-dev --timeout 300
 
 - **现象**：`sum(rate(todo_api_http_requests_total[5m]))` 返回空数组。
 
-  ```json
+  ```json linenums="0"
   {"status":"success","data":{"resultType":"vector","result":[]}}
   ```
 
 - **原因**：Prometheus 刚开始抓取还没有足够样本；没有测试流量；metric 名称写错；或者 ServiceMonitor target 仍然是 down。
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   curl -G 'http://127.0.0.1:9090/api/v1/query' --data-urlencode 'query=up{namespace="todo-dev"}'
   curl -G 'http://127.0.0.1:9090/api/v1/query' --data-urlencode 'query=todo_api_http_requests_total'
   kubectl -n todo-dev get pod todo-load
@@ -1539,7 +1539,7 @@ argocd app sync todo-platform-dev --timeout 300
 
 - **现象**：Grafana 中没有 `Todo API Overview`，或者 dashboard 打开后显示 `No data`。
 
-  ```text
+  ```text linenums="0"
   Dashboard not found
   No data
   ```
@@ -1547,7 +1547,7 @@ argocd app sync todo-platform-dev --timeout 300
 - **原因**：Dashboard ConfigMap 缺少 `grafana_dashboard: "1"` label；sidecar 没有搜索所有 namespace；Dashboard datasource uid 与 Grafana 默认 datasource 不一致；Prometheus 本身还没抓到数据。
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   kubectl -n monitoring get configmap todo-api-dashboard -o jsonpath='{.metadata.labels}{"\n"}'
   kubectl -n monitoring logs deployment/monitoring-grafana -c grafana-sc-dashboard --tail=80
   kubectl -n monitoring get secret monitoring-grafana -o name
@@ -1562,7 +1562,7 @@ argocd app sync todo-platform-dev --timeout 300
 
 - **现象**：Prometheus `Rules` 页面没有 `TodoApiHighP95Latency`，或规则存在但始终是 `inactive`。
 
-  ```text
+  ```text linenums="0"
   no rule groups found
   TodoApiHighP95Latency inactive
   ```
@@ -1570,7 +1570,7 @@ argocd app sync todo-platform-dev --timeout 300
 - **原因**：Prometheus 没有选中 PrometheusRule；规则表达式查询为空；延迟没有超过 500ms；`for: 2m` 还没满足持续时间。
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   kubectl -n monitoring get prometheusrule todo-api-rules -o yaml
   curl -s 'http://127.0.0.1:9090/api/v1/rules' | grep -E 'todo-api|TodoApiHighP95Latency'
   curl -G 'http://127.0.0.1:9090/api/v1/query' --data-urlencode 'query=todo_api:p95_latency_seconds5m'
@@ -1635,70 +1635,13 @@ flowchart TD
 | 排障能力 | 能定位 Target 缺失、PromQL 空数据、Dashboard 无数据和告警不触发 |
 | 生产意识 | 能解释 label 基数、SLO、Histogram bucket、告警噪声和监控系统安全风险 |
 
-## 9. 本章练习题
+## 9. 练习题与面试题
 
-**基础题**
+本章练习题和面试题已拆分到独立页面，完成正文学习后再进入题库练习与复盘。
 
-1. RED 指标体系中的 Rate、Errors、Duration 分别对应 Todo API 的哪些 PromQL？
-2. 为什么 Counter 不能直接用于当前并发请求数？当前并发应该用哪类指标？
-3. `rate(todo_api_http_requests_total[5m])` 和 `increase(todo_api_http_requests_total[5m])` 有什么区别？
-4. `histogram_quantile(0.95, sum by (le) (...))` 中为什么必须保留 `le` label？
-5. ServiceMonitor 的 `selector.matchLabels` 匹配的是 Pod label 还是 Service label？
+[查看本章练习题与面试题](../../questions/stage-05-production-engineering/31-prometheus-grafana.md)
 
-**实操题**
-
-1. 增加一个按 route 维度展示 QPS 的 Grafana 面板。验收标准：面板中能看到 `/healthz`、`/readyz` 或 `/api/v2/auth/login` 等路由的曲线。
-2. 把 `TodoApiHighP95Latency` 的阈值临时改成 `0.001`，生成流量并观察告警进入 firing 状态。验收标准：Prometheus Alerts 页面能看到 firing，然后把阈值改回 `0.5`。
-3. 给 Dashboard 增加 namespace 变量，让查询不再写死 `todo-dev`。验收标准：Grafana 顶部出现 namespace 下拉框，并能选择 `todo-dev`。
-
-**思考题**
-
-1. 如果某次发布后 P95 延迟升高，但 CPU 和内存都正常，你会如何利用指标继续缩小范围？
-2. 如果团队要求把 `user_id` 加到所有 HTTP 指标 label 中，方便按用户排查问题，你会如何解释风险，并给出替代方案？
-
-## 10. 本章面试题
-
-### 面试题 1：Prometheus 为什么通常采用 pull 模型？
-
-**一句话结论**：Pull 模型让 Prometheus 主动发现和抓取目标，更适合 Kubernetes 这类目标频繁变化的环境，也便于统一控制抓取频率和目标健康状态。
-
-**展开解释**：在 Kubernetes 中，Pod 会滚动更新、扩缩容和重建。如果每个应用主动 push，监控系统需要处理大量客户端配置、重试和身份问题。Prometheus 通过 ServiceMonitor 发现 Service，再周期性拉取 `/metrics`，Targets 页面还能直接显示 up/down 和 scrape error。Pushgateway 只适合短生命周期批处理任务，不适合长期运行服务替代 pull。
-
-**深入追问**：如果服务在 NAT 后面或无法被 Prometheus 访问怎么办？可以使用 Agent、remote write、Pushgateway 或边缘 Prometheus 代理，但要明确场景和数据可靠性边界。
-
-### 面试题 2：Counter、Gauge、Histogram 分别适合什么场景？
-
-**一句话结论**：Counter 适合累计事件，Gauge 适合当前状态，Histogram 适合请求耗时这类分布数据。
-
-**展开解释**：请求总数只能增加，所以用 Counter，再通过 `rate` 计算 QPS；当前并发请求数会上升下降，所以用 Gauge；请求延迟不能只看平均值，需要 P95/P99，所以用 Histogram bucket 配合 `histogram_quantile`。类型选错会导致 PromQL 语义错误，例如对 Gauge 使用 `rate` 通常没有业务意义。
-
-**深入追问**：Summary 和 Histogram 怎么选？Prometheus 生态中更推荐 Histogram，因为它能在服务端聚合多个实例的 bucket；Summary 的客户端分位数跨实例聚合困难。
-
-### 面试题 3：为什么要控制 Prometheus label 基数？
-
-**一句话结论**：每一组 label 都是一条时间序列，高基数会迅速放大 Prometheus 内存、磁盘和查询成本。
-
-**展开解释**：`route="/api/v2/todos/:id"` 可能只有几十条序列，但 `path="/api/v2/todos/123456"` 会随着每个 ID 生成新序列。如果再叠加 user_id、status、method、pod，就会产生爆炸式增长。Prometheus 适合统计聚合，不适合承载请求级明细。请求级定位应该使用日志和 Trace。
-
-**深入追问**：如果确实需要按租户看指标怎么办？可以只对有限租户、付费租户或稳定 tenant_id 维度做 label，并设置采样、聚合、保留周期和容量预算；大规模明细仍建议进入日志或分析系统。
-
-### 面试题 4：PrometheusRule 中 recording rule 和 alerting rule 有什么区别？
-
-**一句话结论**：Recording rule 把 PromQL 结果预计算成新时间序列，alerting rule 根据 PromQL 条件生成告警状态。
-
-**展开解释**：Dashboard 中反复计算复杂查询会增加 Prometheus 压力，也容易出现各面板写法不一致。Recording rule 把标准查询固化为 `todo_api:p95_latency_seconds5m` 这类序列，Dashboard 和告警都能复用。Alerting rule 则关注持续条件，例如 P95 延迟超过 500ms 持续 2 分钟后触发 warning。
-
-**深入追问**：为什么告警要加 `for`？因为瞬时尖峰可能是短暂抖动，`for` 可以过滤噪声，让告警更接近真实用户影响。
-
-### 面试题 5：Grafana 面板显示 No data，你会怎么排查？
-
-**一句话结论**：从数据源、PromQL、Prometheus target、ServiceMonitor selector 和应用 `/metrics` 逐层排查。
-
-**展开解释**：先在 Grafana Explore 中执行同一条 PromQL，确认是否是 dashboard 配置问题；再到 Prometheus UI 执行查询，确认数据源是否有数据；接着看 Targets 中 Todo API 是否 up；如果 target 不存在，看 ServiceMonitor selector、namespaceSelector 和 Service 端口名；如果 target up 但没有业务指标，直接 curl `/metrics` 看应用是否暴露 `todo_api_` 指标。
-
-**深入追问**：如果 Prometheus 有数据但 Grafana 没有？重点检查 Grafana datasource uid、时间范围、变量值、面板查询和 dashboard JSON 导入日志。
-
-## 11. 本章总结
+## 10. 本章总结
 
 本篇把 Todo Platform 从“能被部署”推进到“能被观测”。知识上，你理解了可观测性三大支柱、RED/USE 指标体系、Prometheus 拉取模型、ServiceMonitor、PrometheusRule、Counter/Gauge/Histogram、PromQL 和 Grafana dashboard。
 
@@ -1706,7 +1649,7 @@ flowchart TD
 
 能力价值上，这一章是 SRE 和平台工程的关键分界线：只会部署应用，还不足以支撑生产；能用指标判断系统是否满足 SLO、能把异常转化为可排查信号，才开始具备中高级云原生工程能力。
 
-## 12. 下一章衔接
+## 11. 下一章衔接
 
 本篇指标能回答“系统什么时候变慢、错误率是否升高、影响范围多大”。但指标通常不能直接告诉你“是哪一次请求慢、哪条 SQL 慢、哪个下游调用慢、错误栈是什么”。
 

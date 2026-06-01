@@ -43,7 +43,7 @@ Kubernetes 内置对象足够强大，但它们不是业务语言。一个 Todo 
 
 Kubernetes API 扩展要解决的是“平台抽象”问题：把一组底层对象收束成一个业务可理解的 API。例如用户提交：
 
-```yaml
+```yaml linenums="0"
 apiVersion: platform.todo.example.com/v1alpha1
 kind: TodoApp
 metadata:
@@ -89,7 +89,7 @@ Kubernetes API 是一个基于 HTTP 的资源化 API。你通过 `GET`、`POST`�
 
 以 Deployment 为例：
 
-```yaml
+```yaml linenums="0"
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -114,7 +114,7 @@ spec:
 
 在本项目中，未来的 `TodoApp` 也会遵守同样结构：
 
-```yaml
+```yaml linenums="0"
 apiVersion: platform.todo.example.com/v1alpha1
 kind: TodoApp
 metadata:
@@ -140,7 +140,7 @@ GVK 用来描述“这个对象是什么类型”。
 
 GVK 常出现在 YAML 和 Go 类型注册中。你写 YAML 时使用的是：
 
-```yaml
+```yaml linenums="0"
 apiVersion: apps/v1
 kind: Deployment
 ```
@@ -170,7 +170,7 @@ Kubernetes 的核心不是“执行一个命令后立刻完成动作”，而是
 
 例如你提交：
 
-```yaml
+```yaml linenums="0"
 spec:
   replicas: 3
 ```
@@ -188,7 +188,7 @@ spec:
 
 未来的 `TodoApp` 也一样。用户写：
 
-```yaml
+```yaml linenums="0"
 spec:
   replicas: 2
   ingress:
@@ -197,7 +197,7 @@ spec:
 
 Controller 才负责创建 Deployment、Service、Ingress，并把结果写回：
 
-```yaml
+```yaml linenums="0"
 status:
   readyReplicas: 2
   url: https://todo.dev.local
@@ -209,7 +209,7 @@ CRD（CustomResourceDefinition，自定义资源定义）是一种 Kubernetes �
 
 CRD 定义的是类型。下面这段只展示 CRD 的核心结构，帮助你先理解 group、names 和 scope 的位置；它不是一份可直接 `kubectl apply` 的完整 CRD，因为 `apiextensions.k8s.io/v1` 还必须声明 `versions`、`served`、`storage` 和 OpenAPI schema。完整可执行版本会放到第 35 篇。
 
-```yaml
+```yaml linenums="0"
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
@@ -227,7 +227,7 @@ CRD 装进集群后，API server 会把它纳入 discovery、OpenAPI schema、�
 
 自定义资源是这个类型的实例，例如：
 
-```yaml
+```yaml linenums="0"
 apiVersion: platform.todo.example.com/v1alpha1
 kind: TodoApp
 metadata:
@@ -253,7 +253,7 @@ spec:
 
 一个 `TodoApp` 的条件可能是：
 
-```yaml
+```yaml linenums="0"
 status:
   conditions:
     - type: Available
@@ -301,7 +301,7 @@ API server 本身不运行你的业务逻辑。它更像一个强一致的 API �
 
 你可以直接查看 discovery 信息：
 
-```bash
+```bash linenums="0"
 kubectl api-versions
 kubectl api-resources
 kubectl get --raw /apis/apps/v1 | jq '.resources[] | select(.name=="deployments")'
@@ -309,7 +309,7 @@ kubectl get --raw /apis/apps/v1 | jq '.resources[] | select(.name=="deployments"
 
 当你输入：
 
-```bash
+```bash linenums="0"
 kubectl get deploy -n todo-dev
 ```
 
@@ -359,7 +359,7 @@ Kubernetes API version 不是随便写的字符串。它决定：
 
 很多 Kubernetes 资源把 `status` 做成 subresource，例如：
 
-```text
+```text linenums="0"
 /apis/apps/v1/namespaces/todo-dev/deployments/todo-platform/status
 ```
 
@@ -428,7 +428,7 @@ flowchart LR
 
 确认前置环境：
 
-```bash
+```bash linenums="0"
 pwd
 test -d deployments/gitops/envs/dev
 kubectl config current-context
@@ -440,7 +440,7 @@ jq --version
 
 如果 `todo-dev` 不存在，可以先回到第 30 篇同步 GitOps 环境；如果只是想学习 API discovery，也可以创建一个临时 Deployment 作为观察对象：
 
-```bash
+```bash linenums="0"
 kubectl create namespace todo-dev --dry-run=client -o yaml | kubectl apply -f -
 if ! kubectl -n todo-dev get deployment todo-platform >/dev/null 2>&1; then
   kubectl -n todo-dev get deployment todo-api-shape-demo >/dev/null 2>&1 \
@@ -451,7 +451,7 @@ fi
 
 PowerShell 等价命令如下：
 
-```powershell
+```powershell linenums="0"
 kubectl create namespace todo-dev --dry-run=client -o yaml | kubectl apply -f -
 if (-not (kubectl -n todo-dev get deployment todo-platform --ignore-not-found)) {
   if (-not (kubectl -n todo-dev get deployment todo-api-shape-demo --ignore-not-found)) {
@@ -465,7 +465,7 @@ if (-not (kubectl -n todo-dev get deployment todo-platform --ignore-not-found)) 
 
 为了让后续命令可复用，可以先设置观察对象名称：
 
-```bash
+```bash linenums="0"
 export OBSERVE_DEPLOYMENT=todo-platform
 kubectl -n todo-dev get deployment todo-platform >/dev/null 2>&1 || export OBSERVE_DEPLOYMENT=todo-api-shape-demo
 echo "$OBSERVE_DEPLOYMENT"
@@ -473,7 +473,7 @@ echo "$OBSERVE_DEPLOYMENT"
 
 PowerShell：
 
-```powershell
+```powershell linenums="0"
 $OBSERVE_DEPLOYMENT = "todo-platform"
 if (-not (kubectl -n todo-dev get deployment todo-platform --ignore-not-found)) {
   $OBSERVE_DEPLOYMENT = "todo-api-shape-demo"
@@ -485,19 +485,19 @@ $OBSERVE_DEPLOYMENT
 
 创建 API 模型目录：
 
-```bash
+```bash linenums="0"
 mkdir -p operator/api-model
 ```
 
 PowerShell：
 
-```powershell
+```powershell linenums="0"
 New-Item -ItemType Directory -Force -Path operator/api-model
 ```
 
 最终目录如下：
 
-```text
+```text linenums="0"
 operator/
 └── api-model/
     ├── todoapp-example.yaml
@@ -511,7 +511,7 @@ operator/
 
 创建 `operator/api-model/todoapp-example.yaml`：
 
-```bash
+```bash linenums="0"
 cat > operator/api-model/todoapp-example.yaml <<'YAML'
 apiVersion: platform.todo.example.com/v1alpha1
 kind: TodoApp
@@ -542,7 +542,7 @@ YAML
 
 PowerShell：
 
-```powershell
+```powershell linenums="0"
 @'
 apiVersion: platform.todo.example.com/v1alpha1
 kind: TodoApp
@@ -577,7 +577,7 @@ spec:
 
 创建 `operator/api-model/todoapp-status-example.yaml`：
 
-```bash
+```bash linenums="0"
 cat > operator/api-model/todoapp-status-example.yaml <<'YAML'
 apiVersion: platform.todo.example.com/v1alpha1
 kind: TodoApp
@@ -610,7 +610,7 @@ YAML
 
 PowerShell：
 
-```powershell
+```powershell linenums="0"
 @'
 apiVersion: platform.todo.example.com/v1alpha1
 kind: TodoApp
@@ -647,7 +647,7 @@ status:
 
 创建 `operator/api-model/todoapp-api-map.md`：
 
-```bash
+```bash linenums="0"
 cat > operator/api-model/todoapp-api-map.md <<'MD'
 # TodoApp API Model
 
@@ -681,7 +681,7 @@ MD
 
 PowerShell：
 
-```powershell
+```powershell linenums="0"
 @'
 # TodoApp API Model
 
@@ -733,21 +733,21 @@ PowerShell：
 
 查看集群支持的 API versions：
 
-```bash
+```bash linenums="0"
 kubectl api-versions | sort | head -30
 kubectl api-versions | grep -E '^(v1|apps/v1|apiextensions.k8s.io/v1)$'
 ```
 
 PowerShell：
 
-```powershell
+```powershell linenums="0"
 kubectl api-versions | Sort-Object | Select-Object -First 30
 kubectl api-versions | Select-String '^(v1|apps/v1|apiextensions.k8s.io/v1)$'
 ```
 
 查看内置资源：
 
-```bash
+```bash linenums="0"
 kubectl api-resources | head -20
 kubectl api-resources --api-group=apps
 kubectl api-resources --api-group=apiextensions.k8s.io
@@ -755,7 +755,7 @@ kubectl api-resources --api-group=apiextensions.k8s.io
 
 PowerShell：
 
-```powershell
+```powershell linenums="0"
 kubectl api-resources | Select-Object -First 20
 kubectl api-resources --api-group=apps
 kubectl api-resources --api-group=apiextensions.k8s.io
@@ -763,7 +763,7 @@ kubectl api-resources --api-group=apiextensions.k8s.io
 
 预期能看到：
 
-```text
+```text linenums="0"
 deployments   deploy   apps/v1   true   Deployment
 customresourcedefinitions   crd,crds   apiextensions.k8s.io/v1   false   CustomResourceDefinition
 ```
@@ -772,39 +772,39 @@ customresourcedefinitions   crd,crds   apiextensions.k8s.io/v1   false   CustomR
 
 从内置 Deployment 对象读取 GVK：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-dev get deployment "$OBSERVE_DEPLOYMENT" \
   -o jsonpath='{.apiVersion}{" "}{.kind}{"\n"}'
 ```
 
 PowerShell：
 
-```powershell
+```powershell linenums="0"
 kubectl -n todo-dev get deployment $OBSERVE_DEPLOYMENT `
   -o jsonpath='{.apiVersion}{" "}{.kind}{"\n"}'
 ```
 
 预期输出：
 
-```text
+```text linenums="0"
 apps/v1 Deployment
 ```
 
 查看 Deployment 的 GVR 信息：
 
-```bash
+```bash linenums="0"
 kubectl api-resources --api-group=apps | grep '^deployments'
 ```
 
 PowerShell：
 
-```powershell
+```powershell linenums="0"
 kubectl api-resources --api-group=apps | Select-String '^deployments'
 ```
 
 预期输出中应包含：
 
-```text
+```text linenums="0"
 deployments   deploy   apps/v1   true   Deployment
 ```
 
@@ -812,13 +812,13 @@ deployments   deploy   apps/v1   true   Deployment
 
 查看 core API：
 
-```bash
+```bash linenums="0"
 kubectl get --raw /api | jq .
 ```
 
 查看 apps/v1 discovery：
 
-```bash
+```bash linenums="0"
 kubectl get --raw /apis/apps/v1 \
   | jq '.resources[] | select(.name=="deployments") | {name, singularName, namespaced, kind, verbs}'
 ```
@@ -829,42 +829,42 @@ kubectl get --raw /apis/apps/v1 \
 
 查看 Deployment 的期望副本和实际副本：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-dev get deployment "$OBSERVE_DEPLOYMENT" \
   -o jsonpath='spec.replicas={.spec.replicas} status.readyReplicas={.status.readyReplicas}{"\n"}'
 ```
 
 PowerShell：
 
-```powershell
+```powershell linenums="0"
 kubectl -n todo-dev get deployment $OBSERVE_DEPLOYMENT `
   -o jsonpath='spec.replicas={.spec.replicas} status.readyReplicas={.status.readyReplicas}{"\n"}'
 ```
 
 查看 Conditions：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-dev get deployment "$OBSERVE_DEPLOYMENT" \
   -o json | jq '.status.conditions[] | {type, status, reason, message}'
 ```
 
 PowerShell：
 
-```powershell
+```powershell linenums="0"
 kubectl -n todo-dev get deployment $OBSERVE_DEPLOYMENT `
   -o json | jq '.status.conditions[] | {type, status, reason, message}'
 ```
 
 查看 status subresource：
 
-```bash
+```bash linenums="0"
 kubectl get --raw "/apis/apps/v1/namespaces/todo-dev/deployments/${OBSERVE_DEPLOYMENT}/status" \
   | jq '{apiVersion, kind, status}'
 ```
 
 PowerShell：
 
-```powershell
+```powershell linenums="0"
 kubectl get --raw "/apis/apps/v1/namespaces/todo-dev/deployments/$OBSERVE_DEPLOYMENT/status" `
   | jq '{apiVersion, kind, status}'
 ```
@@ -877,7 +877,7 @@ kubectl get --raw "/apis/apps/v1/namespaces/todo-dev/deployments/$OBSERVE_DEPLOY
 
 查看 Deployment 字段说明：
 
-```bash
+```bash linenums="0"
 kubectl explain deployment
 kubectl explain deployment.spec
 kubectl explain deployment.status.conditions
@@ -889,27 +889,27 @@ kubectl explain deployment.status.conditions
 
 先确认 API server 还不认识 `TodoApp`：
 
-```bash
+```bash linenums="0"
 kubectl api-resources | grep -i todoapp || true
 kubectl get crd todoapps.platform.todo.example.com --ignore-not-found
 ```
 
 PowerShell：
 
-```powershell
+```powershell linenums="0"
 kubectl api-resources | Select-String -Pattern 'todoapp' -CaseSensitive:$false
 kubectl get crd todoapps.platform.todo.example.com --ignore-not-found
 ```
 
 尝试 server-side dry-run：
 
-```bash
+```bash linenums="0"
 kubectl apply --dry-run=server -f operator/api-model/todoapp-example.yaml
 ```
 
 预期错误类似：
 
-```text
+```text linenums="0"
 error: resource mapping not found for name: "todo-platform" namespace: "todo-dev" from "operator/api-model/todoapp-example.yaml": no matches for kind "TodoApp" in version "platform.todo.example.com/v1alpha1"
 ensure CRDs are installed first
 ```
@@ -922,31 +922,31 @@ ensure CRDs are installed first
 
 查看我们设计的 `spec`：
 
-```bash
+```bash linenums="0"
 grep -n '^spec:' -A20 operator/api-model/todoapp-example.yaml
 ```
 
 PowerShell：
 
-```powershell
+```powershell linenums="0"
 Select-String -Path operator/api-model/todoapp-example.yaml -Pattern '^spec:' -Context 0,20
 ```
 
 查看我们设计的 `status`：
 
-```bash
+```bash linenums="0"
 grep -n '^status:' -A30 operator/api-model/todoapp-status-example.yaml
 ```
 
 PowerShell：
 
-```powershell
+```powershell linenums="0"
 Select-String -Path operator/api-model/todoapp-status-example.yaml -Pattern '^status:' -Context 0,30
 ```
 
 检查字段归属：
 
-```bash
+```bash linenums="0"
 cat operator/api-model/todoapp-api-map.md
 ```
 
@@ -960,7 +960,7 @@ cat operator/api-model/todoapp-api-map.md
 
 完成实验后，你应该得到以下关键结果：
 
-```text
+```text linenums="0"
 apps/v1 Deployment
 deployments   deploy   apps/v1   true   Deployment
 customresourcedefinitions   crd,crds   apiextensions.k8s.io/v1   false   CustomResourceDefinition
@@ -970,7 +970,7 @@ no matches for kind "TodoApp" in version "platform.todo.example.com/v1alpha1"
 
 同时本地目录中应存在：
 
-```text
+```text linenums="0"
 operator/api-model/todoapp-example.yaml
 operator/api-model/todoapp-status-example.yaml
 operator/api-model/todoapp-api-map.md
@@ -980,14 +980,14 @@ operator/api-model/todoapp-api-map.md
 
 **第一层：能发现 API 资源**
 
-```bash
+```bash linenums="0"
 kubectl api-resources --api-group=apps | grep '^deployments'
 kubectl api-resources --api-group=apiextensions.k8s.io | grep customresourcedefinitions
 ```
 
 PowerShell：
 
-```powershell
+```powershell linenums="0"
 kubectl api-resources --api-group=apps | Select-String '^deployments'
 kubectl api-resources --api-group=apiextensions.k8s.io | Select-String 'customresourcedefinitions'
 ```
@@ -996,14 +996,14 @@ kubectl api-resources --api-group=apiextensions.k8s.io | Select-String 'customre
 
 **第二层：能区分 GVK 与 GVR**
 
-```bash
+```bash linenums="0"
 kubectl -n todo-dev get deployment "$OBSERVE_DEPLOYMENT" -o jsonpath='{.apiVersion}{" "}{.kind}{"\n"}'
 kubectl api-resources --api-group=apps | grep '^deployments'
 ```
 
 PowerShell：
 
-```powershell
+```powershell linenums="0"
 kubectl -n todo-dev get deployment $OBSERVE_DEPLOYMENT -o jsonpath='{.apiVersion}{" "}{.kind}{"\n"}'
 kubectl api-resources --api-group=apps | Select-String '^deployments'
 ```
@@ -1012,7 +1012,7 @@ kubectl api-resources --api-group=apps | Select-String '^deployments'
 
 **第三层：能读取 spec 与 status**
 
-```bash
+```bash linenums="0"
 kubectl -n todo-dev get deployment "$OBSERVE_DEPLOYMENT" \
   -o jsonpath='spec={.spec.replicas} status={.status.readyReplicas}{"\n"}'
 ```
@@ -1021,7 +1021,7 @@ kubectl -n todo-dev get deployment "$OBSERVE_DEPLOYMENT" \
 
 **第四层：能解释 CRD 安装顺序**
 
-```bash
+```bash linenums="0"
 kubectl apply --dry-run=server -f operator/api-model/todoapp-example.yaml
 ```
 
@@ -1029,7 +1029,7 @@ kubectl apply --dry-run=server -f operator/api-model/todoapp-example.yaml
 
 **第五层：能完成 TodoApp API 草案**
 
-```bash
+```bash linenums="0"
 test -f operator/api-model/todoapp-example.yaml
 test -f operator/api-model/todoapp-status-example.yaml
 test -f operator/api-model/todoapp-api-map.md
@@ -1037,7 +1037,7 @@ test -f operator/api-model/todoapp-api-map.md
 
 PowerShell：
 
-```powershell
+```powershell linenums="0"
 Test-Path operator/api-model/todoapp-example.yaml
 Test-Path operator/api-model/todoapp-status-example.yaml
 Test-Path operator/api-model/todoapp-api-map.md
@@ -1051,13 +1051,13 @@ Test-Path operator/api-model/todoapp-api-map.md
 
 如果你只想清理本篇本地草案：
 
-```bash
+```bash linenums="0"
 rm -rf operator/api-model
 ```
 
 PowerShell：
 
-```powershell
+```powershell linenums="0"
 Remove-Item -Recurse -Force operator/api-model
 ```
 
@@ -1065,19 +1065,19 @@ Remove-Item -Recurse -Force operator/api-model
 
 如果你在实验环境节创建了临时 nginx Deployment，请删除它：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-dev delete deployment todo-api-shape-demo --ignore-not-found
 ```
 
 如果 `todo-dev` namespace 也是你为本篇临时创建的，并且里面没有其他课程资源，可以再删除 namespace：
 
-```bash
+```bash linenums="0"
 kubectl delete namespace todo-dev --ignore-not-found
 ```
 
 如果你正在沿用第 30-33 篇的真实阶段五环境，不要删除 `todo-dev` 或 `todo-platform`。如果你在实验过程中额外创建了其他测试对象，请按对象类型删除。例如：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-dev delete deployment api-shape-demo --ignore-not-found
 ```
 
@@ -1087,14 +1087,14 @@ kubectl -n todo-dev delete deployment api-shape-demo --ignore-not-found
 
 - **现象**：
 
-  ```yaml
+  ```yaml linenums="0"
   kind: deployments
   ```
 
 - **原因**：把 GVR 中的 `resources: deployments` 当成 YAML 里的 `kind`。
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   kubectl api-resources --api-group=apps | grep '^deployments'
   kubectl explain deployment
   ```
@@ -1106,14 +1106,14 @@ kubectl -n todo-dev delete deployment api-shape-demo --ignore-not-found
 
 - **现象**：
 
-  ```text
+  ```text linenums="0"
   no matches for kind "TodoApp" in version "platform.todo.example.com/v1alpha1"
   ```
 
 - **原因**：API server 尚未通过 CRD 注册 `TodoApp` 类型。
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   kubectl api-resources | grep -i todoapp || true
   kubectl get crd | grep -i todo || true
   ```
@@ -1127,7 +1127,7 @@ kubectl -n todo-dev delete deployment api-shape-demo --ignore-not-found
 - **原因**：集群中已经存在 `todoapps.platform.todo.example.com` CRD，API server 已经认识 `TodoApp`。
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   kubectl get crd todoapps.platform.todo.example.com
   kubectl api-resources | grep -i todoapp
   ```
@@ -1141,7 +1141,7 @@ kubectl -n todo-dev delete deployment api-shape-demo --ignore-not-found
 - **原因**：没有区分用户期望和系统观察值。
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   grep -n 'readyReplicas\|observedGeneration\|lastError' operator/api-model/todoapp-example.yaml || true
   ```
 
@@ -1154,7 +1154,7 @@ kubectl -n todo-dev delete deployment api-shape-demo --ignore-not-found
 - **原因**：CRD 只扩展 API 类型，不包含自动化逻辑；Controller 尚未部署。
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   kubectl get crd | grep todoapps
   kubectl -n todo-dev get todoapp
   kubectl -n todo-dev get deployment,svc,ingress
@@ -1167,7 +1167,7 @@ kubectl -n todo-dev delete deployment api-shape-demo --ignore-not-found
 
 - **现象**：
 
-  ```yaml
+  ```yaml linenums="0"
   status:
     message: everything is probably ok
   ```
@@ -1243,71 +1243,13 @@ flowchart TD
 | TodoApp 模型 | 能写出 `TodoApp` 的初版 `spec` 与字段归属表 |
 | 跨平台执行 | 能在 Bash 或 PowerShell 中生成同样的 API 模型文件 |
 
-## 9. 本章练习题
+## 9. 练习题与面试题
 
-**基础题**
+本章练习题和面试题已拆分到独立页面，完成正文学习后再进入题库练习与复盘。
 
-1. Kubernetes 中 Resource 和 Kind 有什么区别？
-2. 为什么 `Pod` 的 `apiVersion` 是 `v1`，而 Deployment 是 `apps/v1`？
-3. GVK 和 GVR 分别在哪些场景中出现？
-4. 为什么说 CRD 只是扩展 API，而不是自动化逻辑？
-5. `spec` 和 `status` 为什么要分开？
+[查看本章练习题与面试题](../../questions/stage-06-platform-operator/34-k8s-api-extension.md)
 
-**实操题**
-
-1. 使用 `kubectl get --raw /apis/apps/v1` 找到 `deployments` 的 discovery 信息。验收标准：能指出 `kind`、`namespaced` 和 `verbs`。
-2. 为 `TodoApp` 增加一个 `spec.autoscaling` 草案字段。验收标准：字段只描述期望状态，不包含实际副本数。
-3. 为 `TodoApp` 设计一个 `Degraded` condition 示例。验收标准：包含 `type`、`status`、`reason`、`message` 和 `lastTransitionTime`。
-4. 如果你使用 Windows PowerShell，把本篇 Bash 文件生成命令改写成 PowerShell here-string。验收标准：三个文件内容与 Bash 版本等价。
-
-**思考题**
-
-1. 如果把所有 Helm values 原样塞进 `TodoApp.spec.values`，会带来什么长期维护问题？
-2. 如果用户可以修改 `status.conditions`，会对排障、告警和自动化产生什么风险？
-
-## 10. 本章面试题
-
-### 面试题 1：Kubernetes 为什么容易扩展？
-
-**一句话结论**：因为 Kubernetes 把集群能力抽象成资源化、声明式 API，并允许通过 CRD 注册新的资源类型，再由 Controller 基于 watch 和 reconcile 实现自动化。
-
-**展开解释**：API server 负责校验、存储、鉴权和 watch；CRD 让 API server 认识新的 kind；Controller 监听这些对象并调谐底层资源。这样平台团队可以把业务运维知识封装成新的 Kubernetes API，而不需要修改 kube-apiserver 源码。
-
-**深入追问**：CRD 和 Aggregated API Server 有什么区别？CRD 适合大多数声明式资源扩展，API server 负责存储；Aggregated API Server 适合需要自定义存储、复杂子资源或特殊协议行为的高级扩展。
-
-### 面试题 2：GVK 和 GVR 有什么区别？
-
-**一句话结论**：GVK 描述对象类型，GVR 描述 REST API 资源路径。
-
-**展开解释**：YAML 中的 `apiVersion: apps/v1` 和 `kind: Deployment` 是 GVK 视角；API path 和 RBAC 中的 `resources: ["deployments"]` 是 GVR 视角。kubectl 和 client-go 会通过 discovery 和 RESTMapper 在两者之间映射。
-
-**深入追问**：为什么要关心这个区别？写 Controller、RBAC、动态客户端和排查 `no matches for kind` 时，混淆 GVK/GVR 会直接导致 watch 不到对象或权限配置错误。
-
-### 面试题 3：CRD 安装后，为什么创建 CR 不一定有业务资源生成？
-
-**一句话结论**：CRD 只让 API server 认识和存储新资源，业务资源的创建需要 Controller。
-
-**展开解释**：安装 `TodoApp` CRD 后，API server 可以接受 `TodoApp` 对象并存储到 etcd，但它不知道 TodoApp 应该对应哪些 Deployment、Service 或 Ingress。只有 Todo Controller 监听到 TodoApp 后，才会执行调谐逻辑。
-
-**深入追问**：如果 Controller 停止了会怎样？已创建的底层资源通常还在，但新的 spec 变更不会被调谐，status 也不会更新。排障时要同时看 CR、Controller Pod、Event、日志和 status.conditions。
-
-### 面试题 4：为什么 status 应该作为 subresource？
-
-**一句话结论**：status subresource 可以把用户修改 spec 和 Controller 回写 status 的权限与更新路径分开。
-
-**展开解释**：用户通常应该能创建和更新 `todoapps`，但不应该伪造 `todoapps/status`。Controller 回写 status 时也不应该覆盖用户刚刚修改的 spec。status subresource 提供了更清晰的 RBAC 和并发更新边界。
-
-**深入追问**：没有 status subresource 会有什么风险？用户和 Controller 都更新同一个主资源，容易产生字段冲突；RBAC 也很难精细限制谁能写运行状态。
-
-### 面试题 5：如何设计一个好的 Conditions？
-
-**一句话结论**：Conditions 要稳定、结构化、可机器判断，用 `type` 表达状态维度，用 `status` 表达真假或未知，用 `reason` 和 `message` 解释原因。
-
-**展开解释**：常见字段包括 `type`、`status`、`reason`、`message`、`lastTransitionTime`、`observedGeneration`。`type` 和 `reason` 应尽量稳定，便于 UI、告警和脚本消费；`message` 可以提供更详细的人类可读解释。
-
-**深入追问**：Conditions 和日志有什么区别？Conditions 是资源当前状态摘要，适合快速判断和自动化；日志是过程记录，适合追踪细节。两者都需要，但不能互相替代。
-
-## 11. 本章总结
+## 10. 本章总结
 
 本篇打开了阶段六的大门。知识上，你理解了 Kubernetes API Machinery 的基本组成：资源化 API、API discovery、GVK、GVR、声明式 API、CRD、自定义资源、Controller、`spec`、`status` 和 Conditions。
 
@@ -1315,7 +1257,7 @@ flowchart TD
 
 能力价值上，你开始从“Kubernetes 使用者”转向“平台 API 设计者”。这一步非常关键：Operator 的核心不是写一堆 Go 代码，而是先设计一个稳定、可演进、可排障的 API。
 
-## 12. 下一章衔接
+## 11. 下一章衔接
 
 下一篇第 35 篇会进入 CRD 设计与实践。我们会把本篇的 `TodoApp` 模型变成真正的 `CustomResourceDefinition`，并继续设计 `TodoDatabase`、`TodoCache` 两个资源。
 

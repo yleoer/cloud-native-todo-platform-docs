@@ -38,7 +38,7 @@
 
 本篇结束时，你至少应该能独立完成下面这组任务：
 
-```bash
+```bash linenums="0"
 git status --short --branch
 git switch -c docs/issue-5-git-workflow
 git add .gitattributes .gitignore .gitmessage .github/pull_request_template.md docs/contributing/git-workflow.md
@@ -112,7 +112,7 @@ flowchart LR
 
 最小工作流如下：
 
-```bash
+```bash linenums="0"
 git status --short
 git add docs/contributing/git-workflow.md
 git diff --staged
@@ -152,7 +152,7 @@ tag 不只是“好看的版本号”。后续镜像 tag、Helm Chart 版本和 
 
 分支是指向 commit 的名字。创建分支并不会复制整个项目，它只是创建一个新的指针。
 
-```bash
+```bash linenums="0"
 git switch -c docs/issue-5-git-workflow
 ```
 
@@ -181,7 +181,7 @@ git switch -c docs/issue-5-git-workflow
 
 冲突发生时，文件里会出现类似标记。下面示例前面故意留了一个空格，避免被 Git 检查误判为真实冲突：
 
-```text
+```text linenums="0"
  <<<<<<< HEAD
  review=required
  =======
@@ -195,7 +195,7 @@ git switch -c docs/issue-5-git-workflow
 
 `stash` 用于临时保存未完成的工作区修改：
 
-```bash
+```bash linenums="0"
 git stash push -m "wip: update git workflow"
 git stash list
 git stash pop
@@ -246,7 +246,7 @@ flowchart TD
 
 建议先看清历史关系：
 
-```bash
+```bash linenums="0"
 git fetch origin
 git log --oneline --graph --decorate --all -n 20
 ```
@@ -277,7 +277,7 @@ git log --oneline --graph --decorate --all -n 20
 
 推荐格式：
 
-```text
+```text linenums="0"
 <type>(<scope>): <summary>
 ```
 
@@ -341,13 +341,13 @@ sequenceDiagram
 
 确认 Git 版本：
 
-```bash
+```bash linenums="0"
 git --version
 ```
 
 配置作者信息。请替换成你自己的名字和邮箱：
 
-```bash
+```bash linenums="0"
 git config --global user.name "Your Name"
 git config --global user.email "you@example.com"
 git config --global init.defaultBranch main
@@ -371,7 +371,7 @@ Git 配置有作用范围，实验中不要随意把团队策略写成全局设�
 
 临时仓库结构：
 
-```text
+```text linenums="0"
 /tmp/git-collaboration-lab/
 ├── workflow.txt
 ├── rebase.txt
@@ -383,7 +383,7 @@ Git 配置有作用范围，实验中不要随意把团队策略写成全局设�
 
 课程项目会新增：
 
-```text
+```text linenums="0"
 cloud-native-todo-platform/
 ├── .gitattributes
 ├── .gitignore
@@ -397,7 +397,7 @@ cloud-native-todo-platform/
 
 如果没有安装 `tree`，可以用下面的命令查看类似结构：
 
-```bash
+```bash linenums="0"
 find . -maxdepth 3 -print
 ```
 
@@ -582,7 +582,7 @@ test(api): cover todo validation
 
 创建临时仓库：
 
-```bash
+```bash linenums="0"
 rm -rf /tmp/git-collaboration-lab /tmp/git-collaboration-remote.git
 mkdir -p /tmp/git-collaboration-lab
 cd /tmp/git-collaboration-lab
@@ -593,7 +593,7 @@ git config user.email "learner@example.com"
 
 创建初始提交：
 
-```bash
+```bash linenums="0"
 printf "workflow=main\nreview=required\n" > workflow.txt
 git add workflow.txt
 git commit -m "docs: initialize workflow note"
@@ -601,7 +601,7 @@ git commit -m "docs: initialize workflow note"
 
 制造并解决一次冲突：
 
-```bash
+```bash linenums="0"
 git switch -c docs/issue-5-pr-workflow
 printf "workflow=feature\nreview=required\n" > workflow.txt
 git commit -am "docs: update workflow from feature branch"
@@ -613,7 +613,7 @@ git merge docs/issue-5-pr-workflow
 
 预期 `git merge` 会提示冲突。解决冲突：
 
-```bash
+```bash linenums="0"
 cat > workflow.txt <<'EOF'
 workflow=main-and-feature
 review=required
@@ -626,7 +626,7 @@ git commit -m "docs: resolve workflow conflict"
 
 真实场景中，stash 最常用于临时保存未完成修改，以便切换到其他分支处理紧急任务；本实验先演示最小闭环。
 
-```bash
+```bash linenums="0"
 printf "temporary=wip\n" >> workflow.txt
 git stash push -m "wip: temporary workflow note"
 git stash list
@@ -636,7 +636,7 @@ git restore workflow.txt
 
 练习 rebase：
 
-```bash
+```bash linenums="0"
 git switch -c docs/issue-5-rebase-demo
 printf "rebase=feature\n" > rebase.txt
 git add rebase.txt
@@ -653,7 +653,7 @@ git rebase main
 
 把 rebase 后的功能分支合回 `main`，并创建 tag：
 
-```bash
+```bash linenums="0"
 git switch main
 git merge --ff-only docs/issue-5-rebase-demo
 git tag -a v0.1.0 -m "release: v0.1.0"
@@ -661,7 +661,7 @@ git tag -a v0.1.0 -m "release: v0.1.0"
 
 创建本地裸仓库模拟远程，并推送分支和 tag：
 
-```bash
+```bash linenums="0"
 git init --bare -b main /tmp/git-collaboration-remote.git
 git remote add origin /tmp/git-collaboration-remote.git
 git push -u origin main
@@ -671,7 +671,7 @@ git ls-remote --heads --tags origin
 
 回到课程项目仓库，创建工作分支。下面路径按第 1 篇的建议写法展示，请按你的实际路径调整。如果你还没有远程仓库，执行下面代码块时跳过 `git pull --ff-only origin main` 这一行，但仍然要确保当前工作区干净。
 
-```bash
+```bash linenums="0"
 cd ~/workspace/cloud-native-todo-platform
 git config --local pull.ff only
 git status --short --branch
@@ -684,7 +684,7 @@ git switch -c docs/issue-5-git-workflow
 
 创建目录并写入 5.4 中的文件：
 
-```bash
+```bash linenums="0"
 mkdir -p .github docs/contributing
 ```
 
@@ -692,7 +692,7 @@ mkdir -p .github docs/contributing
 
 让 Git 使用提交模板：
 
-```bash
+```bash linenums="0"
 git config commit.template .gitmessage
 ```
 
@@ -700,7 +700,7 @@ git config commit.template .gitmessage
 
 检查差异并提交：
 
-```bash
+```bash linenums="0"
 git status --short --branch
 git diff -- .gitattributes .gitignore .gitmessage .github/pull_request_template.md docs/contributing/git-workflow.md
 git add .gitattributes .gitignore .gitmessage .github/pull_request_template.md docs/contributing/git-workflow.md
@@ -710,19 +710,19 @@ git commit -m "docs: define git collaboration workflow"
 
 推送分支：
 
-```bash
+```bash linenums="0"
 git push -u origin docs/issue-5-git-workflow
 ```
 
 如果你的远程分支已经存在，并且你只是追加提交，使用：
 
-```bash
+```bash linenums="0"
 git push
 ```
 
 如果你在个人分支上 rebase 过，并确认远程分支没有被别人更新，才可以使用：
 
-```bash
+```bash linenums="0"
 git push --force-with-lease
 ```
 
@@ -742,13 +742,13 @@ git push --force-with-lease
 
 PR/MR 标题建议：
 
-```text
+```text linenums="0"
 docs: define git collaboration workflow
 ```
 
 PR/MR 描述建议：
 
-```markdown
+```markdown linenums="0"
 ## Summary
 
 - Add Git branch workflow documentation.
@@ -770,7 +770,7 @@ Closes #5
 
 合并后删除远程分支，并同步本地 `main`：
 
-```bash
+```bash linenums="0"
 git switch main
 git pull --ff-only origin main
 git branch -d docs/issue-5-git-workflow
@@ -780,13 +780,13 @@ git branch -d docs/issue-5-git-workflow
 
 初始化临时仓库后，分支状态类似：
 
-```text
+```text linenums="0"
 ## main
 ```
 
 制造冲突时预期类似：
 
-```text
+```text linenums="0"
 Auto-merging workflow.txt
 CONFLICT (content): Merge conflict in workflow.txt
 Automatic merge failed; fix conflicts and then commit the result.
@@ -794,13 +794,13 @@ Automatic merge failed; fix conflicts and then commit the result.
 
 `git status --short` 在冲突期间类似：
 
-```text
+```text linenums="0"
 UU workflow.txt
 ```
 
 解决冲突并提交后，历史类似：
 
-```text
+```text linenums="0"
 *   a1b2c3d (HEAD -> main) docs: resolve workflow conflict
 |\
 | * b2c3d4e (docs/issue-5-pr-workflow) docs: update workflow from feature branch
@@ -811,13 +811,13 @@ UU workflow.txt
 
 stash 输出类似：
 
-```text
+```text linenums="0"
 stash@{0}: On main: wip: temporary workflow note
 ```
 
 推送本地远程后，`git ls-remote --heads --tags origin` 预期类似：
 
-```text
+```text linenums="0"
 <commit-sha>	refs/heads/main
 <tag-sha>	refs/tags/v0.1.0
 <commit-sha>	refs/tags/v0.1.0^{}
@@ -825,7 +825,7 @@ stash@{0}: On main: wip: temporary workflow note
 
 课程项目提交后，`git status --short --branch` 预期类似：
 
-```text
+```text linenums="0"
 ## docs/issue-5-git-workflow
 ```
 
@@ -833,7 +833,7 @@ stash@{0}: On main: wip: temporary workflow note
 
 在临时仓库中验证：
 
-```bash
+```bash linenums="0"
 cd /tmp/git-collaboration-lab
 git log --oneline --graph --decorate --all -n 20
 git tag --list
@@ -848,7 +848,7 @@ git ls-remote --heads --tags origin
 
 在课程项目中验证：
 
-```bash
+```bash linenums="0"
 cd ~/workspace/cloud-native-todo-platform
 test -f .gitattributes
 test -f .gitignore
@@ -873,13 +873,13 @@ git config --show-origin --get pull.ff
 
 临时练习仓库可以删除：
 
-```bash
+```bash linenums="0"
 rm -rf /tmp/git-collaboration-lab /tmp/git-collaboration-remote.git
 ```
 
 课程项目中的协作规范文件建议保留，后续章节会继续复用：
 
-```text
+```text linenums="0"
 .gitattributes
 .gitignore
 .gitmessage
@@ -889,14 +889,14 @@ docs/contributing/git-workflow.md
 
 如果你只是本地演练，不想保留未合并分支，可以在确认没有未提交修改后删除：
 
-```bash
+```bash linenums="0"
 git switch main
 git branch -D docs/issue-5-git-workflow
 ```
 
 如果远程分支也只是练习分支，可以删除：
 
-```bash
+```bash linenums="0"
 git push origin --delete docs/issue-5-git-workflow
 ```
 
@@ -908,7 +908,7 @@ git push origin --delete docs/issue-5-git-workflow
 
 - **现象**：
 
-  ```text
+  ```text linenums="0"
   Author identity unknown
   fatal: unable to auto-detect email address
   ```
@@ -917,7 +917,7 @@ git push origin --delete docs/issue-5-git-workflow
 
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   git config --global user.name
   git config --global user.email
   ```
@@ -926,7 +926,7 @@ git push origin --delete docs/issue-5-git-workflow
 
 - **修复**：
 
-  ```bash
+  ```bash linenums="0"
   git config --global user.name "Your Name"
   git config --global user.email "you@example.com"
   ```
@@ -937,7 +937,7 @@ git push origin --delete docs/issue-5-git-workflow
 
 - **现象**：
 
-  ```text
+  ```text linenums="0"
   ## main
    M docs/contributing/git-workflow.md
   ```
@@ -946,7 +946,7 @@ git push origin --delete docs/issue-5-git-workflow
 
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   git status --short --branch
   git branch --show-current
   ```
@@ -955,7 +955,7 @@ git push origin --delete docs/issue-5-git-workflow
 
 - **修复**：
 
-  ```bash
+  ```bash linenums="0"
   git switch -c docs/issue-5-git-workflow
   ```
 
@@ -967,13 +967,13 @@ git push origin --delete docs/issue-5-git-workflow
 
 - **现象**：
 
-  ```text
+  ```text linenums="0"
   error: Committing is not possible because you have unmerged files.
   ```
 
   或者文件里仍然能看到：
 
-  ```text
+  ```text linenums="0"
    <<<<<<< HEAD
    =======
    >>>>>>> feature/demo
@@ -983,7 +983,7 @@ git push origin --delete docs/issue-5-git-workflow
 
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   git status --short
   git diff --check
   git grep -n -E '<<<<<<<|=======|>>>>>>>' -- ':!docs/chapters/stage-01-foundation/05-git-basics.md' || true
@@ -993,7 +993,7 @@ git push origin --delete docs/issue-5-git-workflow
 
 - **修复**：打开冲突文件，理解两边改动意图，删除冲突标记，保存正确结果，然后执行：
 
-  ```bash
+  ```bash linenums="0"
   git add <file>
   git commit
   ```
@@ -1004,7 +1004,7 @@ git push origin --delete docs/issue-5-git-workflow
 
 - **现象**：
 
-  ```text
+  ```text linenums="0"
   ! [rejected] main -> main (fetch first)
   error: failed to push some refs
   ```
@@ -1013,7 +1013,7 @@ git push origin --delete docs/issue-5-git-workflow
 
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   git fetch origin
   git log --oneline --graph --decorate --all -n 20
   ```
@@ -1022,13 +1022,13 @@ git push origin --delete docs/issue-5-git-workflow
 
 - **修复**：
 
-  ```bash
+  ```bash linenums="0"
   git pull --ff-only origin main
   ```
 
   如果不能快进，需要先理解分叉原因，再选择 merge 或 rebase。个人分支 rebase 后更新远程时使用：
 
-  ```bash
+  ```bash linenums="0"
   git push --force-with-lease
   ```
 
@@ -1038,7 +1038,7 @@ git push origin --delete docs/issue-5-git-workflow
 
 - **现象**：
 
-  ```text
+  ```text linenums="0"
   + DATABASE_PASSWORD=prod-password
   + KUBECONFIG=/home/user/.kube/prod
   ```
@@ -1049,7 +1049,7 @@ git push origin --delete docs/issue-5-git-workflow
 
 - **排查**：
 
-```bash
+```bash linenums="0"
 git grep -n -E 'PASSWORD|TOKEN|SECRET|BEGIN .*PRIVATE KEY' || true
 git log --all -- .env
 ```
@@ -1092,7 +1092,7 @@ git log --all -- .env
 
 验收命令：
 
-```bash
+```bash linenums="0"
 git status --short --branch
 ls .gitattributes .gitignore .gitmessage .github/pull_request_template.md docs/contributing/git-workflow.md
 git log --oneline -n 5
@@ -1112,86 +1112,13 @@ git branch -vv
 | 版本标记 | 能创建并解释 `v0.1.0` tag 的作用 |
 | 安全规则 | `.gitignore` 覆盖 `.env`、密钥和构建产物 |
 
-## 9. 本章练习题
+## 9. 练习题与面试题
 
-### 基础题
+本章练习题和面试题已拆分到独立页面，完成正文学习后再进入题库练习与复盘。
 
-1. 工作区、暂存区、本地仓库和远程仓库分别保存什么？
-2. 为什么 `git fetch` 比直接 `git pull` 更适合排查分支分叉？
-3. `merge` 和 `rebase` 的历史形态有什么区别？
-4. 为什么不建议直接在 `main` 分支开发？
-5. tag 和 branch 都是引用，它们的使用场景有什么不同？
+[查看本章练习题与面试题](../../questions/stage-01-foundation/05-git-basics.md)
 
-### 实操题
-
-1. 在临时仓库中创建两个分支，分别修改同一行文本，手动制造并解决一次冲突。当 `git log --oneline --graph --decorate --all` 能看到合并提交时，说明操作成功。
-2. 创建一个功能分支，完成两次提交，然后用 `git rebase main` 同步最新主干。当 `git log --oneline --graph` 中功能分支提交位于最新 `main` 之后，说明操作成功。
-3. 使用 `git stash` 保存未完成修改，切换分支后再恢复。当 `git stash list` 先出现记录、`git stash pop` 后记录消失且修改回到工作区时，说明操作成功。
-
-### 思考题
-
-1. 团队应该选择 squash merge、merge commit 还是 rebase merge？不同选择对排障、回滚和审计有什么影响？
-2. 如果同事把生产 Token 提交到了远程仓库，只在下一次提交中删除文件够不够？你会怎么处理？
-
-## 10. 本章面试题
-
-### 1. Git 的工作区、暂存区和本地仓库有什么区别？
-
-**一句话结论**：工作区是当前文件，暂存区是下一次提交的准备快照，本地仓库保存已经形成的提交历史。
-
-**展开解释**：`git add` 把工作区修改放入暂存区，`git commit` 把暂存区内容生成提交。这个设计允许开发者把一组文件拆成多个清晰提交，而不是把所有修改一次性塞进历史。
-
-**深入追问**：排查“为什么文件没进 commit”时，优先看 `git status` 和 `git diff --staged`。如果文件只在工作区修改但没有 staged，就不会进入下一次提交。
-
-### 2. `git merge` 和 `git rebase` 有什么区别？
-
-**一句话结论**：`merge` 保留分叉历史，`rebase` 改写当前分支提交位置，让历史更线性。
-
-**展开解释**：团队合并 PR/MR 时常用 merge 或 squash；个人功能分支同步最新主干时可以 rebase。rebase 会生成新的提交哈希，因此不适合已经被多人依赖的公共分支。
-
-**深入追问**：如果个人分支 rebase 后已经推送过远程，需要用 `git push --force-with-lease` 更新远程分支。不要用 `--force` 覆盖别人可能已经推送的提交。
-
-### 3. 发生冲突后你会怎么处理？
-
-**一句话结论**：先用 `git status` 找冲突文件，再理解两边意图，编辑成正确结果，最后 `git add` 标记已解决。
-
-**展开解释**：冲突标记中的 `HEAD` 通常代表当前分支一侧，另一侧代表被合并或 rebase 的提交。解决后要删除所有冲突标记，运行 `git diff --check` 检查，再继续 merge commit 或 `git rebase --continue`。
-
-**深入追问**：冲突解决不是纯技术动作。如果涉及业务行为、配置策略或安全规则，应找对应作者确认，不要机械选择“保留当前”。
-
-### 4. 为什么企业团队通常禁止直接 push 到 `main`？
-
-**一句话结论**：因为 `main` 通常代表可构建、可发布的主线，直接 push 会绕过审查、测试和审计。
-
-**展开解释**：PR/MR 可以触发 CI、收集 Review、记录讨论、关联 Issue，并提供回滚上下文。直接 push 到 `main` 会让错误更快进入主线，也让团队难以知道变更背景。
-
-**深入追问**：成熟团队会使用 branch protection、CODEOWNERS、required checks、required approvals 和 signed commits 等机制保护关键分支。
-
-### 5. `git pull` 为什么可能带来问题？
-
-**一句话结论**：`git pull` 等于 fetch 加合并或变基，默认行为可能在你没看清历史时产生额外 merge commit。
-
-**展开解释**：如果本地和远程分支已经分叉，直接 pull 可能制造混乱历史。更稳妥的方式是先 `git fetch origin`，再用 `git log --graph --all` 看清关系，然后选择 `pull --ff-only`、merge 或 rebase。
-
-**深入追问**：项目内可以用 `git config --local pull.ff only` 固定当前仓库策略；团队也可以在开发规范中建议成员配置 `git config --global pull.ff only`，让不能快进的 pull 直接失败，迫使开发者先理解分叉原因。
-
-### 6. 不小心提交了密钥怎么办？
-
-**一句话结论**：立即视为密钥泄露，删除文件远远不够，必须轮换密钥并评估历史清理。
-
-**展开解释**：Git 历史会保留旧提交中的内容。即使你后续删除密钥，已经推送到远程仓库的历史仍可能被别人拉取或缓存。正确流程是撤销或轮换密钥、通知负责人、清理历史、检查访问日志，并补充 `.gitignore` 和 secret scanning。
-
-**深入追问**：如果密钥已经进入公开仓库，应假设它已经泄露。清理历史不能替代密钥轮换。
-
-### 7. 如何让一次发布从 Git tag 追溯到镜像和 Helm Chart？
-
-**一句话结论**：发布时使用不可变 tag，并把 Git SHA 写入镜像标签、镜像标签元数据、Chart 版本或 release note。
-
-**展开解释**：CI 可以在 `v1.2.3` tag 上构建镜像，把镜像打上 `v1.2.3` 和 commit SHA 标签，同时生成 Helm Chart 版本。线上问题发生时，可以从运行镜像反查源码提交、PR/MR 和回滚目标。
-
-**深入追问**：生产环境不要依赖 `latest`。最好记录镜像 digest，因为 tag 可能被误移动，而 digest 指向不可变内容。
-
-## 11. 本章总结
+## 10. 本章总结
 
 本篇建立了企业级 Git 协作的基础模型。你学习了工作区、暂存区、本地仓库、远程仓库、提交历史、分支、`HEAD`、tag、merge、rebase、stash 和 PR/MR 的关系，也理解了冲突、非快进推送和敏感信息泄露这些常见问题如何发生。
 
@@ -1199,7 +1126,7 @@ git branch -vv
 
 能力价值上，你现在可以完成一次从分支开发到 PR/MR 合并的闭环，能写清楚变更背景、验证方法和风险，也能在排障或发布时从 Git 历史追溯变更来源。
 
-## 12. 下一章衔接
+## 11. 下一章衔接
 
 下一篇进入 **第 6 篇：Shell 脚本与自动化基础**。本篇建立的 Git 分支模型、提交规范和 PR/MR 模板，会直接用于管理下一篇的 `dev.sh`、`check.sh`、`clean.sh` 等脚本。
 

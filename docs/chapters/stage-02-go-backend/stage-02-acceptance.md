@@ -21,7 +21,7 @@
 
 建议在 `cloud-native-todo-platform` 仓库中形成以下结构：
 
-```text
+```text linenums="0"
 cloud-native-todo-platform/
 ├── README.md
 ├── Makefile
@@ -91,7 +91,7 @@ cloud-native-todo-platform/
 
 出版前或团队交付前，可以用下面的命令确认本阶段使用的 Go 依赖版本真实存在：
 
-```bash
+```bash linenums="0"
 go list -m -versions github.com/gin-gonic/gin
 go list -m -versions github.com/jackc/pgx/v5
 go list -m -versions github.com/redis/go-redis/v9
@@ -106,7 +106,7 @@ go list -m -versions golang.org/x/crypto
 
 === "Linux / macOS / WSL2"
 
-    ```bash
+    ```bash linenums="0"
     go mod tidy
     go fmt ./...
     go test ./...
@@ -117,7 +117,7 @@ go list -m -versions golang.org/x/crypto
 
 === "Windows PowerShell"
 
-    ```powershell
+    ```powershell linenums="0"
     go mod tidy
     go fmt ./...
     go test ./...
@@ -134,7 +134,7 @@ go list -m -versions golang.org/x/crypto
 
 === "Linux / macOS / WSL2"
 
-    ```bash
+    ```bash linenums="0"
     docker compose up -d postgres redis
     docker compose ps
 
@@ -153,7 +153,7 @@ go list -m -versions golang.org/x/crypto
 
 === "Windows PowerShell"
 
-    ```powershell
+    ```powershell linenums="0"
     docker compose up -d postgres redis
     docker compose ps
 
@@ -178,7 +178,7 @@ go list -m -versions golang.org/x/crypto
 
 === "Linux / macOS / WSL2"
 
-    ```bash
+    ```bash linenums="0"
     HASH=$(TODO_CONFIG_DIR=configs TODO_ENV=dev go run ./api/cmd/todo-api hash-password "change-me-123")
 
     export TODO_CONFIG_DIR=configs
@@ -191,7 +191,7 @@ go list -m -versions golang.org/x/crypto
 
 === "Windows PowerShell"
 
-    ```powershell
+    ```powershell linenums="0"
     $hash = go run ./api/cmd/todo-api hash-password "change-me-123"
 
     $env:TODO_CONFIG_DIR = 'configs'
@@ -206,7 +206,7 @@ go list -m -versions golang.org/x/crypto
 
 === "Linux / macOS / WSL2"
 
-    ```bash
+    ```bash linenums="0"
     curl -i http://127.0.0.1:18080/healthz
 
     curl -i http://127.0.0.1:18080/api/v2/todos
@@ -223,7 +223,7 @@ go list -m -versions golang.org/x/crypto
 
 === "Windows PowerShell"
 
-    ```powershell
+    ```powershell linenums="0"
     curl.exe -i http://127.0.0.1:18080/healthz
 
     curl.exe -i http://127.0.0.1:18080/api/v2/todos
@@ -248,7 +248,7 @@ go list -m -versions golang.org/x/crypto
 
 创建 `docs/stage-02-acceptance.md`：
 
-````markdown
+````markdown linenums="0"
 # 阶段二验收记录
 
 ## 基础信息
@@ -369,7 +369,7 @@ curl /api/v2/auth/login:
 
 可以在项目 `README.md` 中增加：
 
-````markdown
+````markdown linenums="0"
 ## Stage 02 Go Backend
 
 This project has completed the Go backend stage:

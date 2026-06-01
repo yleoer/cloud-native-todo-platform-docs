@@ -49,7 +49,7 @@
 
 本篇结束时，你至少应该能成功执行：
 
-```bash
+```bash linenums="0"
 cd ~/workspace/cloud-native-todo-platform
 go get github.com/gin-gonic/gin@v1.12.0
 go mod tidy
@@ -61,7 +61,7 @@ TODO_API_ADDR=127.0.0.1:18080 ./bin/todo-api
 
 另开一个终端验证：
 
-```bash
+```bash linenums="0"
 curl -s http://127.0.0.1:18080/healthz
 curl -s -X POST http://127.0.0.1:18080/api/v2/todos -H 'Content-Type: application/json' -d '{"title":"learn Gin"}'
 curl -s http://127.0.0.1:18080/api/v2/todos
@@ -92,7 +92,7 @@ Gin 解决的不是“不会写 HTTP”的问题，而是“把常见 Web API �
 
 本篇会把项目推进到 `v0.3-api-gin`：
 
-```text
+```text linenums="0"
 cloud-native-todo-platform/
 ├── api/
 │   ├── cmd/todo-api/
@@ -117,7 +117,7 @@ Gin 不是另一个 HTTP 协议实现。它最终仍然作为 `http.Server.Handl
 
 最小结构可以这样理解：
 
-```go
+```go linenums="0"
 router := gin.New()
 server := &http.Server{
 	Addr:    "127.0.0.1:18080",
@@ -142,7 +142,7 @@ server.ListenAndServe()
 
 `gin.Context` 不是 Go 标准库的 `context.Context`。当你要把请求生命周期传给 service 或 repository 时，仍然使用：
 
-```go
+```go linenums="0"
 ctx := c.Request.Context()
 ```
 
@@ -150,7 +150,7 @@ ctx := c.Request.Context()
 
 路由组用来表达一组接口的共同前缀和共同中间件。Todo API v2 使用 `/api/v2` 作为版本前缀：
 
-```go
+```go linenums="0"
 api := router.Group("/api/v2")
 api.GET("/todos", h.listTodos)
 api.POST("/todos", h.createTodo)
@@ -163,7 +163,7 @@ api.GET("/todos/:id", h.getTodo)
 
 Gin 的 `ShouldBindJSON` 可以把 JSON 请求体绑定到结构体，并根据 tag 做基础校验：
 
-```go
+```go linenums="0"
 type todoRequest struct {
 	Title string `json:"title" binding:"required,min=1,max=120"`
 }
@@ -184,13 +184,13 @@ type todoRequest struct {
 
 成功响应：
 
-```json
+```json linenums="0"
 {"data":{"id":1,"title":"learn Gin","status":"pending"}}
 ```
 
 错误响应：
 
-```json
+```json linenums="0"
 {"error":{"code":"invalid_title","message":"title must be between 1 and 120 characters"}}
 ```
 
@@ -239,7 +239,7 @@ sequenceDiagram
 
 本篇中间件顺序是：
 
-```text
+```text linenums="0"
 RequestID -> AccessLog -> Recovery -> Timeout -> BodyLimit -> Router Handler
 ```
 
@@ -257,7 +257,7 @@ RequestID -> AccessLog -> Recovery -> Timeout -> BodyLimit -> Router Handler
 
 本篇在 Gin Handler 包里定义 `todoService` 接口：
 
-```go
+```go linenums="0"
 type todoService interface {
 	List(ctx context.Context, status model.Status) ([]model.Todo, error)
 	Get(ctx context.Context, id int) (model.Todo, error)
@@ -298,13 +298,13 @@ type todoService interface {
 
 进入课程项目根目录：
 
-```bash
+```bash linenums="0"
 cd ~/workspace/cloud-native-todo-platform
 ```
 
 确认 Go module 已存在：
 
-```bash
+```bash linenums="0"
 test -f go.mod
 ```
 
@@ -314,13 +314,13 @@ test -f go.mod
 
 创建本篇需要的目录：
 
-```bash
+```bash linenums="0"
 mkdir -p api/cmd/todo-api api/internal/handler/gin api/internal/model api/internal/repository api/internal/service bin
 ```
 
 本篇完成后的核心结构如下：
 
-```text
+```text linenums="0"
 cloud-native-todo-platform/
 ├── api/
 │   ├── cmd/
@@ -352,7 +352,7 @@ cloud-native-todo-platform/
 
 先用 `go get` 加入 Gin 依赖。这样不会覆盖第 9 篇或后续章节已经写入 `go.mod` 的其他依赖：
 
-```bash
+```bash linenums="0"
 go get github.com/gin-gonic/gin@v1.12.0
 ```
 
@@ -1488,20 +1488,20 @@ func loadConfig() config {
 
 先拉取 Gin 依赖并整理 `go.sum`：
 
-```bash
+```bash linenums="0"
 go get github.com/gin-gonic/gin@v1.12.0
 go mod tidy
 ```
 
 格式化本篇代码：
 
-```bash
+```bash linenums="0"
 go fmt ./api/...
 ```
 
 运行测试：
 
-```bash
+```bash linenums="0"
 go test ./api/...
 ```
 
@@ -1509,13 +1509,13 @@ go test ./api/...
 
 构建二进制：
 
-```bash
+```bash linenums="0"
 go build -o bin/todo-api ./api/cmd/todo-api
 ```
 
 生成 OpenAPI 文档文件：
 
-```bash
+```bash linenums="0"
 go run ./api/cmd/todo-api openapi > api/openapi.yaml
 ```
 
@@ -1523,43 +1523,43 @@ go run ./api/cmd/todo-api openapi > api/openapi.yaml
 
 启动服务。`TODO_API_ADDR` 控制监听地址，默认就是 `127.0.0.1:18080`：
 
-```bash
+```bash linenums="0"
 TODO_API_ADDR=127.0.0.1:18080 ./bin/todo-api
 ```
 
 另开一个终端，检查健康状态：
 
-```bash
+```bash linenums="0"
 curl -s http://127.0.0.1:18080/healthz
 ```
 
 创建 Todo：
 
-```bash
+```bash linenums="0"
 curl -s -X POST http://127.0.0.1:18080/api/v2/todos -H 'Content-Type: application/json' -d '{"title":"学习 Gin 路由组"}'
 ```
 
 查询 Todo 列表：
 
-```bash
+```bash linenums="0"
 curl -s http://127.0.0.1:18080/api/v2/todos
 ```
 
 标记完成：
 
-```bash
+```bash linenums="0"
 curl -s -X PATCH http://127.0.0.1:18080/api/v2/todos/1/done
 ```
 
 查看 OpenAPI 文档：
 
-```bash
+```bash linenums="0"
 curl -s http://127.0.0.1:18080/openapi.yaml | head
 ```
 
 停止服务时，在服务运行的终端按 `Ctrl+C`。程序会执行 `server.Shutdown`，日志中能看到：
 
-```text
+```text linenums="0"
 {"time":"...","level":"INFO","msg":"shutdown signal received"}
 {"time":"...","level":"INFO","msg":"todo api stopped"}
 ```
@@ -1568,7 +1568,7 @@ curl -s http://127.0.0.1:18080/openapi.yaml | head
 
 测试通过时，你会看到类似输出：
 
-```text
+```text linenums="0"
 ?   	cloud-native-todo-platform/api/cmd/todo-api	[no test files]
 ok  	cloud-native-todo-platform/api/internal/handler/gin	0.18s
 ?   	cloud-native-todo-platform/api/internal/model	[no test files]
@@ -1578,19 +1578,19 @@ ok  	cloud-native-todo-platform/api/internal/handler/gin	0.18s
 
 创建 Todo 的响应类似：
 
-```json
+```json linenums="0"
 {"data":{"id":1,"title":"学习 Gin 路由组","status":"pending","created_at":"2026-05-27T10:00:00Z","updated_at":"2026-05-27T10:00:00Z"}}
 ```
 
 查询 Todo 列表的响应会多一层 `items` 字段，因为 `writeJSON` 会先包一层 `data`，而 `listTodos` 传入的是 `gin.H{"items": items}`：
 
-```json
+```json linenums="0"
 {"data":{"items":[{"id":1,"title":"学习 Gin 路由组","status":"pending","created_at":"2026-05-27T10:00:00Z","updated_at":"2026-05-27T10:00:00Z"}]}}
 ```
 
 OpenAPI 文档开头类似：
 
-```text
+```text linenums="0"
 openapi: 3.1.0
 info:
   title: Cloud Native Todo API
@@ -1601,7 +1601,7 @@ info:
 
 验证格式、测试、构建和文档生成：
 
-```bash
+```bash linenums="0"
 go fmt ./api/...
 go test ./api/...
 go build -o bin/todo-api ./api/cmd/todo-api
@@ -1611,7 +1611,7 @@ test -s /tmp/todo-openapi.yaml
 
 验证服务端口监听。先启动服务，再执行：
 
-```bash
+```bash linenums="0"
 ss -ltnp | grep 18080
 ```
 
@@ -1619,13 +1619,13 @@ ss -ltnp | grep 18080
 
 验证错误响应：
 
-```bash
+```bash linenums="0"
 curl -i -s -X POST http://127.0.0.1:18080/api/v2/todos -H 'Content-Type: text/plain' -d '{"title":"bad"}'
 ```
 
 预期状态码是 `415 Unsupported Media Type`，响应体包含：
 
-```json
+```json linenums="0"
 {"error":{"code":"unsupported_media_type","message":"Content-Type must be application/json"}}
 ```
 
@@ -1635,7 +1635,7 @@ curl -i -s -X POST http://127.0.0.1:18080/api/v2/todos -H 'Content-Type: text/pl
 
 删除构建产物和临时文档：
 
-```bash
+```bash linenums="0"
 rm -f bin/todo-api /tmp/todo-openapi.yaml
 ```
 
@@ -1649,14 +1649,14 @@ rm -f bin/todo-api /tmp/todo-openapi.yaml
 
 - **现象**：
 
-  ```text
+  ```text linenums="0"
   go: github.com/gin-gonic/gin@v1.12.0: Get "https://proxy.golang.org/...": i/o timeout
   ```
 
 - **原因**：Go module 代理访问不稳定，或者环境没有配置国内可访问的代理。
 - **排查**：查看当前代理设置：
 
-  ```bash
+  ```bash linenums="0"
   go env GOPROXY
   ```
 
@@ -1664,7 +1664,7 @@ rm -f bin/todo-api /tmp/todo-openapi.yaml
 
 - **修复**：设置 Go module 代理后重试：
 
-  ```bash
+  ```bash linenums="0"
   go env -w GOPROXY=https://goproxy.cn,direct
   go mod tidy
   ```
@@ -1675,7 +1675,7 @@ rm -f bin/todo-api /tmp/todo-openapi.yaml
 
 - **现象**：
 
-  ```text
+  ```text linenums="0"
   HTTP/1.1 415 Unsupported Media Type
   {"error":{"code":"unsupported_media_type","message":"Content-Type must be application/json"}}
   ```
@@ -1683,7 +1683,7 @@ rm -f bin/todo-api /tmp/todo-openapi.yaml
 - **原因**：创建或更新 Todo 时没有设置 `Content-Type: application/json`。
 - **排查**：用 `curl -v` 查看请求头：
 
-  ```bash
+  ```bash linenums="0"
   curl -v -X POST http://127.0.0.1:18080/api/v2/todos -d '{"title":"demo"}'
   ```
 
@@ -1691,7 +1691,7 @@ rm -f bin/todo-api /tmp/todo-openapi.yaml
 
 - **修复**：补上 Header：
 
-  ```bash
+  ```bash linenums="0"
   curl -s -X POST http://127.0.0.1:18080/api/v2/todos -H 'Content-Type: application/json' -d '{"title":"demo"}'
   ```
 
@@ -1701,14 +1701,14 @@ rm -f bin/todo-api /tmp/todo-openapi.yaml
 
 - **现象**：
 
-  ```text
+  ```text linenums="0"
   404 page not found
   ```
 
 - **原因**：第 9 篇标准库版本使用 `/api/v1`，本篇 Gin 版本使用 `/api/v2`。如果沿用旧 curl 命令，就会请求不到路由。
 - **排查**：检查请求路径：
 
-  ```bash
+  ```bash linenums="0"
   curl -i -s http://127.0.0.1:18080/api/v1/todos
   ```
 
@@ -1721,7 +1721,7 @@ rm -f bin/todo-api /tmp/todo-openapi.yaml
 
 - **现象**：
 
-  ```text
+  ```text linenums="0"
   api/internal/handler/http/handler.go:75:25: undefined: service.ParseStatus
   api/internal/handler/http/handler_test.go:18:25: undefined: service.New
   ```
@@ -1731,7 +1731,7 @@ rm -f bin/todo-api /tmp/todo-openapi.yaml
 - **原因**：第 9 篇的标准库 Handler 仍然保留在 `api/internal/handler/http`，它依赖 `service.New` 和 `service.ParseStatus`。如果第 10 篇重写 service 层时只保留 `NewTodoService`，旧 Handler 就会编译失败。
 - **排查**：确认 service 文件中是否保留兼容函数：
 
-  ```bash
+  ```bash linenums="0"
   grep -n "func New(" api/internal/service/todo_service.go
   grep -n "func ParseStatus" api/internal/service/todo_service.go
   ```
@@ -1740,7 +1740,7 @@ rm -f bin/todo-api /tmp/todo-openapi.yaml
 
 - **修复**：补回 `New` 和 `ParseStatus`，然后重新测试：
 
-  ```bash
+  ```bash linenums="0"
   go test ./api/...
   ```
 
@@ -1750,14 +1750,14 @@ rm -f bin/todo-api /tmp/todo-openapi.yaml
 
 - **现象**：
 
-  ```text
+  ```text linenums="0"
   listen tcp 127.0.0.1:18080: bind: address already in use
   ```
 
 - **原因**：上一次服务还在运行，或者另一个程序占用了 18080。
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   ss -ltnp | grep 18080
   ```
 
@@ -1765,7 +1765,7 @@ rm -f bin/todo-api /tmp/todo-openapi.yaml
 
 - **修复**：停止旧服务，或者换一个端口启动：
 
-  ```bash
+  ```bash linenums="0"
   TODO_API_ADDR=127.0.0.1:18081 ./bin/todo-api
   ```
 
@@ -1803,75 +1803,18 @@ rm -f bin/todo-api /tmp/todo-openapi.yaml
 - 能解释 `gin.Context` 与 `context.Context` 的区别。
 - 能说清楚为什么 Handler 层依赖 `todoService` 接口，而不是直接依赖具体存储。
 
-## 9. 本章练习题
+## 9. 练习题与面试题
 
-### 9.1 基础题
+本章练习题和面试题已拆分到独立页面，完成正文学习后再进入题库练习与复盘。
 
-1. Gin 为什么仍然需要 `http.Server`？请用一句话说明两者关系。
-2. `c.Param("id")` 和 `c.Query("status")` 分别读取请求的哪一部分？
-3. `ShouldBindJSON` 和 service 层校验分别适合处理哪类问题？
-4. 为什么错误响应里要有稳定的 `error.code`？
-5. `/healthz` 和 `/readyz` 在语义上有什么区别？
+[查看本章练习题与面试题](../../questions/stage-02-go-backend/10-go-web-api.md)
 
-### 9.2 实操题
-
-1. 给 `GET /api/v2/todos` 增加 `limit` 查询参数，限制最多返回多少条 Todo。验收标准：`curl -s 'http://127.0.0.1:18080/api/v2/todos?limit=1'` 只返回 1 条数据；非法 `limit` 返回 `400`。
-2. 给响应 Header 增加 `X-API-Version: v2`。验收标准：`curl -i -s http://127.0.0.1:18080/healthz` 能看到该 Header。
-3. 在 OpenAPI 文档中补充 `Error` schema 的引用。验收标准：`go run ./api/cmd/todo-api openapi > /tmp/todo-openapi.yaml` 后，文档中每个 `400` 或 `404` 响应都能找到错误结构说明。
-
-### 9.3 思考题
-
-1. 如果团队已经有第 9 篇的标准库 API，什么时候值得迁移到 Gin？迁移收益和风险分别是什么？
-2. 如果线上出现大量 `invalid_request`，你会从前端、测试、网关、后端日志和 OpenAPI 文档哪些角度排查？
-
-## 10. 本章面试题
-
-### 面试题 1：Gin 和 net/http 是什么关系？
-
-**一句话结论**：Gin 是构建在 `net/http` 之上的 Web 框架，最终仍然通过 `http.Server` 接收请求和返回响应。
-
-**展开解释**：`gin.Engine` 实现了标准库 Handler 所需的 `ServeHTTP` 能力，所以可以作为 `http.Server.Handler`。Gin 主要封装了路由匹配、路径参数、JSON 绑定、中间件链和响应写法，但连接监听、超时、优雅关闭这些底层能力仍然来自 `net/http`。
-
-**深入追问**：如果不用 `http.Server` 而直接 `router.Run()`，也能启动服务，但你会少一些显式控制。生产代码通常更建议自己创建 `http.Server`，明确设置 `ReadHeaderTimeout`、`ReadTimeout`、`WriteTimeout`、`IdleTimeout` 和 `Shutdown`。
-
-### 面试题 2：Gin 的中间件顺序为什么重要？
-
-**一句话结论**：中间件像洋葱一样层层包裹请求链，按注册顺序进入、按相反方向返回，顺序会影响日志、panic 恢复、超时和响应状态。
-
-**展开解释**：request ID 应尽量放在最外层，让后续日志和错误响应都能带上同一个 ID；访问日志也应靠外，才能记录完整耗时和最终状态码；Recovery 要包住业务 Handler，避免 panic 逃逸；BodyLimit 要在 JSON 绑定前执行，才能限制请求体大小。
-
-**深入追问**：如果 Handler 已经写出了响应头，再发生 panic，Recovery 也无法把状态码改成 `500`。这说明 Handler 最好先完成校验和业务调用，最后统一写响应。
-
-### 面试题 3：ShouldBindJSON 是否可以替代业务校验？
-
-**一句话结论**：不能。`ShouldBindJSON` 适合协议层输入校验，业务规则仍然应放在 service 层。
-
-**展开解释**：binding tag 可以检查字段是否存在、字符串长度、数字范围等输入形态问题。但“标题是否允许重复”“用户是否有权限更新”“状态能否从 done 改回 pending”这类业务规则不属于 Web 框架职责。放在 service 层可以让 CLI、HTTP API、测试和未来的消息消费者复用同一套规则。
-
-**深入追问**：如果业务规则写在 Handler 里，后续换框架、加 gRPC 或加异步任务时就容易复制规则，导致不同入口行为不一致。
-
-### 面试题 4：为什么要生成 OpenAPI 文档？
-
-**一句话结论**：OpenAPI 把 HTTP API 的路径、参数、请求体、响应和错误结构变成可审查、可测试、可协作的契约。
-
-**展开解释**：没有 API 文档时，前端和测试只能看代码或问后端。OpenAPI 文档可以用于生成客户端、生成测试、接入接口平台，也能让评审者检查状态码、字段命名和版本策略是否一致。本篇通过 `openapi` 命令和 `/openapi.yaml` 同时支持离线和在线查看。
-
-**深入追问**：文档必须跟代码同步。大型团队通常会在 CI 中校验 OpenAPI 格式，甚至做契约测试，避免接口行为变了但文档没变。
-
-### 面试题 5：为什么 Handler 包里要定义 todoService 接口？
-
-**一句话结论**：接口定义在使用方，可以让 Handler 只依赖自己需要的行为，而不是依赖完整具体类型。
-
-**展开解释**：Gin Handler 只需要 `List`、`Get`、`Create`、`Update`、`MarkDone`、`Delete` 这些方法。把接口定义在 Handler 包里，能让测试替换假服务，也能避免 Handler 知道 Service 的内部字段或构造细节。这符合 Go 的小接口习惯。
-
-**深入追问**：接口也不能滥用。如果只有一个实现，且测试不需要替换，过早抽象会增加阅读成本。本篇保留接口，是因为它能帮助你理解 Handler 和 Service 的边界。
-
-## 11. 本章总结
+## 10. 本章总结
 
 本篇你完成了 Todo API v2 的 Gin 重构。知识上，你理解了 Gin 与 `net/http` 的关系，掌握了 `gin.Context`、路由组、JSON 绑定、中间件、统一响应、错误码和 OpenAPI 文档。项目成果上，你新增了 `api/internal/handler/gin`，并让 `todo-api` 具备 Gin 路由、结构化日志、请求 ID、panic 恢复、请求超时、请求体限制和文档生成能力。
 
 能力价值上，你现在不仅能“用框架写接口”，还能解释框架背后的 HTTP 模型，知道哪些能力属于 Gin，哪些能力仍然属于标准库和工程治理。这是从初级 API 开发走向可维护后端服务的关键一步。
 
-## 12. 下一章衔接
+## 11. 下一章衔接
 
 第 11 篇会继续基于这个 Todo API 服务讲 Go 并发：请求并发、后台统计任务、`context` 取消、压测和竞态检测都会围绕本篇的 Gin API 展开。如果跳过本篇，后续看到并发请求进入 Handler、Service 和 Repository 时，会缺少清晰的 Web API 边界感。

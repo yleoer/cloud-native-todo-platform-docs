@@ -73,7 +73,7 @@
 
 第 20-25 篇已经把 Todo Platform 逐步放入 Kubernetes：
 
-```text
+```text linenums="0"
 第 20 篇：kind 集群、控制面、Node、kubelet、CNI 基础
 第 21 篇：Todo API Deployment、Probe、Namespace
 第 22 篇：Service / Ingress / Gateway API 入口
@@ -166,7 +166,7 @@ User Namespaces 是 Linux 内核能力。它把容器内看到的用户 ID 和�
 
 Kubernetes v1.36 中，Pod 通过以下字段启用 User Namespaces：
 
-```yaml
+```yaml linenums="0"
 spec:
   hostUsers: false
 ```
@@ -188,7 +188,7 @@ Pod Security Standards（PSS）定义了三档 Pod 安全级别：
 
 Pod Security Admission（PSA）是 Kubernetes 内置准入控制器，用 Namespace 标签启用。常见标签如下：
 
-```yaml
+```yaml linenums="0"
 metadata:
   labels:
     pod-security.kubernetes.io/enforce: restricted
@@ -250,7 +250,7 @@ Kubernetes RBAC 最容易出问题的地方不是语法，而是范围。`Cluste
 
 普通业务应用优先使用：
 
-```text
+```text linenums="0"
 ServiceAccount -> RoleBinding -> Role -> Namespace 内少量资源
 ```
 
@@ -353,7 +353,7 @@ flowchart TD
 
 先确认当前上下文和集群：
 
-```bash
+```bash linenums="0"
 kubectl config current-context
 kubectl get nodes -o wide
 kubectl version
@@ -361,7 +361,7 @@ kubectl version
 
 如果你当前不在第 20 篇创建的 kind 集群，可以切回：
 
-```bash
+```bash linenums="0"
 kubectl config use-context kind-todo-k8s
 ```
 
@@ -371,13 +371,13 @@ kubectl config use-context kind-todo-k8s
 
 以下命令均在项目根目录执行。
 
-```bash
+```bash linenums="0"
 mkdir -p deployments/k8s-security
 ```
 
 本篇会生成以下文件：
 
-```text
+```text linenums="0"
 deployments/k8s-security
 ├── namespace.yaml
 ├── todo-api-rbac.yaml
@@ -391,7 +391,7 @@ deployments/k8s-security
 
 确认本地 Secret 文件不会进入 Git：
 
-```bash
+```bash linenums="0"
 grep -F 'deployments/k8s-security/*.local.yaml' .gitignore || \
   printf '\ndeployments/k8s-security/*.local.yaml\n' >> .gitignore
 ```
@@ -400,7 +400,7 @@ grep -F 'deployments/k8s-security/*.local.yaml' .gitignore || \
 
 创建启用 Restricted Pod Security 的 Namespace：
 
-```bash
+```bash linenums="0"
 cat > deployments/k8s-security/namespace.yaml <<'YAML'
 apiVersion: v1
 kind: Namespace
@@ -421,7 +421,7 @@ YAML
 
 创建 Todo API 的 ServiceAccount、ConfigMap、Role 和 RoleBinding：
 
-```bash
+```bash linenums="0"
 cat > deployments/k8s-security/todo-api-rbac.yaml <<'YAML'
 apiVersion: v1
 kind: ServiceAccount
@@ -482,7 +482,7 @@ YAML
 
 创建满足 Restricted Pod Security 的 Todo API 模拟服务：
 
-```bash
+```bash linenums="0"
 cat > deployments/k8s-security/todo-api-restricted.yaml <<'YAML'
 apiVersion: apps/v1
 kind: Deployment
@@ -579,7 +579,7 @@ YAML
 
 创建一个同样满足 Restricted 的临时客户端 Pod：
 
-```bash
+```bash linenums="0"
 cat > deployments/k8s-security/todo-security-client.yaml <<'YAML'
 apiVersion: v1
 kind: Pod
@@ -627,7 +627,7 @@ YAML
 
 创建 Kubernetes v1.36 User Namespaces 增强补丁。这个文件不参与主线实验，只有当你的集群和运行时确认支持 User Namespaces 时才执行：
 
-```bash
+```bash linenums="0"
 cat > deployments/k8s-security/todo-api-userns-patch.yaml <<'YAML'
 spec:
   template:
@@ -639,7 +639,7 @@ YAML
 
 创建迁移到真实 Todo API Deployment 的安全补丁。这个补丁面向第 21-24 篇保留在 `todo-workloads` Namespace 中的 `todo-api` Deployment，用来说明本篇安全基线如何回到主线项目：
 
-```bash
+```bash linenums="0"
 cat > deployments/k8s-security/todo-api-security-patch.yaml <<'YAML'
 spec:
   template:
@@ -670,7 +670,7 @@ YAML
 
 创建一个故意违规的特权 Pod，用于验证 Pod Security Admission 会拒绝它：
 
-```bash
+```bash linenums="0"
 cat > deployments/k8s-security/bad-privileged-pod.yaml <<'YAML'
 apiVersion: v1
 kind: Pod
@@ -690,7 +690,7 @@ YAML
 
 可选：生成私有仓库镜像拉取密钥。这里的命令只演示格式，请替换成自己的私有仓库地址和只读机器人账号。不要把生成的 `image-pull-secret.local.yaml` 提交到公开仓库。
 
-```bash
+```bash linenums="0"
 export TODO_REGISTRY_SERVER=registry.example.com
 export TODO_REGISTRY_USERNAME=todo-reader
 export TODO_REGISTRY_EMAIL=dev@example.com
@@ -709,7 +709,7 @@ kubectl -n todo-security-lab create secret docker-registry todo-registry-pull \
 
 如果真实生产镜像需要使用该密钥，可以在 ServiceAccount 中引用：
 
-```yaml
+```yaml linenums="0"
 imagePullSecrets:
   - name: todo-registry-pull
 ```
@@ -720,7 +720,7 @@ imagePullSecrets:
 
 先做服务端 dry-run，确认 API Server、RBAC 和 Pod Security Admission 都能接受安全 Manifest：
 
-```bash
+```bash linenums="0"
 kubectl apply --dry-run=server -f deployments/k8s-security/namespace.yaml
 kubectl apply -f deployments/k8s-security/namespace.yaml
 
@@ -731,7 +731,7 @@ kubectl apply --dry-run=server -f deployments/k8s-security/todo-security-client.
 
 创建演示用 Secret。这个 Secret 只用于验证 RBAC 拒绝读取 Secret，不写入仓库：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-security-lab create secret generic todo-db-auth \
   --from-literal=POSTGRES_PASSWORD=local-demo-only \
   --dry-run=client -o yaml | kubectl apply -f -
@@ -739,7 +739,7 @@ kubectl -n todo-security-lab create secret generic todo-db-auth \
 
 应用 RBAC、Deployment 和客户端 Pod：
 
-```bash
+```bash linenums="0"
 kubectl apply -f deployments/k8s-security/todo-api-rbac.yaml
 kubectl apply -f deployments/k8s-security/todo-api-restricted.yaml
 kubectl apply -f deployments/k8s-security/todo-security-client.yaml
@@ -750,7 +750,7 @@ kubectl -n todo-security-lab wait --for=condition=Ready pod/todo-security-client
 
 验证 ServiceAccount 的最小权限：
 
-```bash
+```bash linenums="0"
 SA=system:serviceaccount:todo-security-lab:todo-api-sa
 
 kubectl auth can-i get configmap/todo-api-runtime -n todo-security-lab --as="$SA"
@@ -761,7 +761,7 @@ kubectl auth can-i create pods -n todo-security-lab --as="$SA"
 
 验证客户端能访问 Todo API Service：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-security-lab exec todo-security-client -- \
   wget -qO- --timeout=3 http://todo-api-restricted:18080
 ```
@@ -770,20 +770,20 @@ kubectl -n todo-security-lab exec todo-security-client -- \
 
 这里的 `test ! -d` 表示检查目录不存在；后面的 `&&` 表示只有目录不存在时才打印成功消息。
 
-```bash
+```bash linenums="0"
 kubectl -n todo-security-lab exec deployment/todo-api-restricted -- \
   sh -c 'test ! -d /var/run/secrets/kubernetes.io/serviceaccount && echo "service account token is not mounted"'
 ```
 
 验证 Pod Security Admission 会拒绝特权 Pod：
 
-```bash
+```bash linenums="0"
 kubectl apply --dry-run=server -f deployments/k8s-security/bad-privileged-pod.yaml
 ```
 
 验证 Pod 的关键安全字段：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-security-lab get deployment todo-api-restricted \
   -o jsonpath='serviceAccountName={.spec.template.spec.serviceAccountName}{"\n"}'
 
@@ -805,7 +805,7 @@ kubectl -n todo-security-lab get deployment todo-api-restricted \
 
 可选增强：如果你的集群是 Kubernetes v1.36，且节点运行时支持 User Namespaces，可以把 `hostUsers: false` patch 到 Todo API Deployment：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-security-lab patch deployment todo-api-restricted \
   --type merge \
   --patch-file deployments/k8s-security/todo-api-userns-patch.yaml
@@ -820,14 +820,14 @@ kubectl -n todo-security-lab get deployment todo-api-restricted \
 
 可选增强：查看 User Namespaces 的 UID 映射。不同运行时输出会略有差异，只要 `hostUsers: false` 的 Pod 成功运行，就说明当前集群支持该配置。Alpine 镜像里通常没有 UID 10001 对应的用户名，`id` 可能只显示数字 UID 或 `unknown`，这是正常的；Linux 可以用没有 `/etc/passwd` 条目的数字 UID 运行进程。
 
-```bash
+```bash linenums="0"
 kubectl -n todo-security-lab exec deployment/todo-api-restricted -- \
   sh -c 'id && cat /proc/self/uid_map && readlink /proc/self/ns/user'
 ```
 
 可选迁移：如果你要把安全基线迁回第 21-24 篇的真实 Todo API Deployment，先做服务端 dry-run。不要在本篇主线实验里直接 apply，除非你已经确认 `todo-workloads` 中也存在配套的 `todo-api-sa`。
 
-```bash
+```bash linenums="0"
 kubectl -n todo-workloads patch deployment todo-api \
   --type strategic \
   --patch-file deployments/k8s-security/todo-api-security-patch.yaml \
@@ -838,20 +838,20 @@ kubectl -n todo-workloads patch deployment todo-api \
 
 应用安全 Namespace：
 
-```text
+```text linenums="0"
 namespace/todo-security-lab created
 ```
 
 Deployment 和客户端 Pod 就绪：
 
-```text
+```text linenums="0"
 deployment "todo-api-restricted" successfully rolled out
 pod/todo-security-client condition met
 ```
 
 RBAC 最小权限检查：
 
-```text
+```text linenums="0"
 yes
 no
 no
@@ -867,25 +867,25 @@ no
 
 访问 Todo API Service：
 
-```text
+```text linenums="0"
 Todo API security baseline OK
 ```
 
 ServiceAccount token 未挂载：
 
-```text
+```text linenums="0"
 service account token is not mounted
 ```
 
 Pod Security Admission 拒绝特权 Pod 时，会看到类似输出：
 
-```text
+```text linenums="0"
 Error from server (Forbidden): error when creating "deployments/k8s-security/bad-privileged-pod.yaml": pods "bad-privileged-pod" is forbidden: violates PodSecurity "restricted:latest": privileged, allowPrivilegeEscalation != false, unrestricted capabilities, runAsNonRoot != true, seccompProfile
 ```
 
 安全字段检查会输出：
 
-```text
+```text linenums="0"
 serviceAccountName=todo-api-sa
 automountServiceAccountToken=false
 runAsNonRoot=true
@@ -896,7 +896,7 @@ capabilities.drop=ALL
 
 如果执行了 User Namespaces 增强 patch，`hostUsers` 检查会输出：
 
-```text
+```text linenums="0"
 false
 ```
 
@@ -904,7 +904,7 @@ false
 
 第一层：确认 Namespace 已启用 Restricted Pod Security。
 
-```bash
+```bash linenums="0"
 kubectl get namespace todo-security-lab --show-labels
 ```
 
@@ -912,7 +912,7 @@ kubectl get namespace todo-security-lab --show-labels
 
 第二层：确认 RBAC 是最小权限。
 
-```bash
+```bash linenums="0"
 SA=system:serviceaccount:todo-security-lab:todo-api-sa
 kubectl auth can-i get configmap/todo-api-runtime -n todo-security-lab --as="$SA"
 kubectl auth can-i get secrets -n todo-security-lab --as="$SA"
@@ -922,7 +922,7 @@ kubectl auth can-i get secrets -n todo-security-lab --as="$SA"
 
 第三层：确认工作负载满足 Restricted。
 
-```bash
+```bash linenums="0"
 kubectl -n todo-security-lab get pods
 kubectl -n todo-security-lab describe pod -l app.kubernetes.io/name=todo-api
 ```
@@ -931,7 +931,7 @@ kubectl -n todo-security-lab describe pod -l app.kubernetes.io/name=todo-api
 
 第四层：确认不安全 Pod 会被拒绝。
 
-```bash
+```bash linenums="0"
 kubectl apply --dry-run=server -f deployments/k8s-security/bad-privileged-pod.yaml
 ```
 
@@ -939,7 +939,7 @@ kubectl apply --dry-run=server -f deployments/k8s-security/bad-privileged-pod.ya
 
 第五层：确认服务仍然可用。
 
-```bash
+```bash linenums="0"
 kubectl -n todo-security-lab exec todo-security-client -- \
   wget -qO- --timeout=3 http://todo-api-restricted:18080
 ```
@@ -950,13 +950,13 @@ kubectl -n todo-security-lab exec todo-security-client -- \
 
 删除实验 Namespace：
 
-```bash
+```bash linenums="0"
 kubectl delete namespace todo-security-lab
 ```
 
 如果你不再保留本地实验文件，可以删除目录：
 
-```bash
+```bash linenums="0"
 rm -rf deployments/k8s-security
 ```
 
@@ -970,14 +970,14 @@ rm -rf deployments/k8s-security
 
 - **现象**：
 
-```text
+```text linenums="0"
 Error from server (Forbidden): pods "todo-api-restricted-..." is forbidden: violates PodSecurity "restricted:latest": allowPrivilegeEscalation != false, unrestricted capabilities, runAsNonRoot != true, seccompProfile
 ```
 
 - **原因**：Pod 所在 Namespace 开启了 Restricted，但 Manifest 缺少必需的安全字段，或容器设置了 privileged、hostNetwork、hostPath 等不允许的能力。
 - **排查**：
 
-```bash
+```bash linenums="0"
 kubectl get namespace todo-security-lab --show-labels
 kubectl -n todo-security-lab describe replicaset -l app.kubernetes.io/name=todo-api
 kubectl -n todo-security-lab get events --sort-by=.lastTimestamp
@@ -986,7 +986,7 @@ kubectl -n todo-security-lab get events --sort-by=.lastTimestamp
 - **修复**：补齐 `runAsNonRoot: true`、非零 `runAsUser`、`allowPrivilegeEscalation: false`、`capabilities.drop: [ALL]`、`seccompProfile.type: RuntimeDefault`，并移除 privileged、hostNetwork、hostPID、hostIPC、hostPath 等配置。
 - **验证**：
 
-```bash
+```bash linenums="0"
 kubectl apply --dry-run=server -f deployments/k8s-security/todo-api-restricted.yaml
 ```
 
@@ -994,7 +994,7 @@ kubectl apply --dry-run=server -f deployments/k8s-security/todo-api-restricted.y
 
 - **现象**：
 
-```text
+```text linenums="0"
 no
 ```
 
@@ -1003,7 +1003,7 @@ no
 - **原因**：RoleBinding 的 `subjects.name`、`subjects.namespace`、`roleRef.name` 或命令中的 `--as` 身份写错；也可能是 Role 中使用了 `resourceNames`，但验证命令没有指定具体资源名。
 - **排查**：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-security-lab get serviceaccount todo-api-sa
 kubectl -n todo-security-lab get role todo-api-config-reader -o yaml
 kubectl -n todo-security-lab get rolebinding todo-api-read-config -o yaml
@@ -1012,7 +1012,7 @@ kubectl -n todo-security-lab get rolebinding todo-api-read-config -o yaml
 - **修复**：确认 ServiceAccount 完整身份是 `system:serviceaccount:todo-security-lab:todo-api-sa`。如果 Role 使用了 `resourceNames: ["todo-api-runtime"]`，验证时也要写成 `get configmap/todo-api-runtime`。
 - **验证**：
 
-```bash
+```bash linenums="0"
 kubectl auth can-i get configmap/todo-api-runtime \
   -n todo-security-lab \
   --as=system:serviceaccount:todo-security-lab:todo-api-sa
@@ -1022,20 +1022,20 @@ kubectl auth can-i get configmap/todo-api-runtime \
 
 - **现象**：
 
-```text
+```text linenums="0"
 bind: permission denied
 ```
 
 或：
 
-```text
+```text linenums="0"
 Read-only file system
 ```
 
 - **原因**：非 root 容器不能绑定 1024 以下低端口；只读根文件系统下，应用仍然试图写 `/var`、`/tmp`、当前目录或日志文件。
 - **排查**：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-security-lab logs deployment/todo-api-restricted
 kubectl -n todo-security-lab describe pod -l app.kubernetes.io/name=todo-api
 ```
@@ -1043,7 +1043,7 @@ kubectl -n todo-security-lab describe pod -l app.kubernetes.io/name=todo-api
 - **修复**：让应用监听 1024 以上端口，例如本篇使用 `18080`；把临时写入路径改到显式挂载的 `emptyDir`，例如 `/tmp`；生产镜像应在 Dockerfile 中提前创建非 root 用户和可写目录。
 - **验证**：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-security-lab rollout restart deployment/todo-api-restricted
 kubectl -n todo-security-lab rollout status deployment/todo-api-restricted --timeout=180s
 ```
@@ -1052,20 +1052,20 @@ kubectl -n todo-security-lab rollout status deployment/todo-api-restricted --tim
 
 - **现象**：
 
-```text
+```text linenums="0"
 open /var/run/secrets/kubernetes.io/serviceaccount/token: no such file or directory
 ```
 
 或应用日志中出现：
 
-```text
+```text linenums="0"
 Unauthorized
 ```
 
 - **原因**：本篇刻意设置了 `automountServiceAccountToken: false`。如果应用代码确实需要访问 Kubernetes API，Pod 内不会自动有 token。
 - **排查**：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-security-lab get serviceaccount todo-api-sa -o yaml
 kubectl -n todo-security-lab get deployment todo-api-restricted -o yaml | grep -n "automountServiceAccountToken"
 ```
@@ -1073,7 +1073,7 @@ kubectl -n todo-security-lab get deployment todo-api-restricted -o yaml | grep -
 - **修复**：先确认应用真的需要访问 Kubernetes API，再只为这个 Deployment 打开 token，并保持 Role 最小化。不要为了修复这个错误直接绑定 `cluster-admin`。
 - **验证**：
 
-```bash
+```bash linenums="0"
 kubectl auth can-i get configmap/todo-api-runtime \
   -n todo-security-lab \
   --as=system:serviceaccount:todo-security-lab:todo-api-sa
@@ -1083,7 +1083,7 @@ kubectl auth can-i get configmap/todo-api-runtime \
 
 - **现象**：
 
-```text
+```text linenums="0"
 Warning  Failed  kubelet  Error: failed to create containerd task: failed to set MOUNT_ATTR_IDMAP ... invalid argument
 ```
 
@@ -1092,7 +1092,7 @@ Warning  Failed  kubelet  Error: failed to create containerd task: failed to set
 - **原因**：User Namespaces 需要 Kubernetes API、Linux 内核、文件系统、container runtime 和 OCI runtime 共同支持。老版本 kind 节点镜像或宿主机环境可能暂时不满足。
 - **排查**：
 
-```bash
+```bash linenums="0"
 kubectl version
 kubectl -n todo-security-lab describe pod -l app.kubernetes.io/name=todo-api
 kubectl get nodes -o wide
@@ -1101,7 +1101,7 @@ kubectl get nodes -o wide
 - **修复**：优先升级到 Kubernetes v1.36 和支持 User Namespaces 的运行时。如果只是为了完成本篇 RBAC、SecurityContext 和 Pod Security 主线实验，可以跳过 `todo-api-userns-patch.yaml`，保留基础 Deployment。不要删除非 root、seccomp、capabilities 和不可提权配置。
 - **验证**：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-security-lab rollout undo deployment/todo-api-restricted
 kubectl -n todo-security-lab rollout status deployment/todo-api-restricted --timeout=180s
 ```
@@ -1176,75 +1176,18 @@ flowchart TD
 - `todo-api-security-patch.yaml` 能对真实 `todo-api` Deployment 做服务端 dry-run，说明安全基线可以迁回主线项目。
 - 私有仓库凭据只存在于本地 `*.local.yaml` 或集群 Secret 中，不进入 Git 仓库。
 
-## 9. 本章练习题
+## 9. 练习题与面试题
 
-基础题：
+本章练习题和面试题已拆分到独立页面，完成正文学习后再进入题库练习与复盘。
 
-1. ServiceAccount 和 Kubernetes Namespace 是什么关系？为什么不建议所有业务 Pod 都使用 `default` ServiceAccount？
-2. RoleBinding 可以绑定 ClusterRole 吗？如果可以，它的权限范围是 Namespace 还是整个集群？
-3. 为什么 `list secrets` 不是一个安全的“只读权限”？
-4. `allowPrivilegeEscalation: false` 和 `runAsNonRoot: true` 分别解决什么问题？
-5. Pod Security Standards 中 Baseline 和 Restricted 的差异是什么？
+[查看本章练习题与面试题](../../questions/stage-04-kubernetes/26-k8s-security.md)
 
-实操题：
-
-1. 把 `todo-api-config-reader` 的权限从指定 ConfigMap 扩展为读取本 Namespace 所有 ConfigMap，再用 `kubectl auth can-i list configmaps` 验证变化。完成后恢复最小权限。
-2. 修改 `bad-privileged-pod.yaml`，逐项修复它违反 Restricted 的字段，直到 `kubectl apply --dry-run=server` 通过。
-3. 生成一个 `todo-registry-pull` 镜像拉取密钥文件，并把它加入 `todo-api-sa` 的 `imagePullSecrets`。不要把真实密码提交到仓库。
-
-思考题：
-
-1. 如果某个控制器确实需要跨 Namespace 读取资源，应该如何在 ClusterRole、ClusterRoleBinding 和 Namespace 隔离之间做权衡？
-2. User Namespaces、非 root、Pod Security Admission、NetworkPolicy 和 RBAC 分别位于哪一层？其中任意一层配置正确，是否可以替代其它层？
-
-## 10. 本章面试题
-
-### 面试题 1：ServiceAccount、Role 和 RoleBinding 如何配合？
-
-**一句话结论**：ServiceAccount 表示工作负载身份，Role 定义权限，RoleBinding 把这个身份和权限绑定在某个 Namespace 内。
-
-**展开解释**：Pod 通过 `serviceAccountName` 使用 ServiceAccount。Role 中的 rules 描述 API Group、Resource、Verb 和可选的 ResourceName。RoleBinding 的 subjects 指向 ServiceAccount，roleRef 指向 Role。最终 kube-apiserver 在鉴权时根据请求身份和 RBAC 规则判断 allow 或 deny。
-
-**深入追问**：ClusterRole 可以通过 RoleBinding 绑定到某个 Namespace，从而复用权限模板但限制作用范围；ClusterRoleBinding 则把 ClusterRole 扩散到集群范围，普通业务工作负载应谨慎使用。
-
-### 面试题 2：为什么不建议给业务 Pod 自动挂载 ServiceAccount token？
-
-**一句话结论**：没有 API 访问需求的 Pod 不应该携带可用 API 凭据，否则应用漏洞可能变成 Kubernetes API 权限泄漏。
-
-**展开解释**：ServiceAccount token 是 Pod 调用 API Server 的凭据。即使 RBAC 很小，只要 token 存在，攻击者拿到容器执行权后就可以尝试调用 API、探测权限边界或利用误配。`automountServiceAccountToken: false` 可以让无 API 访问需求的 Pod 不暴露 token。
-
-**深入追问**：如果应用确实需要访问 API，应只给专用 ServiceAccount 绑定最小 Role，并优先使用短生命周期的 projected token。不要为了方便给它绑定 `cluster-admin`。
-
-### 面试题 3：Restricted Pod Security 通常会检查哪些内容？
-
-**一句话结论**：Restricted 会阻止特权容器、宿主机命名空间、危险卷类型、root 运行、未设置 seccomp、可提权和未丢弃 capabilities 等配置。
-
-**展开解释**：Restricted 是面向普通业务工作负载的高约束基线。它要求 Pod 明确表达安全意图，例如非 root、`allowPrivilegeEscalation: false`、`seccompProfile: RuntimeDefault`、`capabilities.drop: [ALL]`。这些规则由 Pod Security Admission 或其它策略引擎在准入阶段执行。
-
-**深入追问**：PSS 是策略标准，PSA 是 Kubernetes 内置执行机制。生产环境还可以配合 ValidatingAdmissionPolicy、Kyverno、Gatekeeper 或云厂商策略服务实现更细规则。
-
-### 面试题 4：User Namespaces 和 `runAsNonRoot` 有什么区别？
-
-**一句话结论**：`runAsNonRoot` 控制容器内进程不要以 root 运行；User Namespaces 控制容器内 UID/GID 映射到宿主机时不等于宿主机高权限用户。
-
-**展开解释**：没有 User Namespaces 时，容器内 root 在内核视角仍可能与宿主机 root 有危险关联。启用 `hostUsers: false` 后，容器内用户被映射到宿主机上的非特权范围，降低容器逃逸后的破坏力。即便如此，普通业务仍应优先非 root 运行。
-
-**深入追问**：User Namespaces 是 Linux-only，并依赖内核、文件系统、container runtime 和 OCI runtime 支持；它也不能与 hostNetwork、hostIPC、hostPID 同时使用。
-
-### 面试题 5：Kubernetes Secret 的主要风险是什么？
-
-**一句话结论**：Secret 是敏感数据对象，不是天然加密保险箱；风险来自未加密存储、过宽 RBAC、提交到 Git、被 Pod 滥挂载和应用日志泄漏。
-
-**展开解释**：Secret 数据是 base64 编码，默认可能以未加密形式存储在 etcd 中。拥有 `get`、`list` 或 `watch` Secret 权限的主体可以读取 Secret 内容；能创建 Pod 的用户也可能通过挂载 Secret 间接读取数据。
-
-**深入追问**：生产环境应开启 etcd 静态加密，限制 Secret RBAC，使用外部 Secret 管理系统或 CSI Driver，避免把明文或 base64 后的 Secret Manifest 提交到仓库，并建立轮换与审计机制。
-
-## 11. 本章总结
+## 10. 本章总结
 
 本篇把 Todo Platform 的安全基线从“能运行”推进到“按最小权限运行”。我们创建了专用 ServiceAccount，用 RoleBinding 只授予读取指定 ConfigMap 的权限；通过 SecurityContext 让容器以非 root、不可提权、RuntimeDefault seccomp 和 drop ALL capabilities 运行；通过 Pod Security Admission 在 Namespace 级别拒绝不安全 Pod；通过 `automountServiceAccountToken: false` 和本地 Secret 文件规则减少凭据暴露。
 
 到这里，Todo Platform 已经具备 Kubernetes 工作负载、服务入口、配置、存储、网络隔离和安全基线。下一步要解决的是：这些 YAML 如何被复用、参数化、发布和升级。
 
-## 12. 下一章衔接
+## 11. 下一章衔接
 
 第 27 篇会进入 Helm 4 包管理。我们会把前几篇逐步写出的 Deployment、Service、ConfigMap、Secret、RBAC、NetworkPolicy 和安全上下文组织成 Chart，让 Todo Platform 从“一组手写 YAML”演进成“可版本化、可发布、可回滚的 Kubernetes 应用包”。

@@ -41,7 +41,7 @@
 
 本篇结束时，你至少应该能成功执行：
 
-```bash
+```bash linenums="0"
 cd ~/workspace/cloud-native-todo-platform
 go get golang.org/x/crypto@v0.52.0
 go mod tidy
@@ -52,7 +52,7 @@ TODO_JWT_SECRET=0123456789abcdef0123456789abcdef TODO_AUTH_USERS="admin=$HASH" g
 
 另开终端登录并访问受保护接口：
 
-```bash
+```bash linenums="0"
 TOKEN=$(curl -s -H 'Content-Type: application/json' -d '{"username":"admin","password":"change-me-123"}' http://127.0.0.1:18080/api/v2/auth/login | sed -n 's/.*"token":"\([^"]*\)".*/\1/p')
 curl -i -H "Authorization: Bearer $TOKEN" http://127.0.0.1:18080/api/v2/todos
 ```
@@ -85,7 +85,7 @@ curl -i -H "Authorization: Bearer $TOKEN" http://127.0.0.1:18080/api/v2/todos
 
 本篇会新增或修改：
 
-```text
+```text linenums="0"
 cloud-native-todo-platform/
 ├── configs/
 │   ├── base.json
@@ -122,7 +122,7 @@ cloud-native-todo-platform/
 
 JWT 是一种带签名的 Token 格式，常见结构是：
 
-```text
+```text linenums="0"
 header.payload.signature
 ```
 
@@ -132,7 +132,7 @@ header.payload.signature
 
 登录接口只在用户名和密码正确时签发 JWT。后续请求带上：
 
-```text
+```text linenums="0"
 Authorization: Bearer <token>
 ```
 
@@ -152,7 +152,7 @@ Authorization: Bearer <token>
 
 本篇继续使用统一响应信封：
 
-```json
+```json linenums="0"
 {"error":{"code":"unauthorized","message":"authentication required"}}
 ```
 
@@ -162,7 +162,7 @@ Authorization: Bearer <token>
 
 配置分层的目标是把代码和环境差异拆开：
 
-```text
+```text linenums="0"
 base.json  通用默认值
 dev.json   本地开发覆盖
 test.json  测试环境覆盖
@@ -189,7 +189,7 @@ Rate Limiting 已在第 13 篇用 Redis 实现，本篇重点是把它纳入生�
 
 生产服务入口不应该只有“启动 HTTP 服务”一种行为。常见命令包括：
 
-```text
+```text linenums="0"
 todo-api serve
 todo-api config-check
 todo-api hash-password <password>
@@ -256,7 +256,7 @@ sequenceDiagram
 
 中间件顺序决定请求先经过哪道门：
 
-```text
+```text linenums="0"
 RequestID -> AccessLog -> Recovery -> Timeout -> BodyLimit -> SecurityHeaders -> CORS -> Auth -> Audit -> Handler
 ```
 
@@ -316,13 +316,13 @@ pprof 能暴露函数名、goroutine 栈、内存对象和运行状态，里面�
 
 进入课程项目根目录：
 
-```bash
+```bash linenums="0"
 cd ~/workspace/cloud-native-todo-platform
 ```
 
 确认第 13 篇文件已存在：
 
-```bash
+```bash linenums="0"
 test -f api/internal/repository/cached.go
 test -f api/internal/ratelimit/redis_limiter.go
 test -f api/internal/tasks/redis_queue.go
@@ -332,13 +332,13 @@ test -f api/internal/tasks/redis_queue.go
 
 创建本篇新增目录：
 
-```bash
+```bash linenums="0"
 mkdir -p configs api/internal/auth api/internal/config
 ```
 
 本篇新增或覆盖文件如下：
 
-```text
+```text linenums="0"
 cloud-native-todo-platform/
 ├── configs/
 │   ├── base.json
@@ -2318,14 +2318,14 @@ func slogLevel(level string) slog.Level {
 
 拉取生产化依赖并整理依赖：
 
-```bash
+```bash linenums="0"
 go get golang.org/x/crypto@v0.52.0
 go mod tidy
 ```
 
 生成本地管理员密码哈希：
 
-```bash
+```bash linenums="0"
 HASH=$(go run ./api/cmd/todo-api hash-password "change-me-123")
 echo "$HASH"
 ```
@@ -2334,7 +2334,7 @@ bcrypt 哈希里包含 `$`，Linux、macOS、WSL2 和 PowerShell 都建议用引
 
 设置本地实验配置：
 
-```bash
+```bash linenums="0"
 export TODO_ENV=dev
 export TODO_CONFIG_DIR=configs
 export TODO_JWT_SECRET=0123456789abcdef0123456789abcdef
@@ -2345,7 +2345,7 @@ export TODO_AUTH_USERS="admin=$HASH"
 
 如果你使用 PowerShell：
 
-```powershell
+```powershell linenums="0"
 $hash = go run ./api/cmd/todo-api hash-password "change-me-123"
 $env:TODO_ENV = 'dev'
 $env:TODO_CONFIG_DIR = 'configs'
@@ -2355,13 +2355,13 @@ $env:TODO_AUTH_USERS = "admin=$hash"
 
 检查配置：
 
-```bash
+```bash linenums="0"
 go run ./api/cmd/todo-api config-check
 ```
 
 格式化、测试和构建：
 
-```bash
+```bash linenums="0"
 go fmt ./api/...
 go test ./api/...
 go build -o bin/todo-api ./api/cmd/todo-api
@@ -2369,25 +2369,25 @@ go build -o bin/todo-api ./api/cmd/todo-api
 
 如果你希望启用完整的 PostgreSQL + Redis 环境，先启动容器；如果不设置 `TODO_DATABASE_DSN` 和 `TODO_REDIS_ADDR`，API 会回退到内存模式，仍然可以完成认证和中间件实验：
 
-```bash
+```bash linenums="0"
 docker compose up -d postgres redis
 ```
 
 启动 Todo API v5：
 
-```bash
+```bash linenums="0"
 ./bin/todo-api serve
 ```
 
 另开终端，先验证无 Token 会被拒绝：
 
-```bash
+```bash linenums="0"
 curl -i http://127.0.0.1:18080/api/v2/todos
 ```
 
 登录获取 JWT：
 
-```bash
+```bash linenums="0"
 TOKEN=$(curl -s -H 'Content-Type: application/json' \
   -d '{"username":"admin","password":"change-me-123"}' \
   http://127.0.0.1:18080/api/v2/auth/login | sed -n 's/.*"token":"\([^"]*\)".*/\1/p')
@@ -2397,7 +2397,7 @@ echo "$TOKEN"
 
 带 Token 创建 Todo：
 
-```bash
+```bash linenums="0"
 curl -i -H "Authorization: Bearer $TOKEN" \
   -H 'Content-Type: application/json' \
   -d '{"title":"production style todo api"}' \
@@ -2406,13 +2406,13 @@ curl -i -H "Authorization: Bearer $TOKEN" \
 
 启用 pprof：
 
-```bash
+```bash linenums="0"
 TODO_PPROF_ENABLED=true ./bin/todo-api serve
 ```
 
 另开终端分别抓取 goroutine、heap 和 CPU profile：
 
-```bash
+```bash linenums="0"
 go tool pprof -top http://127.0.0.1:18081/debug/pprof/goroutine
 go tool pprof -top http://127.0.0.1:18081/debug/pprof/heap
 go tool pprof -top "http://127.0.0.1:18081/debug/pprof/profile?seconds=5"
@@ -2422,31 +2422,31 @@ go tool pprof -top "http://127.0.0.1:18081/debug/pprof/profile?seconds=5"
 
 无 Token 请求应返回：
 
-```text
+```text linenums="0"
 HTTP/1.1 401 Unauthorized
 ```
 
 响应体类似：
 
-```json
+```json linenums="0"
 {"error":{"code":"unauthorized","message":"authentication required"}}
 ```
 
 登录成功响应类似：
 
-```json
+```json linenums="0"
 {"data":{"token":"<jwt>","token_type":"Bearer"}}
 ```
 
 访问日志类似：
 
-```json
+```json linenums="0"
 {"level":"INFO","msg":"http request","method":"POST","path":"/api/v2/todos","status":201,"request_id":"3","user":"admin"}
 ```
 
 审计日志类似：
 
-```json
+```json linenums="0"
 {"level":"INFO","msg":"audit event","user":"admin","method":"POST","path":"/api/v2/todos","status":201,"request_id":"3"}
 ```
 
@@ -2456,25 +2456,25 @@ pprof 输出中应能看到 goroutine、heap 或 CPU profile 对应的函数和�
 
 验证配置检查：
 
-```bash
+```bash linenums="0"
 go run ./api/cmd/todo-api config-check
 ```
 
 验证 JWT Secret 太短会失败：
 
-```bash
+```bash linenums="0"
 TODO_JWT_SECRET=short go run ./api/cmd/todo-api config-check
 ```
 
 验证无 Token 拒绝：
 
-```bash
+```bash linenums="0"
 curl -i http://127.0.0.1:18080/api/v2/todos
 ```
 
 验证错误密码拒绝：
 
-```bash
+```bash linenums="0"
 curl -i -H 'Content-Type: application/json' \
   -d '{"username":"admin","password":"wrong-password"}' \
   http://127.0.0.1:18080/api/v2/auth/login
@@ -2482,13 +2482,13 @@ curl -i -H 'Content-Type: application/json' \
 
 验证 OpenAPI 已声明登录接口和 Bearer Token：
 
-```bash
+```bash linenums="0"
 curl -s http://127.0.0.1:18080/openapi.yaml | grep -E 'auth/login|bearerAuth|401'
 ```
 
 验证安全 Header：
 
-```bash
+```bash linenums="0"
 curl -i http://127.0.0.1:18080/healthz
 ```
 
@@ -2496,7 +2496,7 @@ curl -i http://127.0.0.1:18080/healthz
 
 验证 pprof：
 
-```bash
+```bash linenums="0"
 curl -s http://127.0.0.1:18081/debug/pprof/ | head
 ```
 
@@ -2504,13 +2504,13 @@ curl -s http://127.0.0.1:18081/debug/pprof/ | head
 
 停止 API 后，清理当前终端里的敏感环境变量：
 
-```bash
+```bash linenums="0"
 unset TODO_JWT_SECRET TODO_AUTH_USERS TODO_ENV TODO_CONFIG_DIR TODO_CORS_ALLOWED_ORIGINS TODO_PPROF_ENABLED
 ```
 
 PowerShell：
 
-```powershell
+```powershell linenums="0"
 Remove-Item Env:TODO_JWT_SECRET -ErrorAction SilentlyContinue
 Remove-Item Env:TODO_AUTH_USERS -ErrorAction SilentlyContinue
 Remove-Item Env:TODO_ENV -ErrorAction SilentlyContinue
@@ -2529,7 +2529,7 @@ Remove-Item Env:TODO_PPROF_ENABLED -ErrorAction SilentlyContinue
 - **原因**：JWT Secret 太短，生产环境容易被暴力猜测。
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   echo "$TODO_JWT_SECRET"
   ```
 
@@ -2542,7 +2542,7 @@ Remove-Item Env:TODO_PPROF_ENABLED -ErrorAction SilentlyContinue
 - **原因**：密码哈希不是由 `hash-password` 生成，或 `TODO_AUTH_USERS` 没有正确设置。
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   echo "$TODO_AUTH_USERS"
   go run ./api/cmd/todo-api hash-password "change-me-123"
   ```
@@ -2556,7 +2556,7 @@ Remove-Item Env:TODO_PPROF_ENABLED -ErrorAction SilentlyContinue
 - **原因**：`Authorization` Header 缺少 `Bearer ` 前缀、Token 复制不完整、服务重启后 JWT Secret 变了。
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   echo "$TOKEN"
   curl -i -H "Authorization: Bearer $TOKEN" http://127.0.0.1:18080/api/v2/todos
   ```
@@ -2570,7 +2570,7 @@ Remove-Item Env:TODO_PPROF_ENABLED -ErrorAction SilentlyContinue
 - **原因**：请求来源不在 `cors.allowed_origins` 中，或浏览器发出 OPTIONS 预检请求。
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   curl -i -X OPTIONS http://127.0.0.1:18080/api/v2/todos \
     -H 'Origin: http://127.0.0.1:3000' \
     -H 'Access-Control-Request-Method: POST'
@@ -2585,7 +2585,7 @@ Remove-Item Env:TODO_PPROF_ENABLED -ErrorAction SilentlyContinue
 - **原因**：没有设置 `TODO_PPROF_ENABLED=true`，或端口被占用。
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   echo "$TODO_PPROF_ENABLED"
   curl -i http://127.0.0.1:18081/debug/pprof/
   ```
@@ -2640,73 +2640,13 @@ Remove-Item Env:TODO_PPROF_ENABLED -ErrorAction SilentlyContinue
 - 能验证安全 Header 和 CORS 行为。
 - 能启用 pprof 并抓取一个 profile。
 
-## 9. 本章练习题
+## 9. 练习题与面试题
 
-### 9.1 基础题
+本章练习题和面试题已拆分到独立页面，完成正文学习后再进入题库练习与复盘。
 
-1. JWT 的 header、payload、signature 分别有什么作用？
-2. 认证和授权有什么区别？
-3. 访问日志和审计日志有什么区别？
-4. 为什么生产错误响应不能直接返回底层错误？
-5. dev/test/prod 配置分层解决了什么问题？
-6. pprof 为什么不能直接暴露公网？
+[查看本章练习题与面试题](../../questions/stage-02-go-backend/14-go-production.md)
 
-### 9.2 实操题
-
-1. 把 Token TTL 从 `2h` 改成 `1m`，登录后等待过期，再验证 Todo 接口返回 401。
-2. 给审计日志增加 `todo_id` 字段。验收标准：更新、删除 Todo 时日志包含资源 ID。
-3. 给 `TODO_CORS_ALLOWED_ORIGINS` 增加测试用例，覆盖空字符串、单个 Origin 和多个 Origin。
-4. 给 `config-check` 输出增加脱敏后的配置摘要，例如只显示 Redis 是否启用，不显示密码。
-
-### 9.3 思考题
-
-1. JWT 泄露后，如何降低影响范围？
-2. 为什么很多团队会把认证放在 API 网关，同时服务内部仍然校验 Token？
-3. 如果 pprof 只绑定 localhost，Kubernetes 中应该如何临时访问它？
-
-## 10. 本章面试题
-
-### 面试题 1：JWT 的安全边界是什么？
-
-**一句话结论**：JWT 可以证明 Token 未被篡改，但不能自动解决权限、撤销和泄露问题。
-
-**展开解释**：JWT 通过签名保证 payload 没被客户端修改，通过 exp 限制有效期。服务端仍然要保护 Secret、设置合理过期时间、校验 Bearer Header，并避免在日志中记录 Token 原文。
-
-**深入追问**：如果需要立即撤销 Token，纯无状态 JWT 不够，需要引入黑名单、短 Token + Refresh Token、版本号或服务端会话状态。
-
-### 面试题 2：为什么要做配置分层？
-
-**一句话结论**：配置分层让同一份代码在 dev/test/prod 中使用不同运行参数，而不需要改代码。
-
-**展开解释**：默认配置适合本地开发，环境配置表达差异，环境变量或 Secret 负责部署时覆盖敏感值。这样可以让镜像不可变，环境可配置。
-
-**深入追问**：在 Kubernetes 中，普通配置通常放 ConfigMap，敏感配置放 Secret；配置变更还要考虑滚动更新、回滚和审计。
-
-### 面试题 3：请求 ID 有什么价值？
-
-**一句话结论**：请求 ID 能把一次请求在访问日志、审计日志、错误日志和下游调用中的记录串起来。
-
-**展开解释**：没有请求 ID 时，线上排障只能按时间和路径猜测。请求 ID 进入响应 Header 和日志字段后，用户反馈一个 ID，开发就能快速定位完整链路。
-
-**深入追问**：在微服务里，请求 ID 还会和 trace id、span id 一起使用，进入 OpenTelemetry 等链路追踪系统。
-
-### 面试题 4：pprof 上线要注意什么？
-
-**一句话结论**：pprof 很适合排查 CPU、内存和 goroutine 问题，但不能无保护暴露。
-
-**展开解释**：pprof 可能泄露函数名、调用栈、内存分配和运行时状态。生产中应默认关闭，临时启用时绑定 localhost、内网或受认证保护的入口。
-
-**深入追问**：在 Kubernetes 中常用 port-forward 临时访问 pprof，抓完 profile 后关闭入口，并保留 profile 文件用于复盘。
-
-### 面试题 5：生产 API 为什么需要统一错误响应？
-
-**一句话结论**：统一错误响应能让客户端稳定处理错误，也能避免泄露内部实现。
-
-**展开解释**：客户端需要机器可读的错误码，用户需要清晰但安全的错误信息。服务端日志可以记录详细错误，但响应体不应该暴露数据库错误、Secret、Token 或调用栈。
-
-**深入追问**：大型系统通常会定义错误码规范、错误映射层和审计日志策略，让排障信息留在服务端，用户响应保持稳定。
-
-## 11. 本章总结
+## 10. 本章总结
 
 本篇把 Todo API 从“具备数据库、缓存和限流能力”推进到“具备生产运行边界”的 Todo API v5。你实现了 JWT 登录与认证中间件，补齐了请求 ID、访问日志、审计日志、安全 Header、CORS、配置分层、运维命令和 pprof 排障入口。
 
@@ -2714,7 +2654,7 @@ Remove-Item Env:TODO_PPROF_ENABLED -ErrorAction SilentlyContinue
 
 能力价值上，你已经能把 Go API 的功能实现和生产运行需求连起来。下一阶段进入 Docker 和容器化时，这些配置、日志、健康检查和关闭逻辑会直接影响镜像构建、容器启动、Compose 编排和 Kubernetes 部署。
 
-## 12. 下一章衔接
+## 11. 下一章衔接
 
 第 15 篇会进入 Docker 基础与镜像构建。Todo API v5 的配置、健康检查、启动命令和优雅关闭会成为容器化的基础：镜像里运行哪个命令、容器如何注入环境变量、健康检查打哪个端点、日志如何输出到 stdout，都会复用本篇成果。
 
