@@ -432,7 +432,7 @@ flowchart TD
 检查版本：
 
 ```bash
-helm version --short
+helm version
 kubectl version --client
 kubectl cluster-info
 docker image inspect todo-api:v0.1.0 >/dev/null

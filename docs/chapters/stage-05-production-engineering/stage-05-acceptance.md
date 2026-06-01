@@ -152,7 +152,7 @@ Loki、Tempo 与 Alloy 验证：
 kubectl -n observability get pod,svc
 kubectl -n observability logs daemonset/alloy --tail=80
 kubectl -n observability port-forward service/loki-gateway 3100:80
-kubectl -n observability port-forward service/tempo 3200:3100
+kubectl -n observability port-forward service/tempo 3200:3200
 ```
 
 排障演练收尾验证：

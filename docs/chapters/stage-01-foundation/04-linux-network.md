@@ -648,16 +648,22 @@ main() {
   require_command ip
   require_command getent
 
-  if curl -fsS "$URL/healthz" >/dev/null; then
+  if curl --noproxy 127.0.0.1,localhost -fsS "$URL/healthz" >/dev/null; then
     ok "health endpoint ok: $URL/healthz"
   else
     fail "health endpoint failed: $URL/healthz"
   fi
 
-  if curl -fsS "$URL/todos" >/dev/null; then
+  if curl --noproxy 127.0.0.1,localhost -fsS "$URL/todos" >/dev/null; then
     ok "todos endpoint ok: $URL/todos"
   else
     fail "todos endpoint failed: $URL/todos"
+  fi
+
+  if curl --noproxy 127.0.0.1,localhost -fsS "$URL/debug/request" >/dev/null; then
+    ok "debug request endpoint ok: $URL/debug/request"
+  else
+    fail "debug request endpoint failed: $URL/debug/request"
   fi
 
   # Do not use -p here: showing process names often requires sudo.

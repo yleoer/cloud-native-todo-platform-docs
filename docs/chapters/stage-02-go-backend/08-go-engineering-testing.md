@@ -313,7 +313,7 @@ cloud-native-todo-platform/
 
 创建 `internal/config/config.go`：
 
-```go
+```go title="internal/config/config.go"
 package config
 
 import (
@@ -362,7 +362,7 @@ func getInt(key string, fallback int) int {
 
 创建 `internal/logger/logger.go`：
 
-```go
+```go title="internal/logger/logger.go"
 package logger
 
 import (
@@ -396,7 +396,7 @@ func parseLevel(level string) slog.Level {
 
 创建 `internal/todo/model.go`：
 
-```go
+```go title="internal/todo/model.go"
 package todo
 
 import "time"
@@ -430,7 +430,7 @@ type Stats struct {
 
 创建 `internal/todo/repository.go`：
 
-```go
+```go title="internal/todo/repository.go"
 package todo
 
 import (
@@ -494,7 +494,7 @@ func (r *MemoryRepository) List(ctx context.Context) ([]Todo, error) {
 
 创建 `internal/todo/service.go`：
 
-```go
+```go title="internal/todo/service.go"
 package todo
 
 import (
@@ -590,7 +590,7 @@ func (s *Service) Stats(ctx context.Context) (Stats, error) {
 
 创建 `internal/app/app.go`：
 
-```go
+```go title="internal/app/app.go"
 package app
 
 import (
@@ -628,7 +628,7 @@ func (a *App) Health(ctx context.Context) error {
 
 创建 `cmd/todo-api/main.go`：
 
-```go
+```go title="cmd/todo-api/main.go"
 package main
 
 import (
@@ -663,7 +663,7 @@ func main() {
 
 创建 `internal/todo/service_test.go`：
 
-```go
+```go title="internal/todo/service_test.go"
 package todo
 
 import (
@@ -792,7 +792,7 @@ func BenchmarkServiceStats(b *testing.B) {
 
 创建 `test/integration/app_test.go`：
 
-```go
+```go title="test/integration/app_test.go"
 package integration
 
 import (

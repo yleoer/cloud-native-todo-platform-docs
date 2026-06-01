@@ -84,7 +84,7 @@ RBAC 最小权限不是把权限写得越少越好，而是让权限和 Reconcil
 // +kubebuilder:rbac:groups=platform.todo.example.com,resources=todoapps/finalizers,verbs=update
 // +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups="",resources=services,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups="",resources=events,verbs=create;patch
+// +kubebuilder:rbac:groups="",resources=events,verbs=create;patch;update
 // +kubebuilder:rbac:groups=coordination.k8s.io,resources=leases,verbs=get;list;watch;create;update;patch;delete
 ```
 
@@ -297,7 +297,7 @@ operator/
 // +kubebuilder:rbac:groups=platform.todo.example.com,resources=todoapps/finalizers,verbs=update
 // +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups="",resources=services,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups="",resources=events,verbs=create;patch
+// +kubebuilder:rbac:groups="",resources=events,verbs=create;patch;update
 // +kubebuilder:rbac:groups=coordination.k8s.io,resources=leases,verbs=get;list;watch;create;update;patch;delete
 ```
 
@@ -385,7 +385,7 @@ rules:
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
   - apiGroups: [""]
     resources: ["events"]
-    verbs: ["create", "patch"]
+    verbs: ["create", "patch", "update"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
@@ -403,7 +403,7 @@ subjects:
 {{- end }}
 ```
 
-这个模板和第 40 篇有一个重要差异：它不再用一个集群级 `ClusterRoleBinding` 覆盖所有命名空间，而是按 `watch.namespaces` 为每个租户命名空间生成 `Role` 和 `RoleBinding`。Leader election 的 Lease 权限只授予 Operator 安装命名空间。这样 `todo-operator-system` 中的 ServiceAccount 只能在被授权的租户命名空间里管理 `TodoApp`、Deployment、Service 和 Event。
+这个模板和第 40 篇有一个重要差异：它不再用一个集群级 `ClusterRoleBinding` 覆盖所有命名空间，而是按 `watch.namespaces` 为每个租户命名空间生成 `Role` 和 `RoleBinding`。Leader election 的 Lease 权限只授予 Operator 安装命名空间。这样 `todo-operator-system` 中的 ServiceAccount 只能在被授权的租户命名空间里管理 `TodoApp`、Deployment、Service 和 Event。Leader election 和 recorder 还可能在 Operator 安装命名空间写 core Events，因此安装命名空间的 Role 也要包含 `events` 的 `create`、`patch`、`update`。
 
 Helm 模板里 `range .Values.watch.namespaces` 会把 `.` 切换成当前命名空间字符串，所以循环内部要用 `$` 回到 Chart 根作用域，例如 `{{ include "todo-operator.fullname" $ }}` 和 `{{ $.Release.Namespace }}`。这是 Helm 模板里很常见的作用域写法，后续模板中看到 `$` 时可以按“根对象”理解。
 

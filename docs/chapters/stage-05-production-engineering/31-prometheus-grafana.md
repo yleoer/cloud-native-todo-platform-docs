@@ -364,7 +364,7 @@ go version
 docker version --format '{{.Server.Version}}'
 kind version
 kubectl version --client
-helm version --short
+helm version
 ```
 
 本篇需要在同一个 kind 集群里同时运行 Argo CD、Todo API、Prometheus、Grafana、Alertmanager、kube-state-metrics 和 node-exporter。建议 Docker Desktop 为 kind 节点预留至少 6GB 内存；如果安装监控栈时大量 Pod 长时间 `Pending` 或 `OOMKilled`，优先检查 Docker Desktop 的资源上限。

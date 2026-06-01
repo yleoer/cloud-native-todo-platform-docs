@@ -765,18 +765,19 @@ kubectl -n todo-workloads describe secret todo-api-auth
 kubectl -n todo-workloads get secret todo-api-auth -o yaml
 ```
 
-不要把这类输出贴到 issue、聊天工具或日志系统里。base64 可以很容易还原，例如：
+不要把这类输出贴到 issue、聊天工具或日志系统里。日常验收只检查 key 是否存在，不直接打印明文：
+
+```bash
+kubectl -n todo-workloads get secret todo-api-auth
+kubectl -n todo-workloads get secret todo-api-auth \
+  -o jsonpath='{.data.TODO_JWT_SECRET}' | grep -q . && echo "jwt secret key exists"
+```
+
+只有在本地临时实验、确认不会记录终端输出时，才可以手动解码核对内容。Linux 和 WSL2 通常使用 `base64 -d`；macOS 默认 `base64` 常用 `base64 -D`：
 
 ```bash
 kubectl -n todo-workloads get secret todo-api-auth \
   -o jsonpath='{.data.TODO_JWT_SECRET}' | base64 -d
-```
-
-Linux 和 WSL2 通常使用 `base64 -d`；macOS 默认 `base64` 常用 `base64 -D`。如果命令报参数错误，换成：
-
-```bash
-kubectl -n todo-workloads get secret todo-api-auth \
-  -o jsonpath='{.data.TODO_JWT_SECRET}' | base64 -D
 ```
 
 本地实验看完即可，不要在共享环境中这样操作生产 Secret。
@@ -937,7 +938,8 @@ kubectl -n todo-workloads get secret
 - **排查**：
 
   ```bash
-  kubectl -n todo-workloads get secret todo-api-auth -o jsonpath='{.data.TODO_AUTH_USERS}' | base64 -d
+  kubectl -n todo-workloads exec "$POD" -- sh -c 'test -n "$TODO_AUTH_USERS" && echo "auth users exists"'
+  kubectl -n todo-workloads get secret todo-api-auth
   ```
 
 - **修复**：生成 Secret 时用双引号包住整体，并确认 `HASH` 变量已经正确生成。

@@ -40,7 +40,7 @@
 本篇命令以 Linux / macOS / WSL2 Bash 为主。Windows 用户建议在 WSL2 Ubuntu 中执行整篇实验，避免 Bash 变量、管道和重定向写法在 PowerShell 中产生额外差异；如果必须使用 PowerShell，需要把 Bash 变量写法改为 PowerShell 变量。
 
 !!! note "关于 Kubernetes 与 kind 版本"
-    课程蓝图锁定 Kubernetes 1.36.x，但 kind v0.31.0 官方发布说明中预构建并推荐固定 digest 的默认节点镜像仍是 `registry.cn-guangzhou.aliyuncs.com/yleoer/node:v1.35.0@sha256:452d707d4862f52530247495d180205e029056831160e22870e37e3f6c1ac31f`。本篇实验不依赖 1.36 专属 API，因此主线优先使用 kind 官方当前稳定节点镜像，保证读者能复现。出版前如果 kind 官方 release 已提供 1.36.x 预构建节点镜像及 digest，应统一替换；如果你本地已经有可用的 1.36.x kind 节点镜像，也可以通过 `KIND_NODE_IMAGE` 环境变量覆盖。
+    课程蓝图锁定 Kubernetes 1.36.x，但 kind v0.31.0 官方发布说明中预构建并推荐的默认节点镜像仍是 `registry.cn-guangzhou.aliyuncs.com/yleoer/node:v1.35.0`。本篇实验不依赖 1.36 专属 API，因此主线优先使用 kind 官方当前稳定节点镜像，保证读者能复现。镜像 digest 可能随镜像同步方式变化；若使用课程镜像仓库，请以本机 `docker image inspect registry.cn-guangzhou.aliyuncs.com/yleoer/node:v1.35.0 --format '{{json .RepoDigests}}'` 输出为准。出版前如果 kind 官方 release 已提供 1.36.x 预构建节点镜像及 digest，应统一替换；如果你本地已经有可用的 1.36.x kind 节点镜像，也可以通过 `KIND_NODE_IMAGE` 环境变量覆盖。
 
 ## 2. 本章工作场景与真实案例
 

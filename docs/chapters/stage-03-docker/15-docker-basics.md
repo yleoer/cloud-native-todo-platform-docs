@@ -482,7 +482,7 @@ docker image ls
 
 如果出现 `no matching manifest`，通常表示当前 CPU 架构没有对应镜像；如果出现 `pull access denied`，通常是镜像名写错、仓库私有或未登录。
 
-先清理可能残留的同名容器，避免名称冲突。
+先清理可能残留的同名容器，避免名称冲突。注意：如果你正在按“连续阶段验证”保留阶段二的 `todo-postgres`、`todo-redis` 容器和数据卷，不要执行下面的清理命令；请改用独立前缀，例如 `stage03-api`、`stage03-postgres`、`stage03-redis`。
 
 === "Linux / macOS / WSL2"
 
@@ -958,7 +958,7 @@ docker run --rm --network todo-net registry.cn-guangzhou.aliyuncs.com/yleoer/alp
 
 ### 5.8 清理步骤
 
-只停止和删除容器，保留数据卷：
+只停止和删除容器，保留数据卷。注意：这会删除 `todo-api`、`todo-postgres`、`todo-redis` 三个容器；连续验证多阶段时，先确认这些容器不是前序阶段仍需保留的运行环境。
 
 ```bash
 docker rm -f todo-api todo-postgres todo-redis
