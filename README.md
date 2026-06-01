@@ -8,30 +8,30 @@
 - **实战性**：每个阶段都有配套项目，最终完成完整的云原生平台
 - **渐进性**：6 个学习阶段，按照“先会用，再深入”的顺序逐步推进
 - **可复现性**：锁定 Go 1.26、Docker 29、Kubernetes 1.36、Helm 4 等课程基线
-- **职业导向**：对标真实岗位能力，包含实验、排障、面试和作品集验收
+- **工程导向**：贴近真实工程流程，包含实验、排障、面试和作品集验收
 
 ## 🎯 学习路径
 
-新版课程设计为 **6 个学习阶段、42 大篇、约 230 章**。当前站点已完成阶段一至阶段六主线内容。
+课程设计为 **6 个学习阶段、42 大篇、约 230 章**。
 
 <details open>
-<summary><strong>阶段一：基础能力（第 1-6 篇，已发布）</strong></summary>
+<summary><strong>阶段一：基础能力（第 1-6 篇）</strong></summary>
 
 环境准备、YAML、Linux 文件/进程/网络、Git 协作和 Shell 自动化。
 
-- [第 1 篇：课程导学与开发环境准备 [A]](docs/chapters/stage-01-foundation/01-course-guide-env.md)
-- [第 2 篇：Linux 文件系统与命令基础 [A]](docs/chapters/stage-01-foundation/02-linux-filesystem.md)
-- [第 3 篇：Linux 进程、服务与软件管理 [A]](docs/chapters/stage-01-foundation/03-linux-process.md)
-- [第 4 篇：Linux 网络基础与排障 [A]](docs/chapters/stage-01-foundation/04-linux-network.md)
-- [第 5 篇：Git 基础与团队协作 [A]](docs/chapters/stage-01-foundation/05-git-basics.md)
-- [第 6 篇：Shell 脚本与自动化基础 [A]](docs/chapters/stage-01-foundation/06-shell-scripting.md)
+- [第 1 篇：课程导学与开发环境准备](docs/chapters/stage-01-foundation/01-course-guide-env.md)
+- [第 2 篇：Linux 文件系统与命令基础](docs/chapters/stage-01-foundation/02-linux-filesystem.md)
+- [第 3 篇：Linux 进程、服务与软件管理](docs/chapters/stage-01-foundation/03-linux-process.md)
+- [第 4 篇：Linux 网络基础与排障](docs/chapters/stage-01-foundation/04-linux-network.md)
+- [第 5 篇：Git 基础与团队协作](docs/chapters/stage-01-foundation/05-git-basics.md)
+- [第 6 篇：Shell 脚本与自动化基础](docs/chapters/stage-01-foundation/06-shell-scripting.md)
 - [附录 A：基础环境作品集验收](docs/chapters/stage-01-foundation/stage-01-acceptance.md)
 - [附录 B：命令速查与排障手册](docs/chapters/stage-01-foundation/stage-01-cheatsheet-troubleshooting.md)
 
 </details>
 
 <details>
-<summary><strong>阶段二：Go 后端开发（新版规划第 7-14 篇，当前已发布后端章节）</strong></summary>
+<summary><strong>阶段二：Go 后端开发（第 7-14 篇）</strong></summary>
 
 从 Go 基础到工程化、net/http、Gin、并发、PostgreSQL、Redis 和后端生产化。
 
@@ -48,7 +48,7 @@
 </details>
 
 <details>
-<summary><strong>阶段三：容器化能力（新版规划第 15-19 篇，当前已发布 Docker 章节）</strong></summary>
+<summary><strong>阶段三：容器化能力（第 15-19 篇）</strong></summary>
 
 Docker 基础、Dockerfile、Compose、容器原理、OCI、containerd、runc 和 CRI。
 
@@ -63,7 +63,7 @@ Docker 基础、Dockerfile、Compose、容器原理、OCI、containerd、runc �
 </details>
 
 <details>
-<summary><strong>阶段四：Kubernetes 应用交付（第 20-28 篇，当前已发布第 28 篇 + 阶段验收）</strong></summary>
+<summary><strong>阶段四：Kubernetes 应用交付（第 20-28 篇）</strong></summary>
 
 Kubernetes 架构、工作负载、Service / Ingress / Gateway API、配置、存储、网络、安全、Helm 4 和 Kustomize。
 
@@ -95,19 +95,19 @@ CI/CD、GitOps、Prometheus / Grafana、Loki、OpenTelemetry 和 Kubernetes 生�
 </details>
 
 <details>
-<summary><strong>阶段六：平台工程与 Operator 能力（第 34-42 篇，已发布）</strong></summary>
+<summary><strong>阶段六：平台工程与 Operator 能力（第 34-42 篇）</strong></summary>
 
 Kubernetes API Machinery、CRD、手写 Controller、Kubebuilder、Webhook、Finalizer、Operator 测试发布、生产实践和最终集成。
 
-- [第 34 篇：Kubernetes API 扩展机制 [B]](docs/chapters/stage-06-platform-operator/34-k8s-api-extension.md)
-- [第 35 篇：CRD 设计与实践 [C]](docs/chapters/stage-06-platform-operator/35-crd-design.md)
-- [第 36 篇：Controller 机制：Informer 与 Workqueue [B]](docs/chapters/stage-06-platform-operator/36-controller-informer-workqueue.md)
-- [第 37 篇：手写简化版 Controller [C]](docs/chapters/stage-06-platform-operator/37-handwritten-controller.md)
-- [第 38 篇：Kubebuilder 入门 [C]](docs/chapters/stage-06-platform-operator/38-kubebuilder.md)
-- [第 39 篇：Operator 高级机制 [C]](docs/chapters/stage-06-platform-operator/39-operator-advanced.md)
-- [第 40 篇：Operator 测试、发布与升级 [C]](docs/chapters/stage-06-platform-operator/40-operator-test-release.md)
-- [第 41 篇：Operator 生产实践 [C]](docs/chapters/stage-06-platform-operator/41-operator-production.md)
-- [第 42 篇：综合集成与职业能力验收 [C]](docs/chapters/stage-06-platform-operator/42-final-integration-career.md)
+- [第 34 篇：Kubernetes API 扩展机制](docs/chapters/stage-06-platform-operator/34-k8s-api-extension.md)
+- [第 35 篇：CRD 设计与实践](docs/chapters/stage-06-platform-operator/35-crd-design.md)
+- [第 36 篇：Controller 机制：Informer 与 Workqueue](docs/chapters/stage-06-platform-operator/36-controller-informer-workqueue.md)
+- [第 37 篇：手写简化版 Controller](docs/chapters/stage-06-platform-operator/37-handwritten-controller.md)
+- [第 38 篇：Kubebuilder 入门](docs/chapters/stage-06-platform-operator/38-kubebuilder.md)
+- [第 39 篇：Operator 高级机制](docs/chapters/stage-06-platform-operator/39-operator-advanced.md)
+- [第 40 篇：Operator 测试、发布与升级](docs/chapters/stage-06-platform-operator/40-operator-test-release.md)
+- [第 41 篇：Operator 生产实践](docs/chapters/stage-06-platform-operator/41-operator-production.md)
+- [第 42 篇：综合集成与能力验收](docs/chapters/stage-06-platform-operator/42-final-integration-career.md)
 - [附录 A：Operator 开发能力验收](docs/chapters/stage-06-platform-operator/stage-06-operator-acceptance.md)
 - [附录 B：版本锁定与环境矩阵](docs/chapters/stage-06-platform-operator/stage-06-version-environment.md)
 
@@ -121,16 +121,13 @@ Kubernetes API Machinery、CRD、手写 Controller、Kubebuilder、Webhook、Fin
 
 ### 本地运行
 
-<details open>
-<summary><strong>Linux / macOS</strong></summary>
-
 ```bash
 # 克隆仓库
 git clone https://github.com/yleoer/cloud-native-todo-platform-docs.git
 cd cloud-native-todo-platform-docs
 
 # 创建虚拟环境
-python3 -m venv .venv
+python -m venv .venv
 source .venv/bin/activate
 
 # 安装依赖
@@ -139,29 +136,6 @@ pip install -r requirements.txt
 # 启动开发服务器
 mkdocs serve
 ```
-
-</details>
-
-<details>
-<summary><strong>Windows PowerShell</strong></summary>
-
-```powershell
-# 克隆仓库
-git clone https://github.com/yleoer/cloud-native-todo-platform-docs.git
-cd cloud-native-todo-platform-docs
-
-# 创建虚拟环境
-py -m venv .venv
-.\.venv\Scripts\Activate.ps1
-
-# 安装依赖
-pip install -r requirements.txt
-
-# 启动开发服务器
-mkdocs serve
-```
-
-</details>
 
 启动后访问：`http://127.0.0.1:8000`
 
@@ -172,12 +146,12 @@ docs/
 ├── index.md                    # 首页
 ├── chapters/                   # 课程章节
 │   ├── stage-01-foundation/   # 阶段一：基础能力
-│   │   ├── 01-course-guide-env.md   # 第 1 篇：课程导学与开发环境准备 [A]
-│   │   ├── 02-linux-filesystem.md   # 第 2 篇：Linux 文件系统与命令基础 [A]
-│   │   ├── 03-linux-process.md      # 第 3 篇：Linux 进程、服务与软件管理 [A]
-│   │   ├── 04-linux-network.md      # 第 4 篇：Linux 网络基础与排障 [A]
-│   │   ├── 05-git-basics.md         # 第 5 篇：Git 基础与团队协作 [A]
-│   │   ├── 06-shell-scripting.md    # 第 6 篇：Shell 脚本与自动化基础 [A]
+│   │   ├── 01-course-guide-env.md   # 第 1 篇：课程导学与开发环境准备
+│   │   ├── 02-linux-filesystem.md   # 第 2 篇：Linux 文件系统与命令基础
+│   │   ├── 03-linux-process.md      # 第 3 篇：Linux 进程、服务与软件管理
+│   │   ├── 04-linux-network.md      # 第 4 篇：Linux 网络基础与排障
+│   │   ├── 05-git-basics.md         # 第 5 篇：Git 基础与团队协作
+│   │   ├── 06-shell-scripting.md    # 第 6 篇：Shell 脚本与自动化基础
 │   │   ├── stage-01-acceptance.md   # 阶段一附录 A：作品集验收
 │   │   └── stage-01-cheatsheet-troubleshooting.md # 阶段一附录 B：速查与排障
 │   ├── stage-02-go-backend/    # 阶段二：Go 语言与后端开发
@@ -217,15 +191,15 @@ docs/
 │   │   ├── 33-k8s-troubleshooting.md # 第 33 篇：Kubernetes 生产排障
 │   │   └── stage-05-acceptance.md    # 阶段五附录 A：生产工程作品集验收
 │   ├── stage-06-platform-operator/ # 阶段六：平台工程与 Operator 能力
-│   │   ├── 34-k8s-api-extension.md  # 第 34 篇：Kubernetes API 扩展机制 [B]
-│   │   ├── 35-crd-design.md         # 第 35 篇：CRD 设计与实践 [C]
-│   │   ├── 36-controller-informer-workqueue.md # 第 36 篇：Controller 机制 [B]
-│   │   ├── 37-handwritten-controller.md # 第 37 篇：手写简化版 Controller [C]
-│   │   ├── 38-kubebuilder.md        # 第 38 篇：Kubebuilder 入门 [C]
-│   │   ├── 39-operator-advanced.md  # 第 39 篇：Operator 高级机制 [C]
-│   │   ├── 40-operator-test-release.md # 第 40 篇：Operator 测试、发布与升级 [C]
-│   │   ├── 41-operator-production.md # 第 41 篇：Operator 生产实践 [C]
-│   │   ├── 42-final-integration-career.md # 第 42 篇：综合集成与职业能力验收 [C]
+│   │   ├── 34-k8s-api-extension.md  # 第 34 篇：Kubernetes API 扩展机制
+│   │   ├── 35-crd-design.md         # 第 35 篇：CRD 设计与实践
+│   │   ├── 36-controller-informer-workqueue.md # 第 36 篇：Controller 机制
+│   │   ├── 37-handwritten-controller.md # 第 37 篇：手写简化版 Controller
+│   │   ├── 38-kubebuilder.md        # 第 38 篇：Kubebuilder 入门
+│   │   ├── 39-operator-advanced.md  # 第 39 篇：Operator 高级机制
+│   │   ├── 40-operator-test-release.md # 第 40 篇：Operator 测试、发布与升级
+│   │   ├── 41-operator-production.md # 第 41 篇：Operator 生产实践
+│   │   ├── 42-final-integration-career.md # 第 42 篇：综合集成与能力验收
 │   │   ├── stage-06-operator-acceptance.md # 阶段六附录 A：Operator 开发能力验收
 │   │   └── stage-06-version-environment.md # 阶段六附录 B：版本锁定与环境矩阵
 ├── projects/                   # 项目实战
@@ -246,14 +220,6 @@ docs/
 - 想从传统运维转向 DevOps、SRE 或云原生平台工程的人
 - 想学习 CRD、Controller、Operator 开发的工程师
 
-## 💼 学完后可以胜任的工作
-
-- **Go 后端开发工程师**：独立开发 RESTful API 服务
-- **DevOps 工程师**：搭建 CI/CD、GitOps 流程，管理 K8s 集群
-- **云原生平台工程师**：设计云原生架构，接入可观测系统
-- **Kubernetes Operator 开发工程师**：开发 CRD、Controller、Operator
-- **SRE 工程师**：排查生产故障，优化系统可靠性
-
 ## 🛠️ 技术栈
 
 - **语言**：Go
@@ -266,14 +232,6 @@ docs/
 - **开发框架**：Gin 1.12、GORM、Kubebuilder
 
 ## 🔧 构建与部署
-
-### 本地构建
-
-```bash
-mkdocs build
-```
-
-构建产物生成到 `site/` 目录。
 
 ### GitHub Pages 自动部署
 
@@ -339,6 +297,8 @@ GitHub Pages 设置：
 ## 🙏 致谢
 
 感谢所有为云原生技术发展做出贡献的开源社区和开发者。
+
+感谢 DeepSeek 对课程章节的评审建议与细节修正支持。
 
 感谢 Codex 在课程内容编写、文档结构调整和本地验证过程中的协作支持。
 

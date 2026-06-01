@@ -101,6 +101,32 @@ code, pre {
   border-radius: 0.3rem;
 }
 
+.md-typeset .highlight.terminal-prompt .code code > span,
+.md-typeset .highlight.terminal-prompt pre code > span {
+  position: relative;
+  display: block;
+  padding-left: 1.65rem;
+}
+
+.md-typeset .highlight.terminal-prompt .code code > span::before,
+.md-typeset .highlight.terminal-prompt pre code > span::before {
+  content: attr(data-prompt);
+  position: absolute;
+  left: 0;
+  color: var(--md-code-hl-comment-color, var(--md-default-fg-color--light));
+  user-select: none;
+}
+
+.md-typeset .highlight.terminal-prompt .code code > span[data-prompt=""],
+.md-typeset .highlight.terminal-prompt pre code > span[data-prompt=""] {
+  padding-left: 0;
+}
+
+.md-typeset .highlight.terminal-prompt .code code > span[data-prompt=""]::before,
+.md-typeset .highlight.terminal-prompt pre code > span[data-prompt=""]::before {
+  content: "";
+}
+
 /* 优化行内代码样式 */
 .md-typeset code {
   padding: 0.2rem 0.4rem;

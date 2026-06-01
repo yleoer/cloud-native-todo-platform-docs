@@ -1,4 +1,4 @@
-# 第 42 篇：综合集成与职业能力验收 [C]
+# 第 42 篇：综合集成与能力验收
 
 走到第 42 篇，Cloud Native Todo Platform 已经不再是一个单点练习。你已经写过 Go API，做过 Docker 镜像，部署过 Kubernetes 工作负载，配置过 Helm、Kustomize、CI/CD、GitOps、Prometheus、Grafana、Loki、OpenTelemetry，也从 CRD、Controller、Kubebuilder、Webhook、Finalizer、测试发布一直推进到 Operator 生产实践。
 
@@ -140,7 +140,7 @@ git commit SHA
 
 面试官通常不会逐行读你的所有代码，但会抓住一个点深入追问。作品集的作用，是让你每个关键点都有对应证据，而不是靠记忆临场发挥。
 
-### 3.5 职业能力表达模型
+### 3.5 工程能力表达模型
 
 项目表达可以按“四层模型”组织：
 
@@ -259,11 +259,11 @@ flowchart TD
 
 本章故障演练选择“错误镜像标签”，因为它真实、常见、影响明确。现象通常是 `ImagePullBackOff` 或 `ErrImagePull`，不会破坏集群，也能完整覆盖 GitOps、Operator、Deployment、Events 和 status。排障时不要直接改线上 Pod，而要回到声明式入口：修复 Git 中的镜像值，让 Argo CD 重新同步，Operator 再调谐到新状态。
 
-### 4.5 从项目到岗位能力
+### 4.5 从项目到工程能力
 
-表 42-3 项目能力到岗位能力的映射
+表 42-3 项目能力到工程能力的映射
 
-| 项目证据 | 岗位能力 | 面试表达重点 |
+| 项目证据 | 工程能力 | 表达重点 |
 |---|---|---|
 | Go API 与测试 | 后端工程能力 | API 设计、测试、配置、优雅关闭 |
 | Dockerfile 与镜像扫描 | 容器化能力 | 多阶段构建、非 root、镜像体积和安全 |
@@ -273,7 +273,7 @@ flowchart TD
 | CRD / Controller / Operator | 平台工程能力 | 声明式 API、控制循环、生命周期自动化 |
 | 故障复盘 | SRE 思维 | 影响面、定位证据、修复动作、预防机制 |
 
-最终作品集要服务于这个映射。一个好的项目讲解不是“我写了很多文件”，而是“这些文件分别证明了哪些岗位能力”。
+最终作品集要服务于这个映射。一个好的项目讲解不是“我写了很多文件”，而是“这些文件分别证明了哪些工程能力”。
 
 ## 5. 手把手实验
 

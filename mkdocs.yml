@@ -154,10 +154,10 @@ extra:
       name: GitHub
 
 extra_css:
-  - stylesheets/extra.css?v=20260526-1
+  - stylesheets/extra.css?v=20260601-1
 
 extra_javascript:
-  - javascripts/extra.js?v=20260526-1
+  - javascripts/extra.js?v=20260601-1
   - javascripts/mathjax.js
   - https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js
 
@@ -165,12 +165,12 @@ nav:
   - 首页: index.md
 
   - 阶段一 基础能力:
-      - 1. 课程导学与开发环境准备 [A]: chapters/stage-01-foundation/01-course-guide-env.md
-      - 2. Linux 文件系统与命令基础 [A]: chapters/stage-01-foundation/02-linux-filesystem.md
-      - 3. Linux 进程、服务与软件管理 [A]: chapters/stage-01-foundation/03-linux-process.md
-      - 4. Linux 网络基础与排障 [A]: chapters/stage-01-foundation/04-linux-network.md
-      - 5. Git 基础与团队协作 [A]: chapters/stage-01-foundation/05-git-basics.md
-      - 6. Shell 脚本与自动化 [A]: chapters/stage-01-foundation/06-shell-scripting.md
+      - 1. 课程导学与开发环境准备: chapters/stage-01-foundation/01-course-guide-env.md
+      - 2. Linux 文件系统与命令基础: chapters/stage-01-foundation/02-linux-filesystem.md
+      - 3. Linux 进程、服务与软件管理: chapters/stage-01-foundation/03-linux-process.md
+      - 4. Linux 网络基础与排障: chapters/stage-01-foundation/04-linux-network.md
+      - 5. Git 基础与团队协作: chapters/stage-01-foundation/05-git-basics.md
+      - 6. Shell 脚本与自动化: chapters/stage-01-foundation/06-shell-scripting.md
       - 附录 A. 基础环境作品集验收: chapters/stage-01-foundation/stage-01-acceptance.md
       - 附录 B. 命令速查与排障手册: chapters/stage-01-foundation/stage-01-cheatsheet-troubleshooting.md
 
@@ -223,6 +223,6 @@ nav:
       - 39. Operator 高级机制: chapters/stage-06-platform-operator/39-operator-advanced.md
       - 40. Operator 测试、发布与升级: chapters/stage-06-platform-operator/40-operator-test-release.md
       - 41. Operator 生产实践: chapters/stage-06-platform-operator/41-operator-production.md
-      - 42. 综合集成与职业能力验收: chapters/stage-06-platform-operator/42-final-integration-career.md
+      - 42. 综合集成与能力验收: chapters/stage-06-platform-operator/42-final-integration-career.md
       - 附录 A. Operator 开发能力验收: chapters/stage-06-platform-operator/stage-06-operator-acceptance.md
       - 附录 B. 版本锁定与环境矩阵: chapters/stage-06-platform-operator/stage-06-version-environment.md

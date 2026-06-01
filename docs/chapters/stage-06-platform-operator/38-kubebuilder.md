@@ -1,4 +1,4 @@
-# 第 38 篇：Kubebuilder 入门 [C]
+# 第 38 篇：Kubebuilder 入门
 
 第 36 篇已经讲清楚 `Informer -> Workqueue -> Reconcile` 的控制循环，第 37 篇已经把这条链路落到手写 client-go Controller 上。本篇换一个更贴近生产团队的方式：使用 Kubebuilder 和 controller-runtime 开发 Todo Operator。
 

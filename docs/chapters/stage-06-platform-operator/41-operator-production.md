@@ -1,4 +1,4 @@
-# 第 41 篇：Operator 生产实践 [C]
+# 第 41 篇：Operator 生产实践
 
 第 40 篇已经把 Todo Operator 纳入测试、发布、升级和回滚流水线。到这里，它已经不是一个只能本地演示的 Controller，而是一个可以被打包、安装和验证的控制面组件。新的问题随之出现：这个 Operator 真能进入生产环境吗？
 
@@ -1613,6 +1613,6 @@ helm list -A | grep todo-operator
 
 ## 12. 下一章衔接
 
-下一篇第 42 篇会进入阶段六最终综合集成与职业能力验收。我们会把第 34-41 篇的 Operator 能力串起来，完成 Cloud Native Todo Platform 的最终交付视图：从 Git Push、CI/CD、GitOps、Helm Chart 到 Todo Operator 一键交付整套 Todo 平台。
+下一篇第 42 篇会进入阶段六最终综合集成与能力验收。我们会把第 34-41 篇的 Operator 能力串起来，完成 Cloud Native Todo Platform 的最终交付视图：从 Git Push、CI/CD、GitOps、Helm Chart 到 Todo Operator 一键交付整套 Todo 平台。
 
 请保留本篇新增或修改的 RBAC、`cmd/main.go` Watch 配置、`TodoAppReconciler` predicate/index、Helm 生产 values、metrics 模板、告警模板和 smoke test。它们会成为第 42 篇作品集、架构图、部署说明和面试讲解稿的核心证据。

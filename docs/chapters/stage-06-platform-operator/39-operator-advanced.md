@@ -1,4 +1,4 @@
-# 第 39 篇：Operator 高级机制 [C]
+# 第 39 篇：Operator 高级机制
 
 第 38 篇已经用 Kubebuilder 完成了 Todo Operator 的最小工程化版本：`TodoApp` 能自动创建 Deployment 和 Service，并把 Ready 副本数写回 status。本篇继续在 `<project-root>/operator/kubebuilder/` 上增强它，让这个 Operator 开始具备生产级生命周期管理能力。
 

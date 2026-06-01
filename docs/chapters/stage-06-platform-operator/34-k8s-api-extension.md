@@ -1,4 +1,4 @@
-# 第 34 篇：Kubernetes API 扩展机制 [B]
+# 第 34 篇：Kubernetes API 扩展机制
 
 本篇开始进入阶段六：平台工程与 Operator 能力。
 

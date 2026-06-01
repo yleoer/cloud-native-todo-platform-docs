@@ -1,4 +1,4 @@
-# 第 25 篇：Kubernetes 网络原理 [B]
+# 第 25 篇：Kubernetes 网络原理
 
 第 24 篇把 Todo Platform 的 PostgreSQL 放进了 Kubernetes，并让 Todo API 通过 `todo-postgres.todo-workloads.svc.cluster.local` 访问数据库。到这里，平台已经有了真实的服务间调用链路：客户端访问 Todo API，Todo API 再访问 PostgreSQL。下一类真实问题也随之出现：DNS 为什么能解析，Service 为什么能把流量转到 Pod，网络策略为什么能拦住未授权访问。
 

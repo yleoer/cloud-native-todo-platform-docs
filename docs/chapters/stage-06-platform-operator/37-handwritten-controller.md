@@ -1,4 +1,4 @@
-# 第 37 篇：手写简化版 Controller [C]
+# 第 37 篇：手写简化版 Controller
 
 第 35 篇已经把 `TodoApp`、`TodoDatabase`、`TodoCache` 注册成真实 CRD，第 36 篇已经把 `Informer -> Workqueue -> Reconcile` 的控制循环拆开讲清楚。本篇把这条链路放回真实 Kubernetes 集群：不用 Kubebuilder，不用代码生成，直接用 client-go 手写一个最小 `TodoApp` Controller。
 
