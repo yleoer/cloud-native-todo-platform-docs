@@ -321,6 +321,13 @@ NetworkPolicy 是 Namespace 内对象。它不能跨 Namespace “保护所有�
 
 Calico 安装命令会访问 `raw.githubusercontent.com`。发布前已验证 Calico 3.32.0 的 `tigera-operator.yaml` 和 `custom-resources.yaml` 可下载，且官方 custom resources 中仍包含 `APIServer` 自定义资源。如果网络无法访问，请提前从 Calico 官方仓库下载对应 manifest，或使用团队可信镜像源；不要从来源不明的第三方链接复制安装清单。
 
+Ubuntu 24.04 上如果 `fs.inotify.max_user_instances` 过低，Calico 或 kind 节点内组件可能出现 `Too many open files` 一类错误。创建临时集群前先检查宿主机 inotify 限制：
+
+```bash
+sysctl fs.inotify.max_user_instances fs.inotify.max_user_watches
+sudo sysctl -w fs.inotify.max_user_instances=1024
+```
+
 临时集群会额外占用本机磁盘空间，主要来自 kind 节点镜像、Calico 镜像和 Alpine 镜像，建议预留 2-3 GB。如果本机同时保留多个 kind 集群，实验前可以用 `kind get clusters` 和 `docker system df` 观察空间占用。
 
 确认本地工具版本：
@@ -616,11 +623,15 @@ kubectl config use-context kind-todo-network-lab
 kind load docker-image registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23 --name todo-network-lab
 ```
 
-安装 Calico 3.32.0。这里使用 Calico operator 安装方式，并为 kind 配置 VXLAN 网络。Calico 容器镜像会从镜像仓库拉取；如果你的网络受限，可以提前拉取 Calico 相关镜像并用 `kind load docker-image --name todo-network-lab` 导入临时集群，或配置可信镜像代理：
+安装 Calico 3.32.0。这里使用 Calico operator 安装方式，并为 kind 配置 VXLAN 网络。Calico 容器镜像会从镜像仓库拉取；如果你的网络受限，可以把 `Installation` 的 `registry` 和 `imagePath` 指向你自己的镜像仓库：
 
 ```bash
 kubectl create -f https://raw.githubusercontent.com/projectcalico/calico/v3.32.0/manifests/tigera-operator.yaml
 kubectl -n tigera-operator wait --for=condition=Available deployment/tigera-operator --timeout=180s
+
+docker pull registry.cn-guangzhou.aliyuncs.com/yleoer/cni:v3.32.0
+docker pull registry.cn-guangzhou.aliyuncs.com/yleoer/node:v3.32.0
+docker pull registry.cn-guangzhou.aliyuncs.com/yleoer/kube-controllers:v3.32.0
 
 cat > deployments/k8s-network/calico-custom-resources.yaml <<'YAML'
 apiVersion: operator.tigera.io/v1
@@ -628,6 +639,8 @@ kind: Installation
 metadata:
   name: default
 spec:
+  registry: registry.cn-guangzhou.aliyuncs.com/
+  imagePath: yleoer
   calicoNetwork:
     bgp: Disabled # ← kind 本地实验不需要 BGP
     ipPools:
@@ -646,7 +659,7 @@ kubectl -n calico-system wait --for=condition=Available deployment/calico-kube-c
 kubectl -n calico-system wait --for=condition=Ready pod -l k8s-app=calico-node --timeout=600s
 ```
 
-如果 wait 命令超时，不要立刻重建集群。先执行 `kubectl -n calico-system get pods` 和 `kubectl -n calico-system describe pod -l k8s-app=calico-node`，确认是镜像拉取慢、节点资源不足，还是 CNI 配置错误。
+如果 wait 命令超时，不要立刻重建集群。先执行 `kubectl -n calico-system get pods` 和 `kubectl -n calico-system describe pod -l k8s-app=calico-node`，确认是镜像拉取慢、节点资源不足，还是 CNI 配置错误。`registry` 与 `imagePath` 组合后，operator 会按 `registry.cn-guangzhou.aliyuncs.com/yleoer/node:v3.32.0`、`registry.cn-guangzhou.aliyuncs.com/yleoer/cni:v3.32.0`、`registry.cn-guangzhou.aliyuncs.com/yleoer/kube-controllers:v3.32.0` 这类路径拉取镜像；如果你的仓库使用不同命名规则，先把镜像重标记成 operator 期望的路径再推送。
 
 确认节点和 Calico Pod Ready：
 

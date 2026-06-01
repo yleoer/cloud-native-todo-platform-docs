@@ -1,4 +1,4 @@
-# 第 32 篇：日志与 OpenTelemetry 链路追踪 [C]
+﻿# 第 32 篇：日志与 OpenTelemetry 链路追踪 [C]
 
 第 31 篇已经让 Todo Platform 具备指标监控能力：Grafana 能看到 QPS、错误率、P95/P99 延迟和资源使用，PrometheusRule 能在 P95 延迟超过阈值时告警。指标能告诉我们“系统什么时候变慢、影响范围多大”，但它通常不能直接回答“是哪一次请求慢、慢在哪一步、当时日志里发生了什么”。
 
@@ -334,7 +334,7 @@ kubectl -n todo-dev get deploy,svc,pod
 
 ```bash
 go version
-helm version --short
+helm version
 kubectl version --client
 docker version --format '{{.Server.Version}}'
 ```
@@ -697,6 +697,8 @@ backend:
 
 gateway:
   enabled: true
+  deploymentStrategy:
+    type: Recreate
 
 chunksCache:
   enabled: false
@@ -705,7 +707,7 @@ resultsCache:
 YAML
 ```
 
-这里的 `commonConfig` 和 `schemaConfig` 是 Loki Helm chart 的 values 键名；chart 渲染后会生成 Loki 运行时配置里的 `common` 和 `schema_config`。这份配置只服务本地 kind 实验：单副本、文件系统、无持久化、关闭缓存。生产环境应使用对象存储、持久化、明确保留周期、多副本和容量规划。
+这里的 `commonConfig` 和 `schemaConfig` 是 Loki Helm chart 的 values 键名；chart 渲染后会生成 Loki 运行时配置里的 `common` 和 `schema_config`。这份配置只服务本地 kind 实验：单副本、文件系统、无持久化、关闭缓存。`gateway` 在单节点 kind 上改成 `Recreate`，是为了避免默认滚动更新在资源紧张时同时拉起新旧 Pod 失败。生产环境应使用对象存储、持久化、明确保留周期、多副本和容量规划。
 
 #### 5.4.7 创建 Tempo values
 
@@ -1278,7 +1280,7 @@ echo "${TRACE_ID}"
 打开 Tempo 端口：
 
 ```bash
-kubectl -n observability port-forward service/tempo 3200:3100
+kubectl -n observability port-forward service/tempo 3200:3200
 ```
 
 如果已经拿到 Trace ID：
@@ -1413,7 +1415,7 @@ curl -G 'http://127.0.0.1:3100/loki/api/v1/query_range' \
 **第四层：Tempo 有 Trace**
 
 ```bash
-kubectl -n observability port-forward service/tempo 3200:3100
+kubectl -n observability port-forward service/tempo 3200:3200
 curl -s "http://127.0.0.1:3200/api/traces/${TRACE_ID}" | head
 ```
 

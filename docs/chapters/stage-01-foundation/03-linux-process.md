@@ -795,6 +795,11 @@ main() {
   pid="$(systemctl show -p MainPID --value "$SERVICE")"
   if [[ "$pid" =~ ^[0-9]+$ && "$pid" -gt 0 ]]; then
     ok "MainPID is valid: $pid"
+    if ps -p "$pid" -o pid,ppid,user,stat,%cpu,%mem,etime,cmd >/dev/null; then
+      ok "process exists for MainPID: $pid"
+    else
+      fail "process not found for MainPID: $pid"
+    fi
   else
     fail "MainPID is invalid: $pid"
   fi
@@ -811,7 +816,7 @@ main() {
     fail "pid file missing: /run/todo-platform/todo-process-demo.pid"
   fi
 
-  if curl -fsS "$URL/healthz" >/dev/null; then
+  if curl --noproxy 127.0.0.1,localhost -fsS "$URL/healthz" >/dev/null; then
     ok "health endpoint ok: $URL/healthz"
   else
     fail "health endpoint failed: $URL/healthz"

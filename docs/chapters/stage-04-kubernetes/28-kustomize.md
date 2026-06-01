@@ -1,4 +1,4 @@
-# 第 28 篇：Kustomize 多环境配置管理 [C]
+﻿# 第 28 篇：Kustomize 多环境配置管理 [C]
 
 第 27 篇把 Todo API 主链路整理成了 Helm 4 Chart。到了阶段四收官篇，我们不再继续复制三套 YAML，也不把每个环境差异都塞进 Helm values，而是学习用 Kustomize 的 base / overlay 模型管理 dev、test、prod 三套环境。
 
@@ -393,11 +393,11 @@ git diff
 
 ```bash
 kubectl version --client --output=yaml
-helm version --short
+helm version
 docker image inspect todo-api:v0.1.0 --format '{{.RepoTags}}'
 ```
 
-如果 `helm version --short` 输出 `helm: command not found` 或 `The term 'helm' is not recognized`，说明 Helm 不在 `PATH` 中，请先回到第 27 篇完成 Helm 4 安装。如果 `todo-api:v0.1.0` 不存在，请回到第 16 篇重新构建镜像，并按第 21 篇方式加载到 kind：
+如果 `helm version` 输出 `helm: command not found` 或 `The term 'helm' is not recognized`，说明 Helm 不在 `PATH` 中，请先回到第 27 篇完成 Helm 4 安装。如果 `todo-api:v0.1.0` 不存在，请回到第 16 篇重新构建镜像，并按第 21 篇方式加载到 kind：
 
 ```bash
 kind load docker-image todo-api:v0.1.0 --name todo-k8s

@@ -222,10 +222,15 @@ CMD ["serve"]
 /app/todo-api serve
 ```
 
-如果你覆盖 `CMD`，同一个镜像还能执行运维命令：
+如果你覆盖 `CMD`，同一个镜像还能执行运维命令。`config-check` 会校验 JWT Secret 和认证用户，因此需要显式传入本地实验环境变量：
 
 ```bash
-docker run --rm todo-api:v0.1.0 config-check
+HASH=$(docker run --rm todo-api:v0.1.0 hash-password "change-me-123")
+docker run --rm \
+  -e TODO_ENV=dev \
+  -e TODO_JWT_SECRET=0123456789abcdef0123456789abcdef \
+  -e "TODO_AUTH_USERS=admin=${HASH}" \
+  todo-api:v0.1.0 config-check
 docker run --rm todo-api:v0.1.0 hash-password "change-me-123"
 docker run --rm todo-api:v0.1.0 migrate
 docker run --rm todo-api:v0.1.0 openapi
@@ -352,6 +357,13 @@ CGO_ENABLED=0 GOOS=linux go build
 构建时：go mod download -> go test ./... -> go build
 运行时：/app/todo-api serve
 运维时：/app/todo-api config-check / migrate / openapi / hash-password
+```
+
+如果企业网络无法拉取 `docker/dockerfile:1.7` frontend，可以删掉 `# syntax=docker/dockerfile:1.7`，并把 `RUN --mount=type=cache` 改成普通 `RUN`，例如：
+
+```dockerfile
+RUN go mod download
+RUN go test ./...
 ```
 
 ### 4.5 镜像安全检查链路
@@ -551,6 +563,7 @@ redis-data/
 # syntax=docker/dockerfile:1.7
 
 ARG GO_VERSION=1.26
+ARG GOPROXY=https://goproxy.cn,direct
 ARG RUNTIME_IMAGE=registry.cn-guangzhou.aliyuncs.com/yleoer/static-debian12:nonroot
 
 FROM golang:${GO_VERSION}-bookworm AS builder
@@ -558,6 +571,10 @@ FROM golang:${GO_VERSION}-bookworm AS builder
 ARG VERSION=dev
 ARG COMMIT=unknown
 ARG BUILD_DATE=unknown
+ARG GOPROXY=https://goproxy.cn,direct
+
+ENV GOPROXY=${GOPROXY} \
+    GOSUMDB=off
 
 WORKDIR /src
 
@@ -613,6 +630,7 @@ CMD ["serve"]
 这份 Dockerfile 有几个关键设计：
 
 - `api/Dockerfile` 使用项目根目录作为构建上下文，所以能 `COPY go.mod go.sum ./`。
+- `GOPROXY=https://goproxy.cn,direct` 和 `GOSUMDB=off` 用于保证 Ubuntu 24.04 教学环境中的 Go module 下载可复现。如果团队已有企业内部 Go module 代理，可以把 `GOPROXY` 构建参数替换为内部可信源。
 - 构建阶段执行 `go test ./...`，避免测试失败的代码进入镜像。它会执行项目全部测试；依赖 PostgreSQL 或 Redis 的集成测试应通过环境变量门控自动跳过（见第 12/13 篇）。如果构建时测试卡住或失败，先检查对应测试是否正确跳过外部依赖。
 - `CGO_ENABLED=0` 生成适合 distroless static 镜像的二进制。
 - 运行阶段只复制二进制、`configs/` 和 `api/migrations/`。
@@ -650,6 +668,7 @@ CMD ["serve"]
     ```bash
     docker build \
       -f api/Dockerfile \
+      --build-arg GOPROXY=https://goproxy.cn,direct \
       --build-arg VERSION="$VERSION" \
       --build-arg COMMIT="$COMMIT" \
       --build-arg BUILD_DATE="$BUILD_DATE" \
@@ -663,6 +682,7 @@ CMD ["serve"]
     ```powershell
     docker build `
       -f api/Dockerfile `
+      --build-arg GOPROXY=https://goproxy.cn,direct `
       --build-arg VERSION="$VERSION" `
       --build-arg COMMIT="$COMMIT" `
       --build-arg BUILD_DATE="$BUILD_DATE" `
@@ -735,7 +755,7 @@ docker image inspect todo-api:v0.1.0 --format '{{json .Config.Labels}}'
       todo-api:v0.1.0 config-check
     ```
 
-下面复用第 15 篇的三容器网络验证流程。先清理旧容器，再创建网络和数据卷：
+下面复用第 15 篇的三容器网络验证流程。先清理旧容器，再创建网络和数据卷。连续验证多阶段时，如果前序阶段仍在使用 `todo-postgres` 或 `todo-redis`，不要执行这组清理命令；请改用独立容器名和网络名，或先记录并备份当前容器状态。
 
 === "Linux / macOS / WSL2"
 
@@ -1151,7 +1171,7 @@ docker pull localhost:5000/todo-api:v0.1.0
 
 ### 5.8 清理步骤
 
-停止并删除实验容器：
+停止并删除实验容器。连续验证多阶段时，先确认这些容器不是前序阶段仍需保留的数据库或缓存环境：
 
 ```bash
 docker rm -f todo-api todo-postgres todo-redis todo-registry

@@ -650,7 +650,19 @@ tools:
 EOF
 ```
 
-用 kubectl 客户端检查 Kubernetes YAML 语法：
+用 kubectl 客户端检查 Kubernetes YAML 语法。注意：`kubectl apply --dry-run=client --validate=false` 仍可能访问 API discovery；如果当前机器没有可用 kubeconfig，它可能连接 `localhost:8080` 并失败。执行前先确认已有 Kubernetes context，或者创建一个临时 kind 集群：
+
+```bash
+kubectl config current-context
+```
+
+如果没有可用 context，本地实验可以先创建课程临时集群：
+
+```bash
+kind create cluster --name todo-dev --image kindest/node:v1.35.0
+```
+
+然后执行 dry-run：
 
 ```bash
 kubectl apply --dry-run=client --validate=false -f docs/examples/multi-doc.yaml
@@ -663,7 +675,7 @@ namespace/todo-dev created (dry run)
 configmap/todo-env created (dry run)
 ```
 
-这里加上 `--validate=false`，是为了避免 kubectl 在还没有集群时去访问 OpenAPI Schema。它只能做基础客户端检查，不能替代真正的集群验证。后面创建 kind 集群后，还要再执行一次真实 `kubectl apply`。
+这里加上 `--validate=false`，是为了跳过 OpenAPI Schema 校验；但在部分 kubectl 版本中，它仍会访问 API discovery。因此它不是离线 YAML 检查工具，只能在已有 context 的前提下做基础客户端 dry-run，不能替代真正的集群验证。后面创建 kind 集群后，还要再执行一次真实 `kubectl apply`。
 
 ### 5.8 编写环境记录和 README
 

@@ -481,7 +481,7 @@ spec:
       serviceAccountName: traefik
       containers:
         - name: traefik
-          image: registry.cn-guangzhou.aliyuncs.com/yleoer/registry.cn-guangzhou.aliyuncs.com/yleoer/traefik:v3.6.17
+          image: registry.cn-guangzhou.aliyuncs.com/yleoer/traefik:v3.6.17
           imagePullPolicy: IfNotPresent
           args:
             - --entrypoints.web.address=:80
@@ -805,8 +805,18 @@ kubectl -n traefik logs deployment/traefik --tail=80
 - `todo-api` Ingress 的 `ingressClassName` 是 `traefik`。
 - `todo-api-local-tls` Secret 存在于 `todo-workloads` Namespace。
 - `EndpointSlice` 中能看到 Ready 的 Todo API Pod 地址。
-- `curl -k --resolve todo.localhost:18443:127.0.0.1 https://todo.localhost:18443/readyz` 返回 `200`。
-- `curl -k --resolve todo-gateway.localhost:18443:127.0.0.1 https://todo-gateway.localhost:18443/readyz` 返回 `200`。
+- Ingress 和 Gateway API 是两条独立入口链路，不能把一条通过等同于另一条通过。
+- `curl -k --resolve todo.localhost:18443:127.0.0.1 https://todo.localhost:18443/readyz` 返回 `200`，才表示 Ingress 链路通过。
+- `curl -k --resolve todo-gateway.localhost:18443:127.0.0.1 https://todo-gateway.localhost:18443/readyz` 返回 `200`，才表示 Gateway API 链路通过。
+
+如果 Gateway API 返回 `200` 但 Ingress 返回 `404`，按独立问题排查 IngressClass、Traefik provider、Host 匹配和 TLS entryPoint：
+
+```bash
+curl -k -i --resolve todo.localhost:18443:127.0.0.1 https://todo.localhost:18443/readyz
+curl -k -i --resolve todo-gateway.localhost:18443:127.0.0.1 https://todo-gateway.localhost:18443/readyz
+kubectl -n todo-workloads describe ingress todo-api
+kubectl -n traefik logs deployment/traefik --tail=120
+```
 
 ### 5.8 清理步骤
 

@@ -320,7 +320,7 @@ argocd app get todo-platform-dev
 ```bash
 kubectl version --client
 kind version
-helm version --short
+helm version
 argocd version --client
 k9s version
 stern --version
@@ -462,10 +462,20 @@ metadata:
     app.kubernetes.io/name: todo-pvc-demo
     app.kubernetes.io/part-of: todo-platform
 spec:
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    seccompProfile:
+      type: RuntimeDefault
   containers:
     - name: writer
       image: registry.cn-guangzhou.aliyuncs.com/yleoer/busybox:1.36.1-1
       command: ["sh", "-c", "date >> /data/probe.txt && sleep 3600"]
+      securityContext:
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop:
+            - ALL
       volumeMounts:
         - name: data
           mountPath: /data
@@ -502,6 +512,11 @@ metadata:
 spec:
   # 故意覆盖集群 DNS 配置，让这个 Pod 使用不可达的 DNS 服务器。
   # 这样不依赖 CNI 是否执行 NetworkPolicy，也能稳定复现 DNS 解析失败。
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    seccompProfile:
+      type: RuntimeDefault
   dnsPolicy: None
   dnsConfig:
     nameservers:
@@ -515,6 +530,11 @@ spec:
     - name: dns
       image: registry.cn-guangzhou.aliyuncs.com/yleoer/busybox:1.36.1-1
       command: ["sh", "-c", "sleep 3600"]
+      securityContext:
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop:
+            - ALL
       resources:
         requests:
           cpu: 10m
@@ -543,9 +563,19 @@ metadata:
     app.kubernetes.io/part-of: todo-platform
 spec:
   restartPolicy: Always
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 65532
+    seccompProfile:
+      type: RuntimeDefault
   containers:
     - name: memory-hog
       image: registry.cn-guangzhou.aliyuncs.com/yleoer/agnhost:2.53
+      securityContext:
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop:
+            - ALL
       args:
         - stress
         - --mem-total
