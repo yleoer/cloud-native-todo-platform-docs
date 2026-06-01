@@ -44,16 +44,11 @@
 
 真实企业环境通常会把 Operator 分成开发、预发和生产三套配置。开发环境可以 Watch 一个实验命名空间；预发环境模拟多个租户命名空间；生产环境必须有明确的租户准入标签、资源配额、发布后 smoke test、告警和回滚记录。本篇实验会把这些动作压缩到本地 kind 集群中完成。
 
-### 2.3 课程项目关联
+### 2.3 Todo 平台模拟案例
 
-本篇继续使用第 40 篇的 `<project-root>/operator/kubebuilder/` 和 `<project-root>/operator/helm/todo-operator/`。项目版本线推进到阶段六子版本 `v4.7-operator-production`，它仍属于 `v4.0-operator` 总版本线。
+> Todo Operator 需要进入生产化演练。你需要收敛 RBAC 权限、限制 watch 范围、补充 metrics 和告警、优化性能，并通过 smoke test 验证关键路径。
 
-本篇产出会被后续章节复用：
-
-- 第 42 篇会把生产化后的 Operator 作为 Cloud Native Todo Platform 的最终一键交付入口。
-- 本篇新增的最小权限、Watch 范围、metrics、告警和 smoke test 会成为最终作品集中的“生产可用性证据”。
-- 本篇的事故案例和 checklist 会被第 42 篇整理成面试讲解稿和项目复盘材料。
-
+这个案例用于训练平台工程视角：Operator 自身也是生产组件，它的权限、性能、观测和故障行为都必须被审查。
 ## 3. 核心概念
 
 ### 3.1 Operator 生产化评估矩阵
@@ -78,7 +73,7 @@ RBAC 最小权限不是把权限写得越少越好，而是让权限和 Reconcil
 
 一个可审查的 marker 示例是：
 
-```go
+```go linenums="0"
 // +kubebuilder:rbac:groups=platform.todo.example.com,resources=todoapps,verbs=get;list;watch;update;patch
 // +kubebuilder:rbac:groups=platform.todo.example.com,resources=todoapps/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=platform.todo.example.com,resources=todoapps/finalizers,verbs=update
@@ -207,6 +202,8 @@ flowchart TD
 
 ## 5. 手把手实验：把 Todo Operator 收敛到生产基线
 
+本实验预计耗时 90-120 分钟。首次拉取 kind 节点镜像、cert-manager 镜像或重新构建 Operator 镜像时会更久。
+
 ### 5.1 步骤 1：实验目标
 
 本实验会在第 40 篇基础上完成以下改造：
@@ -237,7 +234,7 @@ flowchart TD
 
 确认当前目录和工具：
 
-```bash
+```bash linenums="0"
 pwd
 go version
 kubectl version --client
@@ -246,7 +243,7 @@ helm version
 
 预期输出类似：
 
-```text
+```text linenums="0"
 <project-root>/operator/kubebuilder
 go version go1.26.x ...
 Client Version: v1.36.x
@@ -257,7 +254,7 @@ version.BuildInfo{Version:"v4.2.x", ...}
 
 本章最终涉及的关键文件如下：
 
-```text
+```text linenums="0"
 operator/
 ├── kubebuilder/
 │   ├── cmd/
@@ -291,7 +288,7 @@ operator/
 
 编辑 `internal/controller/todoapp_controller.go` 中 Reconciler 上方的 RBAC marker，把主资源权限收敛为下面这样：
 
-```go
+```go linenums="0"
 // +kubebuilder:rbac:groups=platform.todo.example.com,resources=todoapps,verbs=get;list;watch;update;patch
 // +kubebuilder:rbac:groups=platform.todo.example.com,resources=todoapps/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=platform.todo.example.com,resources=todoapps/finalizers,verbs=update
@@ -303,14 +300,14 @@ operator/
 
 然后重新生成 RBAC：
 
-```bash
+```bash linenums="0"
 make manifests
 cat config/rbac/role.yaml
 ```
 
 预期能看到 `todoapps` 的 verbs 不再包含 `create` 和 `delete`：
 
-```text
+```text linenums="0"
 resources:
 - todoapps
 verbs:
@@ -336,7 +333,7 @@ verbs:
 
 第 40 篇的 Helm Chart 中 RBAC 以“能跑通”为目标，本篇必须同步收敛 Chart 模板，否则 `make manifests` 生成的权限和 `helm install` 实际安装的权限会不一致。编辑 `../helm/todo-operator/templates/rbac.yaml`，替换为下面的完整模板：
 
-```yaml
+```yaml linenums="0"
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
@@ -413,7 +410,7 @@ Webhook 证书相关的 `Certificate`、`Issuer` 和最终生成的 Secret 由 c
 
 渲染模板确认 `todoapps` 不再包含 `create` 和 `delete`：
 
-```bash
+```bash linenums="0"
 helm template todo-operator ../helm/todo-operator \
   -n todo-operator-system \
   --show-only templates/rbac.yaml | grep -A8 'resources: \["todoapps"\]'
@@ -421,7 +418,7 @@ helm template todo-operator ../helm/todo-operator \
 
 预期输出应包含：
 
-```text
+```text linenums="0"
 resources: ["todoapps"]
 verbs: ["get", "list", "watch", "update", "patch"]
 ```
@@ -432,7 +429,7 @@ verbs: ["get", "list", "watch", "update", "patch"]
 
 编辑 `cmd/main.go`，在原有 import 基础上增加下面这些依赖：
 
-```go
+```go linenums="0"
 import (
 	"strings"
 
@@ -443,7 +440,7 @@ import (
 
 在 `main.go` 中增加两个 helper：
 
-```go
+```go linenums="0"
 func cacheNamespacesFromEnv() map[string]cache.Config {
 	raw := strings.TrimSpace(os.Getenv("WATCH_NAMESPACE"))
 	if raw == "" {
@@ -471,7 +468,7 @@ func labelSelectorFromEnv() (*metav1.LabelSelector, error) {
 
 创建 Manager 时，把 cache 范围和 leader election namespace 接入：
 
-```go
+```go linenums="0"
 watchLabelSelector, err := labelSelectorFromEnv()
 if err != nil {
 	setupLog.Error(err, "unable to parse WATCH_LABEL_SELECTOR")
@@ -496,7 +493,7 @@ mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 
 注册 Reconciler 时，把 label selector 传进去：
 
-```go
+```go linenums="0"
 if err = (&controller.TodoAppReconciler{
 	Client:             mgr.GetClient(),
 	Scheme:             mgr.GetScheme(),
@@ -512,7 +509,7 @@ if err = (&controller.TodoAppReconciler{
 
 改造后的 `main.go` 结构可以按下面顺序自查：
 
-```text
+```text linenums="0"
 import block
 init() 注册 Scheme
 cacheNamespacesFromEnv()
@@ -531,7 +528,7 @@ main()
 
 编辑 `internal/controller/todoapp_controller.go` 的 import，确保包含：
 
-```go
+```go linenums="0"
 import (
 	"context"
 
@@ -549,7 +546,7 @@ import (
 
 给 Reconciler 增加字段：
 
-```go
+```go linenums="0"
 const deploymentOwnerNameKey = ".metadata.controller"
 
 type TodoAppReconciler struct {
@@ -576,7 +573,7 @@ func (r *TodoAppReconciler) shouldManage(todo *platformv1alpha1.TodoApp) (bool, 
 
 在 `Reconcile` 读取到 `TodoApp` 后，立即增加一次内部防御：
 
-```go
+```go linenums="0"
 managed, err := r.shouldManage(&todo)
 if err != nil {
 	return ctrl.Result{}, err
@@ -590,7 +587,7 @@ if !managed {
 
 替换 `SetupWithManager`：
 
-```go
+```go linenums="0"
 func (r *TodoAppReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	if err := mgr.GetFieldIndexer().IndexField(
 		context.Background(),
@@ -635,7 +632,7 @@ func (r *TodoAppReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 如果你的文件中还没有引用 `platformv1alpha1`，需要保留第 39 篇已有的导入：
 
-```go
+```go linenums="0"
 platformv1alpha1 "github.com/example/todo-operator/api/v1alpha1"
 ```
 
@@ -643,7 +640,7 @@ platformv1alpha1 "github.com/example/todo-operator/api/v1alpha1"
 
 完成 §5.6 和 §5.7 的代码修改后，先做一次编译检查，再继续写 Helm 模板：
 
-```bash
+```bash linenums="0"
 go build ./...
 ```
 
@@ -653,7 +650,7 @@ go build ./...
 
 编辑 `../helm/todo-operator/values.yaml`，把第 40 篇的 values 扩展为下面的生产基线：
 
-```yaml
+```yaml linenums="0"
 image:
   repository: todo-operator
   tag: v0.4.0-test
@@ -732,7 +729,7 @@ metrics:
 
 更新 `../helm/todo-operator/templates/deployment.yaml` 中的 Pod spec 关键部分：
 
-```yaml
+```yaml linenums="0"
 spec:
   replicas: {{ .Values.replicaCount }}
   selector:
@@ -803,7 +800,7 @@ spec:
 
 创建 `../helm/todo-operator/templates/pdb.yaml`：
 
-```yaml
+```yaml linenums="0"
 {{- if .Values.podDisruptionBudget.enabled }}
 apiVersion: policy/v1
 kind: PodDisruptionBudget
@@ -821,7 +818,7 @@ spec:
 
 创建 `../helm/todo-operator/templates/metrics-service.yaml`：
 
-```yaml
+```yaml linenums="0"
 {{- if .Values.metrics.service.enabled }}
 apiVersion: v1
 kind: Service
@@ -849,14 +846,14 @@ spec:
 
 更新 `../helm/todo-operator/templates/webhooks.yaml`，在两个 Webhook 的 `webhooks` 条目中加入：
 
-```yaml
+```yaml linenums="0"
     namespaceSelector:
       {{- toYaml .Values.webhook.namespaceSelector | nindent 6 }}
 ```
 
 最终结构应类似：
 
-```yaml
+```yaml linenums="0"
 webhooks:
   - name: vtodoapp-v1alpha1.kb.io
     admissionReviewVersions: ["v1"]
@@ -873,7 +870,7 @@ webhooks:
 
 创建 `../helm/todo-operator/templates/servicemonitor.yaml`：
 
-```yaml
+```yaml linenums="0"
 {{- if .Values.metrics.serviceMonitor.enabled }}
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
@@ -900,7 +897,7 @@ spec:
 
 创建 `../helm/todo-operator/templates/prometheusrule.yaml`：
 
-```yaml
+```yaml linenums="0"
 {{- if .Values.metrics.prometheusRule.enabled }}
 apiVersion: monitoring.coreos.com/v1
 kind: PrometheusRule
@@ -935,7 +932,7 @@ spec:
 
 `controller="todoapp"` 是 controller-runtime 根据 Controller 注册名称生成的常见标签值，但不同项目脚手架或显式命名可能不同。发布前先用下面的命令确认实际标签，再把 PrometheusRule 中的 label 写死：
 
-```bash
+```bash linenums="0"
 kubectl port-forward -n todo-operator-system svc/todo-operator-metrics 18080:8080 >/tmp/todo-operator-port-forward.log 2>&1 &
 curl -s http://127.0.0.1:18080/metrics | grep -E "controller_runtime_reconcile_(total|errors_total|time_seconds)"
 ```
@@ -944,7 +941,7 @@ curl -s http://127.0.0.1:18080/metrics | grep -E "controller_runtime_reconcile_(
 
 如果你的集群没有 Prometheus Operator CRD，`helm template` 可以渲染这些资源，但 `kubectl apply` 会因为找不到 `ServiceMonitor` 或 `PrometheusRule` kind 而失败。学习环境可以先设置：
 
-```bash
+```bash linenums="0"
 helm template todo-operator ../helm/todo-operator \
   --set metrics.serviceMonitor.enabled=false \
   --set metrics.prometheusRule.enabled=false
@@ -956,7 +953,7 @@ helm template todo-operator ../helm/todo-operator \
 
 创建两个租户命名空间：
 
-```bash
+```bash linenums="0"
 kubectl create namespace todo-team-a --dry-run=client -o yaml | kubectl apply -f -
 kubectl create namespace todo-team-b --dry-run=client -o yaml | kubectl apply -f -
 kubectl label namespace todo-team-a platform.todo.example.com/admission=enabled --overwrite
@@ -965,7 +962,7 @@ kubectl label namespace todo-team-b platform.todo.example.com/admission=enabled 
 
 如果你在纯 PowerShell 中对管道语义不熟，也可以使用下面的直接命令；遇到 AlreadyExists 时说明命名空间已经存在，可以继续执行 label 命令：
 
-```powershell
+```powershell linenums="0"
 kubectl create namespace todo-team-a
 kubectl create namespace todo-team-b
 kubectl label namespace todo-team-a platform.todo.example.com/admission=enabled --overwrite
@@ -974,7 +971,7 @@ kubectl label namespace todo-team-b platform.todo.example.com/admission=enabled 
 
 为 `todo-team-a` 创建一个教学用配额文件 `/tmp/todo-team-a-quota.yaml`：
 
-```yaml
+```yaml linenums="0"
 apiVersion: v1
 kind: ResourceQuota
 metadata:
@@ -1007,14 +1004,14 @@ spec:
 
 应用配额：
 
-```bash
+```bash linenums="0"
 kubectl apply -f /tmp/todo-team-a-quota.yaml
 kubectl describe resourcequota todoapp-quota -n todo-team-a
 ```
 
 预期输出中能看到自定义资源计数：
 
-```text
+```text linenums="0"
 Resource                    Used  Hard
 count/todoapps.platform...  0     20
 pods                        0     50
@@ -1027,9 +1024,13 @@ Kubernetes 对自定义资源配额使用 `count/<resource>.<group>` 形式；�
 
 发布后 smoke test 要回答三个问题：Operator ServiceAccount 是否被正确授权、被接管的 `TodoApp` 是否能完整调谐、未接管对象是否不会被误处理。创建 `test/e2e/run-production-smoke.sh`：
 
-```bash
+```bash linenums="0"
 mkdir -p test/e2e
-cat > test/e2e/run-production-smoke.sh <<'EOF'
+```
+
+将下面内容写入 `test/e2e/run-production-smoke.sh`：
+
+```bash title="test/e2e/run-production-smoke.sh"
 #!/usr/bin/env bash
 set -euo pipefail
 
@@ -1162,7 +1163,11 @@ kubectl delete -f "${managed_file}"
 kubectl wait --for=delete "todoapp/${MANAGED_NAME}" -n "${TENANT_NAMESPACE}" --timeout=120s
 
 echo "production smoke test passed"
-EOF
+```
+
+继续执行：
+
+```bash linenums="0"
 chmod +x test/e2e/run-production-smoke.sh
 ```
 
@@ -1172,7 +1177,7 @@ chmod +x test/e2e/run-production-smoke.sh
 
 先运行代码生成和测试：
 
-```bash
+```bash linenums="0"
 make generate
 make manifests
 go test ./...
@@ -1180,7 +1185,7 @@ go test ./...
 
 确认 cert-manager 已安装。第 40 篇如果保留了 kind 集群，这一步通常已经满足；如果你重建了集群，需要重新安装：
 
-```bash
+```bash linenums="0"
 if ! kubectl get deployment -n cert-manager cert-manager >/dev/null 2>&1; then
   curl -L -o cert-manager.yaml https://github.com/cert-manager/cert-manager/releases/download/v1.20.0/cert-manager.yaml
   sed -i 's|quay.io/jetstack/|registry.cn-guangzhou.aliyuncs.com/yleoer/|g' cert-manager.yaml
@@ -1191,7 +1196,7 @@ fi
 
 渲染 Helm Chart。若当前集群没有 Prometheus Operator CRD，先关闭监控 CR：
 
-```bash
+```bash linenums="0"
 helm lint ../helm/todo-operator
 helm template todo-operator ../helm/todo-operator \
   -n todo-operator-system \
@@ -1203,13 +1208,13 @@ helm template todo-operator ../helm/todo-operator \
 
 预期输出：
 
-```text
+```text linenums="0"
 1 chart(s) linted, 0 chart(s) failed
 ```
 
 构建并加载镜像：
 
-```bash
+```bash linenums="0"
 export OPERATOR_IMG=todo-operator:v0.4.0-test
 docker build -t "${OPERATOR_IMG}" .
 kind load docker-image "${OPERATOR_IMG}" --name "${KIND_CLUSTER_NAME:-todo-operator-e2e}"
@@ -1217,7 +1222,7 @@ kind load docker-image "${OPERATOR_IMG}" --name "${KIND_CLUSTER_NAME:-todo-opera
 
 安装或升级 Operator：
 
-```bash
+```bash linenums="0"
 helm upgrade --install todo-operator ../helm/todo-operator \
   -n todo-operator-system \
   --create-namespace \
@@ -1229,14 +1234,14 @@ helm upgrade --install todo-operator ../helm/todo-operator \
 
 等待 Controller Manager Ready：
 
-```bash
+```bash linenums="0"
 kubectl rollout status deployment/todo-operator-controller-manager -n todo-operator-system --timeout=180s
 kubectl get pods -n todo-operator-system
 ```
 
 预期输出类似：
 
-```text
+```text linenums="0"
 deployment "todo-operator-controller-manager" successfully rolled out
 NAME                                                READY   STATUS    RESTARTS   AGE
 todo-operator-controller-manager-...                1/1     Running   0          40s
@@ -1245,7 +1250,7 @@ todo-operator-controller-manager-...                1/1     Running   0         
 
 验证 RBAC 权限：
 
-```bash
+```bash linenums="0"
 SA=system:serviceaccount:todo-operator-system:todo-operator
 kubectl auth can-i list todoapps.platform.todo.example.com --as="${SA}" -n todo-team-a
 kubectl auth can-i delete todoapps.platform.todo.example.com --as="${SA}" -n todo-team-a
@@ -1256,7 +1261,7 @@ kubectl auth can-i get secrets --as="${SA}" -n todo-team-a
 
 预期输出：
 
-```text
+```text linenums="0"
 yes
 no
 yes
@@ -1266,8 +1271,9 @@ no
 
 创建被接管的 `TodoApp`：
 
-```bash
-cat >/tmp/todoapp-production-smoke.yaml <<'YAML'
+将下面内容写入 `/tmp/todoapp-production-smoke.yaml`：
+
+```yaml title="/tmp/todoapp-production-smoke.yaml"
 apiVersion: platform.todo.example.com/v1alpha1
 kind: TodoApp
 metadata:
@@ -1279,8 +1285,11 @@ spec:
   image: registry.cn-guangzhou.aliyuncs.com/yleoer/hello:plain-text
   replicas: 2
   port: 80
-YAML
+```
 
+继续执行：
+
+```bash linenums="0"
 kubectl apply -f /tmp/todoapp-production-smoke.yaml
 kubectl rollout status deployment/todo-production-smoke -n todo-team-a --timeout=180s
 kubectl get todoapp todo-production-smoke -n todo-team-a -o yaml
@@ -1295,8 +1304,9 @@ kubectl get todoapp todo-production-smoke -n todo-team-a -o yaml
 
 再创建一个未打接管标签的对象：
 
-```bash
-cat >/tmp/todoapp-unmanaged.yaml <<'YAML'
+将下面内容写入 `/tmp/todoapp-unmanaged.yaml`：
+
+```yaml title="/tmp/todoapp-unmanaged.yaml"
 apiVersion: platform.todo.example.com/v1alpha1
 kind: TodoApp
 metadata:
@@ -1306,8 +1316,11 @@ spec:
   image: registry.cn-guangzhou.aliyuncs.com/yleoer/hello:plain-text
   replicas: 1
   port: 80
-YAML
+```
 
+继续执行：
+
+```bash linenums="0"
 kubectl apply -f /tmp/todoapp-unmanaged.yaml
 sleep 10
 kubectl get deployment todo-unmanaged -n todo-team-a
@@ -1315,7 +1328,7 @@ kubectl get deployment todo-unmanaged -n todo-team-a
 
 预期输出：
 
-```text
+```text linenums="0"
 Error from server (NotFound): deployments.apps "todo-unmanaged" not found
 ```
 
@@ -1323,14 +1336,14 @@ Error from server (NotFound): deployments.apps "todo-unmanaged" not found
 
 最后检查 metrics endpoint：
 
-```bash
+```bash linenums="0"
 kubectl port-forward -n todo-operator-system svc/todo-operator-metrics 8080:8080 >/tmp/todo-operator-port-forward.log 2>&1 &
 curl -s http://127.0.0.1:8080/metrics | grep -E "controller_runtime_reconcile_(total|errors_total|time_seconds)"
 ```
 
 预期输出包含：
 
-```text
+```text linenums="0"
 controller_runtime_reconcile_total{controller="todoapp",result="success"} ...
 controller_runtime_reconcile_errors_total{controller="todoapp"} ...
 controller_runtime_reconcile_time_seconds_bucket{controller="todoapp",le="..."} ...
@@ -1338,13 +1351,13 @@ controller_runtime_reconcile_time_seconds_bucket{controller="todoapp",le="..."} 
 
 上面这些命令也可以直接通过脚本执行：
 
-```bash
+```bash linenums="0"
 test/e2e/run-production-smoke.sh
 ```
 
 预期输出：
 
-```text
+```text linenums="0"
 deployment "todo-operator-controller-manager" successfully rolled out
 ...
 production smoke test passed
@@ -1356,33 +1369,31 @@ production smoke test passed
 
 删除测试对象：
 
-```bash
+```bash linenums="0"
 kubectl delete -f /tmp/todoapp-production-smoke.yaml --ignore-not-found
 kubectl delete -f /tmp/todoapp-unmanaged.yaml --ignore-not-found
 ```
 
 卸载 Operator：
 
-```bash
+```bash linenums="0"
 helm uninstall todo-operator -n todo-operator-system
 kubectl delete namespace todo-operator-system --ignore-not-found
 ```
 
 删除租户命名空间和临时文件：
 
-```bash
+```bash linenums="0"
 kubectl delete namespace todo-team-a todo-team-b --ignore-not-found
 rm -f /tmp/todo-team-a-quota.yaml /tmp/todoapp-production-smoke.yaml /tmp/todoapp-unmanaged.yaml /tmp/todo-operator-production.yaml
 ```
 
 如果你保留 kind 集群继续调试，请至少确认没有残留 `TodoApp`、Deployment 和 Helm release：
 
-```bash
+```bash linenums="0"
 kubectl get todoapp -A
 helm list -A | grep todo-operator
 ```
-
-本实验预计耗时 90-120 分钟。首次拉取 kind 节点镜像、cert-manager 镜像或重新构建 Operator 镜像时会更久。
 
 ## 6. 常见错误与排障
 
@@ -1390,14 +1401,14 @@ helm list -A | grep todo-operator
 
 - **现象**：
 
-  ```text
+  ```text linenums="0"
   deployments.apps is forbidden: User "system:serviceaccount:todo-operator-system:todo-operator" cannot create resource "deployments" in API group "apps" in the namespace "todo-team-a"
   ```
 
 - **原因**：RBAC marker 或 Helm RBAC 模板没有同步，Controller 实际行为需要的 verb 没有授权。
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   kubectl auth can-i create deployments.apps --as=system:serviceaccount:todo-operator-system:todo-operator -n todo-team-a
   kubectl get role todo-operator-manager-role -n todo-team-a -o yaml
   kubectl get rolebinding todo-operator-manager-rolebinding -n todo-team-a -o yaml
@@ -1412,7 +1423,7 @@ helm list -A | grep todo-operator
 
 - **现象**：
 
-  ```text
+  ```text linenums="0"
   todoapp.platform.todo.example.com/todo-production-smoke created
   Error from server (NotFound): deployments.apps "todo-production-smoke" not found
   ```
@@ -1420,7 +1431,7 @@ helm list -A | grep todo-operator
 - **原因**：`TodoApp` 创建在不属于 `WATCH_NAMESPACE` 的命名空间，或者 `WATCH_NAMESPACE` 中有空格、拼写错误。
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   kubectl get deployment todo-operator-controller-manager -n todo-operator-system -o jsonpath='{.spec.template.spec.containers[0].env}{"\n"}'
   kubectl get todoapp -A
   ```
@@ -1434,7 +1445,7 @@ helm list -A | grep todo-operator
 
 - **现象**：
 
-  ```text
+  ```text linenums="0"
   failed calling webhook "vtodoapp-v1alpha1.kb.io": no endpoints available for service
   ```
 
@@ -1443,7 +1454,7 @@ helm list -A | grep todo-operator
 - **原因**：`namespaceSelector` 标签配置与预期不一致。带标签的 namespace 会触发 Webhook；未带标签的 namespace 会跳过 Webhook。
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   kubectl get namespace --show-labels | grep todo-team
   kubectl get validatingwebhookconfiguration todo-operator-validating-webhook-configuration -o yaml | grep -A6 namespaceSelector
   kubectl get endpoints -n todo-operator-system
@@ -1458,14 +1469,14 @@ helm list -A | grep todo-operator
 
 - **现象**：
 
-  ```text
+  ```text linenums="0"
   no matches for kind "PrometheusRule" in version "monitoring.coreos.com/v1"
   ```
 
 - **原因**：当前集群没有安装 Prometheus Operator CRD，但 Helm Chart 渲染了 `ServiceMonitor` 或 `PrometheusRule`。
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   kubectl api-resources | grep monitoring.coreos.com
   helm template todo-operator ../helm/todo-operator --show-only templates/prometheusrule.yaml
   ```
@@ -1479,14 +1490,14 @@ helm list -A | grep todo-operator
 
 - **现象**：
 
-  ```text
+  ```text linenums="0"
   repeated Events: DeploymentUpdated from two different controller-manager Pods
   ```
 
 - **原因**：多副本部署时没有开启 leader election，或者不同版本使用了不同的 leader election ID/namespace，导致多个副本同时认为自己是 leader。
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   kubectl get leases -n todo-operator-system
   kubectl logs -n todo-operator-system deploy/todo-operator-controller-manager | grep -i leader
   helm get values todo-operator -n todo-operator-system
@@ -1513,97 +1524,13 @@ helm list -A | grep todo-operator
 
 **事故案例：RBAC 从 ClusterRole 收敛到 Role 后漏绑租户命名空间。** 某平台团队为了最小权限，把 Operator 从全局 `ClusterRoleBinding` 改成每个租户 namespace 一个 `RoleBinding`。变更在 `todo-team-a` 验证通过后直接推广，但 `todo-team-b` 的 RoleBinding 没有随租户清单同步创建，结果业务方提交的 `TodoApp` 一直处于 Pending，Controller 日志反复出现 forbidden，GitOps 却只显示 CR 已经 apply 成功。复盘结论是：RBAC 收敛不能只看模板 diff，必须把“租户 namespace 列表、ServiceAccount 名称、RoleBinding 生成结果、`kubectl auth can-i` 输出、smoke test”作为同一张发布检查表。这个案例也解释了为什么本篇强调 Watch 范围、RBAC、Helm values 和发布后验证必须一起变更。
 
-## 8. 本章小项目
+## 8. 练习题与面试题
 
-本章小项目是完成 `<project-root>/operator/kubebuilder/` 和 `<project-root>/operator/helm/todo-operator/` 的生产基线改造。
+本章练习题和面试题已拆分到独立页面，完成正文学习后再进入题库练习与复盘。
 
-你需要交付：
+[查看本章练习题与面试题](../../questions/stage-06-platform-operator/41-operator-production.md)
 
-- 收敛后的 RBAC marker 和生成的 `config/rbac/role.yaml`。
-- 支持 `WATCH_NAMESPACE` 和 `WATCH_LABEL_SELECTOR` 的 `cmd/main.go`。
-- 支持 predicate 和 Deployment owner index 的 `TodoAppReconciler`。
-- 增强后的 Helm Chart：多副本、leader election、资源限制、安全上下文、PDB、metrics Service、ServiceMonitor、PrometheusRule 和 Webhook namespace selector。
-- 租户命名空间配额样例和发布后 smoke test 脚本。
-
-验收标准：
-
-| 验收项 | 判断方式 |
-|---|---|
-| RBAC 最小权限 | `delete todoapps` 返回 `no`，目标 namespace 创建 Deployment 返回 `yes`，`default` namespace 创建 Deployment 返回 `no` |
-| Watch 范围 | 目标 namespace 中带标签 `TodoApp` 被调谐，未带标签对象不创建 Deployment |
-| 多副本可用 | `replicaCount=2` 时只产生一个 leader，两个 Pod Ready |
-| 资源与安全 | Deployment 中存在 requests/limits、非 root、只读 rootfs 和 drop capabilities |
-| Webhook 范围 | 只有带 admission 标签的 namespace 触发 Webhook |
-| Metrics | `/metrics` 暴露 controller-runtime reconcile 指标 |
-| 告警资源 | 有 Prometheus Operator CRD 时 `ServiceMonitor` 和 `PrometheusRule` 可 apply |
-| Smoke test | 创建、Ready、扩缩容、删除和 finalizer 清理均通过 |
-
-项目完成后，版本线可以标记为 `v4.7-operator-production`。
-
-## 9. 练习题
-
-### 基础题
-
-1. 为什么 RBAC 最小权限不能只靠“删除看起来多余的 verb”完成？还需要哪些验证？
-2. `WATCH_NAMESPACE`、label selector 和 Webhook `namespaceSelector` 分别限制的是哪一段流程？
-3. controller-runtime cache 默认行为对大规模集群有什么风险？为什么限制 cache 范围通常比直接提高并发更重要？
-4. Conditions、Events、日志和 metrics 分别适合回答什么排障问题？
-5. 为什么 `replicaCount=2` 时必须开启 leader election？
-
-### 实操题
-
-1. 把 `watch.namespaces` 从 `todo-team-a,todo-team-b` 改为只包含 `todo-team-a`，在 `todo-team-b` 创建带接管标签的 `TodoApp`。验收标准：`TodoApp` 被创建，但不会生成 Deployment。
-2. 给 Helm Chart 增加 `manager.maxConcurrentReconciles` 值，并在 `SetupWithManager` 中接入 controller options。验收标准：`helm template` 能看到参数，Controller 启动日志能确认并发配置。
-3. 先执行 `curl -s http://127.0.0.1:8080/metrics | grep workqueue` 确认实际 workqueue 指标，再增加一个 PrometheusRule：当 TodoApp 队列深度持续 10 分钟大于 100 时告警。验收标准：`helm template --show-only templates/prometheusrule.yaml` 能渲染出新规则。
-
-### 思考题
-
-1. 如果安全团队要求 Operator 不能使用 ClusterRole，只允许每个租户 namespace 一个 RoleBinding，你会如何调整 Helm Chart 和发布流程？
-2. 如果某次升级后 `TodoApp` Reconcile 错误率升高，但业务 Pod 仍然 Running，你会先回滚、先静默告警还是先排查？请说明决策依据。
-
-## 10. 面试题
-
-### 面试题 1：如何判断一个 Operator 是否具备生产可用性？
-
-**一句话结论**：要从权限、隔离、性能、可观测性和运维动作五个维度判断，而不是只看能否安装成功。
-
-**展开解释**：生产 Operator 应该有最小 RBAC、明确 Watch 范围、资源限制、安全上下文、leader election、发布后 smoke test、metrics、日志、Events、Conditions 和回滚手册。它还要证明 CRD、Webhook、Controller 和 Helm Chart 的变更能被测试和审查。
-
-**深入追问**：如果只能先补一个维度，优先补什么？通常先补权限和发布后 smoke test，因为它们分别限制风险上限和验证核心路径是否可用。
-
-### 面试题 2：Predicate、Index 和 Cache 范围有什么区别？
-
-**一句话结论**：Cache 范围决定同步哪些对象，Predicate 决定哪些事件入队，Index 决定如何高效查找关联对象。
-
-**展开解释**：限制 cache namespace 可以减少 List-Watch 对象数量；predicate 可以过滤未被接管的对象或无意义更新；field index 可以避免按标签或 owner 查找子资源时全量扫描。三者可以叠加，但不能互相替代。
-
-**深入追问**：为什么不直接提高 `MaxConcurrentReconciles`？并发只能加快处理已经进入队列的请求，不能减少无关对象同步、无效事件入队或低效 List 的成本。
-
-### 面试题 3：Operator 为什么需要 leader election？
-
-**一句话结论**：多副本 Controller Manager 需要 leader election 来保证同一时刻只有一个副本执行调谐逻辑。
-
-**展开解释**：如果两个副本同时 Reconcile 同一个对象，可能重复写 status、重复记录 Event，或对外部资源执行重复操作。leader election 用 Lease 选出一个活跃副本，其他副本作为热备。当前 leader 失效后，备副本再接管。
-
-**深入追问**：leader election 是否提升吞吐？通常不是。它主要提升可用性，不是让同一个 Controller 并行处理更多对象。吞吐需要结合队列、并发、cache、外部 API 限流和幂等设计一起评估。
-
-### 面试题 4：Webhook 的 `namespaceSelector` 有什么生产价值？
-
-**一句话结论**：它能把 Admission 影响范围限制在目标命名空间，避免 Webhook 故障阻断无关租户。
-
-**展开解释**：Webhook 位于 API server 写路径，`failurePolicy=Fail` 时服务不可用会导致匹配对象创建或更新失败。通过 `namespaceSelector`，平台可以只让带准入标签的 namespace 使用该 Webhook，降低故障影响面，也让租户接入流程更明确。
-
-**深入追问**：只配置 `namespaceSelector` 是否足够隔离？不够。它只限制 Admission，还要配合 Watch namespace、RBAC、ResourceQuota、NetworkPolicy 和发布流程。
-
-### 面试题 5：Operator 的监控应该看哪些指标？
-
-**一句话结论**：至少看 Reconcile 错误率、耗时、队列深度、workqueue 重试、Pod 重启和 Webhook 请求失败。
-
-**展开解释**：controller-runtime 默认暴露 Reconcile 和 workqueue 相关指标，可以用于判断 Controller 是否在持续失败或积压。结合 Kubernetes Pod 指标和 API server admission 指标，可以区分是 Controller 调谐问题、资源不足问题还是 Webhook 写路径问题。
-
-**深入追问**：为什么还需要 Events 和 Conditions？metrics 适合聚合趋势，不能告诉业务用户某个 `TodoApp` 为什么不 Ready。Events 和 Conditions 提供对象级解释，是排障闭环的一部分。
-
-## 11. 本章总结
+## 9. 本章总结
 
 本篇把 Todo Operator 从“可测试、可发布、可升级”推进到“具备生产基线”。知识上，你建立了 Operator 生产化评估矩阵，理解了最小 RBAC、租户隔离、Watch 范围、cache 调优、predicate、field index、leader election、metrics、日志、Events 和 Conditions 的职责边界。
 
@@ -1611,7 +1538,7 @@ helm list -A | grep todo-operator
 
 能力上，你已经可以从平台工程视角评估一个 Operator 是否适合进入生产：它能影响哪些对象，失败时影响哪些租户，出问题时谁会收到告警，值班人员如何定位，回滚时有哪些边界。这比“能写 Controller”更接近真实岗位要求。
 
-## 12. 下一章衔接
+## 10. 下一章衔接
 
 下一篇第 42 篇会进入阶段六最终综合集成与能力验收。我们会把第 34-41 篇的 Operator 能力串起来，完成 Cloud Native Todo Platform 的最终交付视图：从 Git Push、CI/CD、GitOps、Helm Chart 到 Todo Operator 一键交付整套 Todo 平台。
 

@@ -10,8 +10,8 @@
 
 - 1.1 课程目标、岗位路线与综合项目介绍
 - 1.2 YAML 语法基础：缩进、多文档、锚点与别名
-- 1.3 Ubuntu 24.04 统一学习环境
-- 1.4 终端、PATH、Docker Engine 与 kubeconfig
+- 1.3 Ubuntu Server 24.04 统一学习环境
+- 1.4 Bash/Zsh、PATH、kind 与 kubeconfig
 - 1.5 安装 Go、Git、Docker、kubectl、kind、Helm
 - 1.6 版本环境锁定与 `check-env.sh` 检查脚本
 
@@ -32,19 +32,6 @@
 - 能初始化 `cloud-native-todo-platform` 仓库，并创建规范的课程项目目录结构。
 - 能阅读和编写基础 Kubernetes YAML 资源文件。
 - 能编写并运行 `scripts/check-env.sh` 脚本，检查工具链版本是否符合课程基线。
-
-本篇结束时，你至少应该能在自己的主力学习终端中成功执行：
-
-```bash
-go version
-git --version
-docker --version
-kubectl version --client
-kind version
-helm version
-```
-
-预期结果不是每个人输出完全相同，而是这些命令都能返回版本信息，且版本符合团队或课程约定。
 
 ## 2. 本章工作场景与真实案例
 
@@ -67,55 +54,14 @@ helm version
 
 后续 Go 后端、平台工程、DevOps、SRE 都会围绕同一个仓库工作。目录边界清楚，脚本可复用，环境版本可检查，协作成本就会低很多。
 
-### 2.3 课程项目关联
+### 2.3 Todo 平台模拟案例
 
-本篇的真实案例是：
+> 你加入一个云原生平台团队，团队准备用 Todo 平台作为内部培训样例。你的第一项任务不是写业务代码，而是在 Ubuntu Server 上准备统一终端、工具链、Docker、kubectl、kind 和 Helm，并留下可复查的环境验证记录。
 
-> 你加入一个云原生平台团队，团队准备从零建设 `Cloud Native Todo Platform`。你需要在本机完成开发环境准备，初始化项目仓库，写出一个环境检查脚本，让后续同学可以用同样方式验证自己的环境。
-
-如果这一步做得扎实，后面学习 Go、Docker、Kubernetes、Helm 和 Operator 时，问题会少很多。反过来，如果第一天环境混乱，后面经常会出现“教程没错，但我机器跑不起来”的挫败感。
-
+这个案例用来说明为什么课程一开始要统一环境、版本、YAML 和基础命令：只有机器状态清楚，后面的本地开发、容器实验和 Kubernetes 实验才有稳定前提。
 ## 3. 核心概念
 
-### 3.1 课程总路线
-
-图 1-1 展示了本课程的主线。
-
-```mermaid
-flowchart LR
-    A["阶段一<br/>基础能力"] --> B["阶段二<br/>Go 后端开发"]
-    B --> C["阶段三<br/>容器化能力"]
-    C --> D["阶段四<br/>Kubernetes 应用交付"]
-    D --> E["阶段五<br/>生产工程能力"]
-    E --> F["阶段六<br/>平台工程与 Operator"]
-
-    A --> P["Cloud Native Todo Platform"]
-    B --> P
-    C --> P
-    D --> P
-    E --> P
-    F --> P
-
-    classDef stage fill:#e0f2fe,stroke:#0284c7,color:#0f172a
-    classDef project fill:#dcfce7,stroke:#16a34a,color:#0f172a
-    class A,B,C,D,E,F stage
-    class P project
-```
-
-这不是一套“学一个工具换一个工具”的课程，而是一个项目逐步生产化的过程。
-
-项目会这样演进：
-
-| 阶段 | 项目形态 |
-|---|---|
-| 阶段一 | 初始化仓库、脚本、目录、基础环境 |
-| 阶段二 | 从 Todo CLI 演进到生产风格 Go Todo API |
-| 阶段三 | 为 Todo API 构建镜像，使用 Compose 编排本地环境 |
-| 阶段四 | 把 Todo Platform 部署到 Kubernetes |
-| 阶段五 | 接入 CI/CD、GitOps、监控、日志和链路追踪 |
-| 阶段六 | 开发 Todo Operator 自动管理整套平台生命周期 |
-
-### 3.2 YAML 是什么
+### 3.1 YAML 是什么
 
 YAML 是一种常见的配置文件格式。Kubernetes YAML、Helm values、GitHub Actions workflow、Argo CD Application 都会大量使用 YAML。
 
@@ -135,7 +81,7 @@ tools:
 
 YAML 最容易出错的是缩进。不要混用 Tab 和空格，课程中统一使用 2 个空格缩进。
 
-### 3.3 多文档、锚点与别名
+### 3.2 多文档、锚点与别名
 
 一个 YAML 文件可以用 `---` 分隔多个文档。Kubernetes 中常把多个资源写在同一个文件里。
 
@@ -169,34 +115,17 @@ tools:
 
 本篇先掌握这些基础即可。后续 Kubernetes、Helm、GitHub Actions、Argo CD 都会继续使用 YAML。
 
-### 3.4 为什么统一使用 Ubuntu 24.04
+### 3.3 YAML 常见错误
 
-云原生技术大量运行在 Linux 之上。为了减少新手在系统差异、包管理器、路径、权限、Shell 行为和 Docker 运行方式上的额外负担，本课程统一使用 **Ubuntu 24.04 LTS** 作为学习和实验环境。
+写 YAML 时，先记住这几条：
 
-统一环境带来三个好处：
+- 同一层级必须使用相同缩进。
+- 冒号后面通常要有空格，例如 `name: todo-dev`。
+- 字符串可以不加引号，但包含 `:`、`#`、`{}` 等特殊字符时建议加引号。
+- 列表项 `-` 后面要有空格，例如 `- go`。
+- 锚点和别名只在同一个 YAML 文档内生效，不能跨 `---` 复用。
 
-- 命令可复制：课程中的 Bash、apt、systemd、Docker Engine 命令都按 Ubuntu 24.04 编写。
-- 问题可复现：同一条命令在不同学员机器上的行为更接近，便于排障和答疑。
-- 更贴近生产：后续容器、Kubernetes 节点、CI runner 和服务器环境都以 Linux 为主。
-
-### 3.5 版本环境锁定
-
-版本环境锁定的目的不是追求“永远最新”，而是让团队成员有共同基线。
-
-本课程新版设计采用以下基线：
-
-| 工具 | 课程基线 | 用途 |
-|---|---|---|
-| Go | 1.26.x | 编写 CLI、API、Controller、Operator |
-| Docker | 29.x | 构建镜像、运行容器、本地开发 |
-| containerd | 2.3.x LTS | 理解 Kubernetes 节点运行时，后续容器运行时章节会使用 |
-| Kubernetes / kubectl | 1.36.x | 学习 K8s API、工作负载、网络、安全 |
-| kind | 0.31+ | 本地 Kubernetes 集群 |
-| Helm | 4.2.x | Kubernetes 应用打包发布 |
-| PostgreSQL | 18.x | 后续 Todo API 持久化 |
-| Redis | 8.2.x | 后续缓存、限流和异步任务 |
-
-工具版本会随时间变化。真实团队应该在 README、CI、构建镜像、安装脚本里写清版本范围，并定期审查。
+如果 `kubectl apply --dry-run=client` 报 YAML 解析错误，优先检查缩进、冒号、列表项和文档分隔符。
 
 ## 4. 原理深入
 
@@ -206,7 +135,7 @@ tools:
 
 检查命令位置：
 
-```bash
+```bash linenums="0"
 command -v go
 command -v docker
 echo "$PATH"
@@ -214,7 +143,7 @@ echo "$PATH"
 
 预期输出类似：
 
-```text
+```text linenums="0"
 /usr/local/go/bin/go
 /usr/bin/docker
 /usr/local/go/bin:/usr/local/bin:/usr/bin:...
@@ -222,23 +151,7 @@ echo "$PATH"
 
 如果工具已经安装但命令找不到，通常不是工具坏了，而是没有加入 `PATH`，或者当前终端没有重新加载环境变量。
 
-### 4.2 Docker CLI 与 Docker Engine
-
-Docker CLI 是你输入的命令，Docker daemon 才是真正管理镜像和容器的后台服务。
-
-在本课程的 Ubuntu 24.04 环境中，推荐关系是：
-
-```text
-Ubuntu 24.04 shell
-  -> docker CLI
-    -> Docker Engine daemon
-      -> containerd
-        -> runc
-```
-
-这解释了一个常见现象：`docker --version` 能成功，但 `docker info` 失败。前者只说明 Docker CLI 已安装，后者才说明 Docker daemon 正在运行且当前用户有权限访问。
-
-### 4.3 kubectl、kind 与 kubeconfig
+### 4.2 kubectl、kind 与 kubeconfig
 
 `kind` 并不是让 Kubernetes 继续用 Docker Engine 直接运行 Pod。更准确地说，`kind` 会把每个本地 Kubernetes 节点做成一个外层容器，这个外层节点容器可以由 Docker 或 Podman 承载；节点容器内部运行 kubelet、containerd 等组件，Pod 容器仍由 kubelet 通过 CRI 调用 containerd 创建。
 
@@ -246,25 +159,31 @@ Ubuntu 24.04 shell
 
 三者关系如下：
 
-```text
-kind create cluster
-  -> 让 Docker/Podman 在本机启动 kind node 容器
-  -> node 容器内部运行 Kubernetes 组件和 containerd
-  -> 写入 kubeconfig context
-kubectl
-  -> 读取 kubeconfig
-  -> 访问当前 context 指向的集群
+```mermaid
+flowchart LR
+    Kind["kind<br/>创建本地集群"] --> Node["kind node 容器<br/>运行 Kubernetes 节点"]
+    Kind --> Kubeconfig["kubeconfig<br/>写入 context"]
 
-Pod 创建链路
-  -> kubelet
-  -> CRI
-  -> containerd
-  -> runc
+    Kubectl["kubectl<br/>读取 kubeconfig"] --> Kubeconfig
+    Kubectl --> APIServer["Kubernetes API Server"]
+
+    Node --> APIServer
+    Node --> Kubelet["kubelet"]
+    Kubelet --> CRI["CRI"]
+    CRI --> Containerd["containerd"]
+    Containerd --> Runc["runc"]
+
+    classDef tool fill:#e0f2fe,stroke:#0284c7,color:#0f172a
+    classDef config fill:#fef3c7,stroke:#d97706,color:#0f172a
+    classDef runtime fill:#dcfce7,stroke:#16a34a,color:#0f172a
+    class Kind,Kubectl tool
+    class Kubeconfig config
+    class Node,APIServer,Kubelet,CRI,Containerd,Runc runtime
 ```
 
 查看当前集群上下文：
 
-```bash
+```bash linenums="0"
 kubectl config current-context
 kubectl config get-contexts
 ```
@@ -273,9 +192,13 @@ kubectl config get-contexts
 
 ## 5. 手把手实验
 
+预计耗时：首次安装工具需要 1-3 小时；如果工具已安装，完成仓库初始化和脚本验证约 30-45 分钟。
+
 ### 5.1 实验目标
 
-本实验会完成本篇小项目：**搭建统一实验环境，初始化 `cloud-native-todo-platform` 仓库，并运行 `check-env.sh` 验证工具链**。
+本实验会完成：**搭建统一实验环境，初始化 `cloud-native-todo-platform` 仓库，并运行 `check-env.sh` 验证工具链**。
+
+本课程默认使用 **Ubuntu Server 24.04 LTS**，命令在 Bash 或 Zsh 中执行。不要使用 Windows PowerShell、CMD 或普通 `sh` 直接运行本篇命令；后续章节会大量依赖 Bash/Zsh、apt、systemd 和 Linux 权限模型。
 
 最终交付物包括：
 
@@ -289,64 +212,108 @@ kubectl config get-contexts
 
 ### 5.2 实验环境
 
-建议硬件：
+建议先确认服务器资源和终端环境：
 
 | 项目 | 建议 |
 |---|---|
+| 操作系统 | Ubuntu Server 24.04 LTS |
+| 终端 | Bash 或 Zsh |
 | CPU | 4 核及以上 |
 | 内存 | 16GB 及以上 |
 | 磁盘 | 至少预留 50GB |
 | 编辑器 | VS Code |
-| 终端 | Ubuntu 24.04 自带 Terminal、GNOME Terminal 或同类 Linux 终端 |
 
-建议软件及版本：
+执行以下命令检查当前环境：
 
-| 软件 | 课程基线 | 检查命令 |
-|---|---|---|
-| Go | 1.26.x | `go version` |
-| Git | 2.x，Ubuntu 24.04 apt 仓库版本即可 | `git --version` |
-| Docker | 29.x | `docker --version` |
-| kubectl | 1.36.x | `kubectl version --client` |
-| kind | 0.31+ | `kind version` |
-| Helm | 4.2.x | `helm version --template '{{.Version}}'` |
+| 命令 | 含义 |
+|---|---|
+| `cat /etc/os-release` | 查看 Linux 发行版、版本号和代号，确认是否为 Ubuntu 24.04。 |
+| `uname -m` | 查看 CPU 架构，例如 `x86_64` 表示 64 位 x86 架构。 |
+| `nproc` | 查看当前系统可用的逻辑 CPU 数量。 |
+| `lscpu \| sed -n '1,12p'` | 查看 CPU 基本信息，并只截取前 12 行，避免输出过长。 |
+| `free -h` | 查看内存和 Swap 使用情况，`-h` 表示使用人类可读单位。 |
+| `df -h /` | 查看根分区 `/` 的磁盘容量、已用空间和剩余空间。 |
+| `echo "$SHELL"` | 查看当前默认登录 Shell，例如 Bash 或 Zsh。 |
+| `bash --version` | 查看 Bash 版本，后续脚本会大量使用 Bash 语法。 |
+| `zsh --version || true` | 如果已安装 Zsh，则查看 Zsh 版本；如果未安装，也不中断整组检查命令。 |
 
-确认当前系统为 Ubuntu 24.04：
-
-```bash
+```bash linenums="0"
 cat /etc/os-release
 uname -m
+nproc
+lscpu | sed -n '1,12p'
+free -h
+df -h /
+echo "$SHELL"
+bash --version
+zsh --version || true
 ```
 
-`/etc/os-release` 中应包含 `VERSION_ID="24.04"`。如果不是 Ubuntu 24.04，请先切换到课程指定环境后再继续，避免后续包源、systemd、Docker 和 Kubernetes 命令出现不必要差异。
+示例环境记录如下：
+
+```text linenums="0"
+$ cat /etc/os-release
+PRETTY_NAME="Ubuntu 24.04.4 LTS"
+VERSION_ID="24.04"
+VERSION="24.04.4 LTS (Noble Numbat)"
+VERSION_CODENAME=noble
+ID=ubuntu
+
+$ uname -m
+x86_64
+
+$ nproc
+6
+
+$ lscpu | sed -n '1,12p'
+Architecture:                            x86_64
+CPU op-mode(s):                          32-bit, 64-bit
+Address sizes:                           40 bits physical, 48 bits virtual
+Byte Order:                              Little Endian
+CPU(s):                                  6
+On-line CPU(s) list:                     0-5
+Vendor ID:                               GenuineIntel
+Model name:                              Intel Core Processor (Haswell, no TSX, IBRS)
+CPU family:                              6
+
+$ free -h
+               total        used        free      shared  buff/cache   available
+Mem:            23Gi       613Mi        21Gi       1.1Mi       1.6Gi        22Gi
+Swap:             0B          0B          0B
+
+$ df -h /
+Filesystem      Size  Used Avail Use% Mounted on
+/dev/vda1       193G  3.1G  190G   2% /
+
+$ echo "$SHELL"
+/usr/bin/zsh
+
+$ bash --version
+GNU bash, version 5.2.21(1)-release (x86_64-pc-linux-gnu)
+
+$ zsh --version || true
+zsh 5.9 (x86_64-ubuntu-linux-gnu)
+```
+
+`/etc/os-release` 中应包含 `VERSION_ID="24.04"`。如果不是 Ubuntu Server 24.04，请先切换到课程指定环境后再继续，避免后续包源、systemd、Docker 和 Kubernetes 命令出现不必要差异。输出和示例不必完全一致，但 CPU、内存和磁盘应满足上面的建议值；如果没有安装 Zsh，可以继续使用 Bash，不影响本篇实验。
 
 ### 5.3 安装核心工具
 
-本课程默认在 Ubuntu 24.04 上安装工具。安装不要追求“命令越短越好”，而要追求来源可信、版本可查、结果可验证。国内网络环境下，优先使用可信镜像源、公司制品库或公司代理；不要从不明网盘下载二进制文件。
-
-默认参考这些入口：
-
-| 工具 | 安装来源 | 本篇验证方式 |
-|---|---|---|
-| Go | 官方 tar 包；国内可使用 `golang.google.cn/dl` 下载页 | `go version` |
-| Git | Ubuntu apt 仓库 | `git --version` |
-| Docker | Docker Engine apt 仓库；国内可使用可信 Docker CE 镜像源 | `docker --version` 和 `docker info` |
-| kubectl | Kubernetes apt 仓库或官方二进制 | `kubectl version --client` |
-| kind | GitHub Release 或公司制品库缓存的二进制 | `kind version` |
-| Helm | `get.helm.sh` 官方 tar 包或公司制品库缓存的二进制 | `helm version` |
+本课程默认在 Ubuntu Server 24.04 上安装工具。安装不要追求“命令越短越好”，而要追求来源可信、版本可查、结果可验证。国内网络环境下，优先使用可信镜像源、公司制品库或公司代理；不要从不明网盘下载二进制文件。
 
 安装完成后的最低要求是：命令能在你的主力学习终端里返回版本信息。
 
 先安装基础包：
 
-```bash
+```bash linenums="0"
 sudo apt update
-sudo apt install -y curl ca-certificates gnupg lsb-release make tar gzip
+sudo apt install -y curl ca-certificates gnupg lsb-release make tar gzip tree
 sudo apt install -y git
 ```
 
 如果国内访问 Ubuntu 官方源较慢，可以把 Ubuntu 24.04 的 apt 源切换到可信镜像源。以下示例使用清华源，执行前会备份原文件：
 
-```bash
+```bash linenums="0"
 sudo cp /etc/apt/sources.list.d/ubuntu.sources /etc/apt/sources.list.d/ubuntu.sources.bak
 sudo sed -i \
   -e 's|http://archive.ubuntu.com/ubuntu/|https://mirrors.tuna.tsinghua.edu.cn/ubuntu/|g' \
@@ -357,7 +324,7 @@ sudo apt update
 
 安装 Go：
 
-```bash
+```bash linenums="0"
 GO_VERSION=1.26.0
 GO_ARCH=amd64
 curl -fLO "https://golang.google.cn/dl/go${GO_VERSION}.linux-${GO_ARCH}.tar.gz"
@@ -372,7 +339,7 @@ go env GOPROXY
 
 安装 Docker Engine：
 
-```bash
+```bash linenums="0"
 sudo install -m 0755 -d /etc/apt/keyrings
 curl -fsSL https://download.docker.com/linux/ubuntu/gpg \
   | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
@@ -387,7 +354,7 @@ sudo usermod -aG docker "$USER"
 
 `usermod -aG docker "$USER"` 后需要重新登录终端，或者临时执行 `newgrp docker`。确认 Docker daemon：
 
-```bash
+```bash linenums="0"
 docker --version
 docker compose version
 docker info
@@ -397,7 +364,7 @@ docker info
 
 安装 kubectl：
 
-```bash
+```bash linenums="0"
 sudo install -m 0755 -d /etc/apt/keyrings
 curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.36/deb/Release.key \
   | sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
@@ -410,7 +377,7 @@ kubectl version --client
 
 安装 kind：
 
-```bash
+```bash linenums="0"
 KIND_VERSION=v0.31.0
 curl -fLo kind "https://github.com/kubernetes-sigs/kind/releases/download/${KIND_VERSION}/kind-linux-amd64"
 chmod +x kind
@@ -420,7 +387,7 @@ kind version
 
 安装 Helm：
 
-```bash
+```bash linenums="0"
 HELM_VERSION=v4.2.0
 curl -fLO "https://get.helm.sh/helm-${HELM_VERSION}-linux-amd64.tar.gz"
 tar -zxf "helm-${HELM_VERSION}-linux-amd64.tar.gz"
@@ -433,7 +400,7 @@ helm version
 
 最后统一验证：
 
-```bash
+```bash linenums="0"
 go version
 git --version
 docker --version
@@ -443,33 +410,59 @@ kind version
 helm version
 ```
 
-### 5.4 企业网络与镜像源准备
+示例验证记录如下：
 
-如果你在公司网络中学习，可能会遇到代理、证书、镜像仓库和 Docker Hub 限流问题。不要把这些问题误判为 Go、Docker 或 Kubernetes 本身不可用。
+```text linenums="0"
+验证日期：2026-06-01
 
-常见企业配置包括：
+$ go version
+go version go1.26.3 linux/amd64
 
-| 场景 | 处理方向 |
-|---|---|
-| 访问 GitHub 慢或失败 | 使用公司代理，或使用内部 Git 镜像 |
-| Go module 下载失败 | 配置公司 `GOPROXY` 或可信公共代理 |
-| Docker Hub 拉取失败 | 使用公司镜像仓库、镜像加速器或预拉取镜像 |
-| 公司 HTTPS 代理拦截 | 安装公司 CA 证书，并遵守安全规范 |
-| 二进制下载受限 | 使用公司制品库统一分发 Go、kubectl、Helm、kind |
+$ git --version
+git version 2.43.0
 
-Go 代理示例：
+$ docker --version
+Docker version 29.5.2, build 79eb04c
 
-```bash
-go env -w GOPROXY=https://goproxy.cn,direct
+$ docker info
+Client:
+ Version: 29.5.2
+ Plugins:
+  buildx: v0.34.1
+  compose: v5.1.4
+
+Server:
+ Server Version: 29.5.2
+ Storage Driver: overlayfs
+ Cgroup Driver: systemd
+ Cgroup Version: 2
+ Runtimes: io.containerd.runc.v2 runc
+ Default Runtime: runc
+ containerd version: 193637f7ee8ae5f5aa5248f49e7baa3e6164966e
+ runc version: v1.3.5-0-g488fc13e
+ Kernel Version: 6.8.0-124-generic
+ Operating System: Ubuntu 24.04.4 LTS
+ OSType: linux
+ Architecture: x86_64
+ CPUs: 6
+ Total Memory: 23.47GiB
+
+$ kubectl version --client
+Client Version: v1.36.1
+Kustomize Version: v5.8.1
+
+$ kind version
+kind v0.31.0 go1.25.5 linux/amd64
+
+$ helm version
+version.BuildInfo{Version:"v4.2.0", GitCommit:"06468084e85c244c712834933d25ea232a4c2093", GitTreeState:"clean", GoVersion:"go1.26.3", KubeClientVersion:"v1.36"}
 ```
 
-本课程统一使用 `https://goproxy.cn,direct`。如果公司要求使用内部 Go module proxy，应以公司地址替换上面的公共地址，并记录到 `docs/environment.md`。
-
-### 5.5 初始化项目仓库
+### 5.4 初始化项目仓库
 
 创建工作目录：
 
-```bash
+```bash linenums="0"
 mkdir -p ~/workspace
 cd ~/workspace
 mkdir -p cloud-native-todo-platform
@@ -478,15 +471,15 @@ cd cloud-native-todo-platform
 
 初始化 Git：
 
-```bash
+```bash linenums="0"
 git init
 ```
 
 创建新版项目主线目录：
 
-下面的命令使用了 Bash 的花括号展开，请在 Ubuntu 24.04 的 Bash 中执行，不要切换到 `sh`。
+下面的命令使用了花括号展开，请在 Ubuntu Server 24.04 的 Bash 或 Zsh 中执行；如果不确定当前 Shell 行为，优先使用 Bash，不要切换到 `sh`。
 
-```bash
+```bash linenums="0"
 mkdir -p api/cmd/todo-api
 mkdir -p api/internal/{config,handler/{http,gin},service,repository,middleware,model}
 mkdir -p api/migrations api/tests
@@ -511,23 +504,17 @@ mkdir -p operator/{crd,handwritten,kubebuilder,helm}
 
 这些目录有些在阶段一暂时不会写入业务代码，例如 `observability/` 和 `operator/`。这里先建好骨架，是为了让后续每一篇都在同一个项目主线中演进，而不是每章重新开一个孤立目录。
 
-### 5.6 查看文件目录结构
+### 5.5 查看文件目录结构
 
 执行 `tree` 查看当前仓库骨架：
 
-```bash
+```bash linenums="0"
 tree -L 4 .
-```
-
-如果系统还没有 `tree`，先安装：
-
-```bash
-sudo apt install -y tree
 ```
 
 预期输出类似：
 
-```text
+```text linenums="0"
 .
 ├── api
 │   ├── cmd
@@ -547,12 +534,16 @@ sudo apt install -y tree
 ├── deployments
 │   ├── docker-compose
 │   ├── helm
+│   │   └── todo-platform
 │   ├── k8s-base
 │   ├── k8s-network
 │   ├── k8s-security
 │   └── kustomize
 │       ├── base
 │       └── overlays
+│         ├── dev
+│         ├── prod
+│         └── test
 ├── docs
 │   └── examples
 ├── observability
@@ -571,7 +562,7 @@ sudo apt install -y tree
 
 这一步对应实验八步中的“文件目录结构”。不要跳过它，因为后续课程会持续复用这些目录。
 
-### 5.7 编写 YAML 示例
+### 5.6 编写 YAML 示例
 
 创建基础 YAML：
 
@@ -583,20 +574,6 @@ tools:
   - go                              # ← 后续编写 CLI、API、Operator
   - docker                          # ← 后续构建和运行容器
   - kubectl                         # ← 后续操作 Kubernetes 集群
-```
-
-写入文件：
-
-```bash
-cat > docs/examples/basic.yaml <<'EOF'
-project:
-  name: cloud-native-todo-platform
-  stage: foundation
-tools:
-  - go
-  - docker
-  - kubectl
-EOF
 ```
 
 创建 Kubernetes 多文档示例：
@@ -616,29 +593,9 @@ data:
   TODO_ENV: dev                     # ← 应用环境标识
 ```
 
-写入文件：
-
-```bash
-cat > docs/examples/multi-doc.yaml <<'EOF'
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: todo-dev
----
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: todo-env
-  namespace: todo-dev
-data:
-  TODO_ENV: dev
-EOF
-```
-
 创建锚点示例：
 
-```bash
-cat > docs/examples/anchors.yaml <<'EOF'
+```yaml title="docs/examples/anchors.yaml"
 versions:
   go: &go_version "1.26.x"
   docker: "29.x"
@@ -647,7 +604,6 @@ tools:
     go: *go_version
   cli:
     go: *go_version
-EOF
 ```
 
 用 kubectl 客户端检查 Kubernetes YAML 语法。注意：`kubectl apply --dry-run=client --validate=false` 仍可能访问 API discovery；如果当前机器没有可用 kubeconfig，它可能连接 `localhost:8080` 并失败。执行前先确认已有 Kubernetes context，或者创建一个临时 kind 集群：
@@ -659,30 +615,31 @@ kubectl config current-context
 如果没有可用 context，本地实验可以先创建课程临时集群：
 
 ```bash
-kind create cluster --name todo-dev --image kindest/node:v1.35.0
+kind create cluster --name todo-dev --image registry.cn-guangzhou.aliyuncs.com/yleoer/node:v1.35.0
 ```
 
 然后执行 dry-run：
 
-```bash
+```bash linenums="0"
 kubectl apply --dry-run=client --validate=false -f docs/examples/multi-doc.yaml
 ```
 
 预期输出：
 
-```text
+```text linenums="0"
 namespace/todo-dev created (dry run)
 configmap/todo-env created (dry run)
 ```
 
 这里加上 `--validate=false`，是为了跳过 OpenAPI Schema 校验；但在部分 kubectl 版本中，它仍会访问 API discovery。因此它不是离线 YAML 检查工具，只能在已有 context 的前提下做基础客户端 dry-run，不能替代真正的集群验证。后面创建 kind 集群后，还要再执行一次真实 `kubectl apply`。
 
-### 5.8 编写环境记录和 README
+### 5.7 编写环境记录和 README
 
 创建环境记录：
 
-```bash
-cat > docs/environment.md <<'EOF'
+将下面内容写入 `docs/environment.md`：
+
+```markdown title="docs/environment.md"
 # 开发环境记录
 
 ## 基础信息
@@ -704,13 +661,13 @@ cat > docs/environment.md <<'EOF'
 ## 备注
 
 - 记录 Ubuntu 版本、CPU 架构、Docker Engine 安装方式和是否使用国内镜像源。
-EOF
 ```
 
 创建 README：
 
-```bash
-cat > README.md <<'EOF'
+将下面内容写入 `README.md`：
+
+```markdown title="README.md"
 # Cloud Native Todo Platform
 
 这是《从 Go 后端开发、Docker 容器化、Kubernetes 到 Operator 开发与生产实践》课程的综合项目仓库。
@@ -724,13 +681,13 @@ cat > README.md <<'EOF'
 请先运行：
 
 ./scripts/check-env.sh
-EOF
 ```
 
 创建 `.gitignore`：
 
-```bash
-cat > .gitignore <<'EOF'
+将下面内容追加到 `.gitignore`（如果已有相同内容，不需要重复添加）：
+
+```text title=".gitignore"
 .DS_Store
 .idea/
 .vscode/
@@ -744,12 +701,11 @@ coverage.out
 .env.*
 !.env.example
 kubeconfig*
-EOF
 ```
 
 `.env`、kubeconfig、私钥、Token 都不应该提交到 Git。
 
-### 5.9 编写版本锁与 `check-env.sh`
+### 5.8 编写版本锁与 `check-env.sh`
 
 先创建版本锁文件：
 
@@ -760,21 +716,7 @@ DOCKER_REQUIRED_PREFIX="Docker version 29."
 KUBECTL_REQUIRED_PREFIX=v1.36
 KIND_REQUIRED_PREFIX=kind
 HELM_REQUIRED_PREFIX=v4.
-KIND_NODE_IMAGE=registry.cn-guangzhou.aliyuncs.com/yleoer/node:v1.35.0@sha256:452d707d4862f52530247495d180205e029056831160e22870e37e3f6c1ac31f
-```
-
-写入文件：
-
-```bash
-cat > scripts/versions.conf <<'EOF'
-GO_REQUIRED_PREFIX=go1.26
-GO_PROXY_REQUIRED=https://goproxy.cn,direct
-DOCKER_REQUIRED_PREFIX="Docker version 29."
-KUBECTL_REQUIRED_PREFIX=v1.36
-KIND_REQUIRED_PREFIX=kind
-HELM_REQUIRED_PREFIX=v4.
-KIND_NODE_IMAGE=registry.cn-guangzhou.aliyuncs.com/yleoer/node:v1.35.0@sha256:452d707d4862f52530247495d180205e029056831160e22870e37e3f6c1ac31f
-EOF
+KIND_NODE_IMAGE=registry.cn-guangzhou.aliyuncs.com/yleoer/node:v1.35.0@sha256:986401fce0e567a9860075ba9df8c8459bd99a35f79024d8a682773fb40f0753
 ```
 
 这个文件不是为了让所有机器永远固定死，而是让团队知道当前课程基线是什么。脚本发现版本不一致时先给出警告，由你判断是否需要升级。这里使用 `.conf` 后缀，是为了避免新手把它和存放密钥的 `.env` 文件混淆。
@@ -783,18 +725,18 @@ EOF
 
 校验这个 digest 的方法如下：
 
-```bash
+```bash linenums="0"
 docker pull registry.cn-guangzhou.aliyuncs.com/yleoer/node:v1.35.0
 docker inspect registry.cn-guangzhou.aliyuncs.com/yleoer/node:v1.35.0 --format '{{.RepoDigests}}'
 ```
 
 预期输出应包含：
 
-```text
-kindest/node@sha256:452d707d4862f52530247495d180205e029056831160e22870e37e3f6c1ac31f
+```text linenums="0"
+[registry.cn-guangzhou.aliyuncs.com/yleoer/node@sha256:986401fce0e567a9860075ba9df8c8459bd99a35f79024d8a682773fb40f0753]
 ```
 
-kind v0.31 官方发布的预构建节点镜像中没有 1.36.x 节点镜像，因此本篇先锁定 `v1.35.0` 作为 kind 烟测集群。后续如果 kind 官方发布 `kindest/node:v1.36.x`，再把 `KIND_NODE_IMAGE` 和 5.10 的预期节点版本一起升级。
+kind v0.31 官方发布的预构建节点镜像中没有 1.36.x 节点镜像，因此本篇先锁定 `v1.35.0` 作为 kind 烟测集群。后续如果 kind 官方发布 `kindest/node:v1.36.x`，再把 `KIND_NODE_IMAGE` 和 5.9 的预期节点版本一起升级。
 
 创建环境检查脚本：
 
@@ -902,49 +844,51 @@ main() {
 main "$@"
 ```
 
-把上面的完整脚本保存为 `scripts/check-env.sh`。推荐直接用 VS Code 新建文件；如果使用终端粘贴，可执行 `cat > scripts/check-env.sh <<'EOF'`，粘贴完整脚本，最后单独输入一行 `EOF` 结束。
+把上面的完整脚本保存为 `scripts/check-env.sh`。
 
 Helm 版本检查使用 `helm version --template '{{.Version}}'`，是为了只取 `v4.2.x` 这样的语义版本，避免默认输出中的 Git commit、GoVersion 等字段影响脚本判断。
 
 如果复制脚本后执行异常，先确认文件使用 LF 换行。若执行脚本时出现 `$'\r': command not found`，可以运行：
 
-```bash
+```bash linenums="0"
 sed -i 's/\r$//' scripts/check-env.sh
 ```
 
 赋予执行权限：
 
-```bash
+```bash linenums="0"
 chmod +x scripts/check-env.sh
 ```
 
 运行检查：
 
-```bash
+```bash linenums="0"
 ./scripts/check-env.sh
 ```
 
 预期输出会包含：
 
-```text
-[OK] go found: ...
+```text linenums="0"
+[OK] Go matches expected prefix: go1.26
 [OK] Go proxy matches expected prefix: https://goproxy.cn,direct
-[OK] git found: ...
-[OK] docker found: ...
-[OK] kubectl found: ...
-[OK] kind found: ...
-[OK] helm found: ...
+[OK] Docker CLI matches expected prefix: Docker version 29.
+[OK] kubectl matches expected prefix: v1.36
+[OK] kind matches expected prefix: kind
+[OK] Helm matches expected prefix: v4.
+
+==> Docker daemon
+[OK] Docker daemon is reachable
 
 Environment check completed.
 ```
 
 如果 Docker Engine 没启动，脚本应该给出 WARN，而不是直接中断。这样的设计能让新手先看完所有工具状态，再集中处理问题。
 
-### 5.10 可选：创建 kind 集群做烟测
+### 5.9 可选：创建 kind 集群做烟测
 
 如果 Docker daemon 可以访问，可以创建一个本地 Kubernetes 集群。创建前先读取版本锁文件，让 kind 使用固定节点镜像：
 
-```bash
+```bash linenums="0"
 source scripts/versions.conf
 kind create cluster --name todo-dev --image "$KIND_NODE_IMAGE"
 ```
@@ -953,13 +897,13 @@ kind create cluster --name todo-dev --image "$KIND_NODE_IMAGE"
 
 查看节点：
 
-```bash
+```bash linenums="0"
 kubectl get nodes
 ```
 
 预期输出：
 
-```text
+```text linenums="0"
 NAME                     STATUS   ROLES           AGE   VERSION
 todo-dev-control-plane   Ready    control-plane   ...   v1.35.0
 ```
@@ -970,48 +914,48 @@ todo-dev-control-plane   Ready    control-plane   ...   v1.35.0
 
 应用前面写的 YAML：
 
-```bash
+```bash linenums="0"
 kubectl apply -f docs/examples/multi-doc.yaml
 ```
 
 验证资源：
 
-```bash
+```bash linenums="0"
 kubectl get namespace todo-dev
 kubectl -n todo-dev get configmap todo-env
 ```
 
-### 5.11 完成首次提交
+### 5.10 完成首次提交
 
 查看 Git 状态：
 
-```bash
+```bash linenums="0"
 git status --short
 ```
 
 暂存文件：
 
-```bash
+```bash linenums="0"
 git add .
 ```
 
 提交：
 
-```bash
+```bash linenums="0"
 git commit -m "初始化课程项目环境"
 ```
 
 查看提交记录：
 
-```bash
+```bash linenums="0"
 git log --oneline -1
 ```
 
-### 5.12 验证方法
+### 5.11 验证方法
 
 本篇实验完成后，集中执行下面的验证命令：
 
-```bash
+```bash linenums="0"
 cd ~/workspace/cloud-native-todo-platform
 ./scripts/check-env.sh
 kubectl apply --dry-run=client --validate=false -f docs/examples/multi-doc.yaml
@@ -1023,7 +967,7 @@ git log --oneline -1
 
 预期结果：
 
-```text
+```text linenums="0"
 [OK] go found: ...
 [OK] git found: ...
 [OK] docker found: ...
@@ -1043,30 +987,20 @@ configmap/todo-env created (dry run)
 - `docs/environment.md`、`scripts/versions.conf`、`scripts/check-env.sh` 都存在。
 - `git log --oneline -1` 能看到首次提交。
 
-### 5.13 清理步骤
+### 5.12 清理步骤
 
-如果你在 5.10 创建了 kind 集群，实验结束后可以删除它：
+如果你在 5.9 创建了 kind 集群，实验结束后可以删除它：
 
-```bash
+```bash linenums="0"
 kind delete cluster --name todo-dev
 ```
 
 确认上下文已经清理：
 
-```bash
+```bash linenums="0"
 kubectl config get-contexts
 ```
 
-如果只是想重新做一遍仓库初始化实验，可以删除本地练习仓库：
-
-```bash
-cd ~/workspace
-rm -rf cloud-native-todo-platform
-```
-
-删除仓库前请确认里面没有你想保留的笔记或提交记录。课程后续章节会继续使用这个仓库；如果你准备接着学习下一篇，不需要删除仓库，只需要保留当前成果即可。
-
-预计耗时：首次安装工具需要 1-3 小时；如果工具已安装，完成仓库初始化和脚本验证约 30-45 分钟。
 
 ## 6. 常见错误与排障
 
@@ -1084,7 +1018,7 @@ rm -rf cloud-native-todo-platform
 
 **现象：**
 
-```text
+```text linenums="0"
 bash: go: command not found
 ```
 
@@ -1092,7 +1026,7 @@ bash: go: command not found
 
 **排查：**
 
-```bash
+```bash linenums="0"
 command -v go
 echo "$PATH"
 ls /usr/local/go/bin/go
@@ -1106,7 +1040,7 @@ ls /usr/local/go/bin/go
 
 **现象：**
 
-```text
+```text linenums="0"
 Cannot connect to the Docker daemon at unix:///var/run/docker.sock. Is the docker daemon running?
 ```
 
@@ -1114,14 +1048,14 @@ Cannot connect to the Docker daemon at unix:///var/run/docker.sock. Is the docke
 
 **排查：**
 
-```bash
+```bash linenums="0"
 docker --version
 docker info
 ```
 
 **修复：** 启动 Docker Engine，并确认当前用户有权限访问 Docker daemon：
 
-```bash
+```bash linenums="0"
 sudo systemctl enable --now docker
 sudo usermod -aG docker "$USER"
 newgrp docker
@@ -1134,7 +1068,7 @@ docker info
 
 **现象：**
 
-```text
+```text linenums="0"
 error: error parsing docs/examples/basic.yaml: error converting YAML to JSON: yaml: line 3: mapping values are not allowed in this context
 ```
 
@@ -1142,7 +1076,7 @@ error: error parsing docs/examples/basic.yaml: error converting YAML to JSON: ya
 
 **排查：**
 
-```bash
+```bash linenums="0"
 sed -n '1,80p' docs/examples/basic.yaml
 kubectl apply --dry-run=client --validate=false -f docs/examples/multi-doc.yaml
 ```
@@ -1155,7 +1089,7 @@ kubectl apply --dry-run=client --validate=false -f docs/examples/multi-doc.yaml
 
 **现象：**
 
-```text
+```text linenums="0"
 The connection to the server localhost:8080 was refused - did you specify the right host or port?
 ```
 
@@ -1163,7 +1097,7 @@ The connection to the server localhost:8080 was refused - did you specify the ri
 
 **排查：**
 
-```bash
+```bash linenums="0"
 kubectl config current-context
 kubectl config get-contexts
 kind get clusters
@@ -1171,7 +1105,7 @@ kind get clusters
 
 **修复：** 如果只是做客户端 YAML 检查，使用 `--dry-run=client --validate=false`；如果要真实验证资源，先创建 kind 集群：
 
-```bash
+```bash linenums="0"
 source scripts/versions.conf
 kind create cluster --name todo-dev --image "$KIND_NODE_IMAGE"
 kubectl get nodes
@@ -1183,7 +1117,7 @@ kubectl get nodes
 
 **现象：**
 
-```text
+```text linenums="0"
 bash: ./scripts/check-env.sh: Permission denied
 ```
 
@@ -1191,13 +1125,13 @@ bash: ./scripts/check-env.sh: Permission denied
 
 **排查：**
 
-```bash
+```bash linenums="0"
 ls -l scripts/check-env.sh
 ```
 
 **修复：**
 
-```bash
+```bash linenums="0"
 chmod +x scripts/check-env.sh
 ./scripts/check-env.sh
 ```
@@ -1228,116 +1162,13 @@ chmod +x scripts/check-env.sh
 - 团队项目应锁定版本范围，并通过脚本或 CI 检查，而不是依赖口头约定。
 - kind 适合本地学习和集成测试，不代表生产 Kubernetes 高可用架构。
 
-## 8. 本章小项目
+## 8. 练习题与面试题
 
-本章小项目：**统一实验环境与 `cloud-native-todo-platform` 仓库初始化**。
+本章练习题和面试题已拆分到独立页面，完成正文学习后再进入题库练习与复盘。
 
-交付物：
+[查看本章练习题与面试题](../../questions/stage-01-foundation/01-course-guide-env.md)
 
-- 一套可运行的本地学习环境。
-- 已安装并能验证版本的 `go`、`git`、`docker`、`kubectl`、`kind`、`helm`。
-- 一个课程主线仓库 `cloud-native-todo-platform`。
-- 基础 YAML 示例文件。
-- 一个环境记录文件 `docs/environment.md`。
-- 一个版本锁文件 `scripts/versions.conf`。
-- 一个环境检查脚本 `scripts/check-env.sh`。
-- 至少一次 Git 提交。
-
-验收命令：
-
-```bash
-cd ~/workspace/cloud-native-todo-platform
-./scripts/check-env.sh
-kubectl apply --dry-run=client --validate=false -f docs/examples/multi-doc.yaml
-test -f scripts/versions.conf
-git log --oneline -1
-```
-
-能力验收标准：
-
-| 能力项 | 验收方式 |
-|---|---|
-| 环境基线 | 能确认并说明课程统一使用 Ubuntu 24.04 的原因 |
-| YAML 基础 | 能解释缩进、列表、多文档、锚点和别名 |
-| 工具安装 | 6 个核心工具都能输出版本 |
-| Docker | `docker info` 能成功或能解释为什么 daemon 暂不可用 |
-| kubectl / kind | 能说明 kubectl、kubeconfig、kind 的关系 |
-| 仓库规范 | 能解释每个一级目录的用途 |
-| 自动化意识 | 能通过 `scripts/check-env.sh` 做环境自检 |
-| 版本锁定 | 能解释 `scripts/versions.conf` 中每个版本前缀的作用 |
-| Git 基础 | 仓库有初始化提交和清晰提交信息 |
-
-## 9. 本章练习题
-
-### 基础题
-
-1. 找出下面这段故意写错的 YAML 片段的问题，并写出修复后的片段。
-
-    ```yaml
-    tools:
-    - go
-      - docker
-    ```
-    提示：本题重点是 YAML 列表缩进；如果想提前观察 Kubernetes 多文档格式，可以参考 `docs/examples/multi-doc.yaml`。
-2. `kubectl` 和 `kind` 分别解决什么问题？
-3. 为什么本课程统一要求使用 Ubuntu 24.04？
-4. 为什么 `.env` 和 kubeconfig 不应该提交到 Git？
-
-### 实操题
-
-1. 在你的机器上运行 `scripts/check-env.sh`，把关键版本记录到 `docs/environment.md`。
-2. 修改 `docs/examples/basic.yaml`，增加 `helm` 和 `kind` 两个工具项。
-3. 执行 `kubectl apply --dry-run=client --validate=false -f docs/examples/multi-doc.yaml`，观察输出。
-4. 创建分支 `feature/env-notes`，补充环境记录并提交一次 Git 记录。
-
-### 思考题
-
-1. 如果团队里有人使用 Go 1.22，有人使用 Go 1.26，可能会带来哪些问题？
-2. 如果你要给新同事写一份环境安装文档，你会如何安排顺序，才能减少新手卡住的概率？
-
-## 10. 本章面试题
-
-### 1. 你如何从零搭建一个云原生 Go 项目的开发环境？
-
-参考答案：
-
-一句话结论：先统一主力终端和工具版本，再初始化仓库结构，最后用脚本自动验证环境。
-
-展开解释：本课程统一使用 Ubuntu 24.04，先确认 `/etc/os-release` 和 CPU 架构，再安装 Go、Git、Docker Engine、kubectl、kind、Helm。国内环境下还要配置可信 apt 源、Go proxy 和必要的制品库缓存。安装完成后，先确认每个工具能输出版本，再规划 `api/`、`cli/`、`deployments/`、`scripts/`、`operator/` 等目录。最后编写 `check-env.sh` 做自动化环境检查，并把版本记录到 `docs/environment.md` 或 README 中。
-
-深入追问：如果团队成员环境不一致，你会怎么治理？可以回答：把版本基线写进 `scripts/versions.conf`、README、CI 和构建镜像中，并定期升级验证。
-
-### 2. 为什么 Kubernetes 学习要重视 YAML？
-
-参考答案：
-
-一句话结论：YAML 是 Kubernetes 声明式配置的主要载体，写错缩进就可能写错资源意图。
-
-展开解释：Kubernetes 资源大多通过 YAML 描述，例如 Deployment、Service、ConfigMap、Secret、Ingress、CRD。YAML 的缩进、列表、字典、多文档会直接影响资源是否能被正确解析。学会 YAML 不是为了背语法，而是为了能读懂、编写和排查声明式配置。
-
-深入追问：如何降低 YAML 出错概率？可以回答：统一 2 空格缩进，使用编辑器 YAML 插件，提交前运行 `kubectl apply --dry-run=client --validate=false` 做基础检查，并在真实集群中做服务端验证。
-
-### 3. `kubectl`、`kind` 和 kubeconfig 的关系是什么？
-
-参考答案：
-
-一句话结论：`kind` 负责创建本地集群，`kubectl` 负责访问集群，kubeconfig 负责告诉 `kubectl` 访问哪个集群。
-
-展开解释：`kind` 用 Docker 或 Podman 在本机承载外层节点容器，节点容器内部运行 Kubernetes 组件和 containerd；Pod 仍由 kubelet 通过 CRI 调用 containerd 创建。`kubectl` 是 Kubernetes 客户端。kubeconfig 保存集群地址、用户凭据和当前 context。创建 kind 集群后，kind 会把连接信息写入 kubeconfig，kubectl 根据当前 context 访问对应集群。
-
-深入追问：为什么执行危险命令前要看 context？可以回答：同一台机器可能同时保存本地、测试、生产多个 kubeconfig；误把删除命令发到生产集群，是非常典型的运维事故来源。
-
-### 4. 为什么要做版本环境锁定？
-
-参考答案：
-
-一句话结论：版本锁定的目标是减少环境漂移，让问题可复现、可定位、可协作。
-
-展开解释：Go、Docker、kubectl、Helm、Kubernetes 的版本差异可能导致构建结果、YAML 字段、命令行为和 API 兼容性不同。真实团队通常会在 README、CI、脚本、容器镜像和本地环境检查脚本中明确版本范围，并定期审查升级。
-
-深入追问：版本锁定是不是永远不升级？可以回答：不是。锁定是为了稳定基线，升级应该通过分支验证、CI 测试和迁移说明完成，而不是每个人随意升级。
-
-## 11. 本章总结
+## 9. 本章总结
 
 本篇完成了整套课程的第一块地基。你看到了 6 个阶段、42 篇内容如何围绕 `Cloud Native Todo Platform` 逐步展开；掌握了 YAML 的最小可用语法；明确了课程统一基于 Ubuntu 24.04；知道了 PATH、Docker daemon、kubeconfig 这些基础机制为什么会影响后续实验。
 
@@ -1345,7 +1176,7 @@ git log --oneline -1
 
 能力价值上，本篇训练的是工程化学习的第一种习惯：不要只靠“我机器上能跑”，而要用可记录、可检查、可复现的方式管理环境。这个习惯会直接影响真实团队协作、CI/CD 稳定性、生产排障效率，也会成为面试中展示项目经验时很有分量的基础能力。
 
-## 12. 下一章衔接
+## 10. 下一章衔接
 
 下一篇进入 **Linux 文件系统与命令基础**。
 

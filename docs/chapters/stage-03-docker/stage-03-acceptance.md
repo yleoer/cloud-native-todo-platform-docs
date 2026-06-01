@@ -21,7 +21,7 @@
 
 建议在 `cloud-native-todo-platform` 应用仓库中形成以下结构：
 
-```text
+```text linenums="0"
 cloud-native-todo-platform/
 ├── .dockerignore
 ├── api/
@@ -87,7 +87,7 @@ cloud-native-todo-platform/
 
 === "Linux / macOS / WSL2"
 
-    ```bash
+    ```bash linenums="0"
     docker version
     docker compose version
 
@@ -111,7 +111,7 @@ cloud-native-todo-platform/
 
 === "Windows PowerShell"
 
-    ```powershell
+    ```powershell linenums="0"
     docker version
     docker compose version
 
@@ -148,7 +148,7 @@ cloud-native-todo-platform/
 
 适合 Linux、WSL2 Ubuntu 或虚拟机环境：
 
-```bash
+```bash linenums="0"
 docker history todo-api:v0.1.0
 docker inspect todo-api:v0.1.0
 docker network inspect todo-platform_default 2>/dev/null || true
@@ -169,8 +169,13 @@ kubectl get nodes -o wide
 
 如果你已经完成第 19 篇运行时探针实验，还应该能进入 kind 节点查看 CRI 层状态：
 
+<<<<<<< HEAD
+```bash linenums="0"
+NODE="$(docker ps --filter name=todo-runtime-control-plane --format '{{.Names}}' | head -n 1)"
+=======
 ```bash
 NODE="$(docker ps --filter "name=${KIND_CLUSTER}-control-plane" --format '{{.Names}}' | head -n 1)"
+>>>>>>> origin/main
 docker exec -it "$NODE" crictl ps
 docker exec -it "$NODE" crictl images | grep todo-api
 docker exec -it "$NODE" ctr -n k8s.io images ls | grep todo-api
@@ -213,7 +218,7 @@ docker exec -it "$NODE" crictl pods
 
 在应用仓库创建 `docs/docker/stage-03-acceptance.md`，记录你的验收结果：
 
-````markdown
+````markdown linenums="0"
 # Stage 03 Docker Acceptance
 
 ## 基础信息

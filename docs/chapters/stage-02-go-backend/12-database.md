@@ -36,9 +36,9 @@
 - 能编写需要真实 PostgreSQL 的集成测试，并用环境变量控制是否运行。
 - 能启动 Todo API v3，验证服务重启后数据不丢失。
 
-本篇结束时，你至少应该能成功执行：
+你至少应该能成功执行：
 
-```bash
+```bash linenums="0"
 cd ~/workspace/cloud-native-todo-platform
 docker compose up -d postgres
 docker compose exec -T postgres psql -U todo -d todo_platform -f /migrations/000001_create_todos.up.sql
@@ -74,30 +74,11 @@ TODO_DATABASE_DSN='postgres://todo:todo_password@127.0.0.1:5432/todo_platform?ss
 
 本篇会刻意保持 API 契约不变：Handler 仍然调用 Service，Service 仍然依赖 Repository 接口，只是 Repository 的实现从内存换成 PostgreSQL。
 
-### 2.3 课程项目关联
+### 2.3 Todo 平台模拟案例
 
-本篇会新增和修改：
+> Todo 平台不能只依赖内存保存数据。你需要接入 PostgreSQL，编写数据库连接、迁移脚本、仓储实现和集成测试，让待办事项在服务重启后仍然存在。
 
-```text
-cloud-native-todo-platform/
-├── docker-compose.yml
-└── api/
-    ├── cmd/
-    │   └── todo-api/
-    │       └── main.go
-    ├── internal/
-    │   ├── database/
-    │   │   └── postgres.go
-    │   └── repository/
-    │       ├── postgres.go
-    │       └── postgres_integration_test.go
-    └── migrations/
-        ├── 000001_create_todos.up.sql
-        └── 000001_create_todos.down.sql
-```
-
-第 10 篇的 Gin Handler 不需要改。第 11 篇的 `StatsService` 也不需要改，因为它只依赖 `List(ctx, status)` 这个读接口。换成 PostgreSQL 后，统计任务和压测命令可以继续用来观察数据库访问是否稳定。
-
+这个案例强调持久化边界：业务代码不应该直接散落 SQL 细节，连接配置、迁移、事务和测试数据清理都要有明确位置。
 ## 3. 核心概念
 
 ### 3.1 PostgreSQL
@@ -129,7 +110,7 @@ Todo 数据可以放进 `todos` 表：
 
 关键约束示例：
 
-```sql
+```sql linenums="0"
 status TEXT NOT NULL CHECK (status IN ('pending', 'done'))
 ```
 
@@ -148,7 +129,7 @@ CRUD 是后端最常见的四类操作：
 
 PostgreSQL 的 `RETURNING` 很适合 API 场景：
 
-```sql
+```sql linenums="0"
 INSERT INTO todos (title, status)
 VALUES ($1, 'pending')
 RETURNING id, title, status, created_at, updated_at;
@@ -160,7 +141,7 @@ RETURNING id, title, status, created_at, updated_at;
 
 索引让数据库更快找到数据。本篇 Todo API 经常按状态筛选：
 
-```sql
+```sql linenums="0"
 SELECT id, title, status, created_at, updated_at
 FROM todos
 WHERE status = 'pending'
@@ -169,7 +150,7 @@ ORDER BY id;
 
 所以迁移文件会创建：
 
-```sql
+```sql linenums="0"
 CREATE INDEX IF NOT EXISTS idx_todos_status ON todos(status);
 ```
 
@@ -231,7 +212,7 @@ Handler 和 Service 不需要知道 SQL 细节。Repository 负责把业务对�
 
 第 10 篇的 `TodoService` 依赖的是接口：
 
-```go
+```go linenums="0"
 type Repository interface {
 	List(ctx context.Context, status model.Status) ([]model.Todo, error)
 	Get(ctx context.Context, id int) (model.Todo, error)
@@ -252,7 +233,7 @@ type Repository interface {
 
 本篇会设置：
 
-```go
+```go linenums="0"
 db.SetMaxOpenConns(10)
 db.SetMaxIdleConns(5)
 db.SetConnMaxLifetime(30 * time.Minute)
@@ -266,7 +247,7 @@ db.SetConnMaxLifetime(30 * time.Minute)
 
 迁移文件把结构变化写成版本化脚本：
 
-```text
+```text linenums="0"
 api/migrations/
 ├── 000001_create_todos.up.sql
 └── 000001_create_todos.down.sql
@@ -275,6 +256,8 @@ api/migrations/
 本篇为了教学清晰，用 `psql -f` 手动执行迁移，并创建 `schema_migrations` 表记录版本。真实团队通常会使用 golang-migrate、Flyway、Liquibase 或平台内置迁移工具。
 
 ## 5. 手把手实验
+
+预计耗时：20 分钟阅读，70 分钟动手实验。
 
 ### 5.1 实验目标
 
@@ -299,20 +282,20 @@ api/migrations/
 
 进入课程项目根目录：
 
-```bash
+```bash linenums="0"
 cd ~/workspace/cloud-native-todo-platform
 ```
 
 确认 Docker 可用：
 
-```bash
+```bash linenums="0"
 docker version
 docker compose version
 ```
 
 确认第 10 篇和第 11 篇文件已存在：
 
-```bash
+```bash linenums="0"
 test -f api/cmd/todo-api/main.go
 test -f api/internal/repository/memory.go
 test -f api/internal/service/stats_service.go
@@ -322,13 +305,13 @@ test -f api/internal/service/stats_service.go
 
 创建本篇新增目录：
 
-```bash
+```bash linenums="0"
 mkdir -p api/internal/database api/migrations
 ```
 
 本篇新增或覆盖文件如下：
 
-```text
+```text linenums="0"
 cloud-native-todo-platform/
 ├── docker-compose.yml
 └── api/
@@ -1038,52 +1021,52 @@ func buildRepository(ctx context.Context, cfg config, logger *slog.Logger) (serv
 
 确认 Go 代理配置。第 7 篇已经设置过 `GOPROXY`，这里再检查一次，避免依赖拉取卡在网络问题上：
 
-```bash
+```bash linenums="0"
 go env GOPROXY
 ```
 
 拉取 PostgreSQL 驱动并整理依赖。本篇固定 pgx 版本，保证同一批学员拿到一致的依赖；日常探索可以使用 latest，但团队项目应提交明确版本：
 
-```bash
+```bash linenums="0"
 go get github.com/jackc/pgx/v5/stdlib@v5.9.2
 go mod tidy
 ```
 
 启动 PostgreSQL：
 
-```bash
+```bash linenums="0"
 docker compose up -d postgres
 docker compose ps
 ```
 
 等待数据库就绪：
 
-```bash
+```bash linenums="0"
 docker compose exec postgres pg_isready -U todo -d todo_platform
 ```
 
 执行迁移。`-T` 表示不分配伪终端，更适合脚本化执行 SQL 文件：
 
-```bash
+```bash linenums="0"
 docker compose exec -T postgres psql -U todo -d todo_platform -f /migrations/000001_create_todos.up.sql
 ```
 
 查看表和迁移版本：
 
-```bash
+```bash linenums="0"
 docker compose exec postgres psql -U todo -d todo_platform -c "\dt"
 docker compose exec postgres psql -U todo -d todo_platform -c "SELECT version, applied_at FROM schema_migrations ORDER BY version;"
 ```
 
 运行普通测试：
 
-```bash
+```bash linenums="0"
 go test ./api/...
 ```
 
 运行 PostgreSQL 集成测试：
 
-```bash
+```bash linenums="0"
 docker compose exec postgres createdb -U todo -O todo todo_platform_test || true
 TODO_TEST_DATABASE_DSN='postgres://todo:todo_password@127.0.0.1:5432/todo_platform_test?sslmode=disable' TODO_ALLOW_DATABASE_RESET=true go test ./api/internal/repository -run Postgres -count=1
 ```
@@ -1092,19 +1075,19 @@ TODO_TEST_DATABASE_DSN='postgres://todo:todo_password@127.0.0.1:5432/todo_platfo
 
 构建 API：
 
-```bash
+```bash linenums="0"
 go build -o bin/todo-api ./api/cmd/todo-api
 ```
 
 启动 PostgreSQL 版 API：
 
-```bash
+```bash linenums="0"
 TODO_DATABASE_DSN='postgres://todo:todo_password@127.0.0.1:5432/todo_platform?sslmode=disable' TODO_API_ADDR=127.0.0.1:18080 ./bin/todo-api
 ```
 
 另开一个终端，创建并查询 Todo：
 
-```bash
+```bash linenums="0"
 curl -s -X POST http://127.0.0.1:18080/api/v2/todos \
   -H 'Content-Type: application/json' \
   -d '{"title":"persist with PostgreSQL"}'
@@ -1114,7 +1097,7 @@ curl -s http://127.0.0.1:18080/api/v2/todos
 
 停止 API 后重新启动，再次查询：
 
-```bash
+```bash linenums="0"
 curl -s http://127.0.0.1:18080/api/v2/todos
 ```
 
@@ -1124,7 +1107,7 @@ curl -s http://127.0.0.1:18080/api/v2/todos
 
 迁移执行后，`\dt` 输出类似：
 
-```text
+```text linenums="0"
               List of relations
  Schema |       Name        | Type  | Owner
 --------+-------------------+-------+-------
@@ -1135,7 +1118,7 @@ curl -s http://127.0.0.1:18080/api/v2/todos
 
 迁移版本查询输出类似：
 
-```text
+```text linenums="0"
        version        |          applied_at
 ----------------------+-------------------------------
  000001_create_todos  | 2026-05-28 10:00:00.000000+00
@@ -1143,13 +1126,13 @@ curl -s http://127.0.0.1:18080/api/v2/todos
 
 集成测试通过时，输出类似：
 
-```text
+```text linenums="0"
 ok  	cloud-native-todo-platform/api/internal/repository	0.42s
 ```
 
 API 启动日志中应能看到：
 
-```json
+```json linenums="0"
 {"level":"INFO","msg":"using postgres repository"}
 {"level":"INFO","msg":"todo api starting","addr":"127.0.0.1:18080"}
 ```
@@ -1158,25 +1141,25 @@ API 启动日志中应能看到：
 
 验证数据库表存在：
 
-```bash
+```bash linenums="0"
 docker compose exec postgres psql -U todo -d todo_platform -c "\d todos"
 ```
 
 验证事件记录：
 
-```bash
+```bash linenums="0"
 docker compose exec postgres psql -U todo -d todo_platform -c "SELECT todo_id, event_type FROM todo_events ORDER BY id;"
 ```
 
 验证状态索引可能被使用：
 
-```bash
+```bash linenums="0"
 docker compose exec postgres psql -U todo -d todo_platform -c "EXPLAIN SELECT id, title, status FROM todos WHERE status = 'pending' ORDER BY id;"
 ```
 
 验证没有设置数据库时仍能使用内存模式：
 
-```bash
+```bash linenums="0"
 TODO_API_ADDR=127.0.0.1:18080 ./bin/todo-api
 ```
 
@@ -1186,19 +1169,17 @@ TODO_API_ADDR=127.0.0.1:18080 ./bin/todo-api
 
 停止 API 后，停止数据库容器但保留数据卷：
 
-```bash
+```bash linenums="0"
 docker compose down
 ```
 
 如果你要彻底删除本篇数据库数据：
 
-```bash
+```bash linenums="0"
 docker compose down -v
 ```
 
 `-v` 会删除数据卷，Todo 数据会丢失。只有确认不需要保留本地实验数据时再执行。
-
-预计耗时：20 分钟阅读，70 分钟动手实验。
 
 ## 6. 常见错误与排障
 
@@ -1206,14 +1187,14 @@ docker compose down -v
 
 - **现象**：
 
-  ```text
+  ```text linenums="0"
   dial tcp 127.0.0.1:5432: connect: connection refused
   ```
 
 - **原因**：PostgreSQL 容器没有启动、端口没有映射，或服务还没 ready。
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   docker compose ps
   docker compose logs postgres
   docker compose exec postgres pg_isready -U todo -d todo_platform
@@ -1226,21 +1207,21 @@ docker compose down -v
 
 - **现象**：
 
-  ```text
+  ```text linenums="0"
   password authentication failed for user "todo"
   ```
 
 - **原因**：DSN 中用户名、密码、数据库名和 `docker-compose.yml` 不一致。
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   echo "$TODO_DATABASE_DSN"
   docker compose exec postgres psql -U todo -d todo_platform -c "SELECT current_user;"
   ```
 
 - **修复**：使用本篇统一 DSN：
 
-  ```bash
+  ```bash linenums="0"
   postgres://todo:todo_password@127.0.0.1:5432/todo_platform?sslmode=disable
   ```
 
@@ -1250,20 +1231,20 @@ docker compose down -v
 
 - **现象**：
 
-  ```text
+  ```text linenums="0"
   ERROR: relation "todos" does not exist
   ```
 
 - **原因**：数据库已启动，但还没有执行迁移。
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   docker compose exec postgres psql -U todo -d todo_platform -c "\dt"
   ```
 
 - **修复**：
 
-  ```bash
+  ```bash linenums="0"
   docker compose exec -T postgres psql -U todo -d todo_platform -f /migrations/000001_create_todos.up.sql
   ```
 
@@ -1273,21 +1254,21 @@ docker compose down -v
 
 - **现象**：
 
-  ```text
+  ```text linenums="0"
   set TODO_TEST_DATABASE_DSN to run PostgreSQL integration tests
   ```
 
 - **原因**：本篇故意让普通 `go test ./api/...` 不依赖数据库；只有设置环境变量才跑集成测试。
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   echo "$TODO_TEST_DATABASE_DSN"
   echo "$TODO_ALLOW_DATABASE_RESET"
   ```
 
 - **修复**：
 
-  ```bash
+  ```bash linenums="0"
   docker compose exec postgres createdb -U todo -O todo todo_platform_test || true
   TODO_TEST_DATABASE_DSN='postgres://todo:todo_password@127.0.0.1:5432/todo_platform_test?sslmode=disable' TODO_ALLOW_DATABASE_RESET=true go test ./api/internal/repository -run Postgres -count=1
   ```
@@ -1300,7 +1281,7 @@ docker compose down -v
 - **原因**：没有设置 `TODO_DATABASE_DSN`。
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   echo "$TODO_DATABASE_DSN"
   ```
 
@@ -1319,93 +1300,13 @@ docker compose down -v
 
 5. **集成测试和错误信息都要隔离风险**。本篇用 `todo_platform_test` 跑会重置 schema 的测试，避免误删开发库。生产团队通常会让 CI 为每次测试创建临时数据库、临时 schema 或容器化数据库实例，测试结束后整体销毁。服务端日志可以记录数据库错误细节，但 HTTP 响应不要暴露 SQL、表名、连接串或内部结构。
 
-## 8. 本章小项目
+## 8. 练习题与面试题
 
-本章小项目是 **Todo API v3 PostgreSQL 持久化**。项目目标是在不改变 HTTP API 契约的前提下，把 Todo 数据从内存切换到 PostgreSQL，让数据在服务重启后仍然存在，并用事务记录 Todo 事件。
+本章练习题和面试题已拆分到独立页面，完成正文学习后再进入题库练习与复盘。
 
-交付物包括：
+[查看本章练习题与面试题](../../questions/stage-02-go-backend/12-database.md)
 
-- `docker-compose.yml`
-- `api/migrations/000001_create_todos.up.sql`
-- `api/migrations/000001_create_todos.down.sql`
-- `api/internal/database/postgres.go`
-- `api/internal/repository/postgres.go`
-- `api/internal/repository/postgres_integration_test.go`
-- 更新后的 `api/cmd/todo-api/main.go`
-
-能力验收标准：
-
-- 能启动 PostgreSQL 18 并执行迁移。
-- 能解释 `todos` 和 `todo_events` 的字段、约束和索引。
-- 能运行 PostgreSQL 集成测试。
-- 能启动 `TODO_DATABASE_DSN=... ./bin/todo-api` 并完成 Todo CRUD。
-- 能停止并重启 API 后确认 Todo 数据仍然存在。
-- 能说明事务如何保证 Todo 变更和事件记录一致。
-
-## 9. 本章练习题
-
-### 9.1 基础题
-
-1. PostgreSQL 相比进程内存存储解决了哪些问题？
-2. `*sql.DB` 是单个连接还是连接池？为什么不能每个请求都 `sql.Open`？
-3. `TIMESTAMPTZ` 和普通字符串保存时间相比有什么优势？
-4. `RETURNING` 在 PostgreSQL 中有什么作用？
-5. 为什么数据库约束不能完全被服务层校验替代？
-
-### 9.2 实操题
-
-1. 给 `todos` 表增加 `priority` 字段，允许值为 `low`、`normal`、`high`，默认 `normal`。不要修改已有 `000001` 迁移，新增 `000002_add_todo_priority.up.sql` 和对应 down 迁移。验收标准：迁移 SQL、Repository 查询和集成测试都能通过。
-2. 给列表接口增加按 `created_at DESC` 排序的 Repository 方法。验收标准：插入 3 条 Todo 后，测试能验证最新创建的 Todo 排在前面。
-3. 给 `todo_events` 增加 `request_id` 字段。验收标准：迁移文件包含字段，事件插入 SQL 能写入固定测试值。
-
-### 9.3 思考题
-
-1. 如果 `MarkDone` 已经把 Todo 改成 `done`，但写事件失败，你希望 API 返回成功还是失败？为什么？
-2. 如果 API 副本数从 1 个增加到 10 个，数据库连接池参数应该如何重新评估？
-
-## 10. 本章面试题
-
-### 面试题 1：为什么生产后端服务通常不用本地文件或内存保存核心数据？
-
-**一句话结论**：因为本地文件和内存无法可靠支持多实例、并发写入、复杂查询、事务和运维能力。
-
-**展开解释**：内存重启就丢，文件很难处理并发写和多副本共享。数据库提供表结构、约束、索引、事务、备份恢复、权限和监控，是生产服务保存核心业务数据的标准选择。
-
-**深入追问**：不是所有数据都必须进关系型数据库。缓存、日志、对象文件、搜索索引各有系统承载，但订单、用户、权限、Todo 这类结构化核心数据通常应进入数据库。
-
-### 面试题 2：`database/sql` 中的 `*sql.DB` 是什么？
-
-**一句话结论**：`*sql.DB` 是并发安全的连接池句柄，不是单条连接。
-
-**展开解释**：应用启动时创建一个 `*sql.DB` 并复用。每次查询、执行或事务会从池里借用连接。可以通过 `SetMaxOpenConns`、`SetMaxIdleConns`、`SetConnMaxLifetime` 控制连接数量和生命周期。
-
-**深入追问**：如果每个请求都 `sql.Open`，会造成连接资源浪费、认证开销增加、数据库连接数失控，还会让排障变复杂。
-
-### 面试题 3：事务解决什么问题？
-
-**一句话结论**：事务保证一组数据库操作要么全部提交，要么全部回滚。
-
-**展开解释**：本篇 `MarkDone` 同时更新 Todo 状态和写入事件。如果没有事务，可能状态已经变成 `done`，但事件写入失败。放进同一个事务后，任何一步失败都会回滚，数据保持一致。
-
-**深入追问**：事务不是越大越好。事务越长，锁持有时间越长。生产中应把事务边界控制在必须一致的数据库操作范围内。
-
-### 面试题 4：GORM、sqlc 和 `database/sql` 如何选择？
-
-**一句话结论**：看团队对 SQL 控制力、开发效率和类型安全的权衡。
-
-**展开解释**：`database/sql` 适合学习底层机制和核心路径，SQL 明确但样板代码多。GORM 开发快，适合 CRUD 较多的后台系统，但要理解它生成的 SQL。sqlc 基于手写 SQL 生成类型安全代码，适合 SQL 复杂且团队愿意维护 SQL 文件的项目。
-
-**深入追问**：无论选哪种工具，都不能绕过数据库基本功。索引、事务、连接池、慢查询和迁移风险仍然需要工程师理解。
-
-### 面试题 5：数据库迁移为什么不能随便手工执行？
-
-**一句话结论**：因为数据库结构是生产状态的一部分，必须可追踪、可审查、可重复和可回滚。
-
-**展开解释**：手工改库容易遗漏环境、执行顺序不可追踪，也很难知道线上到底执行了哪些变更。迁移文件用版本记录结构变化，能让开发、测试、生产环境保持一致。
-
-**深入追问**：破坏性迁移要特别谨慎，例如删除字段、重写大表、添加非空字段。常见做法是分阶段上线：先加兼容字段，再改代码写入，最后清理旧字段。
-
-## 11. 本章总结
+## 9. 本章总结
 
 本篇把 Todo API 从内存存储升级到了 PostgreSQL 持久化。你设计了 `todos` 和 `todo_events` 两张表，编写了 up/down 迁移脚本，使用 Docker Compose 启动 PostgreSQL 18，并通过 `database/sql` + pgx 实现了 PostgreSQL Repository。
 
@@ -1413,7 +1314,7 @@ docker compose down -v
 
 能力价值上，你已经具备了后端工程师最常见的数据层能力：建表、写 SQL、设计索引、管理迁移、配置连接池、处理事务和编写数据库集成测试。后续进入 Redis、Docker 和 Kubernetes 时，PostgreSQL 会继续作为 Todo Platform 的核心依赖存在。
 
-## 12. 下一章衔接
+## 10. 下一章衔接
 
 第 13 篇会在 PostgreSQL 持久化的基础上引入 Redis。数据库适合保存权威数据，但高频读取、限流计数、短期缓存和简单异步任务更适合交给 Redis 这类内存数据系统处理。
 

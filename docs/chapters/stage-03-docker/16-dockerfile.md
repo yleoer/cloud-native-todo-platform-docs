@@ -48,14 +48,14 @@
 
 你还需要能执行：
 
-```bash
+```bash linenums="0"
 docker version
 docker buildx version
 ```
 
 本篇的 Dockerfile 位于 `api/Dockerfile`，但构建命令必须在项目根目录执行，并使用根目录作为构建上下文：
 
-```bash
+```bash linenums="0"
 docker build -f api/Dockerfile -t todo-api:v0.1.0 .
 ```
 
@@ -87,32 +87,11 @@ Dockerfile 的工作不是“把命令写进文件”这么简单。它把服务
 
 本篇实验会模拟这条协作链路：先写 Dockerfile，再构建、运行、扫描、分析和推送镜像。你不仅要能让镜像跑起来，还要能解释为什么这样构建更适合生产交付。
 
-### 2.3 课程项目关联
+### 2.3 Todo 平台模拟案例
 
-本篇会把第 15 篇的临时运行方式：
+> Todo API 需要从“源码挂载后 go run”升级为可发布镜像。你需要编写多阶段 Dockerfile，把二进制、配置、迁移脚本、OCI Label 和非 root 运行用户放进可审查的镜像构建流程。
 
-```text
-registry.cn-guangzhou.aliyuncs.com/yleoer/golang:1.26-bookworm + 源码挂载 + go run ./api/cmd/todo-api serve
-```
-
-升级为可发布镜像：
-
-```text
-todo-api:v0.1.0
-├── /app/todo-api          # 已编译 Go 二进制
-├── /app/configs           # 配置文件
-├── /app/api/migrations    # 数据库迁移脚本
-├── OCI Labels             # 版本、commit、构建时间
-└── nonroot 用户            # 非 root 运行
-```
-
-本篇产出会被后续章节复用：
-
-- 第 17 篇会在 Docker Compose 中直接使用 `todo-api:v0.1.0`，不再用 `golang` 镜像临时运行源码。
-- 第 18 篇会基于本篇镜像观察镜像层、rootfs、进程和文件系统隔离。
-- 第 19 篇会把本篇镜像导入 containerd / kind 节点，观察 Docker、containerd、runc 和 CRI 的关系。
-- 第 29 篇 CI/CD 会把本篇手工构建和推送流程自动化。
-
+这个案例关注镜像质量：体积、权限、构建缓存、版本信息和运行用户都会影响交付安全性和可维护性。
 ## 3. 核心概念
 
 ### 3.1 Dockerfile 是什么
@@ -121,14 +100,14 @@ Dockerfile 是镜像构建说明书。它描述基础镜像是什么、复制哪
 
 最小 Dockerfile 可以只有两行：
 
-```dockerfile
+```dockerfile linenums="0"
 FROM registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23
 CMD ["echo", "hello dockerfile"]
 ```
 
 构建并运行：
 
-```bash
+```bash linenums="0"
 docker build -t hello-dockerfile -f Dockerfile .
 docker run --rm hello-dockerfile
 ```
@@ -141,7 +120,7 @@ docker run --rm hello-dockerfile
 
 执行下面命令时，最后的 `.` 是构建上下文：
 
-```bash
+```bash linenums="0"
 docker build -f api/Dockerfile -t todo-api:v0.1.0 .
 ```
 
@@ -149,7 +128,7 @@ Docker 客户端会把构建上下文中的文件发送给 Docker daemon。Docke
 
 本课程项目采用根目录作为构建上下文，因为 Dockerfile 需要读取：
 
-```text
+```text linenums="0"
 cloud-native-todo-platform/
 ├── go.mod
 ├── go.sum
@@ -168,7 +147,7 @@ cloud-native-todo-platform/
 
 最常见的排除对象包括：
 
-```dockerignore
+```dockerignore linenums="0"
 .git
 .env
 *.log
@@ -185,7 +164,7 @@ Dockerfile 中的很多指令会产生镜像层。Docker 会尽量复用前一�
 
 Go 项目常见写法是先复制依赖清单，再下载 module：
 
-```dockerfile
+```dockerfile linenums="0"
 COPY go.mod go.sum ./
 RUN --mount=type=cache,target=/go/pkg/mod go mod download
 COPY . .
@@ -198,7 +177,7 @@ RUN go build -o /out/todo-api ./api/cmd/todo-api
 
 Go 服务编译时需要 Go 工具链，运行时通常只需要编译好的二进制、配置文件、证书和少量运行依赖。多阶段构建把这两件事拆开：
 
-```text
+```text linenums="0"
 builder 阶段：使用 golang 镜像，下载依赖、运行测试、编译二进制
 runtime 阶段：使用 distroless 镜像，只复制二进制、配置和迁移脚本
 ```
@@ -211,19 +190,23 @@ runtime 阶段：使用 distroless 镜像，只复制二进制、配置和迁移
 
 本篇 Dockerfile 使用：
 
-```dockerfile
+```dockerfile linenums="0"
 ENTRYPOINT ["/app/todo-api"]
 CMD ["serve"]
 ```
 
 默认启动等价于：
 
-```text
+```text linenums="0"
 /app/todo-api serve
 ```
 
 如果你覆盖 `CMD`，同一个镜像还能执行运维命令。`config-check` 会校验 JWT Secret 和认证用户，因此需要显式传入本地实验环境变量：
 
+<<<<<<< HEAD
+```bash linenums="0"
+docker run --rm todo-api:v0.1.0 config-check
+=======
 ```bash
 HASH=$(docker run --rm todo-api:v0.1.0 hash-password "change-me-123")
 docker run --rm \
@@ -231,6 +214,7 @@ docker run --rm \
   -e TODO_JWT_SECRET=0123456789abcdef0123456789abcdef \
   -e "TODO_AUTH_USERS=admin=${HASH}" \
   todo-api:v0.1.0 config-check
+>>>>>>> origin/main
 docker run --rm todo-api:v0.1.0 hash-password "change-me-123"
 docker run --rm todo-api:v0.1.0 migrate
 docker run --rm todo-api:v0.1.0 openapi
@@ -262,7 +246,7 @@ OCI（Open Container Initiative，开放容器标准组织）定义了容器镜�
 
 镜像标签是人类可读引用：
 
-```text
+```text linenums="0"
 todo-api:v0.1.0
 todo-api:git-a1b2c3d
 localhost:5000/todo-api:v0.1.0
@@ -330,13 +314,13 @@ flowchart TB
 
 Go 程序默认可能根据依赖和平台使用 CGO。CGO 会让二进制依赖系统动态库。把动态链接二进制复制进 distroless static 镜像时，可能出现一个很迷惑的错误：
 
-```text
+```text linenums="0"
 exec /app/todo-api: no such file or directory
 ```
 
 文件明明存在，却提示找不到，常见原因是动态链接器或系统库不存在。本篇使用：
 
-```bash
+```bash linenums="0"
 CGO_ENABLED=0 GOOS=linux go build
 ```
 
@@ -353,7 +337,7 @@ CGO_ENABLED=0 GOOS=linux go build
 
 本篇的边界是：
 
-```text
+```text linenums="0"
 构建时：go mod download -> go test ./... -> go build
 运行时：/app/todo-api serve
 运维时：/app/todo-api config-check / migrate / openapi / hash-password
@@ -398,6 +382,8 @@ flowchart LR
 
 ## 5. 手把手实验
 
+预计耗时：120 分钟（阅读约 40 分钟，动手实验约 80 分钟）。
+
 ### 5.1 实验目标
 
 本实验会完成一条完整镜像构建链路：
@@ -432,7 +418,7 @@ flowchart LR
 
 确认 Docker 和 buildx 可用：
 
-```bash
+```bash linenums="0"
 docker version
 docker buildx version
 ```
@@ -443,7 +429,7 @@ docker buildx version
 
 === "Linux / macOS / WSL2"
 
-    ```bash
+    ```bash linenums="0"
     hadolint --version || true
     dive --version || true
     trivy --version || true
@@ -452,7 +438,7 @@ docker buildx version
 
 === "Windows PowerShell"
 
-    ```powershell
+    ```powershell linenums="0"
     if (Get-Command hadolint -ErrorAction SilentlyContinue) { hadolint --version } else { "hadolint not installed" }
     if (Get-Command dive -ErrorAction SilentlyContinue) { dive --version } else { "dive not installed" }
     if (Get-Command trivy -ErrorAction SilentlyContinue) { trivy --version } else { "trivy not installed" }
@@ -465,7 +451,7 @@ docker buildx version
 
 === "Linux / macOS / WSL2"
 
-    ```bash
+    ```bash linenums="0"
     test -f go.mod
     test -f go.sum
     test -d api/cmd/todo-api
@@ -475,7 +461,7 @@ docker buildx version
 
 === "Windows PowerShell"
 
-    ```powershell
+    ```powershell linenums="0"
     Test-Path .\go.mod
     Test-Path .\go.sum
     Test-Path .\api\cmd\todo-api
@@ -489,7 +475,7 @@ docker buildx version
 
 本篇新增两个文件：
 
-```text
+```text linenums="0"
 cloud-native-todo-platform/
 ├── .dockerignore
 ├── configs/
@@ -646,7 +632,7 @@ CMD ["serve"]
 
 === "Linux / macOS / WSL2"
 
-    ```bash
+    ```bash linenums="0"
     VERSION=v0.1.0
     COMMIT=$(git rev-parse --short HEAD 2>/dev/null || echo unknown)
     BUILD_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
@@ -654,7 +640,7 @@ CMD ["serve"]
 
 === "Windows PowerShell"
 
-    ```powershell
+    ```powershell linenums="0"
     $VERSION = "v0.1.0"
     $COMMIT = git rev-parse --short HEAD
     if (-not $COMMIT) { $COMMIT = "unknown" }
@@ -665,7 +651,7 @@ CMD ["serve"]
 
 === "Linux / macOS / WSL2"
 
-    ```bash
+    ```bash linenums="0"
     docker build \
       -f api/Dockerfile \
       --build-arg GOPROXY=https://goproxy.cn,direct \
@@ -679,7 +665,7 @@ CMD ["serve"]
 
 === "Windows PowerShell"
 
-    ```powershell
+    ```powershell linenums="0"
     docker build `
       -f api/Dockerfile `
       --build-arg GOPROXY=https://goproxy.cn,direct `
@@ -695,25 +681,25 @@ CMD ["serve"]
 
 查看镜像列表：
 
-```bash
+```bash linenums="0"
 docker image ls todo-api
 ```
 
 查看镜像历史：
 
-```bash
+```bash linenums="0"
 docker history todo-api:v0.1.0
 ```
 
 查看镜像运行用户、入口命令和默认参数：
 
-```bash
+```bash linenums="0"
 docker image inspect todo-api:v0.1.0 --format '{{.Config.User}} {{.Config.Entrypoint}} {{.Config.Cmd}}'
 ```
 
 查看 OCI Label：
 
-```bash
+```bash linenums="0"
 docker image inspect todo-api:v0.1.0 --format '{{json .Config.Labels}}'
 ```
 
@@ -721,14 +707,14 @@ docker image inspect todo-api:v0.1.0 --format '{{json .Config.Labels}}'
 
 === "Linux / macOS / WSL2"
 
-    ```bash
+    ```bash linenums="0"
     HASH=$(docker run --rm todo-api:v0.1.0 hash-password "change-me-123")
     echo "$HASH"
     ```
 
 === "Windows PowerShell"
 
-    ```powershell
+    ```powershell linenums="0"
     $hash = docker run --rm todo-api:v0.1.0 hash-password "change-me-123"
     $hash
     ```
@@ -737,7 +723,7 @@ docker image inspect todo-api:v0.1.0 --format '{{json .Config.Labels}}'
 
 === "Linux / macOS / WSL2"
 
-    ```bash
+    ```bash linenums="0"
     docker run --rm \
       -e TODO_ENV=dev \
       -e TODO_JWT_SECRET=0123456789abcdef0123456789abcdef \
@@ -747,7 +733,7 @@ docker image inspect todo-api:v0.1.0 --format '{{json .Config.Labels}}'
 
 === "Windows PowerShell"
 
-    ```powershell
+    ```powershell linenums="0"
     docker run --rm `
       -e TODO_ENV=dev `
       -e TODO_JWT_SECRET=0123456789abcdef0123456789abcdef `
@@ -759,7 +745,7 @@ docker image inspect todo-api:v0.1.0 --format '{{json .Config.Labels}}'
 
 === "Linux / macOS / WSL2"
 
-    ```bash
+    ```bash linenums="0"
     docker rm -f todo-api todo-postgres todo-redis 2>/dev/null || true
     docker network inspect todo-net >/dev/null 2>&1 || docker network create todo-net
     docker volume create todo-postgres-data
@@ -768,7 +754,7 @@ docker image inspect todo-api:v0.1.0 --format '{{json .Config.Labels}}'
 
 === "Windows PowerShell"
 
-    ```powershell
+    ```powershell linenums="0"
     docker rm -f todo-api todo-postgres todo-redis 2>$null
     docker network inspect todo-net *> $null
     if ($LASTEXITCODE -ne 0) { docker network create todo-net }
@@ -778,7 +764,7 @@ docker image inspect todo-api:v0.1.0 --format '{{json .Config.Labels}}'
 
 启动 PostgreSQL：
 
-```bash
+```bash linenums="0"
 docker run -d \
   --name todo-postgres \
   --network todo-net \
@@ -793,7 +779,7 @@ docker run -d \
 
 Windows PowerShell 写法：
 
-```powershell
+```powershell linenums="0"
 docker run -d `
   --name todo-postgres `
   --network todo-net `
@@ -808,7 +794,7 @@ docker run -d `
 
 启动 Redis：
 
-```bash
+```bash linenums="0"
 docker run -d \
   --name todo-redis \
   --network todo-net \
@@ -820,7 +806,7 @@ docker run -d \
 
 Windows PowerShell 写法：
 
-```powershell
+```powershell linenums="0"
 docker run -d `
   --name todo-redis `
   --network todo-net `
@@ -834,7 +820,7 @@ docker run -d `
 
 === "Linux / macOS / WSL2"
 
-    ```bash
+    ```bash linenums="0"
     for i in $(seq 1 20); do
       if docker exec todo-postgres pg_isready -U todo -d todo_platform; then
         break
@@ -852,7 +838,7 @@ docker run -d `
 
 === "Windows PowerShell"
 
-    ```powershell
+    ```powershell linenums="0"
     for ($i = 1; $i -le 20; $i++) {
       docker exec todo-postgres pg_isready -U todo -d todo_platform
       if ($LASTEXITCODE -eq 0) { break }
@@ -870,7 +856,7 @@ docker run -d `
 
 === "Linux / macOS / WSL2"
 
-    ```bash
+    ```bash linenums="0"
     docker run --rm \
       --network todo-net \
       -e TODO_ENV=dev \
@@ -882,7 +868,7 @@ docker run -d `
 
 === "Windows PowerShell"
 
-    ```powershell
+    ```powershell linenums="0"
     docker run --rm `
       --network todo-net `
       -e TODO_ENV=dev `
@@ -896,7 +882,7 @@ docker run -d `
 
 === "Linux / macOS / WSL2"
 
-    ```bash
+    ```bash linenums="0"
     docker run -d \
       --name todo-api \
       --network todo-net \
@@ -912,7 +898,7 @@ docker run -d `
 
 === "Windows PowerShell"
 
-    ```powershell
+    ```powershell linenums="0"
     docker run -d `
       --name todo-api `
       --network todo-net `
@@ -930,7 +916,7 @@ docker run -d `
 
 === "Linux / macOS / WSL2"
 
-    ```bash
+    ```bash linenums="0"
     curl -i http://127.0.0.1:18080/healthz
 
     TOKEN=$(curl -s -H 'Content-Type: application/json' \
@@ -945,7 +931,7 @@ docker run -d `
 
 === "Windows PowerShell"
 
-    ```powershell
+    ```powershell linenums="0"
     curl.exe -i http://127.0.0.1:18080/healthz
 
     $login = curl.exe -s -H "Content-Type: application/json" -d "{\"username\":\"admin\",\"password\":\"change-me-123\"}" http://127.0.0.1:18080/api/v2/auth/login | ConvertFrom-Json
@@ -958,7 +944,7 @@ Linux / macOS / WSL2 如果没有安装 `jq`，先直接查看登录响应，再
 
 执行 hadolint 检查。已安装本地命令时使用：
 
-```bash
+```bash linenums="0"
 hadolint api/Dockerfile
 ```
 
@@ -966,13 +952,13 @@ hadolint api/Dockerfile
 
 === "Linux / macOS / WSL2"
 
-    ```bash
+    ```bash linenums="0"
     docker run --rm -i hadolint/hadolint:latest-debian < api/Dockerfile
     ```
 
 === "Windows PowerShell"
 
-    ```powershell
+    ```powershell linenums="0"
     Get-Content .\api\Dockerfile -Raw | docker run --rm -i hadolint/hadolint:latest-debian
     ```
 
@@ -980,7 +966,7 @@ hadolint api/Dockerfile
 
 CI 中可以把工具版本固定成普通环境变量，方便统一升级和审计。例如：
 
-```bash
+```bash linenums="0"
 HADOLINT_IMAGE="hadolint/hadolint:v2.14.0-debian"
 TRIVY_IMAGE="aquasec/trivy:0.67.2"
 
@@ -993,7 +979,7 @@ docker run --rm -v "$PWD:/work" "$TRIVY_IMAGE" image --input /work/todo-api-v0.1
 
 使用 `dive` 分析镜像层。已安装本地命令时使用：
 
-```bash
+```bash linenums="0"
 dive todo-api:v0.1.0
 ```
 
@@ -1001,13 +987,13 @@ dive todo-api:v0.1.0
 
 执行漏洞扫描。已安装 Trivy 时使用：
 
-```bash
+```bash linenums="0"
 trivy image --severity HIGH,CRITICAL todo-api:v0.1.0
 ```
 
 如果你使用 Docker Desktop，也可以执行：
 
-```bash
+```bash linenums="0"
 docker scout cves todo-api:v0.1.0
 ```
 
@@ -1017,7 +1003,7 @@ docker scout cves todo-api:v0.1.0
 
 启动本地 registry，演示推送镜像：
 
-```bash
+```bash linenums="0"
 docker rm -f todo-registry 2>/dev/null || true
 docker run -d --name todo-registry -p 127.0.0.1:5000:5000 registry:2
 docker tag todo-api:v0.1.0 localhost:5000/todo-api:v0.1.0
@@ -1027,7 +1013,7 @@ docker pull localhost:5000/todo-api:v0.1.0
 
 Windows PowerShell 写法：
 
-```powershell
+```powershell linenums="0"
 docker rm -f todo-registry 2>$null
 docker run -d --name todo-registry -p 127.0.0.1:5000:5000 registry:2
 docker tag todo-api:v0.1.0 localhost:5000/todo-api:v0.1.0
@@ -1037,7 +1023,7 @@ docker pull localhost:5000/todo-api:v0.1.0
 
 本地 registry 不需要登录，适合学习镜像推送流程。真实团队推送到 GHCR、Harbor 或云厂商镜像仓库时，需要先完成登录和命名空间配置，例如：
 
-```bash
+```bash linenums="0"
 docker login ghcr.io
 docker tag todo-api:v0.1.0 ghcr.io/<your-org>/todo-api:v0.1.0
 docker push ghcr.io/<your-org>/todo-api:v0.1.0
@@ -1049,7 +1035,7 @@ docker push ghcr.io/<your-org>/todo-api:v0.1.0
 
 镜像列表应能看到两个标签：
 
-```text
+```text linenums="0"
 REPOSITORY   TAG          IMAGE ID       CREATED          SIZE
 todo-api     v0.1.0       ...            ...              ...
 todo-api     git-a1b2c3d  ...            ...              ...
@@ -1057,37 +1043,37 @@ todo-api     git-a1b2c3d  ...            ...              ...
 
 镜像运行用户应为非 root：
 
-```text
+```text linenums="0"
 nonroot:nonroot [/app/todo-api] [serve]
 ```
 
 配置检查应输出类似日志：
 
-```text
+```text linenums="0"
 {"level":"INFO","msg":"configuration ok","env":"dev","addr":"0.0.0.0:18080"}
 ```
 
 迁移命令应输出：
 
-```text
+```text linenums="0"
 migration applied
 ```
 
 健康检查应返回：
 
-```text
+```text linenums="0"
 HTTP/1.1 200 OK
 ```
 
 创建 Todo 应返回：
 
-```text
+```text linenums="0"
 HTTP/1.1 201 Created
 ```
 
 本地 registry 推送应出现类似输出：
 
-```text
+```text linenums="0"
 The push refers to repository [localhost:5000/todo-api]
 ...
 v0.1.0: digest: sha256:... size: ...
@@ -1099,53 +1085,53 @@ v0.1.0: digest: sha256:... size: ...
 
 验证 Dockerfile 和 `.dockerignore` 已创建：
 
-```bash
+```bash linenums="0"
 test -f api/Dockerfile
 test -f .dockerignore
 ```
 
 Windows PowerShell：
 
-```powershell
+```powershell linenums="0"
 Test-Path .\api\Dockerfile
 Test-Path .\.dockerignore
 ```
 
 验证镜像包含必要文件，但不依赖 shell。distroless 镜像不能 `docker exec sh`，因此用应用自身命令验证：
 
-```bash
+```bash linenums="0"
 docker run --rm todo-api:v0.1.0 openapi
 docker run --rm todo-api:v0.1.0 hash-password "check-password"
 ```
 
 验证镜像非 root：
 
-```bash
+```bash linenums="0"
 docker image inspect todo-api:v0.1.0 --format '{{.Config.User}}'
 ```
 
 预期输出：
 
-```text
+```text linenums="0"
 nonroot:nonroot
 ```
 
 验证镜像标签包含 commit：
 
-```bash
+```bash linenums="0"
 docker image inspect todo-api:v0.1.0 --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}'
 ```
 
 验证容器实际运行镜像：
 
-```bash
+```bash linenums="0"
 docker inspect todo-api --format '{{.Config.Image}} {{.State.Status}} {{.State.ExitCode}}'
 docker logs --tail 80 todo-api
 ```
 
 验证容器网络：
 
-```bash
+```bash linenums="0"
 docker network inspect todo-net
 docker exec todo-postgres pg_isready -U todo -d todo_platform
 docker exec todo-redis redis-cli -a todo_redis_password ping
@@ -1153,7 +1139,7 @@ docker exec todo-redis redis-cli -a todo_redis_password ping
 
 验证本地 registry 中镜像可拉取：
 
-```bash
+```bash linenums="0"
 docker image rm localhost:5000/todo-api:v0.1.0
 docker pull localhost:5000/todo-api:v0.1.0
 ```
@@ -1173,38 +1159,36 @@ docker pull localhost:5000/todo-api:v0.1.0
 
 停止并删除实验容器。连续验证多阶段时，先确认这些容器不是前序阶段仍需保留的数据库或缓存环境：
 
-```bash
+```bash linenums="0"
 docker rm -f todo-api todo-postgres todo-redis todo-registry
 ```
 
 删除本篇创建的网络：
 
-```bash
+```bash linenums="0"
 docker network rm todo-net
 ```
 
 如果确认不需要保留实验数据，再删除数据卷：
 
-```bash
+```bash linenums="0"
 docker volume rm todo-postgres-data todo-redis-data
 ```
 
 删除本地镜像标签：
 
-```bash
+```bash linenums="0"
 docker image rm todo-api:v0.1.0
 docker image rm localhost:5000/todo-api:v0.1.0
 ```
 
 如果 `todo-api:git-<commit>` 仍然存在，先通过下面命令找到标签再删除：
 
-```bash
+```bash linenums="0"
 docker image ls todo-api
 ```
 
 清理时不要删除团队共享 registry 里的生产镜像。生产镜像的删除需要遵守保留策略、回滚策略和审计流程。
-
-预计耗时：120 分钟（阅读约 40 分钟，动手实验约 80 分钟）。
 
 ## 6. 常见错误与排障
 
@@ -1212,7 +1196,7 @@ docker image ls todo-api
 
 - **现象**：
 
-  ```text
+  ```text linenums="0"
   failed to compute cache key: "/go.mod" not found
   COPY failed: file not found in build context or excluded by .dockerignore: stat configs: file does not exist
   ```
@@ -1220,7 +1204,7 @@ docker image ls todo-api
 - **原因**：在 `api/` 目录中执行了 `docker build .`，导致构建上下文只有 `api/`；或者 `.dockerignore` 误排除了 `configs/`、`api/`、`go.mod`。
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   pwd
   test -f go.mod
   test -d configs
@@ -1231,7 +1215,7 @@ docker image ls todo-api
 
 - **修复**：回到项目根目录执行：
 
-  ```bash
+  ```bash linenums="0"
   docker build -f api/Dockerfile -t todo-api:v0.1.0 .
   ```
 
@@ -1241,7 +1225,7 @@ docker image ls todo-api
 
 - **现象**：
 
-  ```text
+  ```text linenums="0"
   failed to solve: registry.cn-guangzhou.aliyuncs.com/yleoer/static-debian12:nonroot: failed to resolve source metadata
   exec /app/todo-api: no such file or directory
   ```
@@ -1249,7 +1233,7 @@ docker image ls todo-api
 - **原因**：第一类问题是网络、代理或公司镜像策略导致无法拉取 `registry.cn-guangzhou.aliyuncs.com/yleoer/static-debian12:nonroot`。第二类问题是文件可能真的没复制进去，也可能是二进制依赖动态链接器或系统库，而 distroless static 镜像里没有这些依赖。
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   docker pull registry.cn-guangzhou.aliyuncs.com/yleoer/static-debian12:nonroot
   docker image inspect todo-api:v0.1.0 --format '{{.Config.Entrypoint}}'
   docker history todo-api:v0.1.0
@@ -1259,7 +1243,7 @@ docker image ls todo-api
 
 - **修复**：确保构建命令包含：
 
-  ```dockerfile
+  ```dockerfile linenums="0"
   CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/todo-api ./api/cmd/todo-api
   ```
 
@@ -1271,7 +1255,7 @@ docker image ls todo-api
 
 - **现象**：
 
-  ```text
+  ```text linenums="0"
   TODO_JWT_SECRET must be at least 32 bytes
   at least one auth user is required
   ```
@@ -1279,7 +1263,7 @@ docker image ls todo-api
 - **原因**：镜像默认 `TODO_ENV=prod`，生产配置要求显式设置 JWT Secret 和登录用户；或者运行命令忘了传 `TODO_AUTH_USERS`。
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   docker run --rm todo-api:v0.1.0 config-check
   docker image inspect todo-api:v0.1.0 --format '{{json .Config.Env}}'
   ```
@@ -1288,7 +1272,7 @@ docker image ls todo-api
 
 - **修复**：先用镜像生成密码哈希，再传入环境变量：
 
-  ```bash
+  ```bash linenums="0"
   HASH=$(docker run --rm todo-api:v0.1.0 hash-password "change-me-123")
   docker run --rm \
     -e TODO_ENV=dev \
@@ -1303,20 +1287,20 @@ docker image ls todo-api
 
 - **现象**：
 
-  ```text
+  ```text linenums="0"
   curl: (7) Failed to connect to 127.0.0.1 port 18080
   ```
 
   或 Docker 日志里看到服务监听：
 
-  ```text
+  ```text linenums="0"
   "addr":"127.0.0.1:18080"
   ```
 
 - **原因**：容器内服务监听了 `127.0.0.1`，Docker 端口映射无法从宿主机转到容器内部回环地址；或者 `-p` 端口映射写错。
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   docker logs --tail 80 todo-api
   docker port todo-api
   docker inspect todo-api --format '{{json .NetworkSettings.Ports}}'
@@ -1326,7 +1310,7 @@ docker image ls todo-api
 
 - **修复**：启动容器时设置：
 
-  ```bash
+  ```bash linenums="0"
   -e TODO_API_ADDR=0.0.0.0:18080
   -p 127.0.0.1:18080:18080
   ```
@@ -1337,7 +1321,7 @@ docker image ls todo-api
 
 - **现象**：
 
-  ```text
+  ```text linenums="0"
   docker image ls todo-api
   # SIZE 过大
   ```
@@ -1347,7 +1331,7 @@ docker image ls todo-api
 - **原因**：`.dockerignore` 缺失或规则不完整；Dockerfile 把整个上下文复制到了运行镜像；构建产物、日志和密钥没有排除。
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   docker build -f api/Dockerfile -t todo-api:v0.1.0 --progress=plain .
   docker history todo-api:v0.1.0
   dive todo-api:v0.1.0
@@ -1370,144 +1354,13 @@ docker image ls todo-api
 
 5. **构建流程必须可复现、可缓存、可审计**。本地构建成功不代表 CI 构建稳定。生产流水线应固定 Go 版本、基础镜像标签、构建参数和构建平台；记录 commit、构建时间、构建人或流水线编号；使用 registry 保留策略支持回滚，而不是只保留最新镜像。
 
-## 8. 本章小项目
+## 8. 练习题与面试题
 
-本章小项目是 **Todo API 生产风格镜像**。目标是把第 15 篇的源码挂载运行方式升级为可发布镜像。
+本章练习题和面试题已拆分到独立页面，完成正文学习后再进入题库练习与复盘。
 
-项目产出：
+[查看本章练习题与面试题](../../questions/stage-03-docker/16-dockerfile.md)
 
-- 根目录 `.dockerignore`。
-- `api/Dockerfile`。
-- 本地镜像 `todo-api:v0.1.0`。
-- Git 标签镜像 `todo-api:git-<commit>`。
-- 本地 registry 镜像 `localhost:5000/todo-api:v0.1.0`。
-- 一份镜像构建记录，可以放入应用仓库 `docs/docker/chapter-16-image-build-record.md`。
-
-最小验收标准：
-
-- `docker build -f api/Dockerfile -t todo-api:v0.1.0 .` 构建成功。
-- `docker image inspect todo-api:v0.1.0 --format '{{.Config.User}}'` 输出 `nonroot:nonroot`。
-- `docker run --rm todo-api:v0.1.0 hash-password "change-me-123"` 能输出 bcrypt 哈希。
-- `docker run --rm ... todo-api:v0.1.0 config-check` 能通过配置检查。
-- `docker run -d --name todo-api ... todo-api:v0.1.0` 后 `/healthz` 返回 `200 OK`。
-- 登录接口能返回 JWT，带 Token 创建 Todo 返回 `201 Created`。
-- 你能解释为什么 Dockerfile 在 `api/` 目录，而构建上下文仍然使用项目根目录。
-
-进阶验收标准：
-
-- `hadolint api/Dockerfile` 无严重问题，或你能解释并记录每个告警的处理决定。
-- `docker history todo-api:v0.1.0` 或 `dive todo-api:v0.1.0` 的层分析结果已记录。
-- `trivy image --severity HIGH,CRITICAL todo-api:v0.1.0` 或 Docker Scout 扫描结果已记录。
-- `docker push localhost:5000/todo-api:v0.1.0` 成功，并能重新 `docker pull`。
-- 你能说明本地教学工具可以临时使用浮动标签，但 CI 中应固定工具版本或 digest。
-
-构建记录模板：
-
-```markdown title="docs/docker/chapter-16-image-build-record.md"
-# Chapter 16 Image Build Record
-
-## 基础信息
-
-- 操作系统：
-- Docker 版本：
-- Git commit：
-- 镜像标签：
-- 构建时间：
-
-## 构建结果
-
-- 构建命令：
-- 镜像大小：
-- Config.User：
-- Entrypoint / Cmd：
-- OCI Label：
-
-## 工具检查
-
-- hadolint 结果：
-- docker history 观察：
-- dive 观察：
-- trivy / Docker Scout 结果：
-
-## 运行验证
-
-- config-check：
-- migrate：
-- /healthz：
-- 登录：
-- 创建 Todo：
-
-## 排障记录
-
-| 问题 | 现象 | 原因 | 修复 | 预防 |
-|---|---|---|---|---|
-|  |  |  |  |  |
-```
-
-## 9. 本章练习题
-
-### 基础题
-
-1. Dockerfile 中 `RUN`、`ENTRYPOINT`、`CMD` 分别在什么时候生效？为什么不能把长期运行的服务写进 `RUN`？
-2. 为什么本篇要先 `COPY go.mod go.sum ./`，再 `COPY . .`？这和构建缓存有什么关系？
-3. `.dockerignore` 和 `.gitignore` 解决的问题有什么不同？为什么 `.gitignore` 不能替代 `.dockerignore`？
-4. 为什么运行镜像不应该使用完整 `golang` 镜像？多阶段构建解决了什么问题？
-5. 镜像标签和镜像 digest 有什么区别？为什么生产环境不能只依赖 `latest`？
-
-### 实操题
-
-1. 修改 Dockerfile，把 `TODO_ENV` 默认值从 `prod` 改为 `dev`，重新构建镜像并执行 `docker image inspect`。当你能在 `Config.Env` 中看到新默认值时，说明修改生效。完成后再改回 `prod`，避免把开发默认值带入后续章节。
-2. 故意删除 `.dockerignore` 中的 `site/` 或 `tmp/`，创建一个大文件后重新构建，观察 `transferring context` 和镜像构建耗时变化。当你能解释为什么上下文变大时，说明你理解了 `.dockerignore` 的作用。
-3. 把 `USER nonroot:nonroot` 临时删除后重新构建，执行 `docker image inspect todo-api:v0.1.0 --format '{{.Config.User}}'`。当输出为空或不是 `nonroot:nonroot` 时，说明你看到了默认用户风险。实验结束后必须恢复 `USER` 指令。
-
-### 思考题
-
-1. 如果安全扫描报告里出现一个 HIGH 漏洞，但业务必须今天上线，你会如何和开发、安全、SRE 一起评估是否阻塞发布？
-2. 如果 CI 中 Docker build 经常因为下载 Go module 超时失败，你会从构建缓存、代理、私有 module、基础镜像和流水线拆分几个角度怎么优化？
-
-## 10. 本章面试题
-
-### 面试题 1：什么是 Docker 多阶段构建？它解决了什么问题？
-
-**一句话结论**：多阶段构建把编译环境和运行环境拆开，最终镜像只保留运行必需文件，从而减小体积、降低漏洞面并提升交付可控性。
-
-**展开解释**：以 Go 服务为例，编译阶段需要 `golang` 镜像、module 缓存、测试工具和源码；运行阶段只需要编译后的二进制、配置文件和迁移脚本。Dockerfile 可以先在 builder 阶段执行 `go test` 和 `go build`，再在 runtime 阶段用 `COPY --from=builder` 复制产物。这样最终镜像不包含 Go 编译器和源码缓存，也更容易配合非 root、distroless 和漏洞扫描。
-
-**深入追问**：多阶段构建不是越多阶段越好。要根据缓存命中、测试策略、构建速度和可读性拆分阶段。生产中还会结合 BuildKit cache mount、registry cache、SBOM、provenance 和多平台构建，把本地 Dockerfile 扩展成 CI/CD 构建链路。
-
-### 面试题 2：`.dockerignore` 为什么重要？它和 `.gitignore` 有什么区别？
-
-**一句话结论**：`.dockerignore` 控制发送给 Docker daemon 的构建上下文，`.gitignore` 控制 Git 是否跟踪文件，两者作用域不同，不能互相替代。
-
-**展开解释**：Docker build 时，客户端会把构建上下文发送给 Docker daemon。即使某个文件没有提交到 Git，只要它在构建上下文里且没有被 `.dockerignore` 排除，就可能参与构建。`.env`、日志、大型临时文件、测试数据和旧二进制都可能拖慢构建或泄露敏感信息。因此 `.dockerignore` 是镜像构建安全和性能的一部分。
-
-**深入追问**：在 monorepo 中，`.dockerignore` 的设计更重要。不同服务可能共享一个根上下文，错误排除会导致构建失败，排除不足会导致上下文巨大。团队可以用 `docker build --progress=plain`、BuildKit 输出和 CI 检查来监控上下文大小。
-
-### 面试题 3：为什么容器要用非 root 用户运行？
-
-**一句话结论**：非 root 运行能降低应用漏洞被利用后的权限范围，是容器生产安全基线的一部分。
-
-**展开解释**：如果容器进程以 root 运行，攻击者拿到应用执行能力后，容器内文件修改、进程操作和潜在逃逸风险都会更高。非 root 不能解决所有安全问题，但能减少默认权限。配合只读文件系统、最小镜像、Capabilities 限制、Seccomp、AppArmor 和 Kubernetes SecurityContext，才能形成更完整的运行时防线。
-
-**深入追问**：非 root 运行需要应用配合。例如日志不能写固定 root 目录，临时文件要写 `/tmp` 或挂载目录，监听低端口需要额外能力。镜像构建时还要处理文件属主和权限，避免运行时出现 `permission denied`。
-
-### 面试题 4：`ENTRYPOINT` 和 `CMD` 怎么设计更适合后端服务？
-
-**一句话结论**：通常用 `ENTRYPOINT` 固定应用二进制，用 `CMD` 提供默认子命令，这样既有默认服务启动方式，也能方便覆盖执行迁移、配置检查和工具命令。
-
-**展开解释**：本篇使用 `ENTRYPOINT ["/app/todo-api"]` 和 `CMD ["serve"]`，默认运行 API 服务；执行 `docker run todo-api:v0.1.0 migrate` 时，Docker 会把 `migrate` 作为参数传给入口二进制。这样同一个镜像可以服务于启动、迁移、OpenAPI 输出、密码哈希和配置检查，减少“运行镜像”和“运维工具镜像”不一致的问题。
-
-**深入追问**：如果入口脚本过于复杂，可能掩盖信号处理、退出码和日志问题。Go 服务应正确处理 SIGTERM 和优雅关闭；迁移命令应该明确失败退出码，避免 CI/CD 或 Kubernetes Job 误判成功。
-
-### 面试题 5：镜像漏洞扫描发现 HIGH 漏洞时，你会怎么处理？
-
-**一句话结论**：先定位漏洞来源和可利用性，再判断是否升级基础镜像或依赖、是否阻塞发布，并把处理决策记录到发布流程中。
-
-**展开解释**：漏洞可能来自基础镜像 OS 包、Go module、间接依赖或扫描数据库误报。处理时要看严重等级、是否有修复版本、应用是否实际使用受影响功能、是否暴露攻击面，以及当前发布是否紧急。常见动作包括升级基础镜像、升级 Go 依赖、替换镜像、等待上游修复、增加临时缓解措施或阻塞发布。
-
-**深入追问**：成熟团队会把扫描放进 CI/CD 门禁，并定义策略，例如 CRITICAL 阻塞、HIGH 需要安全审批、无修复版本需记录例外。还会生成 SBOM，保存镜像 digest 和扫描报告，确保上线后可以追踪和重建。
-
-## 11. 本章总结
+## 9. 本章总结
 
 本章把 Todo API 从“用 Go 工具链容器临时运行源码”推进到“可构建、可运行、可扫描、可推送的应用镜像”。你学习了 Dockerfile 指令、构建上下文、`.dockerignore`、镜像层缓存、多阶段构建、非 root 用户、distroless 运行镜像、镜像标签、OCI Label、镜像分析和漏洞扫描。
 
@@ -1515,7 +1368,7 @@ docker image ls todo-api
 
 掌握本章后，你已经具备企业后端服务镜像化的核心能力：能写出可审查的 Dockerfile，能解释镜像每一层为什么存在，能排查构建和运行问题，也能和 DevOps、安全、SRE 团队围绕镜像交付进行有效协作。
 
-## 12. 下一章衔接
+## 10. 下一章衔接
 
 第 17 篇会把本篇构建出的 `todo-api:v0.1.0`、PostgreSQL 18、Redis 8.2 和端口、网络、数据卷、环境变量整理成 Docker Compose 本地编排。也就是说，第 15 篇手动理解运行参数，第 16 篇把 API 变成镜像，第 17 篇再把多容器环境变成一条 `docker compose up` 命令。
 

@@ -29,7 +29,7 @@
 
 如果只有第 35 篇的 CRD，平台仍然只是“能存 YAML”。业务团队创建了下面这个对象：
 
-```yaml
+```yaml linenums="0"
 apiVersion: platform.todo.example.com/v1alpha1
 kind: TodoApp
 metadata:
@@ -60,19 +60,11 @@ Controller 的价值不是“收到事件就执行一次脚本”，而是把用
 
 SRE 负责观察 Controller 运行状态：队列是否积压、Reconcile 是否频繁失败、API server 是否被打爆、leader election 是否正常、删除是否卡 finalizer。生产 Controller 不是写完逻辑就结束，它本身也要被监控、限流、排障和升级。
 
-### 2.3 课程项目关联
+### 2.3 Todo 平台模拟案例
 
-本篇承接第 35 篇的三个 CRD，输出第 37 篇手写 Controller 的设计草图：
+> Todo 平台需要一个控制循环来响应 `TodoApp` 和底层资源变化。你需要用简化程序模拟 watch、队列、去重、重试和 reconcile 决策，看清 Controller 如何把期望状态推进到实际状态。
 
-- `TodoApp` 变化时，Controller 要创建或更新 Deployment、Service、Ingress 和观测配置。
-- `TodoDatabase`、`TodoCache` 变化时，可能影响 `TodoApp` 的连接信息和 Ready 状态。
-- Deployment、Service、Ingress 等底层资源变化时，也要反向触发拥有者 `TodoApp` 的 Reconcile。
-- Controller 每次 Reconcile 后要更新 `status.observedGeneration`、`readyReplicas` 和 `conditions`。
-
-本篇不连接真实 Kubernetes API，也不依赖 client-go。我们先用一个小程序模拟核心思想，把“控制循环”这件事看清楚。第 37 篇再把同样的模型搬进真实 client-go Controller。
-
-项目版本线进入阶段六子版本 `v4.2-controller-design`，它仍属于 `v4.0-operator` 总版本线。
-
+这个案例不依赖真实 Kubernetes 集群，重点是理解控制器工作模型：事件只负责触发，最终一致性来自可重复执行的 Reconcile。
 ## 3. 核心概念
 
 ### 3.1 Controller 是控制循环
@@ -81,7 +73,7 @@ Kubernetes 官方把 Controller 描述为持续观察集群状态并在需要时
 
 最小 Controller 的逻辑可以写成下面这样：
 
-```text
+```text linenums="0"
 while running:
   desired = read user object spec
   actual = read current cluster state
@@ -144,7 +136,7 @@ SharedInformer 的价值是减少 API server 压力。多个消费者可以共�
 
 Workqueue 负责把事件变成稳定的任务。典型 key 是 `namespace/name`：
 
-```text
+```text linenums="0"
 TodoApp event: todo-dev/todo-platform changed
 enqueue key:   todo-dev/todo-platform
 worker gets:   todo-dev/todo-platform
@@ -157,7 +149,7 @@ reconcile:     read current TodoApp and related resources
 
 Reconcile 的输入通常只有一个 key：
 
-```go
+```go linenums="0"
 func Reconcile(ctx context.Context, key string) error
 ```
 
@@ -185,7 +177,7 @@ func Reconcile(ctx context.Context, key string) error
 
 controller-runtime 里的业务入口最终仍然是一段 Reconcile 逻辑：
 
-```go
+```go linenums="0"
 func (r *TodoAppReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	var app platformv1alpha1.TodoApp
 	if err := r.Get(ctx, req.NamespacedName, &app); err != nil {
@@ -240,7 +232,7 @@ Controller 启动时，Informer 需要先 List 当前对象并填充本地缓存
 
 因此真实 Controller 常见启动顺序是：
 
-```text
+```text linenums="0"
 start informer
 wait for cache sync
 start workers
@@ -265,7 +257,7 @@ Workqueue 通常不是简单数组。它至少需要维护三类状态：
 
 失败重试通常使用 rate limiting queue：
 
-```text
+```text linenums="0"
 first failure: retry after 100ms
 second failure: retry after 200ms
 third failure: retry after 400ms
@@ -279,7 +271,7 @@ success: forget retry history
 
 假设用户连续执行两次修改：
 
-```bash
+```bash linenums="0"
 kubectl patch todoapp todo-platform -p '{"spec":{"replicas":3}}'
 kubectl patch todoapp todo-platform -p '{"spec":{"replicas":5}}'
 ```
@@ -288,7 +280,7 @@ Controller 可能只处理一次队列 key。如果 Reconcile 依赖第一条事
 
 这也是 Kubernetes Controller 的核心心智模型：
 
-```text
+```text linenums="0"
 事件不是命令，事件只是提醒：请重新检查实际状态。
 ```
 
@@ -313,7 +305,7 @@ Controller 可能只处理一次队列 key。如果 Reconcile 依赖第一条事
 
 如果 Deployment 变化了，Controller 需要知道它属于哪个 `TodoApp`。最常见方式是 owner reference：
 
-```yaml
+```yaml linenums="0"
 metadata:
   ownerReferences:
     - apiVersion: platform.todo.example.com/v1alpha1
@@ -325,7 +317,7 @@ metadata:
 
 如果没有 owner reference，也可以用 label 或 spec 引用建立索引：
 
-```yaml
+```yaml linenums="0"
 metadata:
   labels:
     platform.todo.example.com/app: todo-platform
@@ -335,11 +327,11 @@ Index 的意义是把“底层资源变化”快速映射回“哪个主资源�
 
 ## 5. 手把手实验
 
+预计耗时：75 分钟（动手操作约 45 分钟）。
+
 ### 5.1 实验目标
 
 本实验会编写一个不依赖 client-go 的 Go 程序，模拟 Todo Operator 的事件入队、队列去重、失败重试和幂等 Reconcile。
-
-预计耗时：75 分钟（动手操作约 45 分钟）。
 
 ### 5.2 实验环境
 
@@ -353,7 +345,7 @@ Index 的意义是把“底层资源变化”快速映射回“哪个主资源�
 
 确认环境：
 
-```bash
+```bash linenums="0"
 pwd
 go version
 git status --short
@@ -361,7 +353,7 @@ git status --short
 
 PowerShell：
 
-```powershell
+```powershell linenums="0"
 Get-Location
 go version
 git status --short
@@ -371,19 +363,19 @@ git status --short
 
 创建目录：
 
-```bash
+```bash linenums="0"
 mkdir -p operator/controller-lab
 ```
 
 PowerShell：
 
-```powershell
+```powershell linenums="0"
 New-Item -ItemType Directory -Force -Path operator/controller-lab
 ```
 
 最终目录：
 
-```text
+```text linenums="0"
 operator/
 └── controller-lab/
     ├── go.mod
@@ -395,16 +387,16 @@ operator/
 
 #### 5.4.1 go.mod
 
-下面的 here-doc 写文件方式适用于 Linux、macOS、Git Bash 和 WSL。PowerShell 用户可以用编辑器创建同名文件，或用 PowerShell here-string，文件内容保持一致。
+本节按文件名给出完整内容。请用编辑器创建同名文件，并复制对应内容。
 
 创建 `operator/controller-lab/go.mod`：
 
-```bash
-cat > operator/controller-lab/go.mod <<'EOF'
+将下面内容写入 `operator/controller-lab/go.mod`：
+
+```text title="operator/controller-lab/go.mod"
 module todo-controller-lab
 
 go 1.26
-EOF
 ```
 
 PowerShell 可以使用编辑器创建同名文件，内容保持一致。
@@ -413,8 +405,9 @@ PowerShell 可以使用编辑器创建同名文件，内容保持一致。
 
 创建 `operator/controller-lab/main.go`：
 
-```bash
-cat > operator/controller-lab/main.go <<'GO'
+将下面内容写入 `operator/controller-lab/main.go`：
+
+```go title="operator/controller-lab/main.go"
 package main
 
 import (
@@ -732,10 +725,7 @@ func main() {
 	queue.Shutdown()
 	wg.Wait()
 }
-GO
 ```
-
-这里的 `GO` 只是 here-doc 定界符，作用和常见的 `EOF` 一样；用单引号包住定界符可以避免 shell 展开代码里的变量或反斜杠。
 
 这段程序模拟了几件事：
 
@@ -751,8 +741,9 @@ GO
 
 创建 `operator/controller-lab/controller-design.md`：
 
-```bash
-cat > operator/controller-lab/controller-design.md <<'EOF'
+将下面内容写入 `operator/controller-lab/controller-design.md`：
+
+```markdown title="operator/controller-lab/controller-design.md"
 # Todo Operator Controller Design
 
 ## Primary resource
@@ -799,33 +790,32 @@ cat > operator/controller-lab/controller-design.md <<'EOF'
 - Ingress owner -> TodoApp key
 - TodoDatabase reference -> TodoApp key
 - TodoCache reference -> TodoApp key
-EOF
 ```
 
 ### 5.5 执行命令
 
 进入实验目录：
 
-```bash
+```bash linenums="0"
 cd operator/controller-lab
 ```
 
 格式化并运行程序：
 
-```bash
+```bash linenums="0"
 go fmt ./...
 go run .
 ```
 
 查看设计文档：
 
-```bash
+```bash linenums="0"
 cat controller-design.md
 ```
 
 PowerShell：
 
-```powershell
+```powershell linenums="0"
 Get-Content controller-design.md
 ```
 
@@ -835,7 +825,7 @@ Get-Content controller-design.md
 
 运行 `go run .` 后，输出类似下面这样：
 
-```text
+```text linenums="0"
 informer: list initial TodoApp objects
 informer: cache synced, start workers
 event: Added todo-dev/todo-platform kind=TodoApp -> key=todo-dev/todo-platform
@@ -867,7 +857,7 @@ worker-1: shutdown
 
 **第一层：程序可运行**
 
-```bash
+```bash linenums="0"
 go run .
 ```
 
@@ -875,7 +865,7 @@ go run .
 
 **第二层：队列 key 正确**
 
-```bash
+```bash linenums="0"
 go run . | grep -- '-> key=todo-dev/todo-platform'
 ```
 
@@ -883,7 +873,7 @@ go run . | grep -- '-> key=todo-dev/todo-platform'
 
 **第三层：重试逻辑生效**
 
-```bash
+```bash linenums="0"
 go run . | grep 'queue: retry'
 ```
 
@@ -891,7 +881,7 @@ go run . | grep 'queue: retry'
 
 **第四层：设计文档完整**
 
-```bash
+```bash linenums="0"
 grep -n 'Watch rules\|Reconcile steps\|Required indexes' controller-design.md
 ```
 
@@ -901,7 +891,7 @@ grep -n 'Watch rules\|Reconcile steps\|Required indexes' controller-design.md
 
 把 `RetryDelay` 中的上限从 `5` 临时改成 `2`，再运行：
 
-```bash
+```bash linenums="0"
 go run . | grep 'queue: retry'
 ```
 
@@ -911,14 +901,14 @@ go run . | grep 'queue: retry'
 
 如果当前目录是 `operator/controller-lab`，并且只想删除实验文件：
 
-```bash
+```bash linenums="0"
 cd ../..
 rm -rf operator/controller-lab
 ```
 
 PowerShell：
 
-```powershell
+```powershell linenums="0"
 Set-Location ../..
 Remove-Item -Recurse -Force operator/controller-lab
 ```
@@ -935,7 +925,7 @@ Remove-Item -Recurse -Force operator/controller-lab
 - **原因**：Reconcile 使用事件里携带的旧对象，而不是用 key 重新读取当前状态。
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   grep -n 'reconcile' operator/controller-lab/main.go
   ```
 
@@ -950,7 +940,7 @@ Remove-Item -Recurse -Force operator/controller-lab
 - **原因**：使用普通 channel 或 slice 直接承接事件，没有 queued、processing、dirty 状态。
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   go run ./operator/controller-lab | grep 'queue: dedupe\|queue: mark dirty'
   ```
 
@@ -965,7 +955,7 @@ Remove-Item -Recurse -Force operator/controller-lab
 - **原因**：Controller 只 Watch `TodoApp`，没有 Watch Deployment 或没有把 Deployment 映射回 owner TodoApp key。
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   grep -n 'KindDeployment\|Owner' operator/controller-lab/main.go
   ```
 
@@ -980,7 +970,7 @@ Remove-Item -Recurse -Force operator/controller-lab
 - **原因**：代码只会 create，不会先 get/update；或者无变化时仍然写 status。
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   grep -n 'Ensure\|Patch\|status' operator/controller-lab/controller-design.md
   ```
 
@@ -995,7 +985,7 @@ Remove-Item -Recurse -Force operator/controller-lab
 - **原因**：Controller 添加了 finalizer，但删除逻辑失败或没有移除 finalizer。
 - **排查**：本章纯 Go 模拟程序不会连接 Kubernetes 集群，下面命令是第 37-38 篇部署真实 Controller 后的前瞻验证：
 
-  ```bash
+  ```bash linenums="0"
   kubectl -n todo-dev get todoapp todo-platform -o jsonpath='{.metadata.finalizers}{"\n"}'
   kubectl -n todo-dev describe todoapp todo-platform
   ```
@@ -1026,104 +1016,13 @@ Remove-Item -Recurse -Force operator/controller-lab
 - [client-go workqueue package](https://pkg.go.dev/k8s.io/client-go/util/workqueue)
 - [controller-runtime package](https://pkg.go.dev/sigs.k8s.io/controller-runtime)
 
-## 8. 本章小项目
+## 8. 练习题与面试题
 
-### 8.1 项目产出
+本章练习题和面试题已拆分到独立页面，完成正文学习后再进入题库练习与复盘。
 
-本章完成 Todo Operator 控制循环设计，产出：
+[查看本章练习题与面试题](../../questions/stage-06-platform-operator/36-controller-informer-workqueue.md)
 
-- `operator/controller-lab/go.mod`
-- `operator/controller-lab/main.go`
-- `operator/controller-lab/controller-design.md`
-
-图 36-3 展示本章产物和后续章节的关系：
-
-```mermaid
-flowchart TD
-    CRD["Ch35 CRDs"] --> Design["Ch36 Controller Design"]
-    Design --> Sim["Informer-Workqueue Simulator"]
-    Design --> Handwritten["Ch37 client-go Controller"]
-    Handwritten --> Runtime["Ch38 controller-runtime / Kubebuilder"]
-    Sim --> Queue["Queue semantics"]
-    Sim --> Reconcile["Idempotent Reconcile"]
-```
-
-### 8.2 能力验收标准
-
-| 能力 | 验收标准 |
-|---|---|
-| 控制循环 | 能画出 Informer、Workqueue、Worker、Reconcile 的关系 |
-| 缓存机制 | 能解释 List-Watch、resourceVersion、缓存同步的作用 |
-| 队列机制 | 能说明去重、dirty、重试和限速的意义 |
-| Reconcile 设计 | 能为 TodoApp 写出幂等 Reconcile 步骤 |
-| Watch 设计 | 能列出 TodoApp 的 primary 和 secondary resources |
-| 实验运行 | 能运行模拟程序并观察 Available=True 输出 |
-
-## 9. 本章练习题
-
-**基础题**
-
-1. Controller 为什么不能只处理创建事件？
-2. Informer 缓存解决了什么问题？它带来了什么新问题？
-3. Workqueue 为什么通常只保存 `namespace/name`，而不是保存完整对象？
-4. 什么是 `dirty` key？它解决什么并发问题？
-5. Reconcile 幂等和 HTTP 幂等有什么相似点？
-
-**实操题**
-
-1. 修改模拟程序，把 `Deployment` Ready 事件从 `Replicas: 3` 改成 `Replicas: 2`。验收标准：程序不会输出 `Available=True`。
-2. 再增加一个 `TodoApp`，名字为 `todo-admin`。验收标准：队列能处理两个不同 key。
-3. 把 `TodoDatabase` 事件删除。验收标准：程序会持续重试，并能解释为什么。
-
-**思考题**
-
-1. 如果 `TodoDatabase` 被多个 `TodoApp` 共享，Index 应该如何设计？
-2. 如果 Controller 写 status 又触发自己 Reconcile，如何避免无意义循环？
-3. 为什么 controller-runtime 默认 client “读缓存、写 API server” 对新手来说容易造成误解？
-
-## 10. 本章面试题
-
-### 面试题 1：Informer 和 Watch 有什么区别？
-
-**一句话结论**：Watch 是 API server 提供的事件流，Informer 是客户端对 List-Watch、缓存和事件分发的封装。
-
-**展开解释**：Watch 只告诉你对象变化；Informer 会先 List 初始对象，再 Watch 增量变化，并维护本地 Store。多个处理器可以共享 SharedInformer，减少 API server 压力。
-
-**深入追问**：为什么要等 cache sync？因为 worker 启动前必须确认本地缓存已有初始状态，否则 Reconcile 可能误判对象不存在。
-
-### 面试题 2：Workqueue 为什么不直接处理事件？
-
-**一句话结论**：队列把不稳定的事件流转换成可控的调谐任务。
-
-**展开解释**：Workqueue 支持去重、限速、延迟重试和并发控制。同一个对象多次变化时，Controller 只需要处理最终状态。失败时也不能立刻无限重试，而要按退避策略重新入队。
-
-**深入追问**：为什么队列 key 通常是 `namespace/name`？因为 Reconcile 应读取当前状态，而不是依赖事件里的旧对象。
-
-### 面试题 3：什么是幂等 Reconcile？
-
-**一句话结论**：同一个 Reconcile 运行多次，最终结果仍然正确，不产生重复副作用。
-
-**展开解释**：幂等 Reconcile 会先读取当前状态，再决定创建、更新、删除或跳过。资源已存在时更新，不存在时创建；status 没变化时不重复 patch。
-
-**深入追问**：如何测试幂等？连续调用两次 Reconcile，第二次不应创建新资源，也不应产生无意义更新。
-
-### 面试题 4：secondary resource 变化如何触发主资源 Reconcile？
-
-**一句话结论**：通过 owner reference、label index 或字段索引，把底层资源事件映射回主资源 key。
-
-**展开解释**：Deployment Ready 状态变化会影响 `TodoApp.status.readyReplicas`，所以 Deployment 事件也要入队对应 TodoApp。没有这种反向映射，主资源状态会滞后。
-
-**深入追问**：什么时候 owner reference 不够？跨 namespace、外部云资源或共享依赖资源通常不能只靠 owner reference，需要显式索引或引用关系。
-
-### 面试题 5：controller-runtime 的 Manager 解决了什么问题？
-
-**一句话结论**：Manager 统一管理 Controller 运行所需的 cache、client、scheme、leader election 和生命周期。
-
-**展开解释**：手写 client-go Controller 要自己创建 Informer、Workqueue、worker 和信号处理。controller-runtime 把这些通用能力封装起来，让开发者专注 Reconcile 业务逻辑。
-
-**深入追问**：controller-runtime client 为什么可能读到旧数据？默认 client 通常读缓存、写 API server，缓存同步存在延迟，所以 Controller 不能依赖强读写一致性。
-
-## 11. 本章总结
+## 9. 本章总结
 
 本篇把第 35 篇的 CRD API 推进到了 Controller 控制循环。你理解了 Controller 为什么要通过 List-Watch 和 Informer 获取变化，为什么要用 Workqueue 把事件变成可控任务，也理解了 Reconcile 为什么必须幂等。
 
@@ -1131,7 +1030,7 @@ flowchart TD
 
 能力上，你已经能为 Todo Operator 设计 Watch、Index 和 Reconcile 步骤。下一篇就可以把这些设计落实到真实 Kubernetes 集群里，用 client-go 手写一个最小 Controller。
 
-## 12. 下一章衔接
+## 10. 下一章衔接
 
 下一篇第 37 篇会进入手写简化版 Controller。我们会把本篇的模拟程序替换成真实 client-go 组件：
 

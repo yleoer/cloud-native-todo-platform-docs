@@ -53,50 +53,11 @@ GitOps 的目标不是把所有人工动作都消灭，而是让集群的期望�
 
 出问题时也更容易定位：如果 Git 期望状态错了，修 Git；如果 Git 正确但集群不同步，查 Argo CD；如果 Argo CD 已同步但应用不健康，查 Kubernetes 资源和应用日志。
 
-### 2.3 课程项目关联
+### 2.3 Todo 平台模拟案例
 
-本篇承接前面几篇产物：
+> Todo 平台希望由 Git 中的期望状态驱动集群变更。你需要用 Argo CD 管理 dev 和 prod 环境，处理应用目录、同步策略、健康状态、回滚和 Secret 边界。
 
-```text
-第 27 篇：Todo Platform Helm 4 Chart
-第 28 篇：Kustomize dev/test/prod overlay
-第 29 篇：GitHub Actions 构建镜像并验证部署
-```
-
-第 28 篇的 overlay 里使用了本地 `.secrets/todo-api-auth.env`。这适合本地实验和 CI 临时渲染，但不适合 Argo CD：Argo CD 在集群内从 Git 拉取仓库，不能读取你电脑上的 `.secrets/` 文件，也不应该从 Git 拉取明文生产密钥。
-
-所以本篇会新增 GitOps 专用目录：
-
-```text
-deployments/gitops/
-├── argocd/
-│   ├── todo-platform-project.yaml
-│   ├── todo-platform-dev-application.yaml
-│   └── todo-platform-applicationset.yaml
-└── envs/
-    ├── dev/
-    │   ├── kustomization.yaml
-    │   └── namespace.yaml
-    └── prod/
-        ├── kustomization.yaml
-        ├── namespace.yaml
-        └── patch-deployment-resources.yaml
-```
-
-图 30-1 展示第 29 篇到第 30 篇的职责变化：
-
-```mermaid
-flowchart LR
-    Dev["开发者提交代码"] --> CI["GitHub Actions<br/>测试 / 构建镜像 / 推送 GHCR"]
-    CI --> GitOps["更新 GitOps 目录<br/>镜像 tag / digest / 环境配置"]
-    GitOps --> Argo["Argo CD<br/>持续监听 Git"]
-    Argo --> K8s["Kubernetes 集群<br/>同步期望状态"]
-    K8s --> Drift["漂移检测<br/>OutOfSync / SelfHeal"]
-    Drift --> Argo
-```
-
-本篇产物会被第 31 篇 Prometheus / Grafana 复用：Argo CD 管理的 dev/prod 环境会成为后续监控、日志、Tracing 和生产排障的基础运行环境。
-
+这个案例强调 GitOps 的核心约束：集群状态应该能回到 Git 中解释，敏感信息和环境差异不能靠个人电脑上的临时文件维持。
 ## 3. 核心概念
 
 ### 3.1 GitOps：Git 是唯一事实来源
@@ -105,7 +66,7 @@ GitOps 是一种声明式交付模式：Git 仓库保存应用在集群中的期
 
 最小 GitOps 目录可以长这样：
 
-```text
+```text linenums="0"
 deployments/gitops/envs/dev/
 ├── kustomization.yaml
 └── namespace.yaml
@@ -113,7 +74,7 @@ deployments/gitops/envs/dev/
 
 `kustomization.yaml` 里声明这个环境需要哪些 Kubernetes 对象：
 
-```yaml
+```yaml linenums="0"
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 namespace: todo-dev
@@ -139,7 +100,7 @@ images:
 
 最小示例：
 
-```yaml
+```yaml linenums="0"
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -189,7 +150,7 @@ Argo CD 页面上常见两组状态：
 
 示例：
 
-```yaml
+```yaml linenums="0"
 apiVersion: argoproj.io/v1alpha1
 kind: AppProject
 metadata:
@@ -217,7 +178,7 @@ spec:
 
 自动同步配置放在 `syncPolicy` 中：
 
-```yaml
+```yaml linenums="0"
 syncPolicy:
   automated:
     prune: true
@@ -245,7 +206,7 @@ syncPolicy:
 
 最小示例：
 
-```yaml
+```yaml linenums="0"
 apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
 metadata:
@@ -334,7 +295,7 @@ Argo CD 排障时经常看到三个概念：
 
 当 Desired 与 Live 不一致时，应用就是 `OutOfSync`。当 Live 资源自身运行失败时，应用可能是 `Degraded`。所以排障顺序通常是：
 
-```text
+```text linenums="0"
 repoURL / targetRevision / path 是否正确
   -> Kustomize / Helm 是否能渲染
   -> Argo CD 是否有权限同步
@@ -346,7 +307,7 @@ repoURL / targetRevision / path 是否正确
 
 手工执行：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-dev scale deployment/todo-platform --replicas=2
 ```
 
@@ -358,7 +319,7 @@ kubectl -n todo-dev scale deployment/todo-platform --replicas=2
 
 Argo CD CLI 有 `argocd app rollback`，但在 GitOps 语义下，生产回滚更推荐回滚 Git：
 
-```bash
+```bash linenums="0"
 git revert <bad-commit>
 git push origin main
 ```
@@ -369,7 +330,7 @@ git push origin main
 
 第 28 篇的 `.secrets/todo-api-auth.env` 是本地实验输入，不提交 Git。本篇让 Argo CD 管理 Git 中的公开配置，但认证密钥由集群内预创建的 `Secret/todo-api-auth` 提供：
 
-```text
+```text linenums="0"
 GitOps 仓库：Deployment 引用 todo-api-auth
 Kubernetes 集群：提前创建 Secret/todo-api-auth
 Argo CD：同步 Deployment，但不管理 Secret 明文
@@ -379,11 +340,11 @@ Argo CD：同步 Deployment，但不管理 Secret 明文
 
 ## 5. 手把手实验
 
+预计耗时：90 分钟（动手操作约 60 分钟）。
+
 ### 5.1 实验目标
 
 在一个持续运行的 kind 集群中安装 Argo CD v3.4.3，创建 Todo Platform 的 GitOps dev/prod 目录，使用 Argo CD Application 管理 dev 环境，再使用 ApplicationSet 管理 dev/prod 两套环境，并演示自动同步、漂移修复和 Git 回滚。
-
-预计耗时：90 分钟（动手操作约 60 分钟）。
 
 ### 5.2 实验环境
 
@@ -405,7 +366,7 @@ Argo CD：同步 Deployment，但不管理 Secret 明文
 
 开始前请确认你在 Todo Platform 应用仓库根目录，也就是 `go.mod` 所在目录：
 
-```bash
+```bash linenums="0"
 test -f go.mod
 test -d deployments/helm/todo-platform
 test -d deployments/kustomize/base
@@ -421,7 +382,7 @@ test -d deployments/kustomize/overlays/prod
 
 本篇会新增以下文件：
 
-```text
+```text linenums="0"
 deployments/gitops/
 ├── argocd/
 │   ├── todo-platform-project.yaml
@@ -439,7 +400,7 @@ deployments/gitops/
 
 创建目录：
 
-```bash
+```bash linenums="0"
 mkdir -p deployments/gitops/argocd
 mkdir -p deployments/gitops/envs/dev
 mkdir -p deployments/gitops/envs/prod
@@ -451,7 +412,7 @@ mkdir -p deployments/gitops/envs/prod
 
 先准备仓库地址。下面命令会把 SSH 形式的 GitHub 地址转换成 Argo CD 更容易访问的 HTTPS 地址：
 
-```bash
+```bash linenums="0"
 REPO_URL="$(git remote get-url origin)"
 case "$REPO_URL" in
   git@github.com:*) REPO_URL="https://github.com/${REPO_URL#git@github.com:}" ;;
@@ -466,8 +427,9 @@ echo "$GITOPS_REVISION"
 
 创建 dev Namespace：
 
-```bash
-cat > deployments/gitops/envs/dev/namespace.yaml <<'YAML'
+将下面内容写入 `deployments/gitops/envs/dev/namespace.yaml`：
+
+```yaml title="deployments/gitops/envs/dev/namespace.yaml"
 apiVersion: v1
 kind: Namespace
 metadata:
@@ -476,13 +438,13 @@ metadata:
     pod-security.kubernetes.io/enforce: restricted
     pod-security.kubernetes.io/enforce-version: latest
     app.kubernetes.io/managed-by: argocd
-YAML
 ```
 
 创建 dev GitOps overlay。它直接复用第 28 篇的 `deployments/kustomize/base`，但不使用 `secretGenerator`，因为 Secret 由集群内预创建：
 
-```bash
-cat > deployments/gitops/envs/dev/kustomization.yaml <<'YAML'
+将下面内容写入 `deployments/gitops/envs/dev/kustomization.yaml`：
+
+```yaml title="deployments/gitops/envs/dev/kustomization.yaml"
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 namespace: todo-dev
@@ -545,7 +507,6 @@ patches:
       - op: replace
         path: /subjects/0/namespace
         value: todo-dev
-YAML
 ```
 
 dev 使用 `TODO_LOG_LEVEL=debug`，是为了让本地排障能看到更多请求与配置细节；prod 会改为 `info`，减少日志量并降低敏感信息暴露概率。本篇仍沿用第 28 篇的内存 Repository 约定：不设置 `TODO_DATABASE_DSN` 时，Todo API 不连接 PostgreSQL。
@@ -554,8 +515,9 @@ dev 使用 `TODO_LOG_LEVEL=debug`，是为了让本地排障能看到更多请�
 
 创建 prod Namespace：
 
-```bash
-cat > deployments/gitops/envs/prod/namespace.yaml <<'YAML'
+将下面内容写入 `deployments/gitops/envs/prod/namespace.yaml`：
+
+```yaml title="deployments/gitops/envs/prod/namespace.yaml"
 apiVersion: v1
 kind: Namespace
 metadata:
@@ -564,13 +526,13 @@ metadata:
     pod-security.kubernetes.io/enforce: restricted
     pod-security.kubernetes.io/enforce-version: latest
     app.kubernetes.io/managed-by: argocd
-YAML
 ```
 
 创建 prod 资源 patch：
 
-```bash
-cat > deployments/gitops/envs/prod/patch-deployment-resources.yaml <<'YAML'
+将下面内容写入 `deployments/gitops/envs/prod/patch-deployment-resources.yaml`：
+
+```yaml title="deployments/gitops/envs/prod/patch-deployment-resources.yaml"
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -587,13 +549,13 @@ spec:
             limits:
               cpu: "1"
               memory: 512Mi
-YAML
 ```
 
 创建 prod GitOps overlay。生产示例使用 3 个副本、更保守的日志级别和更高资源配置：
 
-```bash
-cat > deployments/gitops/envs/prod/kustomization.yaml <<'YAML'
+将下面内容写入 `deployments/gitops/envs/prod/kustomization.yaml`：
+
+```yaml title="deployments/gitops/envs/prod/kustomization.yaml"
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 namespace: todo-prod
@@ -657,15 +619,17 @@ patches:
       - op: replace
         path: /subjects/0/namespace
         value: todo-prod
-YAML
 ```
 
 prod 使用 `TODO_LOG_LEVEL=info` 和 3 个副本，体现生产环境更关注稳定性、日志成本和容量冗余。本篇为了聚焦 GitOps 发布链路，prod 示例仍不接入 PostgreSQL；后续如果把数据库主链路纳入 GitOps，需要同步引入 StatefulSet/Secret/备份恢复策略。
 
 创建 AppProject。这里不用默认 `default` project，而是把 Todo Platform 限定在本章需要的仓库、Namespace 和资源类型内：
 
-```bash
-cat > deployments/gitops/argocd/todo-platform-project.yaml <<YAML
+将下面内容写入 `deployments/gitops/argocd/todo-platform-project.yaml`：
+
+把 `<REPO_URL>` 替换为上一步 `echo "$REPO_URL"` 的输出。
+
+```yaml title="deployments/gitops/argocd/todo-platform-project.yaml"
 apiVersion: argoproj.io/v1alpha1
 kind: AppProject
 metadata:
@@ -674,7 +638,7 @@ metadata:
 spec:
   description: Todo Platform GitOps project
   sourceRepos:
-    - ${REPO_URL}
+    - <REPO_URL>
   destinations:
     - server: https://kubernetes.default.svc
       namespace: todo-dev
@@ -700,15 +664,17 @@ spec:
       kind: Role
     - group: "rbac.authorization.k8s.io"
       kind: RoleBinding
-YAML
 ```
 
 这份白名单覆盖第 28 篇 base 从 Helm Chart 渲染出的主链路对象。后续如果你把 Ingress、Job、CronJob 或 ExternalSecret 也纳入 GitOps，需要同步扩展 AppProject 白名单，否则 Argo CD 会拒绝同步。
 
 创建 dev Application。这里开启自动同步、自动 prune 和 self-heal，便于演示 GitOps 控制循环：
 
-```bash
-cat > deployments/gitops/argocd/todo-platform-dev-application.yaml <<YAML
+将下面内容写入 `deployments/gitops/argocd/todo-platform-dev-application.yaml`：
+
+把 `<REPO_URL>` 替换为上一步 `echo "$REPO_URL"` 的输出，把 `<GITOPS_REVISION>` 替换为 `echo "$GITOPS_REVISION"` 的输出。
+
+```yaml title="deployments/gitops/argocd/todo-platform-dev-application.yaml"
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -720,8 +686,8 @@ metadata:
 spec:
   project: todo-platform
   source:
-    repoURL: ${REPO_URL}
-    targetRevision: ${GITOPS_REVISION}
+    repoURL: <REPO_URL>
+    targetRevision: <GITOPS_REVISION>
     path: deployments/gitops/envs/dev
   destination:
     server: https://kubernetes.default.svc
@@ -735,13 +701,15 @@ spec:
       - PruneLast=true
       - ApplyOutOfSyncOnly=true
   revisionHistoryLimit: 10
-YAML
 ```
 
 创建 ApplicationSet。它用 list generator 生成 dev/prod 两个 Application。多环境模板默认不启用自动同步，尤其避免把 prod 复制成 dev 的 auto-sync 策略；本篇前面已经用单独的 dev Application 演示过自动同步和漂移修复：
 
-```bash
-cat > deployments/gitops/argocd/todo-platform-applicationset.yaml <<YAML
+将下面内容写入 `deployments/gitops/argocd/todo-platform-applicationset.yaml`：
+
+把 `<REPO_URL>` 替换为上一步 `echo "$REPO_URL"` 的输出，把 `<GITOPS_REVISION>` 替换为 `echo "$GITOPS_REVISION"` 的输出。
+
+```yaml title="deployments/gitops/argocd/todo-platform-applicationset.yaml"
 apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
 metadata:
@@ -768,8 +736,8 @@ spec:
     spec:
       project: todo-platform
       source:
-        repoURL: ${REPO_URL}
-        targetRevision: ${GITOPS_REVISION}
+        repoURL: <REPO_URL>
+        targetRevision: <GITOPS_REVISION>
         path: "{{.path}}"
       destination:
         server: https://kubernetes.default.svc
@@ -780,7 +748,6 @@ spec:
           - PruneLast=true
           - ApplyOutOfSyncOnly=true
       revisionHistoryLimit: 10
-YAML
 ```
 
 注意：本篇同时保留 `namespace.yaml`、`CreateNamespace=true` 和预创建 Namespace。`namespace.yaml` 用来让 GitOps 管理 Namespace 标签与安全基线；`CreateNamespace=true` 是防止目标 Namespace 不存在的兜底；实验里提前创建 Namespace 是为了先放入不进入 Git 的运行时 Secret。
@@ -789,7 +756,7 @@ YAML
 
 先本地验证 GitOps overlay 能渲染。下面命令不访问集群，只检查 Kustomize 路径和 YAML 结构：
 
-```bash
+```bash linenums="0"
 kubectl kustomize deployments/gitops/envs/dev > /tmp/todo-gitops-dev.yaml
 kubectl kustomize deployments/gitops/envs/prod > /tmp/todo-gitops-prod.yaml
 grep -n "kind: Deployment" /tmp/todo-gitops-dev.yaml
@@ -801,14 +768,14 @@ grep -n "todo-platform-env-" /tmp/todo-gitops-dev.yaml
 
 创建或复用一个持续运行的 kind 集群。第 29 篇的 CI 集群会随 workflow 销毁，本篇需要保留集群给 Argo CD 持续运行：
 
-```bash
+```bash linenums="0"
 kind create cluster --name todo-gitops --image registry.cn-guangzhou.aliyuncs.com/yleoer/node:v1.35.0
 kubectl cluster-info --context kind-todo-gitops
 ```
 
 安装 Argo CD。官方 v3.4.3 安装清单可以使用 server-side apply，避免大型 CRD 在 client-side apply 时触发 annotation 大小限制。v3.4.3 的 install.yaml 中 `argocd-application-controller` 仍是 StatefulSet，因此下面使用 `rollout status statefulset/...` 等待它启动：
 
-```bash
+```bash linenums="0"
 ARGOCD_VERSION="v3.4.3"
 
 kubectl create namespace argocd --dry-run=client -o yaml | kubectl apply -f -
@@ -823,7 +790,7 @@ kubectl -n argocd rollout status statefulset/argocd-application-controller --tim
 
 如果 300 秒后仍未 Ready，先看控制面状态和镜像拉取事件：
 
-```bash
+```bash linenums="0"
 kubectl -n argocd get pods
 kubectl -n argocd describe pod -l app.kubernetes.io/name=argocd-server
 kubectl -n argocd describe pod -l app.kubernetes.io/name=argocd-application-controller
@@ -833,7 +800,7 @@ kubectl -n argocd describe pod -l app.kubernetes.io/name=argocd-application-cont
 
 === "Linux / WSL"
 
-    ```bash
+    ```bash linenums="0"
     ARGOCD_VERSION="v3.4.3"
     curl -fsSLo argocd "https://github.com/argoproj/argo-cd/releases/download/${ARGOCD_VERSION}/argocd-linux-amd64"
     sudo install -m 0755 argocd /usr/local/bin/argocd
@@ -842,14 +809,14 @@ kubectl -n argocd describe pod -l app.kubernetes.io/name=argocd-application-cont
 
 === "macOS"
 
-    ```bash
+    ```bash linenums="0"
     brew install argocd
     argocd version --client
     ```
 
 === "Windows PowerShell"
 
-    ```powershell
+    ```powershell linenums="0"
     $Version = "v3.4.3"
     Invoke-WebRequest -Uri "https://github.com/argoproj/argo-cd/releases/download/$Version/argocd-windows-amd64.exe" -OutFile "$env:USERPROFILE\argocd.exe"
     $env:PATH = "$env:USERPROFILE;$env:PATH"
@@ -860,7 +827,7 @@ kubectl -n argocd describe pod -l app.kubernetes.io/name=argocd-application-cont
 
 === "Linux / macOS / WSL"
 
-    ```bash
+    ```bash linenums="0"
     kubectl -n argocd port-forward svc/argocd-server 8080:443 >/tmp/argocd-port-forward.log 2>&1 &
     ARGOCD_PF_PID=$!
 
@@ -870,7 +837,7 @@ kubectl -n argocd describe pod -l app.kubernetes.io/name=argocd-application-cont
 
 === "Windows PowerShell"
 
-    ```powershell
+    ```powershell linenums="0"
     $PortForward = Start-Process kubectl -ArgumentList "-n","argocd","port-forward","svc/argocd-server","8080:443" -NoNewWindow -PassThru
 
     argocd admin initial-password -n argocd
@@ -881,7 +848,7 @@ kubectl -n argocd describe pod -l app.kubernetes.io/name=argocd-application-cont
 
 === "Linux / macOS / WSL"
 
-    ```bash
+    ```bash linenums="0"
     kubectl -n argocd get secret argocd-initial-admin-secret \
       -o jsonpath="{.data.password}" | base64 -d
     echo
@@ -889,14 +856,14 @@ kubectl -n argocd describe pod -l app.kubernetes.io/name=argocd-application-cont
 
 === "Windows PowerShell"
 
-    ```powershell
+    ```powershell linenums="0"
     $Encoded = kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}"
     [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($Encoded))
     ```
 
 登录成功后建议立即修改密码，再删除初始密码 Secret。学习环境可以先跳过；生产环境不能长期保留初始密码入口：
 
-```bash
+```bash linenums="0"
 argocd account update-password --current-password '<PASTE_INITIAL_PASSWORD>' --new-password '<NEW_STRONG_PASSWORD>'
 
 kubectl -n argocd delete secret argocd-initial-admin-secret --ignore-not-found
@@ -906,14 +873,14 @@ kubectl -n argocd delete secret argocd-initial-admin-secret --ignore-not-found
 
 如果 Todo API 镜像只存在本机，需要先把镜像加载进 kind 集群。第 29 篇已经把正式镜像推送到 GHCR；如果你还在本地学习阶段，可以继续使用本地 `todo-api:v0.1.0`：
 
-```bash
+```bash linenums="0"
 docker image inspect todo-api:v0.1.0
 kind load docker-image todo-api:v0.1.0 --name todo-gitops
 ```
 
 如果 `docker image inspect` 提示 `No such image`，先回到第 16 篇的镜像构建步骤，或在应用仓库根目录重新构建：
 
-```bash
+```bash linenums="0"
 docker build -t todo-api:v0.1.0 -f api/Dockerfile .
 ```
 
@@ -923,7 +890,7 @@ docker build -t todo-api:v0.1.0 -f api/Dockerfile .
 
 === "Linux / macOS / WSL"
 
-    ```bash
+    ```bash linenums="0"
     HASH="$(docker run --rm todo-api:v0.1.0 hash-password "change-me-123")"
     test -n "$HASH"
 
@@ -943,7 +910,7 @@ docker build -t todo-api:v0.1.0 -f api/Dockerfile .
 
 === "Windows PowerShell"
 
-    ```powershell
+    ```powershell linenums="0"
     $Hash = docker run --rm todo-api:v0.1.0 hash-password "change-me-123"
     if (-not $Hash) { throw "hash-password failed" }
 
@@ -963,7 +930,7 @@ docker build -t todo-api:v0.1.0 -f api/Dockerfile .
 
 提交并推送 GitOps 配置。Argo CD 只能从远端 Git 仓库读取配置，不能读取你本机尚未提交的文件：
 
-```bash
+```bash linenums="0"
 git add deployments/gitops
 git commit -m "add todo platform gitops manifests"
 git push origin HEAD
@@ -973,14 +940,14 @@ git push origin HEAD
 
 应用 AppProject 和 dev Application：
 
-```bash
+```bash linenums="0"
 kubectl apply -f deployments/gitops/argocd/todo-platform-project.yaml
 kubectl apply -f deployments/gitops/argocd/todo-platform-dev-application.yaml
 ```
 
 等待 Argo CD 同步并检查状态：
 
-```bash
+```bash linenums="0"
 argocd app get todo-platform-dev
 argocd app wait todo-platform-dev --sync --health --timeout 300
 kubectl -n todo-dev get deploy,svc,pod
@@ -988,14 +955,14 @@ kubectl -n todo-dev get deploy,svc,pod
 
 手工制造一次漂移。Git 中 dev 声明 1 个副本，下面命令把集群手工改成 2 个副本：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-dev scale deployment/todo-platform --replicas=2
 kubectl -n todo-dev get deployment todo-platform
 ```
 
 等待 Argo CD self-heal 把副本数修回 Git 中的 1：
 
-```bash
+```bash linenums="0"
 sleep 30
 kubectl -n todo-dev get deployment todo-platform
 argocd app get todo-platform-dev
@@ -1005,7 +972,7 @@ argocd app get todo-platform-dev
 
 === "Linux / WSL"
 
-    ```bash
+    ```bash linenums="0"
     sed -i 's/TODO_RELEASE=chapter-30-dev/TODO_RELEASE=chapter-30-dev-v2/' deployments/gitops/envs/dev/kustomization.yaml
     git add deployments/gitops/envs/dev/kustomization.yaml
     git commit -m "promote dev release marker"
@@ -1017,7 +984,7 @@ argocd app get todo-platform-dev
 
 === "macOS"
 
-    ```bash
+    ```bash linenums="0"
     sed -i '' 's/TODO_RELEASE=chapter-30-dev/TODO_RELEASE=chapter-30-dev-v2/' deployments/gitops/envs/dev/kustomization.yaml
     git add deployments/gitops/envs/dev/kustomization.yaml
     git commit -m "promote dev release marker"
@@ -1029,7 +996,7 @@ argocd app get todo-platform-dev
 
 === "Windows PowerShell"
 
-    ```powershell
+    ```powershell linenums="0"
     $Path = "deployments/gitops/envs/dev/kustomization.yaml"
     $Content = Get-Content $Path -Raw
     $Content.Replace("TODO_RELEASE=chapter-30-dev", "TODO_RELEASE=chapter-30-dev-v2") | Set-Content $Path
@@ -1044,7 +1011,7 @@ argocd app get todo-platform-dev
 
 演示 Git 回滚。这里不用 `kubectl edit`，也不用在 Argo CD UI 中临时改资源，而是回滚刚才的 Git commit：
 
-```bash
+```bash linenums="0"
 git revert HEAD --no-edit
 git push origin HEAD
 
@@ -1054,7 +1021,7 @@ kubectl -n todo-dev get configmap | grep todo-platform-env
 
 切换到 ApplicationSet 管理 dev/prod。先用 Argo CD 的非级联删除移除单独的 dev Application，但保留已经同步出来的 Kubernetes 资源；随后由 ApplicationSet 重新创建同名 Application 并接管这些资源。`--cascade=false` 会保留已同步的 Kubernetes 对象，只删除 Application CR；默认级联删除会在删除 Application 前清理它管理的对象。这里不要把 `kubectl delete --cascade=orphan` 和 Argo CD CLI 的 `--cascade=false` 混用，它们属于两套不同的删除语义：
 
-```bash
+```bash linenums="0"
 argocd app delete todo-platform-dev --cascade=false -y
 kubectl apply -f deployments/gitops/argocd/todo-platform-applicationset.yaml
 
@@ -1072,14 +1039,14 @@ ApplicationSet 创建的新 Application 首次同步时，Argo CD 会对比 Git 
 
 Argo CD 组件启动完成后应看到：
 
-```text
+```text linenums="0"
 deployment "argocd-server" successfully rolled out
 statefulset rolling update complete 1 pods at revision argocd-application-controller-...
 ```
 
 Application 初次创建后，可能先显示 `OutOfSync`，随后自动同步：
 
-```text
+```text linenums="0"
 Name:               argocd/todo-platform-dev
 Project:            todo-platform
 Server:             https://kubernetes.default.svc
@@ -1090,7 +1057,7 @@ Health Status:      Healthy
 
 dev 环境资源应出现：
 
-```text
+```text linenums="0"
 NAME                            READY   UP-TO-DATE   AVAILABLE   AGE
 deployment.apps/todo-platform   1/1     1            1           2m
 
@@ -1103,7 +1070,7 @@ pod/todo-platform-xxxxxxxxxx-xxxxx   1/1     Running   0          2m
 
 手工扩容后短暂看到 2 个副本，随后被 self-heal 修回 1：
 
-```text
+```text linenums="0"
 NAME            READY   UP-TO-DATE   AVAILABLE
 todo-platform   2/2     2            2
 
@@ -1115,7 +1082,7 @@ todo-platform   1/1     1            1
 
 ApplicationSet 创建后应看到两个 Application：
 
-```text
+```text linenums="0"
 NAME                 SYNC STATUS   HEALTH STATUS
 todo-platform-dev    Synced        Healthy
 todo-platform-prod   Synced        Healthy
@@ -1125,7 +1092,7 @@ todo-platform-prod   Synced        Healthy
 
 第一层：确认 Argo CD 控制面正常。
 
-```bash
+```bash linenums="0"
 kubectl -n argocd get pods
 kubectl -n argocd get crd applications.argoproj.io applicationsets.argoproj.io appprojects.argoproj.io
 ```
@@ -1134,7 +1101,7 @@ kubectl -n argocd get crd applications.argoproj.io applicationsets.argoproj.io a
 
 第二层：确认 GitOps overlay 可渲染。
 
-```bash
+```bash linenums="0"
 kubectl kustomize deployments/gitops/envs/dev | grep -n "TODO_RELEASE"
 kubectl kustomize deployments/gitops/envs/prod | grep -n "replicas:"
 ```
@@ -1143,7 +1110,7 @@ kubectl kustomize deployments/gitops/envs/prod | grep -n "replicas:"
 
 第三层：确认 Application 同步状态。
 
-```bash
+```bash linenums="0"
 argocd app get todo-platform-dev
 argocd app history todo-platform-dev
 ```
@@ -1152,7 +1119,7 @@ argocd app history todo-platform-dev
 
 第四层：确认集群真实资源。
 
-```bash
+```bash linenums="0"
 kubectl -n todo-dev get deploy todo-platform
 kubectl -n todo-dev get pods -l app.kubernetes.io/name=todo-platform
 kubectl -n todo-dev logs deployment/todo-platform --tail=30
@@ -1162,7 +1129,7 @@ kubectl -n todo-dev logs deployment/todo-platform --tail=30
 
 第五层：确认漂移修复。
 
-```bash
+```bash linenums="0"
 kubectl -n todo-dev scale deployment/todo-platform --replicas=2
 sleep 30
 kubectl -n todo-dev get deployment todo-platform -o jsonpath='{.spec.replicas}{"\n"}'
@@ -1172,7 +1139,7 @@ kubectl -n todo-dev get deployment todo-platform -o jsonpath='{.spec.replicas}{"
 
 第六层：确认 ApplicationSet 管理多环境。
 
-```bash
+```bash linenums="0"
 kubectl -n argocd get applicationset todo-platform-envs
 kubectl -n argocd get applications -l app.kubernetes.io/part-of=todo-platform
 ```
@@ -1185,19 +1152,19 @@ kubectl -n argocd get applications -l app.kubernetes.io/part-of=todo-platform
 
 === "Linux / macOS / WSL"
 
-    ```bash
+    ```bash linenums="0"
     kill "$ARGOCD_PF_PID"
     ```
 
 === "Windows PowerShell"
 
-    ```powershell
+    ```powershell linenums="0"
     Stop-Process -Id $PortForward.Id
     ```
 
 如果只想停止 Todo Platform，但保留 Argo CD：
 
-```bash
+```bash linenums="0"
 kubectl -n argocd delete applicationset todo-platform-envs --ignore-not-found
 argocd app delete todo-platform-dev --cascade -y
 argocd app delete todo-platform-prod --cascade -y
@@ -1208,19 +1175,19 @@ kubectl delete namespace todo-dev todo-prod --ignore-not-found
 
 如果要删除 Argo CD：
 
-```bash
+```bash linenums="0"
 kubectl delete namespace argocd --ignore-not-found
 ```
 
 如果要删除整个实验集群：
 
-```bash
+```bash linenums="0"
 kind delete cluster --name todo-gitops
 ```
 
 如果要撤销本篇创建的 GitOps 文件：
 
-```bash
+```bash linenums="0"
 rm -rf deployments/gitops
 git add -A deployments/gitops
 git commit -m "remove todo platform gitops manifests"
@@ -1233,7 +1200,7 @@ git push origin HEAD
 
 - **现象**：
 
-  ```text
+  ```text linenums="0"
   rpc error: code = Unknown desc = authentication required
   repository not accessible
   ```
@@ -1241,7 +1208,7 @@ git push origin HEAD
 - **原因**：Application 的 `repoURL` 指向私有仓库，或者 SSH 地址没有配置 deploy key。Argo CD 运行在集群中，不会自动拥有你本机的 Git 凭据。
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   argocd app get todo-platform-dev
   kubectl -n argocd logs deployment/argocd-repo-server --tail=80
   kubectl -n argocd get secret -l argocd.argoproj.io/secret-type=repository
@@ -1251,7 +1218,7 @@ git push origin HEAD
 
 - **修复**：公开学习仓库可使用 HTTPS 地址。私有仓库可以通过 Argo CD CLI 添加仓库凭据：
 
-  ```bash
+  ```bash linenums="0"
   argocd repo add "$REPO_URL" \
     --username "$GITHUB_ACTOR" \
     --password "$GITHUB_TOKEN"
@@ -1263,7 +1230,7 @@ git push origin HEAD
 
 - **现象**：
 
-  ```text
+  ```text linenums="0"
   ComparisonError: Failed to load target state
   loading KV pairs: env source files: [.secrets/todo-api-auth.env]: no such file or directory
   ```
@@ -1271,7 +1238,7 @@ git push origin HEAD
 - **原因**：Application 直接指向了第 28 篇的 `deployments/kustomize/overlays/dev`，而那个 overlay 使用本地 `.secrets/`。Argo CD 从 Git 渲染时拿不到这个未提交目录。
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   argocd app get todo-platform-dev
   grep -n "secretGenerator" -A5 deployments/kustomize/overlays/dev/kustomization.yaml
   grep -n "secretGenerator" -A5 deployments/gitops/envs/dev/kustomization.yaml
@@ -1288,7 +1255,7 @@ git push origin HEAD
 
 - **现象**：
 
-  ```text
+  ```text linenums="0"
   secret "todo-api-auth" not found
   ```
 
@@ -1297,7 +1264,7 @@ git push origin HEAD
 - **原因**：Deployment 引用了 `todo-api-auth`，但目标 Namespace 中没有预创建 Secret。
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   kubectl -n todo-dev get secret todo-api-auth
   kubectl -n todo-dev describe pod -l app.kubernetes.io/name=todo-platform
   ```
@@ -1306,7 +1273,7 @@ git push origin HEAD
 
 - **修复**：
 
-  ```bash
+  ```bash linenums="0"
   HASH="$(docker run --rm todo-api:v0.1.0 hash-password "change-me-123")"
   test -n "$HASH"
 
@@ -1322,7 +1289,7 @@ git push origin HEAD
 
 - **现象**：
 
-  ```text
+  ```text linenums="0"
   InvalidSpecError: Unable to generate manifests in deployments/gitops/envs/dev
   app path does not exist
   ```
@@ -1330,7 +1297,7 @@ git push origin HEAD
 - **原因**：`spec.source.path` 写错，或者 GitOps 文件只在本地创建但没有 push 到 `targetRevision` 指向的分支。
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   git status --short
   git branch --show-current
   git log --oneline -3
@@ -1347,7 +1314,7 @@ git push origin HEAD
 
 - **现象**：
 
-  ```text
+  ```text linenums="0"
   Failed to pull image "todo-api:v0.1.0"
   ImagePullBackOff
   ```
@@ -1355,7 +1322,7 @@ git push origin HEAD
 - **原因**：kind 集群节点没有本地镜像，或者 GitOps overlay 指向私有 registry 但没有配置 `imagePullSecrets`。
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   kubectl -n todo-dev describe pod -l app.kubernetes.io/name=todo-platform
   kubectl kustomize deployments/gitops/envs/dev | grep -n "image:"
   docker image inspect todo-api:v0.1.0
@@ -1365,7 +1332,7 @@ git push origin HEAD
 
 - **修复**：
 
-  ```bash
+  ```bash linenums="0"
   docker build -t todo-api:v0.1.0 -f api/Dockerfile .
   kind load docker-image todo-api:v0.1.0 --name todo-gitops
   kubectl -n todo-dev rollout restart deployment/todo-platform
@@ -1379,7 +1346,7 @@ git push origin HEAD
 
 - **现象**：
 
-  ```text
+  ```text linenums="0"
   application.argoproj.io "todo-platform-dev" deleted
   deployment.apps/todo-platform not found
   applications.argoproj.io "todo-platform-dev" already exists
@@ -1388,7 +1355,7 @@ git push origin HEAD
 - **原因**：从单独 Application 切换到 ApplicationSet 时，先前的 `todo-platform-dev` Application 仍然占用同名对象，或者误用了默认级联删除，把已经同步出来的 Kubernetes 资源一起删掉。
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   kubectl -n argocd get application todo-platform-dev -o yaml
   kubectl -n argocd get applicationset todo-platform-envs
   kubectl -n todo-dev get deploy,svc,pod
@@ -1398,7 +1365,7 @@ git push origin HEAD
 
 - **修复**：
 
-  ```bash
+  ```bash linenums="0"
   argocd app delete todo-platform-dev --cascade=false -y
   kubectl apply -f deployments/gitops/argocd/todo-platform-applicationset.yaml
   argocd app sync todo-platform-dev --timeout 300
@@ -1425,123 +1392,13 @@ git push origin HEAD
 - [Argo CD ApplicationSet Introduction](https://argo-cd.readthedocs.io/en/stable/operator-manual/applicationset/)
 - [Argo CD v3.4.3 Release](https://github.com/argoproj/argo-cd/releases/tag/v3.4.3)
 
-## 8. 本章小项目
+## 8. 练习题与面试题
 
-### 8.1 项目产出
+本章练习题和面试题已拆分到独立页面，完成正文学习后再进入题库练习与复盘。
 
-本章完成后，Todo Platform 应用仓库新增：
+[查看本章练习题与面试题](../../questions/stage-05-production-engineering/30-gitops-argocd.md)
 
-- `deployments/gitops/envs/dev/kustomization.yaml`：GitOps dev 环境期望状态。
-- `deployments/gitops/envs/dev/namespace.yaml`：dev Namespace 与 Pod Security 标签。
-- `deployments/gitops/envs/prod/kustomization.yaml`：GitOps prod 环境期望状态。
-- `deployments/gitops/envs/prod/namespace.yaml`：prod Namespace 与 Pod Security 标签。
-- `deployments/gitops/envs/prod/patch-deployment-resources.yaml`：prod 资源请求和限制。
-- `deployments/gitops/argocd/todo-platform-project.yaml`：Argo CD 项目权限边界。
-- `deployments/gitops/argocd/todo-platform-dev-application.yaml`：单环境 Application。
-- `deployments/gitops/argocd/todo-platform-applicationset.yaml`：dev/prod 多环境 ApplicationSet。
-
-图 30-4 本章小项目产出关系：
-
-```mermaid
-flowchart TD
-    Base["第 28 篇 Kustomize base"] --> Dev["GitOps dev overlay"]
-    Base --> Prod["GitOps prod overlay"]
-    Dev --> App["todo-platform-dev Application"]
-    Dev --> AppSet["todo-platform-envs ApplicationSet"]
-    Prod --> AppSet
-    Project["todo-platform AppProject"] --> App
-    Project --> AppSet
-    App --> Cluster["todo-dev Namespace"]
-    AppSet --> Cluster
-    AppSet --> ProdNs["todo-prod Namespace"]
-```
-
-### 8.2 能力验收标准
-
-基础验收：
-
-- 能安装 Argo CD v3.4.3，并看到 `argocd-server`、`argocd-repo-server`、`argocd-application-controller` 正常运行。
-- 能写出 `AppProject`，限制 Todo Platform 只能部署到 `todo-dev` 和 `todo-prod`。
-- 能写出 `Application`，指向 `deployments/gitops/envs/dev`。
-- 能解释为什么 GitOps overlay 不再使用第 28 篇的 `.secrets/`。
-
-进阶验收：
-
-- `todo-platform-dev` 能自动同步到 `Synced` 和 `Healthy`。
-- 手工修改 dev Deployment 副本数后，Argo CD 能自动修复漂移。
-- Git 修改 `TODO_RELEASE` 后，Argo CD 能自动同步新 ConfigMap 并滚动更新。
-- 能通过 Git revert 完成回滚，并解释为什么不优先使用集群内手工回滚。
-- ApplicationSet 能生成 `todo-platform-dev` 和 `todo-platform-prod` 两个 Application。
-
-作品集验收：
-
-- 能展示 GitOps 目录结构截图、Argo CD Application 页面截图、同步历史和一次漂移修复证据。
-- 能讲清楚第 29 篇 CI 与第 30 篇 GitOps 的边界：CI 产出制品并更新 Git，Argo CD 从 Git 同步集群。
-
-## 9. 本章练习题
-
-基础题：
-
-1. GitOps 中“Git 是唯一事实来源”是什么意思？它和普通 `kubectl apply` 有什么区别？
-2. Argo CD 的 Sync Status 和 Health Status 分别表示什么？
-3. `prune` 和 `selfHeal` 分别解决什么问题？各自有什么风险？
-4. 为什么 Argo CD 不能直接读取第 28 篇本地 `.secrets/` 目录？
-5. AppProject 在生产环境中的作用是什么？
-
-实操题：
-
-1. 给 dev overlay 增加 `TODO_LOG_LEVEL=info`，提交并推送。验收标准：Argo CD 自动同步，新的 ConfigMap 名称发生变化，Deployment 完成滚动更新。
-2. 暂时关闭 dev Application 的 `selfHeal`，手工把副本数改成 2，观察 Argo CD 状态。验收标准：能看到 `OutOfSync`，但副本数不会自动恢复；重新开启后能恢复。
-3. 在 ApplicationSet 中增加一个 `test` 元素，并创建 `deployments/gitops/envs/test`。验收标准：Argo CD 自动生成 `todo-platform-test` Application。
-
-思考题：
-
-1. 如果生产环境出现紧急故障，你会先暂停 Argo CD 同步、直接手工改集群，还是先提交 Git revert？什么情况下选择不同方案？
-2. 如果 CI 构建镜像后自动提交 GitOps PR，你会如何设计审批、镜像扫描、回滚和审计，避免坏镜像进入 prod？
-
-## 10. 本章面试题
-
-### 面试题 1：CI 直接部署和 GitOps 部署有什么区别？
-
-**一句话结论**：CI 直接部署是流水线主动改集群，GitOps 是流水线改 Git，再由集群内控制器把 Git 期望状态同步到集群。
-
-**展开解释**：CI 直接部署简单，适合 dev、临时环境或小团队，但 CI 需要持有集群写权限，部署历史散在 workflow 日志中。GitOps 把部署配置放进 Git，所有变更走 PR、审计和回滚，Argo CD 负责持续同步、漂移检测和自愈，更适合多环境和生产集群。
-
-**深入追问**：生产中还要讨论 Git 分支保护、Argo CD RBAC、AppProject 限权、Secret 管理、同步窗口、prune 风险和事故时如何暂停同步。
-
-### 面试题 2：Argo CD 的 Synced 和 Healthy 是同一个概念吗？
-
-**一句话结论**：不是。`Synced` 表示集群对象与 Git 期望状态一致，`Healthy` 表示这些对象自身运行正常。
-
-**展开解释**：一个应用可能 `Synced` 但 `Degraded`，例如 Git 中的 Deployment 已经应用，但 Pod 因 Secret 缺失 CrashLoopBackOff。也可能 `OutOfSync` 但 `Healthy`，例如有人手工扩容了 Deployment，应用仍正常服务，但集群状态已经偏离 Git。
-
-**深入追问**：排障时先看 source/path/revision 是否能渲染，再看 sync diff，然后看 Kubernetes 事件、Pod 状态、日志和探针。
-
-### 面试题 3：`prune` 和 `selfHeal` 为什么不能无脑开启？
-
-**一句话结论**：它们能强化 Git 事实来源，但也会放大错误配置和覆盖临时救火动作。
-
-**展开解释**：`prune` 会删除 Git 中已移除的资源，适合清理废弃对象，但路径配错或目录误删时可能删除关键资源。`selfHeal` 会把手工改动修回 Git 状态，适合防止漂移，但事故中直接 `kubectl edit` 的临时修复可能被覆盖。
-
-**深入追问**：生产环境应使用 AppProject 限制作用域，配合 PR 审批、同步窗口、告警确认和分环境策略；dev 可以自动化强一些，prod 要更谨慎。
-
-### 面试题 4：ApplicationSet 解决什么问题？
-
-**一句话结论**：ApplicationSet 用模板批量生成 Application，适合多环境、多集群或 monorepo 场景。
-
-**展开解释**：没有 ApplicationSet 时，dev、test、prod 可能复制三份 Application YAML，只改 path 和 namespace，后续很容易漏改。ApplicationSet 通过 list、git、cluster、matrix 等 generator 生成参数，再渲染模板，统一管理一组应用。
-
-**深入追问**：要注意模板参数缺失、命名冲突、prod 自动同步风险、不同环境的审批策略，以及 ApplicationSet 本身的权限边界。
-
-### 面试题 5：GitOps 中如何做回滚？
-
-**一句话结论**：优先回滚 Git 中的期望状态，例如 `git revert`，再让 Argo CD 同步。
-
-**展开解释**：如果只在集群里手工改 Deployment 或只在 Argo CD 中临时 rollback，Git 仍然保留坏配置，下一次同步可能又把坏状态带回来。Git revert 有审计记录、能走审批、能触发相同的同步链路，也能让团队确认当前生产期望状态。
-
-**深入追问**：数据库迁移、不可逆变更和多服务联动不能只靠 Deployment 回滚。要提前设计备份、兼容性、灰度、feature flag、迁移回滚脚本和发布冻结策略。
-
-## 11. 本章总结
+## 9. 本章总结
 
 本篇把 Todo Platform 从“CI 构建并验证”推进到“GitOps 声明式发布”。你学习了 GitOps 的事实来源模型、Argo CD Application / AppProject / ApplicationSet 的结构、同步状态与健康状态的区别、自动同步、prune、selfHeal、漂移检测和 Git 回滚。
 
@@ -1549,7 +1406,7 @@ flowchart TD
 
 能力价值上，你现在能把第 29 篇的 CI/CD 和本篇 GitOps 组合成企业常见交付链路：CI 负责验证和制品，Git 负责承载期望状态，Argo CD 负责持续同步和漂移治理。这是后续监控、日志、Tracing 和生产排障的运行基础。
 
-## 12. 下一章衔接
+## 10. 下一章衔接
 
 第 31 篇会进入 Prometheus 与 Grafana 监控。本篇已经让 Todo Platform 的 dev/prod 环境由 Argo CD 持续管理；下一篇会回答另一个生产问题：**应用已经能自动发布到集群后，如何知道它是否健康、是否变慢、是否错误率升高、是否需要告警？**
 

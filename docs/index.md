@@ -39,6 +39,67 @@ hide:
 - 云原生系统如何接入 CI/CD、GitOps、监控、日志、链路追踪和安全治理。
 - Operator 如何通过 Kubernetes API 扩展机制自动化管理应用生命周期。
 
+## 课程主线
+
+这不是一套“学一个工具换一个工具”的课程，而是一个项目逐步生产化的过程。
+
+```mermaid
+flowchart LR
+    A["阶段一<br/>基础能力"] --> B["阶段二<br/>Go 后端开发"]
+    B --> C["阶段三<br/>容器化能力"]
+    C --> D["阶段四<br/>Kubernetes 应用交付"]
+    D --> E["阶段五<br/>生产工程能力"]
+    E --> F["阶段六<br/>平台工程与 Operator"]
+
+    A --> P["Cloud Native Todo Platform"]
+    B --> P
+    C --> P
+    D --> P
+    E --> P
+    F --> P
+
+    classDef stage fill:#e0f2fe,stroke:#0284c7,color:#0f172a
+    classDef project fill:#dcfce7,stroke:#16a34a,color:#0f172a
+    class A,B,C,D,E,F stage
+    class P project
+```
+
+| 阶段 | 项目形态 |
+|---|---|
+| 阶段一 | 初始化仓库、脚本、目录、基础环境 |
+| 阶段二 | 从 Todo CLI 演进到生产风格 Go Todo API |
+| 阶段三 | 为 Todo API 构建镜像，使用 Compose 编排本地环境 |
+| 阶段四 | 把 Todo Platform 部署到 Kubernetes |
+| 阶段五 | 接入 CI/CD、GitOps、监控、日志和链路追踪 |
+| 阶段六 | 开发 Todo Operator 自动管理整套平台生命周期 |
+
+## 统一实验环境
+
+云原生技术大量运行在 Linux 之上。为了减少新手在系统差异、包管理器、路径、权限、Shell 行为和 Docker 运行方式上的额外负担，本课程统一使用 **Ubuntu Server 24.04 LTS** 作为学习和实验环境。
+
+统一环境带来三个好处：
+
+- 命令可复制：课程中的 Bash/Zsh、apt、systemd、Docker Engine 命令都按 Ubuntu Server 24.04 编写。
+- 问题可复现：同一条命令在不同学员机器上的行为更接近，便于排障和答疑。
+- 更贴近生产：后续容器、Kubernetes 节点、CI runner 和服务器环境都以 Linux 为主。
+
+## 版本基线
+
+版本环境锁定的目的不是追求“永远最新”，而是让团队成员有共同基线。
+
+| 工具 | 课程基线 | 用途 |
+|---|---|---|
+| Go | 1.26.x | 编写 CLI、API、Controller、Operator |
+| Docker | 29.x | 构建镜像、运行容器、本地开发 |
+| containerd | 2.3.x LTS | 理解 Kubernetes 节点运行时，后续容器运行时章节会使用 |
+| Kubernetes / kubectl | 1.36.x | 学习 K8s API、工作负载、网络、安全 |
+| kind | 0.31+ | 本地 Kubernetes 集群 |
+| Helm | 4.2.x | Kubernetes 应用打包发布 |
+| PostgreSQL | 18.x | 后续 Todo API 持久化 |
+| Redis | 8.2.x | 后续缓存、限流和异步任务 |
+
+工具版本会随时间变化。真实团队应该在 README、CI、构建镜像、安装脚本里写清版本范围，并定期审查。
+
 ## 适合人群
 
 - Linux 基础薄弱或中等的新手。

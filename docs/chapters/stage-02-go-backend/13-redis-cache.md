@@ -36,9 +36,9 @@
 - 能用 Redis 计数器和 Lua（Redis 内置脚本语言）脚本实现固定窗口限流。
 - 能用 Redis List 实现简单异步统计刷新任务。
 
-本篇结束时，你至少应该能成功执行：
+你至少应该能成功执行：
 
-```bash
+```bash linenums="0"
 cd ~/workspace/cloud-native-todo-platform
 docker compose up -d postgres redis
 docker compose exec redis redis-cli -a todo_redis_password ping
@@ -74,39 +74,18 @@ PostgreSQL 是权威数据源，但它不是所有问题的唯一答案：
 
 Redis 的核心价值不是“快”，而是把短期状态、热点读取、计数和轻量协调从主数据库里分离出来。
 
-### 2.3 课程项目关联
+### 2.3 Todo 平台模拟案例
 
-本篇会新增或修改：
+> Todo 平台在高频访问下需要缓存和限流能力。你需要接入 Redis，实现热点读取缓存、请求计数、限流中间件和本地降级处理。
 
-```text
-cloud-native-todo-platform/
-├── docker-compose.yml
-└── api/
-    ├── cmd/
-    │   └── todo-api/
-    │       └── main.go
-    └── internal/
-        ├── cache/
-        │   └── redis.go
-        ├── middleware/
-        │   └── ratelimit.go
-        ├── ratelimit/
-        │   └── redis_limiter.go
-        ├── repository/
-        │   └── cached.go
-        └── tasks/
-            └── redis_queue.go
-```
-
-第 12 篇的 PostgreSQL Repository 仍然是事实数据源。本篇新增的 `CachedRepository` 是包装层：读列表时先查 Redis，未命中再查真实 Repository；写操作成功后删除相关缓存并投递统计刷新任务。
-
+这个案例关注缓存不是“加一层 Redis”这么简单：键设计、过期时间、错误降级和限流策略都会影响接口稳定性。
 ## 3. 核心概念
 
 ### 3.1 Redis 是什么
 
 Redis 是内存型数据结构服务。它通过网络接收命令，例如：
 
-```text
+```text linenums="0"
 SET todo:cache:list:all "..."
 GET todo:cache:list:all
 INCR todo:ratelimit:127.0.0.1:29401234
@@ -169,7 +148,7 @@ Redis String 不只可以保存字符串，也可以做原子计数器。`INCR` 
 
 分布式锁也是 Redis 常见用法，但它比计数器更容易写错。最小正确模型通常是：
 
-```text
+```text linenums="0"
 SET todo:lock:stats <unique-token> NX PX 30000
 ```
 
@@ -179,7 +158,7 @@ SET todo:lock:stats <unique-token> NX PX 30000
 
 释放锁不能简单执行 `DEL todo:lock:stats`，否则可能误删别人刚拿到的新锁。生产中通常用 Lua 脚本完成“比较 token + 删除 Key”的原子操作：
 
-```text
+```text linenums="0"
 if redis.call("GET", KEYS[1]) == ARGV[1] then
   return redis.call("DEL", KEYS[1])
 end
@@ -190,7 +169,7 @@ return 0
 
 限流是为了保护系统在异常流量下仍然可控。本篇实现固定窗口限流：
 
-```text
+```text linenums="0"
 todo:ratelimit:<client-ip>:<minute-window>
 ```
 
@@ -202,7 +181,7 @@ todo:ratelimit:<client-ip>:<minute-window>
 
 Redis List 可以做轻量队列。`LPUSH`（Left Push，左侧推入）负责生产任务，`BRPOP`（Blocking Right Pop，阻塞式右侧弹出）负责消费任务：
 
-```text
+```text linenums="0"
 LPUSH todo:tasks refresh_stats
 BRPOP todo:tasks 5
 ```
@@ -287,6 +266,8 @@ Redis 限流中间件有两种故障策略：
 
 ## 5. 手把手实验
 
+预计耗时：25 分钟阅读，80 分钟动手实验。
+
 ### 5.1 实验目标
 
 本篇要完成 5 件事：
@@ -311,13 +292,13 @@ Redis 限流中间件有两种故障策略：
 
 进入课程项目根目录：
 
-```bash
+```bash linenums="0"
 cd ~/workspace/cloud-native-todo-platform
 ```
 
 确认 Docker、Compose 和 Go 模块代理可用：
 
-```bash
+```bash linenums="0"
 docker version
 docker compose version
 go env GOPROXY
@@ -325,7 +306,7 @@ go env GOPROXY
 
 确认第 12 篇文件已存在：
 
-```bash
+```bash linenums="0"
 test -f api/internal/repository/postgres.go
 test -f api/internal/database/postgres.go
 test -f docker-compose.yml
@@ -335,13 +316,13 @@ test -f docker-compose.yml
 
 创建本篇新增目录：
 
-```bash
+```bash linenums="0"
 mkdir -p api/internal/cache api/internal/middleware api/internal/ratelimit api/internal/tasks
 ```
 
 本篇新增或覆盖文件如下：
 
-```text
+```text linenums="0"
 cloud-native-todo-platform/
 ├── docker-compose.yml
 └── api/
@@ -1049,21 +1030,21 @@ func durationFromEnv(name string, fallback time.Duration) time.Duration {
 
 拉取 Redis 依赖并整理依赖：
 
-```bash
+```bash linenums="0"
 go get github.com/redis/go-redis/v9@v9.19.0
 go mod tidy
 ```
 
 启动 PostgreSQL 和 Redis：
 
-```bash
+```bash linenums="0"
 docker compose up -d postgres redis
 docker compose ps
 ```
 
 确认 Redis 可用：
 
-```bash
+```bash linenums="0"
 docker compose exec redis redis-cli -a todo_redis_password ping
 ```
 
@@ -1071,19 +1052,19 @@ docker compose exec redis redis-cli -a todo_redis_password ping
 
 预期输出：
 
-```text
+```text linenums="0"
 PONG
 ```
 
 如果第 12 篇迁移尚未执行，先执行迁移：
 
-```bash
+```bash linenums="0"
 docker compose exec -T postgres psql -U todo -d todo_platform -f /migrations/000001_create_todos.up.sql
 ```
 
 格式化和测试：
 
-```bash
+```bash linenums="0"
 go fmt ./api/...
 go test ./api/...
 ```
@@ -1092,13 +1073,13 @@ go test ./api/...
 
 构建 API：
 
-```bash
+```bash linenums="0"
 go build -o bin/todo-api ./api/cmd/todo-api
 ```
 
 启动 Todo API v4：
 
-```bash
+```bash linenums="0"
 TODO_DATABASE_DSN='postgres://todo:todo_password@127.0.0.1:5432/todo_platform?sslmode=disable' \
 TODO_REDIS_ADDR=127.0.0.1:6379 \
 TODO_REDIS_PASSWORD=todo_redis_password \
@@ -1110,7 +1091,7 @@ TODO_API_ADDR=127.0.0.1:18080 \
 
 另开一个终端，创建 Todo 并连续查询列表：
 
-```bash
+```bash linenums="0"
 curl -s -X POST http://127.0.0.1:18080/api/v2/todos \
   -H 'Content-Type: application/json' \
   -d '{"title":"cache todo list with Redis"}'
@@ -1121,14 +1102,14 @@ curl -s http://127.0.0.1:18080/api/v2/todos
 
 检查缓存 Key：
 
-```bash
+```bash linenums="0"
 docker compose exec redis redis-cli -a todo_redis_password --scan --pattern 'todo:cache:*'
 docker compose exec redis redis-cli -a todo_redis_password TTL todo:cache:list:all
 ```
 
 验证限流，把阈值临时调低重新启动 API。先在运行 API 的终端按 `Ctrl-C` 停止旧进程，避免端口被占用：
 
-```bash
+```bash linenums="0"
 TODO_DATABASE_DSN='postgres://todo:todo_password@127.0.0.1:5432/todo_platform?sslmode=disable' \
 TODO_REDIS_ADDR=127.0.0.1:6379 \
 TODO_REDIS_PASSWORD=todo_redis_password \
@@ -1139,7 +1120,7 @@ TODO_API_ADDR=127.0.0.1:18080 \
 
 连续请求：
 
-```bash
+```bash linenums="0"
 curl -i http://127.0.0.1:18080/api/v2/todos
 curl -i http://127.0.0.1:18080/api/v2/todos
 curl -i http://127.0.0.1:18080/api/v2/todos
@@ -1150,7 +1131,7 @@ curl -i http://127.0.0.1:18080/api/v2/todos
 
 查看任务队列：
 
-```bash
+```bash linenums="0"
 docker compose exec redis redis-cli -a todo_redis_password LLEN todo:tasks
 ```
 
@@ -1160,7 +1141,7 @@ docker compose exec redis redis-cli -a todo_redis_password LLEN todo:tasks
 
 API 启动日志中应出现：
 
-```json
+```json linenums="0"
 {"level":"INFO","msg":"using postgres repository"}
 {"level":"INFO","msg":"redis cache enabled","addr":"127.0.0.1:6379","ttl":"30s"}
 {"level":"INFO","msg":"redis rate limit enabled","limit_per_minute":60}
@@ -1169,14 +1150,14 @@ API 启动日志中应出现：
 
 缓存命中前后日志类似：
 
-```json
+```json linenums="0"
 {"level":"INFO","msg":"todo list cache miss","key":"todo:cache:list:all"}
 {"level":"INFO","msg":"todo list cache hit","key":"todo:cache:list:all"}
 ```
 
 限流响应类似：
 
-```text
+```text linenums="0"
 HTTP/1.1 429 Too Many Requests
 Content-Type: application/json
 Retry-After: 60
@@ -1184,7 +1165,7 @@ Retry-After: 60
 
 响应体：
 
-```json
+```json linenums="0"
 {"error":{"code":"rate_limited","message":"too many requests"}}
 ```
 
@@ -1192,31 +1173,31 @@ Retry-After: 60
 
 验证 Redis 服务：
 
-```bash
+```bash linenums="0"
 docker compose exec redis redis-cli -a todo_redis_password ping
 ```
 
 验证缓存 Key：
 
-```bash
+```bash linenums="0"
 docker compose exec redis redis-cli -a todo_redis_password --scan --pattern 'todo:cache:*'
 ```
 
 验证限流 Key：
 
-```bash
+```bash linenums="0"
 docker compose exec redis redis-cli -a todo_redis_password --scan --pattern 'todo:ratelimit:*'
 ```
 
 验证任务队列：
 
-```bash
+```bash linenums="0"
 docker compose exec redis redis-cli -a todo_redis_password LLEN todo:tasks
 ```
 
 验证 Redis 全局命中统计：
 
-```bash
+```bash linenums="0"
 docker compose exec redis redis-cli -a todo_redis_password INFO stats
 ```
 
@@ -1226,19 +1207,17 @@ docker compose exec redis redis-cli -a todo_redis_password INFO stats
 
 停止 API 后，停止依赖容器但保留数据卷：
 
-```bash
+```bash linenums="0"
 docker compose down
 ```
 
 如果要彻底清理 PostgreSQL 和 Redis 本地数据：
 
-```bash
+```bash linenums="0"
 docker compose down -v
 ```
 
 `-v` 会删除 PostgreSQL 和 Redis 数据卷。确认不需要保留实验数据再执行。
-
-预计耗时：25 分钟阅读，80 分钟动手实验。
 
 ## 6. 常见错误与排障
 
@@ -1246,14 +1225,14 @@ docker compose down -v
 
 - **现象**：
 
-  ```text
+  ```text linenums="0"
   NOAUTH Authentication required
   ```
 
 - **原因**：Redis 设置了 `--requirepass todo_redis_password`，但命令或 API 没有带密码。
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   docker compose exec redis redis-cli -a todo_redis_password ping
   echo "$TODO_REDIS_PASSWORD"
   ```
@@ -1267,7 +1246,7 @@ docker compose down -v
 - **原因**：没有设置 `TODO_REDIS_ADDR`，API 仍在无 Redis 模式运行；或者请求被限流挡住，没有进入业务逻辑。
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   echo "$TODO_REDIS_ADDR"
   docker compose exec redis redis-cli -a todo_redis_password --scan --pattern 'todo:cache:*'
   ```
@@ -1281,13 +1260,13 @@ docker compose down -v
 - **原因**：写操作后缓存失效失败，或有其他未覆盖的缓存 Key。
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   docker compose exec redis redis-cli -a todo_redis_password --scan --pattern 'todo:cache:*'
   ```
 
 - **修复**：确认 `afterWrite` 会删除 `all`、`pending`、`done` 三类列表缓存；必要时手动删除缓存验证：
 
-  ```bash
+  ```bash linenums="0"
   docker compose exec redis redis-cli -a todo_redis_password DEL todo:cache:list:all todo:cache:list:pending todo:cache:list:done
   ```
 
@@ -1299,7 +1278,7 @@ docker compose down -v
 - **原因**：限流窗口过长、阈值过低，或多个请求都被识别成同一个客户端 IP。
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   docker compose exec redis redis-cli -a todo_redis_password --scan --pattern 'todo:ratelimit:*'
   docker compose exec redis redis-cli -a todo_redis_password TTL todo:ratelimit:127.0.0.1:0
   ```
@@ -1315,7 +1294,7 @@ docker compose down -v
 - **原因**：worker 没启动、Redis BRPOP 失败，或任务消费速度低于生产速度。
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   docker compose exec redis redis-cli -a todo_redis_password LLEN todo:tasks
   ```
 
@@ -1336,97 +1315,13 @@ docker compose down -v
 
 5. **Redis 要有容量和安全边界**。生产 Redis 不应裸露公网，要配置访问控制、TLS、内存上限、淘汰策略、慢命令监控和备份。缓存 Redis、锁 Redis、队列 Redis 最好按风险和容量隔离。
 
-## 8. 本章小项目
+## 8. 练习题与面试题
 
-本章小项目是 **Todo API v4 Redis 加速与异步处理**。项目目标是在 PostgreSQL 持久化基础上，为 Todo API 增加缓存、接口限流和异步统计刷新能力，同时说明 Redis 的一致性和可靠性边界。
+本章练习题和面试题已拆分到独立页面，完成正文学习后再进入题库练习与复盘。
 
-交付物包括：
+[查看本章练习题与面试题](../../questions/stage-02-go-backend/13-redis-cache.md)
 
-- 更新后的 `docker-compose.yml`
-- `api/internal/cache/redis.go`
-- `api/internal/repository/cached.go`
-- `api/internal/ratelimit/redis_limiter.go`
-- `api/internal/middleware/ratelimit.go`
-- `api/internal/tasks/redis_queue.go`
-- 更新后的 `api/cmd/todo-api/main.go`
-
-能力验收标准：
-
-- 能启动 Redis 8.2 并用 `redis-cli` 连接。
-- 能解释 Redis 和 PostgreSQL 的职责差异。
-- 能说明 Cache-Aside 的读写流程。
-- 能验证 Todo 列表缓存 Key 和 TTL。
-- 能触发并解释 `429 Too Many Requests`。
-- 能说明 Redis 分布式锁为什么需要 token、过期时间和 Lua 释放。
-- 能说明 Redis List 队列的可靠性边界。
-
-## 9. 本章练习题
-
-### 9.1 基础题
-
-1. Redis 和 PostgreSQL 的职责有什么不同？
-2. Cache-Aside 的读路径和写路径分别是什么？
-3. 缓存穿透、击穿、雪崩的区别是什么？
-4. 固定窗口限流有什么优点和缺点？
-5. Redis 分布式锁为什么不能简单 `SETNX` 后再 `DEL`？
-6. Redis List 做队列为什么不适合关键业务任务？
-
-### 9.2 实操题
-
-1. 把 Todo 列表缓存 TTL 从 `30s` 改成 `2m`，并用 `TTL` 命令观察变化。
-2. 增加单个 Todo 缓存 Key：`todo:cache:item:<id>`。验收标准：连续 GET 同一个 Todo 时第二次命中缓存，Update/Delete 后缓存被删除；可用 `docker compose exec redis redis-cli -a todo_redis_password GET todo:cache:item:<id>` 验证缓存内容。
-3. 给缓存 TTL 增加 0 到 10 秒随机抖动。验收标准：连续写入多个缓存 Key 时，TTL 不完全相同。
-4. 新增任务类型 `cleanup_done_todos`。验收标准：worker 能识别该任务并记录日志，不影响 `refresh_stats`。
-
-### 9.3 思考题
-
-1. 如果 Redis 故障，Todo 列表接口应该失败、降级访问数据库，还是返回旧缓存？为什么？
-2. 限流应该按 IP、用户 ID 还是 API Token？不同选择有什么影响？
-3. Redis List、Redis Streams、Kafka 在任务队列场景有什么差异？
-
-## 10. 本章面试题
-
-### 面试题 1：Redis 常用于哪些场景？
-
-**一句话结论**：Redis 常用于缓存、计数器、限流、短期状态、排行榜、分布式锁和轻量队列。
-
-**展开解释**：Redis 是内存型数据结构服务，读写延迟低，数据结构丰富。它适合保存可重建、短期、热点或协调类数据。强一致、长期权威数据通常仍然放在 PostgreSQL 等数据库中。
-
-**深入追问**：Redis 不是越多越好。每引入一个缓存 Key，就要设计 TTL、失效、降级、容量和监控。
-
-### 面试题 2：什么是缓存穿透、击穿和雪崩？
-
-**一句话结论**：穿透是不存在的数据绕过缓存，击穿是热点 Key 过期导致并发回源，雪崩是大量 Key 同时失效或 Redis 故障导致数据库被打爆。
-
-**展开解释**：穿透常用参数校验和缓存空值；击穿常用互斥重建、提前刷新；雪崩常用 TTL 抖动、预热、限流和降级。不同问题现象相似，但根因不同。
-
-**深入追问**：缓存问题不能只靠 Redis 解决，还要看业务参数、数据库承载能力、限流策略和可观测性。
-
-### 面试题 3：为什么写操作后通常删除缓存而不是更新缓存？
-
-**一句话结论**：因为一个写操作可能影响多个缓存 Key，删除比精准更新更简单可靠。
-
-**展开解释**：Todo 标记完成会影响全部列表、pending 列表、done 列表和统计缓存。手动更新所有 Key 容易遗漏，删除相关 Key 后让下一次读请求回源并重建缓存，是 Cache-Aside 中常见策略。
-
-**深入追问**：删除缓存也不是强一致。如果删除失败或并发读写交错，仍然可能短时间读到旧数据。关键业务需要更严格的一致性设计。
-
-### 面试题 4：Redis 如何实现分布式锁和接口限流？
-
-**一句话结论**：分布式锁通常用 `SET key token NX PX` 获取、用 Lua 校验 token 后释放；接口限流可以用计数器和过期时间实现固定窗口。
-
-**展开解释**：锁的 token 用来确认释放者身份，过期时间用来避免进程崩溃后永久占锁，Lua 用来保证“判断 token + 删除锁”是原子操作。限流 Key 通常包含限流对象和窗口编号，例如 `todo:ratelimit:<ip>:<minute>`。每个请求递增一次计数，超过阈值就返回 429；本篇用 Lua 把计数和 TTL 设置放到一次 Redis 执行中。
-
-**深入追问**：锁和限流都不是只写几条 Redis 命令就结束。生产中要考虑时钟、超时、续约、可信代理、滑动窗口、漏桶或令牌桶，并且限流通常分布在网关、Ingress、应用和下游依赖多层。
-
-### 面试题 5：Redis List 做任务队列有什么风险？
-
-**一句话结论**：Redis List 简单易用，但缺少完整的确认、重试、死信和消费组机制。
-
-**展开解释**：`LPUSH` + `BRPOP` 可以实现轻量队列。消费者取出任务后如果进程崩溃，任务可能丢失。本篇只用它处理可重算的统计刷新，因此风险可接受。
-
-**深入追问**：可靠任务队列要考虑幂等、重试、超时、死信、顺序和可观测性。可以评估 Redis Streams、Kafka、RabbitMQ 或云消息队列。
-
-## 11. 本章总结
+## 9. 本章总结
 
 本篇把 Todo API 从“有数据库持久化”继续推进到“具备缓存、限流和异步处理能力”。你使用 Docker Compose 启动 Redis 8.2，学习了 String、List 等常用数据结构，理解了分布式锁的正确边界，用 `go-redis` 初始化客户端，并在 API 中按配置启用 Redis。
 
@@ -1434,7 +1329,7 @@ docker compose down -v
 
 能力价值上，你已经能说明 Redis 能解决什么，也能说清它不能解决什么。后续进入第 14 篇生产化时，Redis 的地址、密码、TTL、限流阈值、日志和故障策略都会进入配置分层和运维边界。
 
-## 12. 下一章衔接
+## 10. 下一章衔接
 
 第 14 篇会把 Todo API 继续推向生产化：JWT 鉴权、审计日志、配置分层、结构化日志、健康检查强化和 pprof 性能分析都会围绕当前 API、PostgreSQL 和 Redis 组合展开。
 

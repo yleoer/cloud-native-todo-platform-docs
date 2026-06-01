@@ -35,7 +35,7 @@
 
 本篇会创建一个临时 kind 集群 `todo-network-lab` 来验证 NetworkPolicy。这样做是为了避免修改第 20-24 篇使用的主集群 `todo-k8s`。实验结束后可以直接删除临时集群。
 
-本篇命令以 Linux / macOS / Windows Subsystem for Linux 2（WSL2，Windows 的 Linux 子系统）中的 Bash 为主。Windows PowerShell 用户需要手动创建 YAML 文件，或者把 `cat <<'YAML'` 这类 heredoc 命令改写为 PowerShell 等价写法。
+本篇命令以 Linux / macOS / Windows Subsystem for Linux 2（WSL2，Windows 的 Linux 子系统）中的 Bash 为主。Windows PowerShell 用户需要按页面给出的文件名和内容手动创建 YAML 文件。
 
 !!! warning "NetworkPolicy 需要 CNI 插件支持"
     Kubernetes API Server 可以保存 NetworkPolicy 对象，但是否真正拦截流量取决于 CNI 插件。kind 默认网络插件不负责执行 NetworkPolicy。本篇会在临时集群中安装 Calico，用它验证网络隔离效果。
@@ -68,30 +68,11 @@ Kubernetes 网络故障经常看起来像“应用坏了”，但根因可能在
 
 网络策略不是“最后加一道锁”这么简单。它要求团队先讲清哪些服务应该互通，哪些服务必须隔离，否则策略很容易误伤业务流量。
 
-### 2.3 课程项目关联
+### 2.3 Todo 平台模拟案例
 
-第 20-24 篇已经为 Todo Platform 搭好了工作负载、入口、配置和存储：
+> Todo 平台需要明确访问边界：授权客户端可以访问 Todo API，Todo API 可以访问 PostgreSQL，其他 Namespace 不能直接访问数据库。你需要把这张访问矩阵翻译成 DNS 验证、Service 访问和 NetworkPolicy。
 
-```text
-第 20 篇：kind 集群、Node、kubelet、kube-proxy、CNI 基础
-第 21 篇：Todo API Deployment 与 Service selector
-第 22 篇：Ingress / Gateway API 进入 Todo API
-第 23 篇：ConfigMap / Secret 配置来源
-第 24 篇：Todo API 访问 PostgreSQL Service
-第 25 篇：Pod、Service、DNS、kube-proxy、容器网络接口（Container Network Interface，CNI）与 NetworkPolicy
-```
-
-本篇会把第 24 篇留下的 `todo-api -> todo-postgres` 访问链路作为主案例：允许授权客户端访问 Todo API，只允许 Todo API 访问 PostgreSQL，拒绝其它 Namespace 直接访问数据库。
-
-访问矩阵先写清楚，后面再把它翻译成 NetworkPolicy：
-
-| 来源 | 目标 | 预期 |
-|---|---|---|
-| `todo-clients/allowed-client` | `todo-api:80` | 允许 |
-| `todo-denied/denied-client` | `todo-api:80` | 拒绝 |
-| `todo-clients/allowed-client` | `todo-postgres:5432` | 拒绝 |
-| `todo-workloads/todo-api` | `todo-postgres:5432` | 允许 |
-
+这个案例关注集群网络的可解释性：允许什么、拒绝什么、如何证明策略生效，都要能用命令验证。
 ## 3. 核心概念
 
 ### 3.1 Kubernetes 网络模型
@@ -132,13 +113,13 @@ CoreDNS 是 Kubernetes 默认 DNS 服务。它把 Service、Pod 等对象转换�
 
 常见 Service DNS 格式：
 
-```text
+```text linenums="0"
 <service-name>.<namespace>.svc.cluster.local
 ```
 
 例如第 24 篇中 Todo API 访问 PostgreSQL 的地址是：
 
-```text
+```text linenums="0"
 todo-postgres.todo-workloads.svc.cluster.local
 ```
 
@@ -171,7 +152,7 @@ kube-proxy 的职责是让 Service 虚拟 IP 能转发到后端 Pod。iptables �
 
 你不需要背 iptables 链名，但要理解这条路径：
 
-```text
+```text linenums="0"
 Pod 发起请求 -> 目标是 Service ClusterIP -> 节点网络栈匹配 kube-proxy 规则 -> DNAT 到某个后端 Pod IP
 ```
 
@@ -196,7 +177,7 @@ NetworkPolicy 有两个非常重要的默认行为：
 
 最小默认拒绝入口策略如下：
 
-```yaml
+```yaml linenums="0"
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -245,7 +226,7 @@ Pod 内的 `/etc/resolv.conf` 通常指向集群 DNS Service。应用访问 `tod
 
 典型查询路径是：
 
-```text
+```text linenums="0"
 todo-postgres
 todo-postgres.todo-workloads.svc.cluster.local
 CoreDNS 查询 Kubernetes API 缓存
@@ -297,6 +278,8 @@ NetworkPolicy 是 Namespace 内对象。它不能跨 Namespace “保护所有�
 
 ## 5. 手把手实验
 
+预计耗时：100 分钟（动手操作约 70 分钟）。
+
 ### 5.1 实验目标
 
 本实验要完成：创建一个支持 NetworkPolicy 的临时 kind 集群，部署 Todo Platform 网络实验对象，观察 DNS、Service、EndpointSlice、kube-proxy 转发线索，并验证 NetworkPolicy 拒绝非授权流量。
@@ -332,7 +315,7 @@ sudo sysctl -w fs.inotify.max_user_instances=1024
 
 确认本地工具版本：
 
-```bash
+```bash linenums="0"
 docker version
 kind version
 kubectl version
@@ -340,7 +323,7 @@ kubectl version
 
 准备 Alpine 镜像，避免实验时因为网络问题拉取失败：
 
-```bash
+```bash linenums="0"
 docker pull registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23
 ```
 
@@ -350,13 +333,13 @@ docker pull registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23
 
 创建本篇实验目录：
 
-```bash
+```bash linenums="0"
 mkdir -p deployments/k8s-network/manifests
 ```
 
 本篇完成后，目录结构应类似：
 
-```text
+```text linenums="0"
 deployments/k8s-network
 ├── calico-custom-resources.yaml
 ├── kind-calico-config.yaml
@@ -371,8 +354,9 @@ deployments/k8s-network
 
 创建 kind 配置。这里禁用默认 CNI，让 Calico 接管 Pod 网络：
 
-```bash
-cat > deployments/k8s-network/kind-calico-config.yaml <<'YAML'
+将下面内容写入 `deployments/k8s-network/kind-calico-config.yaml`：
+
+```yaml title="deployments/k8s-network/kind-calico-config.yaml"
 apiVersion: kind.x-k8s.io/v1alpha4
 kind: Cluster
 name: todo-network-lab
@@ -383,13 +367,13 @@ networking:
 nodes:
   - role: control-plane
     image: registry.cn-guangzhou.aliyuncs.com/yleoer/node:v1.35.0@sha256:452d707d4862f52530247495d180205e029056831160e22870e37e3f6c1ac31f # ← kind 0.31.0 官方推荐镜像；kind 发布 1.36.x 后替换为课程基线镜像
-YAML
 ```
 
 创建 Todo Platform 网络实验对象。为了聚焦网络，本实验用 Alpine 模拟 Todo API 和 PostgreSQL 端口，不依赖真实业务镜像。这里的 `nc -l` 每次只处理一个连接后退出，再由 `while true` 自动重启；并发测试或重试时偶遇 `Connection refused` 属于模拟服务的短暂重启窗口，重新执行命令即可：
 
-```bash
-cat > deployments/k8s-network/manifests/todo-network-app.yaml <<'YAML'
+将下面内容写入 `deployments/k8s-network/manifests/todo-network-app.yaml`：
+
+```yaml title="deployments/k8s-network/manifests/todo-network-app.yaml"
 # 结构概览：
 # 1. todo-workloads：模拟 Todo Platform 工作负载 Namespace
 # 2. todo-api：监听 18080，模拟 Todo API HTTP 服务
@@ -499,13 +483,13 @@ spec:
     - name: postgres
       port: 5432
       targetPort: postgres
-YAML
 ```
 
 创建两个客户端 Namespace：一个被授权访问 Todo API，一个未授权：
 
-```bash
-cat > deployments/k8s-network/manifests/todo-network-clients.yaml <<'YAML'
+将下面内容写入 `deployments/k8s-network/manifests/todo-network-clients.yaml`：
+
+```yaml title="deployments/k8s-network/manifests/todo-network-clients.yaml"
 apiVersion: v1
 kind: Namespace
 metadata:
@@ -549,13 +533,13 @@ spec:
       image: registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23
       imagePullPolicy: IfNotPresent
       command: ["sleep", "3600"]
-YAML
 ```
 
 创建 NetworkPolicy。策略目标是：默认拒绝 `todo-workloads` 中所有 Pod 的入口流量；允许授权客户端访问 `todo-api:18080`；只允许 `todo-api` 访问 `todo-postgres:5432`。
 
-```bash
-cat > deployments/k8s-network/manifests/todo-network-policy.yaml <<'YAML'
+将下面内容写入 `deployments/k8s-network/manifests/todo-network-policy.yaml`：
+
+```yaml title="deployments/k8s-network/manifests/todo-network-policy.yaml"
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -605,35 +589,37 @@ spec:
       ports:
         - protocol: TCP
           port: 5432
-YAML
 ```
 
 ### 5.5 执行命令
 
 创建临时网络实验集群：
 
-```bash
+```bash linenums="0"
 kind create cluster --name todo-network-lab --config deployments/k8s-network/kind-calico-config.yaml
 kubectl config use-context kind-todo-network-lab
 ```
 
 把 Alpine 镜像导入 kind 节点：
 
-```bash
+```bash linenums="0"
 kind load docker-image registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23 --name todo-network-lab
 ```
 
 安装 Calico 3.32.0。这里使用 Calico operator 安装方式，并为 kind 配置 VXLAN 网络。Calico 容器镜像会从镜像仓库拉取；如果你的网络受限，可以把 `Installation` 的 `registry` 和 `imagePath` 指向你自己的镜像仓库：
 
-```bash
+```bash linenums="0"
 kubectl create -f https://raw.githubusercontent.com/projectcalico/calico/v3.32.0/manifests/tigera-operator.yaml
 kubectl -n tigera-operator wait --for=condition=Available deployment/tigera-operator --timeout=180s
 
 docker pull registry.cn-guangzhou.aliyuncs.com/yleoer/cni:v3.32.0
 docker pull registry.cn-guangzhou.aliyuncs.com/yleoer/node:v3.32.0
 docker pull registry.cn-guangzhou.aliyuncs.com/yleoer/kube-controllers:v3.32.0
+```
 
-cat > deployments/k8s-network/calico-custom-resources.yaml <<'YAML'
+将下面内容写入 `deployments/k8s-network/calico-custom-resources.yaml`：
+
+```yaml title="deployments/k8s-network/calico-custom-resources.yaml"
 apiVersion: operator.tigera.io/v1
 kind: Installation
 metadata:
@@ -652,8 +638,11 @@ kind: APIServer
 metadata:
   name: default
 spec: {} # ← Calico 3.32.0 官方 custom-resources.yaml 仍包含该 CR
-YAML
+```
 
+继续执行：
+
+```bash linenums="0"
 kubectl apply -f deployments/k8s-network/calico-custom-resources.yaml
 kubectl -n calico-system wait --for=condition=Available deployment/calico-kube-controllers --timeout=600s
 kubectl -n calico-system wait --for=condition=Ready pod -l k8s-app=calico-node --timeout=600s
@@ -663,14 +652,14 @@ kubectl -n calico-system wait --for=condition=Ready pod -l k8s-app=calico-node -
 
 确认节点和 Calico Pod Ready：
 
-```bash
+```bash linenums="0"
 kubectl get nodes -o wide
 kubectl -n calico-system get pods
 ```
 
 部署 Todo Platform 网络实验对象和客户端：
 
-```bash
+```bash linenums="0"
 kubectl apply -f deployments/k8s-network/manifests/todo-network-app.yaml
 kubectl apply -f deployments/k8s-network/manifests/todo-network-clients.yaml
 kubectl -n todo-workloads wait --for=condition=Available deployment/todo-api --timeout=120s
@@ -681,7 +670,7 @@ kubectl -n todo-denied wait --for=condition=Ready pod/denied-client --timeout=12
 
 观察 Pod IP、Service 和 EndpointSlice：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-workloads get pods -o wide
 kubectl -n todo-workloads get service
 kubectl -n todo-workloads get endpointslice
@@ -689,7 +678,7 @@ kubectl -n todo-workloads get endpointslice
 
 从授权客户端解析 DNS 并访问 Todo API：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-clients exec allowed-client -- \
   nslookup todo-api.todo-workloads.svc.cluster.local
 
@@ -699,14 +688,14 @@ kubectl -n todo-clients exec allowed-client -- \
 
 在应用 NetworkPolicy 前，未授权客户端也能访问 Todo API。这一步用来建立对照：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-denied exec denied-client -- \
   wget -qO- --timeout=3 http://todo-api.todo-workloads.svc.cluster.local
 ```
 
 查看 CoreDNS 和 kube-proxy 线索：
 
-```bash
+```bash linenums="0"
 kubectl -n kube-system get pods -l k8s-app=kube-dns
 kubectl -n kube-system logs deployment/coredns --tail=20
 kubectl -n kube-system get configmap kube-proxy -o jsonpath='{.data.config\.conf}' | grep -E 'mode:|clusterCIDR:'
@@ -716,33 +705,33 @@ kubectl -n kube-system get configmap kube-proxy -o jsonpath='{.data.config\.conf
 
 如果第三条命令没有输出，先查看完整 ConfigMap，确认当前 kind 镜像中的 kube-proxy 配置键名：
 
-```bash
+```bash linenums="0"
 kubectl -n kube-system get configmap kube-proxy -o yaml
 ```
 
 进入 kind 节点观察 kube-proxy 维护的 iptables 链。这个命令只适用于 iptables proxy mode 的本地学习，不要在生产节点上随意执行；如果 kube-proxy 配置显示为 nftables 或其它模式，`KUBE-SVC` 链可能不存在，应改查对应模式的规则：
 
-```bash
+```bash linenums="0"
 docker exec todo-network-lab-control-plane sh -c "iptables-save | grep KUBE-SVC | head"
 ```
 
 应用 NetworkPolicy：
 
-```bash
+```bash linenums="0"
 kubectl apply -f deployments/k8s-network/manifests/todo-network-policy.yaml
 kubectl -n todo-workloads get networkpolicy
 ```
 
 验证授权客户端仍然可以访问 Todo API：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-clients exec allowed-client -- \
   wget -qO- --timeout=3 http://todo-api.todo-workloads.svc.cluster.local
 ```
 
 验证未授权客户端被拒绝：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-denied exec denied-client -- \
   sh -c 'wget -qO- --timeout=3 http://todo-api.todo-workloads.svc.cluster.local || echo "blocked by NetworkPolicy"'
 ```
@@ -751,14 +740,14 @@ kubectl -n todo-denied exec denied-client -- \
 
 Alpine 使用 BusyBox 版本的 `nc`，不同发行版对 `-v`、`-z` 参数支持不完全一致。下面统一使用 `echo | nc -w 3` 做 TCP 连通性检查。
 
-```bash
+```bash linenums="0"
 kubectl -n todo-clients exec allowed-client -- \
   sh -c 'echo | nc -w 3 todo-postgres.todo-workloads.svc.cluster.local 5432 >/tmp/postgres-check.out 2>&1 || echo "postgres blocked for client namespace"'
 ```
 
 验证 Todo API Pod 可以访问 PostgreSQL：
 
-```bash
+```bash linenums="0"
 API_POD=$(kubectl -n todo-workloads get pods \
   -l app.kubernetes.io/name=todo-api \
   -o jsonpath='{.items[0].metadata.name}')
@@ -769,8 +758,9 @@ kubectl -n todo-workloads exec "$API_POD" -- \
 
 可选：观察 Egress 策略。主线实验用 Ingress 策略保护被访问方，已经能表达“谁可以访问我”。如果你还想观察“我可以访问谁”，可以为 `todo-api` 增加一条出口白名单：允许访问 PostgreSQL 的 5432 端口，并允许访问 CoreDNS 的 53 端口。
 
-```bash
-cat > deployments/k8s-network/manifests/todo-network-egress-policy.yaml <<'YAML'
+将下面内容写入 `deployments/k8s-network/manifests/todo-network-egress-policy.yaml`：
+
+```yaml title="deployments/k8s-network/manifests/todo-network-egress-policy.yaml"
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -802,8 +792,11 @@ spec:
           port: 53
         - protocol: TCP
           port: 53
-YAML
+```
 
+继续执行：
+
+```bash linenums="0"
 kubectl apply -f deployments/k8s-network/manifests/todo-network-egress-policy.yaml
 ```
 
@@ -813,7 +806,7 @@ kubectl apply -f deployments/k8s-network/manifests/todo-network-egress-policy.ya
 
 Calico Pod 应处于 Running：
 
-```text
+```text linenums="0"
 NAME                                      READY   STATUS    RESTARTS   AGE
 calico-kube-controllers-...              1/1     Running   0          ...
 calico-node-...                          1/1     Running   0          ...
@@ -821,7 +814,7 @@ calico-node-...                          1/1     Running   0          ...
 
 Service 和 EndpointSlice 应存在：
 
-```text
+```text linenums="0"
 NAME            TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)   AGE
 todo-api        ClusterIP   10.96.x.x       <none>        80/TCP    ...
 todo-postgres   ClusterIP   10.96.x.x       <none>        5432/TCP  ...
@@ -829,38 +822,38 @@ todo-postgres   ClusterIP   10.96.x.x       <none>        5432/TCP  ...
 
 DNS 查询应返回 Service 地址：
 
-```text
+```text linenums="0"
 Name:      todo-api.todo-workloads.svc.cluster.local
 Address:  10.96.x.x
 ```
 
 应用 NetworkPolicy 前，未授权客户端能访问 Todo API：
 
-```text
+```text linenums="0"
 todo api network lab
 ```
 
 应用 NetworkPolicy 后，授权客户端仍成功：
 
-```text
+```text linenums="0"
 todo api network lab
 ```
 
 未授权客户端应被拒绝：
 
-```text
+```text linenums="0"
 blocked by NetworkPolicy
 ```
 
 客户端直接访问 PostgreSQL 应被拒绝：
 
-```text
+```text linenums="0"
 postgres blocked for client namespace
 ```
 
 Todo API Pod 访问 PostgreSQL 应成功：
 
-```text
+```text linenums="0"
 postgres tcp endpoint
 ```
 
@@ -870,7 +863,7 @@ postgres tcp endpoint
 
 确认 NetworkPolicy 已创建：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-workloads get networkpolicy
 ```
 
@@ -878,7 +871,7 @@ kubectl -n todo-workloads get networkpolicy
 
 确认 DNS 与 Service：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-clients exec allowed-client -- \
   nslookup todo-api.todo-workloads.svc.cluster.local
 
@@ -889,7 +882,7 @@ kubectl -n todo-workloads get endpointslice
 
 确认隔离效果：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-clients exec allowed-client -- \
   wget -qO- --timeout=3 http://todo-api.todo-workloads.svc.cluster.local
 
@@ -906,23 +899,21 @@ kubectl -n todo-clients exec allowed-client -- \
 
 本篇使用的是临时网络实验集群。确认不再需要后，直接删除集群：
 
-```bash
+```bash linenums="0"
 kind delete cluster --name todo-network-lab
 ```
 
 切回第 20-24 篇使用的主集群。如果你在第 20 篇使用了不同的集群名或 context 名称，请把 `kind-todo-k8s` 替换为你的实际 context：
 
-```bash
+```bash linenums="0"
 kubectl config use-context kind-todo-k8s
 ```
 
 如果你只想删除实验目录中的本地文件：
 
-```bash
+```bash linenums="0"
 rm -rf deployments/k8s-network
 ```
-
-预计耗时：100 分钟（动手操作约 70 分钟）。
 
 ## 6. 常见错误与排障
 
@@ -930,14 +921,14 @@ rm -rf deployments/k8s-network
 
 - **现象**：
 
-  ```text
+  ```text linenums="0"
   todo-api-...   0/1   ContainerCreating   0   3m
   ```
 
 - **原因**：临时集群禁用了默认 CNI，但 Calico 没有安装成功或 `calico-node` 未 Ready。
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   kubectl -n calico-system get pods
   kubectl -n calico-system describe pod -l k8s-app=calico-node
   kubectl describe node todo-network-lab-control-plane
@@ -952,14 +943,14 @@ rm -rf deployments/k8s-network
 
 - **现象**：
 
-  ```text
+  ```text linenums="0"
   nslookup: can't resolve 'todo-api.todo-workloads.svc.cluster.local'
   ```
 
 - **原因**：CoreDNS 未 Ready、Service 名称写错、Namespace 写错，或 Pod 内 `/etc/resolv.conf` 异常。
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   kubectl -n kube-system get pods -l k8s-app=kube-dns
   kubectl -n kube-system logs deployment/coredns --tail=50
   kubectl -n todo-workloads get service todo-api
@@ -973,14 +964,14 @@ rm -rf deployments/k8s-network
 
 - **现象**：
 
-  ```text
+  ```text linenums="0"
   wget: can't connect to remote host (10.96.x.x): Connection refused
   ```
 
 - **原因**：Service selector 没有匹配到 Pod、Pod 没有 Ready、`targetPort` 写错，或后端容器没有监听端口。
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   kubectl -n todo-workloads get service todo-api -o yaml
   kubectl -n todo-workloads get pods --show-labels
   kubectl -n todo-workloads get endpointslice
@@ -998,7 +989,7 @@ rm -rf deployments/k8s-network
 - **原因**：当前 CNI 不支持 NetworkPolicy，或者策略没有选中目标 Pod。
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   kubectl -n todo-workloads get networkpolicy
   kubectl -n todo-workloads get pods --show-labels
   kubectl -n calico-system get pods
@@ -1013,14 +1004,14 @@ rm -rf deployments/k8s-network
 
 - **现象**：Todo API Pod 访问 PostgreSQL 失败：
 
-  ```text
+  ```text linenums="0"
   nc: todo-postgres.todo-workloads.svc.cluster.local (10.96.x.x:5432): timed out
   ```
 
 - **原因**：`allow-api-to-postgres` 的 `podSelector` 或来源 `podSelector` 标签写错，导致策略没有放行 Todo API。
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   kubectl -n todo-workloads get networkpolicy allow-api-to-postgres -o yaml
   kubectl -n todo-workloads get pods --show-labels
   kubectl -n todo-workloads get endpointslice
@@ -1043,102 +1034,13 @@ rm -rf deployments/k8s-network
 
 6. **旧集群网络模式要在升级前审计。** 如果旧集群仍使用 kube-proxy IPVS、特殊 CNI 插件或自定义 iptables 规则，升级到新 Kubernetes 版本前要先确认兼容性。不要只升级控制面版本，而忽略节点网络数据面。
 
-## 8. 本章小项目
+## 8. 练习题与面试题
 
-本章小项目是：**Todo Platform 网络访问路径与 Namespace 隔离策略**。
+本章练习题和面试题已拆分到独立页面，完成正文学习后再进入题库练习与复盘。
 
-### 8.1 项目产出
+[查看本章练习题与面试题](../../questions/stage-04-kubernetes/25-k8s-networking.md)
 
-- `deployments/k8s-network/kind-calico-config.yaml`：支持 NetworkPolicy 的临时 kind 集群配置。
-- `deployments/k8s-network/calico-custom-resources.yaml`：Calico operator 的本地实验配置。
-- `deployments/k8s-network/manifests/todo-network-app.yaml`：Todo API 和 PostgreSQL 网络实验对象。
-- `deployments/k8s-network/manifests/todo-network-clients.yaml`：授权与未授权客户端 Namespace。
-- `deployments/k8s-network/manifests/todo-network-policy.yaml`：默认拒绝、允许客户端访问 API、允许 API 访问 PostgreSQL 的策略。
-- `deployments/k8s-network/manifests/todo-network-egress-policy.yaml`：可选进阶出口策略，限制 Todo API 只能访问 PostgreSQL 和 DNS。
-- 一份网络访问矩阵：谁能访问 Todo API，谁能访问 PostgreSQL，谁被拒绝。
-
-### 8.2 验收标准
-
-基础验收：
-
-- `kubectl -n calico-system get pods` 显示 Calico 组件 Ready。
-- `kubectl -n todo-workloads get endpointslice` 能看到 Todo API 和 PostgreSQL 后端地址。
-- 授权客户端能解析并访问 `todo-api.todo-workloads.svc.cluster.local`。
-- 未授权客户端在应用 NetworkPolicy 后访问 Todo API 被拒绝。
-- 授权客户端不能直接访问 `todo-postgres:5432`。
-- Todo API Pod 可以访问 `todo-postgres:5432`。
-
-进阶验收：
-
-- 能解释为什么默认 kindnet 集群不适合验证 NetworkPolicy 拒绝效果。
-- 能说明 Service 不通时为什么要同时看 Service、EndpointSlice、Pod label 和 readiness。
-- 能说出 IPVS proxy mode deprecated 后，本课程为什么只把它作为旧集群背景知识。
-- 能画出 `todo-client -> todo-api -> todo-postgres` 的访问路径和隔离边界。
-
-## 9. 本章练习题
-
-基础题：
-
-1. Pod IP、Service ClusterIP 和 Node IP 分别解决什么问题？
-2. CNI 插件在 Pod 创建过程中负责哪些事情？
-3. CoreDNS 如何把 `todo-api.todo-workloads.svc.cluster.local` 解析成可访问地址？
-4. Service selector 写错时，EndpointSlice 会有什么表现？
-5. NetworkPolicy 的默认允许和默认拒绝规则是什么？
-
-实操题：
-
-1. 故意把 `todo-api` Service selector 改成错误 label，观察 EndpointSlice 和访问结果。验收标准：能说明 Service 存在但后端为空的现象。
-2. 新增一个 `todo-observer` Namespace，未加 `todo-platform.io/client=allowed` 标签，验证它不能访问 Todo API；加上标签后再验证可以访问。验收标准：能解释 `namespaceSelector` 的作用。
-3. 把 `allow-api-to-postgres` 中的来源 label 改错，验证 Todo API 访问 PostgreSQL 被阻断，再恢复。验收标准：能从 Pod label 和 NetworkPolicy YAML 定位原因。
-
-思考题：
-
-1. 如果生产环境要按“前端 -> API -> 数据库”三层隔离，你会如何设计 Namespace、标签和 NetworkPolicy？
-2. 如果 Ingress 到后端 Service 返回 502，你会按什么顺序排查 DNS、Service、EndpointSlice、Pod readiness 和 NetworkPolicy？
-
-## 10. 本章面试题
-
-### 面试题 1：Kubernetes 中 Pod 到 Service 的访问链路是什么？
-
-**一句话结论**：客户端先通过 DNS 或 Service 名称找到 ClusterIP，再由 kube-proxy 规则把流量转发到 EndpointSlice 中的后端 Pod。
-
-**展开解释**：Service 提供稳定名字和 ClusterIP，EndpointSlice 记录实际后端 Pod IP 和端口。kube-proxy 观察这些对象，在节点上维护转发规则。应用应该访问 Service 名称，而不是直接写 Pod IP。
-
-**深入追问**：如果 Service 不通，要检查 DNS 是否解析、Service selector 是否匹配、EndpointSlice 是否为空、Pod 是否 Ready、NetworkPolicy 是否拦截，以及入口层是否把流量转发到正确 Service。
-
-### 面试题 2：CNI 插件在 Kubernetes 中做什么？
-
-**一句话结论**：CNI 插件负责为 Pod 配置网络接口、分配 IP、配置路由，并可能执行网络策略。
-
-**展开解释**：kubelet 通过容器运行时创建 Pod sandbox，容器运行时调用 CNI 插件完成网络配置。不同 CNI 插件能力不同：有的只解决连通，有的还能执行 NetworkPolicy、加密流量或提供高级可观测性。
-
-**深入追问**：NetworkPolicy 是否生效取决于 CNI。默认 kindnet 不执行 NetworkPolicy，而 Calico、Cilium 等插件可以执行策略。因此不能只看 NetworkPolicy 对象存在，就认为隔离已经生效。
-
-### 面试题 3：CoreDNS 解析失败如何排查？
-
-**一句话结论**：先确认名称是否正确，再看 CoreDNS Pod、Service 对象和 Pod 内 `/etc/resolv.conf`。
-
-**展开解释**：跨 Namespace 建议使用完整域名，例如 `todo-api.todo-workloads.svc.cluster.local`。如果 Service 不存在或 Namespace 写错，CoreDNS 无法返回正确记录。CoreDNS Pod 不 Ready、日志报错或 Pod resolv.conf 异常，也会导致解析失败。
-
-**深入追问**：DNS 解析成功不代表服务可用。解析只说明名字到地址这一步完成了，还要继续检查 EndpointSlice、后端 Pod readiness、kube-proxy 转发和 NetworkPolicy。
-
-### 面试题 4：NetworkPolicy 是默认拒绝还是默认允许？
-
-**一句话结论**：没有被策略选中的 Pod 默认允许；一旦被某个方向的策略选中，该方向就只允许策略明确放行的流量。
-
-**展开解释**：NetworkPolicy 是允许列表模型。创建一个 `podSelector: {}` 且 `policyTypes: [Ingress]` 的策略，会让该 Namespace 内所有 Pod 的入口流量进入默认拒绝状态。后续需要用其它策略逐项放行。
-
-**深入追问**：Ingress 和 Egress 是两个方向，互不自动等价。只限制 Ingress 时，Pod 出口流量仍可能默认允许；生产策略要同时考虑谁访问我，以及我能访问谁。
-
-### 面试题 5：kube-proxy iptables 和旧 IPVS 模式有什么区别？
-
-**一句话结论**：iptables 模式通过节点上的规则链做 Service 转发；IPVS 模式曾用 Linux IPVS 做虚拟服务负载均衡，但已进入 deprecated 路径，本课程只把它作为旧集群背景知识。
-
-**展开解释**：iptables 模式会把访问 ClusterIP 的流量通过 DNAT 转到后端 Pod。IPVS 模式在旧集群里常用于更高规模的 Service 转发，但 Kubernetes 官方从 v1.35 起已将 IPVS proxy mode 标记为 deprecated，并推荐 nftables 作为更现代的替代方向。学习时要知道这些模式的历史差异，但实操应以当前课程锁定版本和发行版默认配置为准。
-
-**深入追问**：接手旧集群时，应先看 kube-proxy ConfigMap、节点内核模块和发行版文档，再决定排障工具。升级前要确认旧模式是否仍受支持，以及迁移到 iptables / nftables 会不会影响业务流量。
-
-## 11. 本章总结
+## 9. 本章总结
 
 本篇把第 24 篇留下的 `todo-api -> todo-postgres` 链路拆开，系统讲解了 Kubernetes 网络中的 Pod IP、Service ClusterIP、CoreDNS、EndpointSlice、kube-proxy、CNI 和 NetworkPolicy。你不仅知道了“Service 名字为什么能访问”，还知道了“访问失败时应该沿哪条链路排查”。
 
@@ -1146,7 +1048,7 @@ rm -rf deployments/k8s-network
 
 能力价值上，你已经具备 Kubernetes 网络排障的基础框架：看地址、看名字、看后端、看规则、看策略。进入真实工作后，这套顺序能帮你把“网络不通”从模糊抱怨拆成可定位、可复现、可修复的问题。
 
-## 12. 下一章衔接
+## 10. 下一章衔接
 
 第 26 篇会进入 Kubernetes 安全，讨论 ServiceAccount、Role-Based Access Control（RBAC，基于角色的访问控制）、SecurityContext、Pod Security Standards 和 Secret 安全。本篇解决“哪些 Pod 在网络上可以互相访问”，下一篇会解决“哪些身份在 API 上可以做哪些操作、容器进程以什么权限运行”。
 

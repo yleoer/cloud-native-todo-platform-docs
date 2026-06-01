@@ -20,7 +20,7 @@
 
 建议在 `cloud-native-todo-platform` 仓库中形成以下结构：
 
-```text
+```text linenums="0"
 cloud-native-todo-platform/
 ├── README.md
 ├── Makefile                       # 建议：统一验收入口
@@ -71,10 +71,13 @@ cloud-native-todo-platform/
 
 创建 `docs/stage-01-acceptance.md`：
 
-````bash
+```bash linenums="0"
 mkdir -p docs
+```
 
-cat > docs/stage-01-acceptance.md <<'EOF'
+将下面内容写入 `docs/stage-01-acceptance.md`：
+
+````markdown title="docs/stage-01-acceptance.md"
 # 阶段一验收记录
 
 ## 基础信息
@@ -145,7 +148,6 @@ bash --version:
 - [ ] 增加 Dockerfile。
 - [ ] 增加 GitHub Actions。
 - [ ] 增加 Kubernetes 部署 YAML。
-EOF
 ````
 
 这份文档是作品集入口之一。面试或复盘时，它能证明你不是只照抄命令，而是能记录环境、验证结果和排障过程。
@@ -154,10 +156,13 @@ EOF
 
 创建 `scripts/check-foundation.sh`：
 
-```bash
+```bash linenums="0"
 mkdir -p scripts
+```
 
-cat > scripts/check-foundation.sh <<'EOF'
+将下面内容写入 `scripts/check-foundation.sh`：
+
+```bash title="scripts/check-foundation.sh"
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
@@ -260,14 +265,17 @@ main() {
 }
 
 main "$@"
-EOF
+```
 
+继续执行：
+
+```bash linenums="0"
 chmod +x scripts/check-foundation.sh
 ```
 
 运行：
 
-```bash
+```bash linenums="0"
 ./scripts/check-foundation.sh
 ```
 
@@ -277,7 +285,7 @@ chmod +x scripts/check-foundation.sh
 
 如果仓库已有 `Makefile`，追加以下目标；如果还没有，可以先创建一个最小版本：
 
-```makefile
+```makefile linenums="0"
 .PHONY: check-foundation
 
 check-foundation:
@@ -286,7 +294,7 @@ check-foundation:
 
 运行：
 
-```bash
+```bash linenums="0"
 make check-foundation
 ```
 
@@ -296,7 +304,7 @@ make check-foundation
 
 在项目 `README.md` 中增加阶段一成果说明：
 
-````markdown
+````markdown linenums="0"
 ## Stage 01 Foundation
 
 This repository has completed the foundation stage:
@@ -337,7 +345,7 @@ make check-foundation
 
 验收路径建议如下：
 
-```bash
+```bash linenums="0"
 git status --short --branch
 go env GOPROXY
 grep -n '^GO_PROXY_REQUIRED=https://goproxy.cn,direct$' scripts/versions.conf

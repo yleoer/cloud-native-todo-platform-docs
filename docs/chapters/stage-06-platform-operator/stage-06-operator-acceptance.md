@@ -57,7 +57,7 @@ flowchart LR
 
 作品集说明应避免堆工具名。推荐表达：
 
-```text
+```text linenums="0"
 我为 Todo Platform 设计并实现了一个 Kubernetes Operator：先用 CRD 定义平台 API，再用 Kubebuilder Reconciler 把 TodoApp 调谐为 Deployment 和 Service；随后补齐 Webhook 默认值/校验、Finalizer 删除清理、Conditions 状态回写、envtest/kind 集成测试、Helm 发布和生产基线。当前 Operator 管理应用层资源，TodoDatabase/TodoCache 作为 API 边界和后续扩展方向保留。
 ```
 
@@ -65,13 +65,13 @@ flowchart LR
 
 文档仓库验证：
 
-```bash
+```bash linenums="0"
 mkdocs build --strict
 ```
 
 CRD 基线验证：
 
-```bash
+```bash linenums="0"
 kubectl apply --server-side -f operator/crds/base
 kubectl wait --for=condition=Established crd/todoapps.platform.todo.example.com --timeout=60s
 kubectl explain todoapp.spec
@@ -80,7 +80,7 @@ kubectl apply --dry-run=server -f operator/samples/todoapp.yaml
 
 Kubebuilder 项目验证：
 
-```bash
+```bash linenums="0"
 cd operator/kubebuilder
 make generate
 make manifests
@@ -90,7 +90,7 @@ make test
 
 envtest 与 kind 集成验证：
 
-```bash
+```bash linenums="0"
 make envtest
 KUBEBUILDER_ASSETS="$(pwd)/bin/k8s/1.35.0-linux-amd64" go test ./test/envtest -v
 ./test/e2e/run-kind-e2e.sh
@@ -107,7 +107,7 @@ kubectl label namespace todo-team-b platform.todo.example.com/admission=enabled 
 
 Helm 发布验证：
 
-```bash
+```bash linenums="0"
 helm lint ../helm/todo-operator
 helm template todo-operator ../helm/todo-operator --include-crds >/tmp/todo-operator.yaml
 helm install todo-operator ../helm/todo-operator -n todo-operator-system --create-namespace
@@ -117,7 +117,7 @@ helm rollback todo-operator 1 -n todo-operator-system
 
 生产基线验证：
 
-```bash
+```bash linenums="0"
 OPERATOR_SA="${OPERATOR_SA:-todo-operator}"
 kubectl auth can-i create deployments.apps -n todo-team-a \
   --as="system:serviceaccount:todo-operator-system:${OPERATOR_SA}"
@@ -131,7 +131,7 @@ kubectl -n todo-operator-system port-forward svc/todo-operator-metrics 8080:8080
 
 最终最小闭环：
 
-```bash
+```bash linenums="0"
 kubectl apply -f deployments/final/todoapp-local-smoke.yaml
 kubectl -n todo-final get todoapp todo-final-smoke
 kubectl -n todo-final rollout status deployment/todo-final-smoke --timeout=180s
@@ -141,7 +141,7 @@ kubectl -n todo-final rollout status deployment/todo-final-smoke --timeout=180s
 
 阶段六当前实现的核心闭环是：
 
-```text
+```text linenums="0"
 TodoApp CR -> Todo Operator -> Deployment / Service / status.conditions
 ```
 

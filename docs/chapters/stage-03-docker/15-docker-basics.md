@@ -46,7 +46,7 @@
 
 你还需要能执行：
 
-```bash
+```bash linenums="0"
 docker version
 docker compose version
 ```
@@ -79,30 +79,11 @@ Docker 的价值不是“命令更酷”，而是把依赖运行环境变成可�
 
 本篇先让你手动执行 Docker 命令，是为了看清每个运行参数的意义。第 17 篇再写 Compose 时，你会知道 YAML 中的 `ports`、`volumes`、`networks`、`environment` 分别来自哪里。
 
-### 2.3 课程项目关联
+### 2.3 Todo 平台模拟案例
 
-本篇会把第 14 篇 Todo API v5 的运行环境改成三类容器：
+> Todo 平台需要在开发机上用容器运行 API、PostgreSQL 和 Redis。你需要理解镜像、容器、端口映射、环境变量、网络和数据卷如何共同组成本地运行环境。
 
-```text
-宿主机 curl
-  |
-  | 127.0.0.1:18080
-  v
-todo-api 容器
-  |
-  | Docker network: todo-net
-  +-- todo-postgres:5432
-  |
-  +-- todo-redis:6379
-```
-
-本篇产出会被后续章节直接复用：
-
-- 第 16 篇会把当前用 `registry.cn-guangzhou.aliyuncs.com/yleoer/golang:1.26-bookworm` 临时运行的 Todo API，构建成 `todo-api` 应用镜像。
-- 第 17 篇会把本篇多条 `docker run` 命令整理为 `compose.yaml`。
-- 第 18 篇会深入解释本篇已经使用过的容器进程、文件系统、网络和数据卷隔离。
-- 第 19 篇会把 Docker 背后的 containerd、runc 和 CRI 调用链拆开观察。
-
+这个案例要求你能解释每个容器承担什么职责，以及服务之间如何通过容器网络和持久化卷协作。
 ## 3. 核心概念
 
 ### 3.1 Docker 解决什么问题
@@ -119,7 +100,7 @@ Docker 是一种容器平台，用来创建、运行、分发和管理容器。�
 
 镜像是容器的只读模板。你可以把镜像理解为：
 
-```text
+```text linenums="0"
 应用程序 + 运行时 + 文件系统快照 + 默认启动命令
 ```
 
@@ -134,7 +115,7 @@ Docker 是一种容器平台，用来创建、运行、分发和管理容器。�
 
 拉取镜像：
 
-```bash
+```bash linenums="0"
 docker pull registry.cn-guangzhou.aliyuncs.com/yleoer/postgres:18-alpine
 docker pull registry.cn-guangzhou.aliyuncs.com/yleoer/redis:8.2-alpine
 docker pull registry.cn-guangzhou.aliyuncs.com/yleoer/golang:1.26-bookworm
@@ -143,7 +124,7 @@ docker pull registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23
 
 查看本地镜像：
 
-```bash
+```bash linenums="0"
 docker image ls
 ```
 
@@ -153,7 +134,7 @@ docker image ls
 
 容器是镜像运行起来后的进程实例。同一个镜像可以启动多个容器：
 
-```text
+```text linenums="0"
 registry.cn-guangzhou.aliyuncs.com/yleoer/postgres:18-alpine 镜像
   ├── todo-postgres 容器
   └── test-postgres 容器
@@ -161,13 +142,13 @@ registry.cn-guangzhou.aliyuncs.com/yleoer/postgres:18-alpine 镜像
 
 容器生命周期可以简化理解为：
 
-```text
+```text linenums="0"
 create -> start -> running -> stop -> remove
 ```
 
 常用命令：
 
-```bash
+```bash linenums="0"
 docker ps
 docker ps -a
 docker stop todo-postgres
@@ -192,7 +173,7 @@ docker rm todo-postgres
 
 容器有自己的网络命名空间。容器内服务监听的端口，默认不能直接被宿主机访问。宿主机要访问容器服务，需要端口映射：
 
-```text
+```text linenums="0"
 宿主机 127.0.0.1:18080 -> todo-api 容器 18080
 宿主机 127.0.0.1:15432 -> todo-postgres 容器 5432
 宿主机 127.0.0.1:16379 -> todo-redis 容器 6379
@@ -200,7 +181,7 @@ docker rm todo-postgres
 
 命令格式：
 
-```bash
+```bash linenums="0"
 docker run -p 127.0.0.1:宿主机端口:容器端口 ...
 ```
 
@@ -212,21 +193,21 @@ docker run -p 127.0.0.1:宿主机端口:容器端口 ...
 
 Docker Volume 用来持久化数据：
 
-```text
+```text linenums="0"
 todo-postgres-data -> /var/lib/postgresql/data
 todo-redis-data    -> /data
 ```
 
 创建数据卷：
 
-```bash
+```bash linenums="0"
 docker volume create todo-postgres-data
 docker volume create todo-redis-data
 ```
 
 查看数据卷：
 
-```bash
+```bash linenums="0"
 docker volume ls
 ```
 
@@ -236,13 +217,13 @@ docker volume ls
 
 Docker 默认会创建 bridge 网络。为了让本章容器能通过稳定名字互相访问，我们会创建自定义网络：
 
-```bash
+```bash linenums="0"
 docker network create todo-net
 ```
 
 加入同一个自定义网络后，容器可以通过容器名互相解析：
 
-```text
+```text linenums="0"
 todo-api -> todo-postgres:5432
 todo-api -> todo-redis:6379
 ```
@@ -253,7 +234,7 @@ todo-api -> todo-redis:6379
 
 容器的主进程应该把日志输出到 stdout / stderr。Docker 会收集这些输出：
 
-```bash
+```bash linenums="0"
 docker logs todo-api
 docker logs --tail 80 todo-api
 docker logs -f todo-api
@@ -261,13 +242,13 @@ docker logs -f todo-api
 
 进入带有 shell 的容器：
 
-```bash
+```bash linenums="0"
 docker exec -it todo-api bash
 ```
 
 查看容器详细信息：
 
-```bash
+```bash linenums="0"
 docker inspect todo-api
 docker inspect todo-api --format '{{.State.Status}} {{.State.ExitCode}}'
 ```
@@ -308,7 +289,7 @@ flowchart LR
 
 图 15-2 镜像层与容器可写层：
 
-```text
+```text linenums="0"
 容器可写层        <- 容器运行时写入的临时文件
 镜像层 N
 镜像层 N-1
@@ -324,7 +305,7 @@ flowchart LR
 
 容器内服务应监听：
 
-```text
+```text linenums="0"
 0.0.0.0:18080
 ```
 
@@ -332,7 +313,7 @@ flowchart LR
 
 图 15-3 宿主机端口映射到容器监听地址：
 
-```text
+```text linenums="0"
 curl 127.0.0.1:18080
   -> Docker 端口映射
   -> todo-api 容器 0.0.0.0:18080
@@ -340,7 +321,7 @@ curl 127.0.0.1:18080
 
 因此本篇启动 Todo API 时会设置：
 
-```bash
+```bash linenums="0"
 TODO_API_ADDR=0.0.0.0:18080
 ```
 
@@ -381,6 +362,8 @@ sequenceDiagram
 
 ## 5. 手把手实验
 
+预计耗时：90 分钟（阅读约 30 分钟，动手实验约 60 分钟）。
+
 ### 5.1 实验目标
 
 使用 Docker 手动启动 `todo-postgres`、`todo-redis` 和 `todo-api` 三个容器，完成数据库迁移、登录、带 JWT 创建 Todo，并验证容器网络、日志、端口映射和数据卷。
@@ -400,7 +383,7 @@ sequenceDiagram
 
 确认 Docker 可用：
 
-```bash
+```bash linenums="0"
 docker version
 docker compose version
 ```
@@ -411,7 +394,7 @@ docker compose version
 
 本篇不新增项目文件，重点是从项目根目录用 Docker 运行已有代码。开始前确认目录中存在这些文件：
 
-```bash
+```bash linenums="0"
 test -d api/cmd/todo-api
 test -f api/migrations/000001_create_todos.up.sql
 test -d configs
@@ -419,7 +402,7 @@ test -d configs
 
 项目关键目录应类似：
 
-```text
+```text linenums="0"
 cloud-native-todo-platform/
 ├── api/
 │   ├── cmd/
@@ -472,7 +455,7 @@ Todo API 容器会使用这些关键环境变量：
 
 先拉取本篇要用的官方镜像。这样如果网络、镜像名或平台架构有问题，会在启动容器前暴露出来。
 
-```bash
+```bash linenums="0"
 docker pull registry.cn-guangzhou.aliyuncs.com/yleoer/postgres:18-alpine
 docker pull registry.cn-guangzhou.aliyuncs.com/yleoer/redis:8.2-alpine
 docker pull registry.cn-guangzhou.aliyuncs.com/yleoer/golang:1.26-bookworm
@@ -486,19 +469,19 @@ docker image ls
 
 === "Linux / macOS / WSL2"
 
-    ```bash
+    ```bash linenums="0"
     docker rm -f todo-api todo-postgres todo-redis 2>/dev/null || true
     ```
 
 === "Windows PowerShell"
 
-    ```powershell
+    ```powershell linenums="0"
     docker rm -f todo-api todo-postgres todo-redis 2>$null
     ```
 
 创建 Docker 网络和数据卷。
 
-```bash
+```bash linenums="0"
 docker network create todo-net
 docker volume create todo-postgres-data
 docker volume create todo-redis-data
@@ -510,7 +493,7 @@ docker volume create todo-go-build-cache
 
 启动 PostgreSQL 容器。
 
-```bash
+```bash linenums="0"
 docker run -d \
   --name todo-postgres \
   --network todo-net \
@@ -525,7 +508,7 @@ docker run -d \
 
 Windows PowerShell 写法：
 
-```powershell
+```powershell linenums="0"
 docker run -d `
   --name todo-postgres `
   --network todo-net `
@@ -540,7 +523,7 @@ docker run -d `
 
 启动 Redis 容器。
 
-```bash
+```bash linenums="0"
 docker run -d \
   --name todo-redis \
   --network todo-net \
@@ -552,7 +535,7 @@ docker run -d \
 
 Windows PowerShell 写法：
 
-```powershell
+```powershell linenums="0"
 docker run -d `
   --name todo-redis `
   --network todo-net `
@@ -566,7 +549,7 @@ docker run -d `
 
 === "Linux / macOS / WSL2"
 
-    ```bash
+    ```bash linenums="0"
     for i in $(seq 1 20); do
       if docker exec todo-postgres pg_isready -U todo -d todo_platform; then
         break
@@ -584,7 +567,7 @@ docker run -d `
 
 === "Windows PowerShell"
 
-    ```powershell
+    ```powershell linenums="0"
     for ($i = 1; $i -le 20; $i++) {
       docker exec todo-postgres pg_isready -U todo -d todo_platform
       if ($LASTEXITCODE -eq 0) { break }
@@ -600,14 +583,14 @@ docker run -d `
 
 预期输出：
 
-```text
+```text linenums="0"
 /var/run/postgresql:5432 - accepting connections
 PONG
 ```
 
 验证容器名可以被 Docker DNS 解析。
 
-```bash
+```bash linenums="0"
 docker run --rm --network todo-net registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23 nslookup todo-postgres
 docker run --rm --network todo-net registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23 nslookup todo-redis
 ```
@@ -618,7 +601,7 @@ docker run --rm --network todo-net registry.cn-guangzhou.aliyuncs.com/yleoer/alp
 
 === "Linux / macOS / WSL2"
 
-    ```bash
+    ```bash linenums="0"
     HASH=$(docker run --rm \
       -v "$PWD:/workspace" \
       -v todo-go-mod-cache:/go/pkg/mod \
@@ -632,7 +615,7 @@ docker run --rm --network todo-net registry.cn-guangzhou.aliyuncs.com/yleoer/alp
 
 === "Windows PowerShell"
 
-    ```powershell
+    ```powershell linenums="0"
     $hash = docker run --rm `
       -v "${PWD}:/workspace" `
       -v todo-go-mod-cache:/go/pkg/mod `
@@ -650,7 +633,7 @@ docker run --rm --network todo-net registry.cn-guangzhou.aliyuncs.com/yleoer/alp
 
 === "Linux / macOS / WSL2"
 
-    ```bash
+    ```bash linenums="0"
     docker run --rm \
       --network todo-net \
       -v "$PWD:/workspace" \
@@ -671,7 +654,7 @@ docker run --rm --network todo-net registry.cn-guangzhou.aliyuncs.com/yleoer/alp
 
 === "Windows PowerShell"
 
-    ```powershell
+    ```powershell linenums="0"
     docker run --rm `
       --network todo-net `
       -v "${PWD}:/workspace" `
@@ -694,7 +677,7 @@ docker run --rm --network todo-net registry.cn-guangzhou.aliyuncs.com/yleoer/alp
 
 === "Linux / macOS / WSL2"
 
-    ```bash
+    ```bash linenums="0"
     docker run --rm \
       --network todo-net \
       -v "$PWD:/workspace" \
@@ -712,7 +695,7 @@ docker run --rm --network todo-net registry.cn-guangzhou.aliyuncs.com/yleoer/alp
 
 === "Windows PowerShell"
 
-    ```powershell
+    ```powershell linenums="0"
     docker run --rm `
       --network todo-net `
       -v "${PWD}:/workspace" `
@@ -730,7 +713,7 @@ docker run --rm --network todo-net registry.cn-guangzhou.aliyuncs.com/yleoer/alp
 
 预期输出：
 
-```text
+```text linenums="0"
 migration applied
 ```
 
@@ -740,7 +723,7 @@ migration applied
 
 === "Linux / macOS / WSL2"
 
-    ```bash
+    ```bash linenums="0"
     docker run -d \
       --name todo-api \
       --network todo-net \
@@ -763,7 +746,7 @@ migration applied
 
 === "Windows PowerShell"
 
-    ```powershell
+    ```powershell linenums="0"
     docker run -d `
       --name todo-api `
       --network todo-net `
@@ -786,14 +769,14 @@ migration applied
 
 查看容器状态和日志。
 
-```bash
+```bash linenums="0"
 docker ps
 docker logs --tail 80 todo-api
 ```
 
 验证健康检查。
 
-```bash
+```bash linenums="0"
 curl -i http://127.0.0.1:18080/healthz
 curl -i http://127.0.0.1:18080/readyz
 ```
@@ -804,7 +787,7 @@ curl -i http://127.0.0.1:18080/readyz
 
     如果已经安装 `jq`，优先使用结构化 JSON 解析方式提取 Token：
 
-    ```bash
+    ```bash linenums="0"
     TOKEN=$(curl -s -H 'Content-Type: application/json' \
       -d '{"username":"admin","password":"change-me-123"}' \
       http://127.0.0.1:18080/api/v2/auth/login | jq -r '.data.token')
@@ -814,7 +797,7 @@ curl -i http://127.0.0.1:18080/readyz
 
     如果没有安装 `jq`，可以临时使用 `sed`。这个写法假设 API 返回紧凑 JSON，后续如果响应格式变成多行或字段层级调整，应改回 `jq` 或直接查看登录响应。
 
-    ```bash
+    ```bash linenums="0"
     TOKEN=$(curl -s -H 'Content-Type: application/json' \
       -d '{"username":"admin","password":"change-me-123"}' \
       http://127.0.0.1:18080/api/v2/auth/login | sed -n 's/.*"token":"\([^"]*\)".*/\1/p')
@@ -824,7 +807,7 @@ curl -i http://127.0.0.1:18080/readyz
 
     如果 `echo "$TOKEN"` 没有输出，不要继续创建 Todo，先直接查看登录响应：
 
-    ```bash
+    ```bash linenums="0"
     curl -i -H 'Content-Type: application/json' \
       -d '{"username":"admin","password":"change-me-123"}' \
       http://127.0.0.1:18080/api/v2/auth/login
@@ -832,7 +815,7 @@ curl -i http://127.0.0.1:18080/readyz
 
     Token 有值后再创建 Todo：
 
-    ```bash
+    ```bash linenums="0"
     curl -i -H "Authorization: Bearer $TOKEN" \
       -H 'Content-Type: application/json' \
       -d '{"title":"run todo api with docker"}' \
@@ -841,7 +824,7 @@ curl -i http://127.0.0.1:18080/readyz
 
 === "Windows PowerShell"
 
-    ```powershell
+    ```powershell linenums="0"
     $login = curl.exe -s -H "Content-Type: application/json" -d "{\"username\":\"admin\",\"password\":\"change-me-123\"}" http://127.0.0.1:18080/api/v2/auth/login | ConvertFrom-Json
     $token = $login.data.token
 
@@ -850,7 +833,7 @@ curl -i http://127.0.0.1:18080/readyz
 
 查看 Docker 网络、端口和数据卷。
 
-```bash
+```bash linenums="0"
 docker port todo-api
 docker network inspect todo-net
 docker volume ls
@@ -859,13 +842,13 @@ docker inspect todo-api --format '{{.State.Status}} {{.State.ExitCode}}'
 
 进入 API 容器观察运行环境。
 
-```bash
+```bash linenums="0"
 docker exec -it todo-api bash
 ```
 
 进入容器后可以执行：
 
-```bash
+```bash linenums="0"
 pwd
 ls
 go version
@@ -876,7 +859,7 @@ exit
 
 `docker ps` 应能看到三个容器：
 
-```text
+```text linenums="0"
 CONTAINER ID   IMAGE                  COMMAND                  STATUS         PORTS                         NAMES
 ...            registry.cn-guangzhou.aliyuncs.com/yleoer/golang:1.26-bookworm   "go run ./api/cmd/..."   Up ...         127.0.0.1:18080->18080/tcp    todo-api
 ...            registry.cn-guangzhou.aliyuncs.com/yleoer/postgres:18-alpine     "docker-entrypoint..."   Up ...         127.0.0.1:15432->5432/tcp     todo-postgres
@@ -885,31 +868,31 @@ CONTAINER ID   IMAGE                  COMMAND                  STATUS         PO
 
 `/healthz` 应返回：
 
-```text
+```text linenums="0"
 HTTP/1.1 200 OK
 ```
 
 无 Token 请求 Todo 列表应返回：
 
-```bash
+```bash linenums="0"
 curl -i http://127.0.0.1:18080/api/v2/todos
 ```
 
 预期状态码：
 
-```text
+```text linenums="0"
 HTTP/1.1 401 Unauthorized
 ```
 
 带 Token 创建 Todo 应返回：
 
-```text
+```text linenums="0"
 HTTP/1.1 201 Created
 ```
 
 API 日志中应能看到请求日志和 Redis 启用信息，输出类似：
 
-```text
+```text linenums="0"
 {"level":"INFO","msg":"redis cache enabled","addr":"todo-redis:6379","ttl":"30s"}
 {"level":"INFO","msg":"http request","method":"POST","path":"/api/v2/todos","status":201,"user":"admin"}
 ```
@@ -918,7 +901,7 @@ API 日志中应能看到请求日志和 Redis 启用信息，输出类似：
 
 验证 Docker 资源存在：
 
-```bash
+```bash linenums="0"
 docker network inspect todo-net --format '{{.Name}}'
 docker volume inspect todo-postgres-data --format '{{.Name}}'
 docker volume inspect todo-redis-data --format '{{.Name}}'
@@ -926,14 +909,14 @@ docker volume inspect todo-redis-data --format '{{.Name}}'
 
 验证 PostgreSQL 和 Redis 从容器内部可用：
 
-```bash
+```bash linenums="0"
 docker exec todo-postgres psql -U todo -d todo_platform -c '\dt'
 docker exec todo-redis redis-cli -a todo_redis_password ping
 ```
 
 验证 API 容器通过容器名访问依赖：
 
-```bash
+```bash linenums="0"
 docker exec todo-api getent hosts todo-postgres
 docker exec todo-api getent hosts todo-redis
 docker exec todo-api bash -lc ': </dev/tcp/todo-postgres/5432 && echo postgres-ok'
@@ -945,13 +928,13 @@ docker logs --tail 120 todo-api
 
 验证宿主机只能通过映射端口访问：
 
-```bash
+```bash linenums="0"
 curl -i http://127.0.0.1:18080/healthz
 ```
 
 验证容器 DNS：
 
-```bash
+```bash linenums="0"
 docker run --rm --network todo-net registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23 nslookup todo-postgres
 docker run --rm --network todo-net registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23 nslookup todo-redis
 ```
@@ -960,25 +943,23 @@ docker run --rm --network todo-net registry.cn-guangzhou.aliyuncs.com/yleoer/alp
 
 只停止和删除容器，保留数据卷。注意：这会删除 `todo-api`、`todo-postgres`、`todo-redis` 三个容器；连续验证多阶段时，先确认这些容器不是前序阶段仍需保留的运行环境。
 
-```bash
+```bash linenums="0"
 docker rm -f todo-api todo-postgres todo-redis
 ```
 
 删除本篇创建的网络：
 
-```bash
+```bash linenums="0"
 docker network rm todo-net
 ```
 
 如果确认不需要保留实验数据，再删除数据卷：
 
-```bash
+```bash linenums="0"
 docker volume rm todo-postgres-data todo-redis-data todo-go-mod-cache todo-go-build-cache
 ```
 
 `docker volume rm` 会删除 PostgreSQL、Redis 和 Go 缓存数据。生产环境或重要开发环境不要随手删除数据卷。
-
-预计耗时：90 分钟（阅读约 30 分钟，动手实验约 60 分钟）。
 
 ## 6. 常见错误与排障
 
@@ -986,14 +967,14 @@ docker volume rm todo-postgres-data todo-redis-data todo-go-mod-cache todo-go-bu
 
 - **现象**：
 
-  ```text
+  ```text linenums="0"
   Cannot connect to the Docker daemon at unix:///var/run/docker.sock. Is the docker daemon running?
   ```
 
 - **原因**：Docker Desktop 没启动，Linux 上 Docker daemon 未运行，或当前终端连接到了错误的 Docker context。
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   docker version
   docker context ls
   ```
@@ -1007,21 +988,21 @@ docker volume rm todo-postgres-data todo-redis-data todo-go-mod-cache todo-go-bu
 
 - **现象**：
 
-  ```text
+  ```text linenums="0"
   Bind for 127.0.0.1:18080 failed: port is already allocated
   ```
 
 - **原因**：宿主机上已有进程或其他容器占用了 `18080` 端口。
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   docker ps --format 'table {{.Names}}\t{{.Ports}}'
   ss -ltnp | grep 18080
   ```
 
   Windows PowerShell 可用：
 
-  ```powershell
+  ```powershell linenums="0"
   netstat -ano | findstr 18080
   ```
 
@@ -1032,7 +1013,7 @@ docker volume rm todo-postgres-data todo-redis-data todo-go-mod-cache todo-go-bu
 
 - **现象**：
 
-  ```text
+  ```text linenums="0"
   docker ps
   # 看不到 todo-api
 
@@ -1043,7 +1024,7 @@ docker volume rm todo-postgres-data todo-redis-data todo-go-mod-cache todo-go-bu
 - **原因**：应用启动失败，常见原因是 `TODO_JWT_SECRET` 太短、`TODO_AUTH_USERS` 没设置、配置目录挂载失败、Windows 路径没有挂载进容器，或 Go 依赖下载失败。
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   docker logs todo-api
   docker inspect todo-api --format '{{.State.Status}} {{.State.ExitCode}} {{.State.Error}}'
   ```
@@ -1052,13 +1033,13 @@ docker volume rm todo-postgres-data todo-redis-data todo-go-mod-cache todo-go-bu
 
 - **排查挂载问题**：如果日志里出现 `stat /workspace/api/cmd/todo-api: no such file or directory`，用轻量容器验证目录是否真的挂载成功：
 
-  ```bash
+  ```bash linenums="0"
   docker run --rm -v "$PWD:/workspace" -w /workspace registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23 ls
   ```
 
   Windows PowerShell 写法：
 
-  ```powershell
+  ```powershell linenums="0"
   Get-Location
   Test-Path .\api\cmd\todo-api
   docker run --rm -v "${PWD}:/workspace" -w /workspace registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23 ls
@@ -1071,7 +1052,7 @@ docker volume rm todo-postgres-data todo-redis-data todo-go-mod-cache todo-go-bu
 
 - **现象**：
 
-  ```text
+  ```text linenums="0"
   dial tcp 127.0.0.1:5432: connect: connection refused
   dial tcp: lookup todo-postgres: no such host
   ```
@@ -1079,7 +1060,7 @@ docker volume rm todo-postgres-data todo-redis-data todo-go-mod-cache todo-go-bu
 - **原因**：容器内使用了错误地址。`127.0.0.1` 指向 API 容器自己，不是 PostgreSQL 容器。`no such host` 通常表示容器没有加入同一个 Docker 网络，或容器名写错。
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   docker network inspect todo-net
   docker run --rm --network todo-net registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23 nslookup todo-postgres
   docker run --rm --network todo-net registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23 nslookup todo-redis
@@ -1092,7 +1073,7 @@ docker volume rm todo-postgres-data todo-redis-data todo-go-mod-cache todo-go-bu
 
 如果登录接口看起来成功，但创建 Todo 返回 `401 Unauthorized`，先检查本地变量是否真的拿到了 Token：
 
-```bash
+```bash linenums="0"
 echo "$TOKEN"
 curl -i -H 'Content-Type: application/json' \
   -d '{"username":"admin","password":"change-me-123"}' \
@@ -1107,7 +1088,7 @@ curl -i -H 'Content-Type: application/json' \
 - **原因**：没有挂载数据卷，或清理时执行了 `docker volume rm todo-postgres-data`。
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   docker inspect todo-postgres --format '{{json .Mounts}}'
   docker volume ls
   ```
@@ -1129,93 +1110,13 @@ curl -i -H 'Content-Type: application/json' \
 
 5. **有状态数据必须有备份和生命周期策略**。Docker Volume 能让删除容器时数据不丢，但它不是备份方案。生产数据库需要定期备份、恢复演练、容量监控、权限隔离和升级方案。清理命令中带 `-v` 或 `docker volume rm` 时要格外小心。
 
-## 8. 本章小项目
+## 8. 练习题与面试题
 
-本章小项目是 **Todo Platform Docker 基础运行环境**。项目目标是不用 Dockerfile 和 Compose，完全通过 Docker CLI 手动运行 Todo API、PostgreSQL 和 Redis，并记录关键排障命令。
+本章练习题和面试题已拆分到独立页面，完成正文学习后再进入题库练习与复盘。
 
-项目产出：
+[查看本章练习题与面试题](../../questions/stage-03-docker/15-docker-basics.md)
 
-- 一个名为 `todo-net` 的 Docker 网络。
-- 两个持久化数据卷：`todo-postgres-data`、`todo-redis-data`。
-- 三个容器：`todo-postgres`、`todo-redis`、`todo-api`。
-- 一次成功的 Todo API 登录和带 Token 创建 Todo 记录。
-- 一份你自己的 Docker 运行记录，可以放入 `docs/docker/chapter-15-run-record.md`。
-
-验收标准：
-
-- `docker ps` 能看到三个容器运行。
-- `curl -i http://127.0.0.1:18080/healthz` 返回 `200 OK`。
-- `/api/v2/auth/login` 能返回 JWT。
-- 带 Token 调用 `POST /api/v2/todos` 返回 `201 Created`。
-- `docker network inspect todo-net` 中能看到三个容器。
-- `docker volume ls` 中能看到 PostgreSQL 和 Redis 数据卷。
-- 你能解释为什么 `TODO_DATABASE_DSN` 使用 `todo-postgres:5432`，不是 `127.0.0.1:15432`。
-- 你能解释为什么容器内 API 要监听 `0.0.0.0:18080`，不是只监听 `127.0.0.1:18080`。
-
-## 9. 本章练习题
-
-### 基础题
-
-1. 镜像和容器有什么区别？为什么同一个镜像可以启动多个容器？
-2. 为什么数据库容器需要数据卷？如果不挂载数据卷会发生什么？
-3. `-p 127.0.0.1:18080:18080` 中三个部分分别是什么意思？
-4. 容器内访问另一个容器时，为什么应该使用容器名而不是 `127.0.0.1`？
-5. `docker ps` 和 `docker ps -a` 的区别是什么？
-
-### 实操题
-
-1. 把 Todo API 的宿主机映射端口改为 `18081`，验证 `curl -i http://127.0.0.1:18081/healthz` 返回 `200 OK`。当 `docker port todo-api` 显示 `127.0.0.1:18081` 时，说明操作成功。
-2. 停止并删除 `todo-api` 容器，然后用相同参数重新启动。验证 PostgreSQL 中之前创建的 Todo 是否仍然存在。当重新登录后能查询到旧数据时，说明数据卷生效。
-3. 故意把 `TODO_REDIS_ADDR` 改成 `127.0.0.1:6379` 启动 API，观察日志中的连接错误。修复为 `todo-redis:6379` 后重新启动，当日志不再出现 Redis 连接错误时，说明你理解了容器网络地址。
-
-### 思考题
-
-1. 如果测试同学说“我本机 Docker 里能跑，但 CI 里跑不起来”，你会从镜像、网络、端口、环境变量、数据卷哪些方向排查？
-2. 本篇用 `registry.cn-guangzhou.aliyuncs.com/yleoer/golang:1.26-bookworm` 加源码挂载运行 API。它适合本地学习，但为什么不适合生产发布？
-
-## 10. 本章面试题
-
-### 面试题 1：Docker 镜像和容器有什么区别？
-
-**一句话结论**：镜像是只读模板，容器是镜像运行起来后的进程实例。
-
-**展开解释**：镜像包含文件系统、运行时、程序和默认命令，可以被推送到仓库并在不同机器上拉取。容器是在镜像基础上创建的运行实例，有自己的可写层、进程、网络和挂载。删除容器不会删除镜像，删除镜像也不能影响已经运行中的容器进程，除非先停止并删除相关容器。
-
-**深入追问**：镜像通常由多层只读层组成，容器启动时会叠加一个可写层。数据库这类有状态数据不应依赖容器可写层，而应使用 Volume、持久化存储或外部数据库服务。
-
-### 面试题 2：容器内为什么不能用 127.0.0.1 访问另一个容器？
-
-**一句话结论**：每个容器有自己的网络命名空间，容器内的 `127.0.0.1` 只指向容器自己。
-
-**展开解释**：Docker 为容器提供隔离的网络环境。API 容器里的 `127.0.0.1:5432` 表示 API 容器内部的 5432 端口，不是 PostgreSQL 容器，也不是宿主机映射端口。容器之间应加入同一个 Docker 网络，并通过容器名或网络别名访问，例如 `todo-postgres:5432`。
-
-**深入追问**：这和 Kubernetes 中通过 Service DNS 访问依赖服务的思想一致。进入 Kubernetes 后，应用也不应该写 Pod IP，而应该访问稳定的 Service 名称。
-
-### 面试题 3：Docker Volume 解决什么问题？
-
-**一句话结论**：Volume 用来把数据从容器生命周期中独立出来，避免删除容器时数据丢失。
-
-**展开解释**：容器可写层适合临时文件，不适合数据库持久化。PostgreSQL 和 Redis 需要把数据目录挂载到 Volume。这样容器删除后，Volume 仍然保留，重新创建容器时可以继续使用原有数据。
-
-**深入追问**：Volume 不是备份。生产环境仍然需要备份、恢复演练、权限控制、容量监控和升级策略。进入 Kubernetes 后，同类问题会演进为 PersistentVolume 和 PersistentVolumeClaim。
-
-### 面试题 4：如何排查一个容器启动后立刻退出？
-
-**一句话结论**：先看 `docker ps -a` 确认退出状态，再看 `docker logs` 和 `docker inspect` 找退出原因。
-
-**展开解释**：`docker ps` 只显示运行中容器，退出容器要用 `docker ps -a`。日志能看到应用启动失败原因，例如配置缺失、端口错误、数据库连接失败。`docker inspect` 可以查看退出码、启动命令、环境变量、挂载和网络。排查顺序通常是状态、日志、退出码、启动参数、依赖服务。
-
-**深入追问**：退出码 125 往往是 Docker 参数错误，126/127 常见于命令不可执行或不存在，137 常见于 SIGKILL 或 OOM。进入 Kubernetes 后，这类问题会表现为 CrashLoopBackOff。
-
-### 面试题 5：Dockerfile、docker run 和 Docker Compose 分别解决什么问题？
-
-**一句话结论**：Dockerfile 定义镜像怎么构建，`docker run` 定义容器怎么启动，Docker Compose 定义一组服务如何一起运行。
-
-**展开解释**：本篇的 `docker run` 手动指定了镜像、环境变量、端口、数据卷和网络。第 16 篇会用 Dockerfile 把 Todo API 变成可分发的镜像。第 17 篇会用 Compose 把 API、PostgreSQL、Redis 的启动参数写成声明式 YAML，一条命令启动完整环境。
-
-**深入追问**：生产环境通常不会手动 `docker run`。镜像由 CI 构建并推送到仓库，运行参数由 Compose、Kubernetes、Helm、GitOps 或云平台托管。核心是可审查、可回滚、可复现。
-
-## 11. 本章总结
+## 9. 本章总结
 
 本篇把阶段二的 Todo API 放进了 Docker 运行环境。你学习了镜像、容器、仓库、端口映射、数据卷和 Docker 网络，理解了 Docker CLI 到 Docker daemon、镜像仓库、本地镜像和容器进程之间的基本链路。你还手动启动了 PostgreSQL、Redis 和 Todo API 三个容器，完成了迁移、登录、带 Token 创建 Todo、日志查看、网络检查和资源清理。
 
@@ -1223,6 +1124,6 @@ curl -i -H 'Content-Type: application/json' \
 
 能力价值上，你已经能胜任基础容器运行、容器日志查看、端口和网络排障、数据卷生命周期管理等工作任务。后续写 Dockerfile、Compose 和 Kubernetes YAML 时，本篇的每一个命令参数都会变成更高层配置的一部分。
 
-## 12. 下一章衔接
+## 10. 下一章衔接
 
 第 16 篇会把本篇的 `registry.cn-guangzhou.aliyuncs.com/yleoer/golang:1.26-bookworm + 源码挂载 + go run` 改造成真正的 Todo API 镜像。你将学习 Dockerfile、多阶段构建、构建缓存、`.dockerignore`、非 root 用户和镜像安全。如果跳过本篇，下一章里 `EXPOSE`、`CMD`、镜像标签、端口映射和运行用户这些概念会缺少运行经验支撑。

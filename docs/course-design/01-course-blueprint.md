@@ -2,9 +2,9 @@
 
 课程名称：**《从 Go 后端开发、Docker 容器化、Kubernetes 到 Operator 开发与生产实践》**
 
-> **配套设计文档**：[00 章节写作规范](00-chapter-writing-standard.md) | [02 完整课程目录](02-full-curriculum.md) | [03 项目主线设计](03-project-mainline-cloud-native-todo-platform.md)
+> **配套设计文档**：[00 章节写作规范](00-chapter-writing-standard.md) | [02 完整课程目录](02-full-curriculum.md) | [03 Todo 平台模拟案例设计](03-project-mainline-cloud-native-todo-platform.md)
 
-项目主线：**《Cloud Native Todo Platform》**
+贯穿模拟案例：**《Cloud Native Todo Platform》**
 
 ## 1. 教程整体定位
 
@@ -22,7 +22,7 @@
   -> Kubernetes API 扩展（CRD → 手写 Controller → Kubebuilder → Webhook → Finalizer → 生产实践）
 ```
 
-课程不是孤立知识点堆砌，而是围绕一个持续演进的综合项目 **Cloud Native Todo Platform** 展开。
+课程不是孤立知识点堆砌，而是用 **Cloud Native Todo Platform** 作为贯穿式 Todo 平台模拟案例，把每篇技术放进真实业务和工程场景中讲清楚。
 
 学习者会从本地写一个 Go Todo 程序开始，逐步为它接入 PostgreSQL、Redis、Docker、Compose、Kubernetes、Helm、CI/CD、GitOps、监控、日志、链路追踪，最后开发一个自定义 Operator 来管理该平台的生命周期。
 
@@ -150,11 +150,11 @@ K8s API Machinery -> CRD 设计 -> 手写 Controller(Informer/Workqueue/Reconcil
 | 阶段五 | 第 29-33 篇 | 5 |
 | 阶段六 | 第 34-42 篇 | 9 |
 
-## 8. 全套综合项目规划
+## 8. Todo 平台模拟案例规划
 
-综合项目名称：**Cloud Native Todo Platform**
+模拟案例名称：**Cloud Native Todo Platform**
 
-项目演进路线：
+阶段性能力路线：
 
 1. 阶段一：CLI 与基础环境
    - 使用 Go 编写本地 Todo CLI

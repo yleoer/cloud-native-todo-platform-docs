@@ -45,27 +45,11 @@
 
 本章实验会模拟这条协作线。你会创建一个最终交付分支，补齐最终 YAML、GitHub Actions 工作流、Argo CD Application、验证脚本和作品集文档。然后通过一次故障注入证明这不是“截图项目”：当镜像标签错误导致 Pod 无法启动时，你能按证据链定位到 Deployment、Events、`TodoApp.status.conditions`、Operator 指标和 Git 变更，再通过 GitOps 修复。
 
-### 2.3 课程项目关联
+### 2.3 Todo 平台模拟案例
 
-本章继续使用前面所有阶段积累的目录，尤其是：
+> Todo 平台需要整理成一个可展示的综合案例：应用团队提交 `TodoApp` YAML，平台完成部署、服务暴露、状态回写、监控指标和故障演练。你需要把架构说明、部署手册、排障记录和面试讲解稿整理成完整作品集。
 
-- `api/`：第 9-14 篇积累的 Todo API 服务。
-- `deployments/`：第 15-28 篇积累的 Docker、Kubernetes、Helm 和 Kustomize 交付文件。
-- `.github/workflows/`：第 29 篇积累的 CI/CD 流水线。
-- `observability/`：第 31-32 篇积累的 Prometheus、Grafana、Loki 和 OpenTelemetry 配置。
-- `operator/kubebuilder/` 与 `operator/helm/todo-operator/`：第 38-41 篇积累的 Todo Operator。
-
-本章把项目版本线推进到 `v5.0-final-delivery`。其中第 41 篇的 `v4.7-operator-production` 是 Operator 自身的生产基线，本篇的 `v5.0-final-delivery` 是整个 Cloud Native Todo Platform 的综合交付基线。
-
-需要提前说明一个边界：第 35 篇定义过 `TodoApp`、`TodoDatabase`、`TodoCache` 三个 CRD，第 38-41 篇实际完成的是 `TodoApp` 对 Deployment、Service、status、Events 和 metrics 的自动化管理。也就是说，当前课程主线已经具备“应用交付 Operator”的可执行能力，但还没有实现数据库和缓存的独立 Controller。
-
-因此本章实验采用“两条路径”：
-
-- **路径 A：最小可执行闭环**。只依赖第 41 篇已有 Operator，使用 `deployments/final/todoapp-local-smoke.yaml` 创建 `TodoApp`，验证 Deployment、Service、Ready condition、RBAC、metrics 和故障演练。这条路径是本章必须跑通的主路径。
-- **路径 B：完整作品集增强路径**。使用 `deployments/final/todoapp-full.yaml` 表达 `TodoApp`、`TodoDatabase`、`TodoCache` 的最终平台契约，并接入 Argo CD、Prometheus、Loki、Trace 和作品集证据。只有当你已经安装第 35 篇三个 CRD，或已经继续实现 DB/Cache Controller 时，才把它作为完整可执行路径。
-
-这样安排不是降低目标，而是让课程边界更真实：企业项目经常会先交付一个可运行的最小闭环，再把尚未自动化的能力写成明确的 API 契约和路线图。面试或评审时，能诚实讲清“已经实现什么、还计划实现什么”，比把未完成能力说成已完成更专业。
-
+这个案例关注表达能力：除了让系统跑通，还要能解释设计取舍、验证证据、故障处理和生产边界。
 ## 3. 核心概念
 
 ### 3.1 最终交付契约
@@ -90,7 +74,7 @@
 
 最小证据链如下：
 
-```text
+```text linenums="0"
 git commit SHA
   -> GitHub Actions run
   -> image tag or digest
@@ -277,11 +261,11 @@ flowchart TD
 
 ## 5. 手把手实验
 
+预计耗时：90 分钟（动手操作约 60 分钟）。
+
 ### 5.1 步骤 1：实验目标
 
 本次实验目标是：在项目仓库中整理最终交付入口和作品集材料，先用一条 `kubectl apply -f deployments/final/todoapp-local-smoke.yaml` 跑通当前 Operator 的最小闭环，再用 `deployments/final/todoapp-full.yaml` 整理完整平台契约和作品集证据。
-
-预计耗时：90 分钟（动手操作约 60 分钟）。
 
 ### 5.2 步骤 2：实验环境
 
@@ -309,7 +293,7 @@ flowchart TD
 
 先执行下面的检查：
 
-```bash
+```bash linenums="0"
 kubectl get crd todoapps.platform.todo.example.com
 kubectl get deploy -n todo-operator-system
 kubectl get svc -n todo-operator-system
@@ -322,7 +306,7 @@ kubectl get ns todo-team-a --ignore-not-found
 
 本章在项目根目录新增或整理下面这些文件：
 
-```text
+```text linenums="0"
 cloud-native-todo-platform/
 ├── .github/
 │   └── workflows/
@@ -348,7 +332,7 @@ cloud-native-todo-platform/
 
 如果你的仓库里还没有这些目录，先创建：
 
-```bash
+```bash linenums="0"
 mkdir -p .github/workflows
 mkdir -p deployments/final
 mkdir -p deployments/gitops/applications
@@ -362,7 +346,7 @@ mkdir -p scripts
 
 先创建 `deployments/final/todoapp-local-smoke.yaml`。这份文件只验证第 41 篇已经实现的能力：namespace 准入标签、`TodoApp` 接管标签、Deployment/Service 调谐和 status 回写。
 
-```yaml
+```yaml linenums="0"
 apiVersion: v1
 kind: Namespace
 metadata:
@@ -394,7 +378,7 @@ spec:
 
 创建 `deployments/final/todoapp-full.yaml`：
 
-```yaml
+```yaml linenums="0"
 apiVersion: v1
 kind: Namespace
 metadata:
@@ -500,7 +484,7 @@ spec:
 
 创建 `deployments/gitops/applications/todo-platform-final.yaml`：
 
-```yaml
+```yaml linenums="0"
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -537,7 +521,7 @@ spec:
 
 创建 `.github/workflows/final-integration.yml`：
 
-```yaml
+```yaml linenums="0"
 name: final-integration
 
 on:
@@ -631,10 +615,17 @@ jobs:
 
 上面的 workflow 使用当前验证过的 `actions/checkout@v4`、`actions/setup-go@v5` 和 `actions/setup-python@v5`。出版前不要只凭记忆判断版本号是否存在，应执行下面的命令复核 tag：
 
+<<<<<<< HEAD
+```bash linenums="0"
+git ls-remote --tags https://github.com/actions/checkout.git refs/tags/v6
+git ls-remote --tags https://github.com/actions/setup-go.git refs/tags/v6
+git ls-remote --tags https://github.com/actions/setup-python.git refs/tags/v6
+=======
 ```bash
 git ls-remote --tags https://github.com/actions/checkout.git refs/tags/v4
 git ls-remote --tags https://github.com/actions/setup-go.git refs/tags/v5
 git ls-remote --tags https://github.com/actions/setup-python.git refs/tags/v5
+>>>>>>> origin/main
 ```
 
 如果未来升级到更高 major 版本 action，必须先确认 tag 真实存在、runner 版本满足 action runtime 要求，并至少在 GitHub Actions 中跑通一次完整 workflow。`python-version: "3.13"` 是当前课程验证线；若改用 Python 3.14，应同步验证 runner 镜像支持。Helm 4.2.0 实测不支持短格式版本输出，本章用 `helm version`、`helm template --include-crds` 和一次真实 `helm install/upgrade/rollback` 证明锁定版本可用。
@@ -645,7 +636,7 @@ git ls-remote --tags https://github.com/actions/setup-python.git refs/tags/v5
 
 创建 `scripts/final-verify.sh`：
 
-```bash
+```bash linenums="0"
 #!/usr/bin/env bash
 set -euo pipefail
 
@@ -776,13 +767,13 @@ echo "final verification passed"
 
 脚本默认验证最小可执行路径。如果你已经具备完整 DB/Cache CRD 和真实 Todo API 镜像，可以这样验证完整作品集 YAML：
 
-```bash
+```bash linenums="0"
 MANIFEST=deployments/final/todoapp-full.yaml scripts/final-verify.sh
 ```
 
 给脚本增加执行权限：
 
-```bash
+```bash linenums="0"
 chmod +x scripts/final-verify.sh
 ```
 
@@ -790,7 +781,7 @@ Windows 用户建议在 WSL 或 Git Bash 中执行这个脚本。如果必须使
 
 PowerShell 中设置环境变量的写法如下：
 
-```powershell
+```powershell linenums="0"
 $env:MANIFEST = "deployments/final/todoapp-local-smoke.yaml"
 $env:METRICS_LOCAL_PORT = "18081"
 bash scripts/final-verify.sh
@@ -798,7 +789,7 @@ bash scripts/final-verify.sh
 
 查看脚本可覆盖参数：
 
-```bash
+```bash linenums="0"
 scripts/final-verify.sh --help
 ```
 
@@ -806,7 +797,7 @@ scripts/final-verify.sh --help
 
 创建 `docs/portfolio/architecture.md`：
 
-~~~~markdown
+~~~~markdown linenums="0"
 # Cloud Native Todo Platform 架构说明
 
 ## 项目目标
@@ -843,7 +834,7 @@ flowchart TB
 
 创建 `docs/portfolio/deploy-runbook.md`：
 
-```markdown
+```markdown linenums="0"
 # Cloud Native Todo Platform 部署手册
 
 ## 前置条件
@@ -884,7 +875,7 @@ flowchart TB
 
 创建 `docs/portfolio/troubleshooting.md`：
 
-```markdown
+```markdown linenums="0"
 # Cloud Native Todo Platform 故障排查记录
 
 ## 演练场景：错误镜像标签
@@ -933,7 +924,7 @@ CI 中增加镜像存在性检查；生产 manifest 优先使用 digest；发布
 
 创建 `docs/portfolio/interview-talk-track.md`：
 
-```markdown
+```markdown linenums="0"
 # Cloud Native Todo Platform 面试讲解稿
 
 ## 30 秒版本
@@ -959,7 +950,7 @@ CI 中增加镜像存在性检查；生产 manifest 优先使用 digest；发布
 
 创建 `docs/portfolio/evidence/README.md`：
 
-```markdown
+```markdown linenums="0"
 # Evidence
 
 这个目录保存最终验收证据。
@@ -985,7 +976,7 @@ CI 中增加镜像存在性检查；生产 manifest 优先使用 digest；发布
 
 先检查文件是否都在：
 
-```bash
+```bash linenums="0"
 test -f deployments/final/todoapp-local-smoke.yaml
 test -f deployments/final/todoapp-full.yaml
 test -f deployments/gitops/applications/todo-platform-final.yaml
@@ -995,7 +986,7 @@ test -x scripts/final-verify.sh
 
 验证 YAML 基本结构。这里使用 `--validate=false`，是因为 client dry-run 环境不一定能访问集群 OpenAPI schema，也不一定安装了全部 CRD：
 
-```bash
+```bash linenums="0"
 kubectl apply --dry-run=client --validate=false -f deployments/final/todoapp-local-smoke.yaml
 kubectl apply --dry-run=client --validate=false -f deployments/final/todoapp-full.yaml
 kubectl apply --dry-run=client --validate=false -f deployments/gitops/applications/todo-platform-final.yaml
@@ -1003,14 +994,14 @@ kubectl apply --dry-run=client --validate=false -f deployments/gitops/applicatio
 
 如果你的集群已安装所有 CRD，可以进一步执行 server-side dry-run。最小路径只要求 `TodoApp` CRD；完整路径还要求 `TodoDatabase` 和 `TodoCache` CRD：
 
-```bash
+```bash linenums="0"
 kubectl apply --dry-run=server -f deployments/final/todoapp-local-smoke.yaml
 kubectl apply --dry-run=server -f deployments/final/todoapp-full.yaml
 ```
 
 #### 5.5.2 确认 Operator 安装状态
 
-```bash
+```bash linenums="0"
 kubectl get pods -n todo-operator-system
 kubectl get deploy -n todo-operator-system
 kubectl get svc -n todo-operator-system
@@ -1020,7 +1011,7 @@ kubectl get validatingwebhookconfiguration | grep todo
 
 确认 Operator 的 ServiceAccount 权限仍符合第 41 篇收敛结果：
 
-```bash
+```bash linenums="0"
 SA=system:serviceaccount:todo-operator-system:todo-operator
 kubectl auth can-i create deployments --as="${SA}" -n todo-team-a
 kubectl auth can-i delete todoapps --as="${SA}" -n todo-team-a
@@ -1030,7 +1021,7 @@ kubectl auth can-i delete todoapps --as="${SA}" -n todo-team-a
 
 #### 5.5.3 跑通最小可执行闭环
 
-```bash
+```bash linenums="0"
 kubectl apply -f deployments/final/todoapp-local-smoke.yaml
 kubectl -n todo-team-a get todoapp
 kubectl -n todo-team-a get deploy,svc,pod
@@ -1040,7 +1031,7 @@ kubectl -n todo-team-a get deploy,svc,pod
 
 #### 5.5.4 运行最终验证脚本
 
-```bash
+```bash linenums="0"
 scripts/final-verify.sh
 ```
 
@@ -1058,7 +1049,7 @@ scripts/final-verify.sh
 
 如果你的 ServiceAccount 或 metrics Service 名称不同，用环境变量覆盖：
 
-```bash
+```bash linenums="0"
 OPERATOR_SERVICE_ACCOUNT=todo-operator-controller-manager \
 METRICS_SERVICE=todo-operator-controller-manager-metrics-service \
 scripts/final-verify.sh
@@ -1068,7 +1059,7 @@ scripts/final-verify.sh
 
 完整路径需要三个 CRD 都已安装：
 
-```bash
+```bash linenums="0"
 kubectl get crd todoapps.platform.todo.example.com
 kubectl get crd tododatabases.platform.todo.example.com
 kubectl get crd todocaches.platform.todo.example.com
@@ -1076,7 +1067,7 @@ kubectl get crd todocaches.platform.todo.example.com
 
 把 `deployments/final/todoapp-full.yaml` 中的镜像替换为你的真实 Todo API 镜像或 digest，然后执行：
 
-```bash
+```bash linenums="0"
 kubectl apply --dry-run=server -f deployments/final/todoapp-full.yaml
 kubectl apply -f deployments/final/todoapp-full.yaml
 MANIFEST=deployments/final/todoapp-full.yaml scripts/final-verify.sh
@@ -1088,14 +1079,14 @@ MANIFEST=deployments/final/todoapp-full.yaml scripts/final-verify.sh
 
 把镜像改成一个不存在的 tag：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-team-a patch todoapp todo-platform-final --type=merge \
   -p '{"spec":{"image":"registry.cn-guangzhou.aliyuncs.com/yleoer/hello:missing-final-42"}}'
 ```
 
 观察 rollout：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-team-a rollout status deployment/todo-platform-final --timeout=60s
 kubectl -n todo-team-a get pods
 kubectl -n todo-team-a get events --sort-by=.lastTimestamp | tail -n 20
@@ -1107,7 +1098,7 @@ curl -s http://127.0.0.1:18080/metrics | grep controller_runtime_reconcile_error
 
 修复镜像：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-team-a patch todoapp todo-platform-final --type=merge \
   -p '{"spec":{"image":"registry.cn-guangzhou.aliyuncs.com/yleoer/hello:plain-text"}}'
 
@@ -1120,14 +1111,14 @@ kubectl -n todo-team-a rollout status deployment/todo-platform-final --timeout=1
 
 如果你的本地集群已经安装 Argo CD，先修改 Application 的 `repoURL`，然后执行：
 
-```bash
+```bash linenums="0"
 kubectl apply -f deployments/gitops/applications/todo-platform-final.yaml
 kubectl -n argocd get application todo-platform-final
 ```
 
 查看同步状态：
 
-```bash
+```bash linenums="0"
 argocd app get todo-platform-final
 argocd app sync todo-platform-final
 argocd app wait todo-platform-final --health --timeout 180
@@ -1135,7 +1126,7 @@ argocd app wait todo-platform-final --health --timeout 180
 
 如果没有安装 Argo CD CLI，也可以用 `kubectl` 查看：
 
-```bash
+```bash linenums="0"
 kubectl -n argocd get application todo-platform-final -o yaml
 ```
 
@@ -1143,7 +1134,7 @@ kubectl -n argocd get application todo-platform-final -o yaml
 
 Argo CD 修复故障时，不要直接 patch 线上 Deployment。推荐流程是：
 
-```bash
+```bash linenums="0"
 git checkout -b fix/final-image-digest
 # 编辑 deployments/final/todoapp-full.yaml，把 spec.image 改为已存在的镜像 tag 或 digest
 git add deployments/final/todoapp-full.yaml
@@ -1157,7 +1148,7 @@ PR 合并后，等待 Argo CD 同步，再检查 Application revision 是否已�
 
 如果第 31-32 篇的可观测组件已经安装，可以保存下面三类证据。Prometheus 查询示例：
 
-```promql
+```promql linenums="0"
 rate(controller_runtime_reconcile_errors_total{controller="todoapp"}[5m])
 histogram_quantile(0.95, rate(controller_runtime_reconcile_time_seconds_bucket{controller="todoapp"}[5m]))
 ```
@@ -1166,7 +1157,7 @@ histogram_quantile(0.95, rate(controller_runtime_reconcile_time_seconds_bucket{c
 
 Loki 查询示例：
 
-```logql
+```logql linenums="0"
 {namespace="todo-team-a"} |= "todo-platform-final"
 {namespace="todo-operator-system"} |= "todo-platform-final"
 ```
@@ -1179,33 +1170,33 @@ Trace 查询没有统一命令，取决于你在第 32 篇使用 Tempo、Jaeger 
 
 最小可执行 YAML apply 成功时，你会看到类似输出：
 
-```text
+```text linenums="0"
 namespace/todo-team-a configured
 todoapp.platform.todo.example.com/todo-platform-final configured
 ```
 
 查看核心对象：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-team-a get todoapp todo-platform-final
 ```
 
 预期输出：
 
-```text
+```text linenums="0"
 NAME                  IMAGE                         REPLICAS   PHASE   READY   AGE
 todo-platform-final   registry.cn-guangzhou.aliyuncs.com/yleoer/hello:plain-text   2          Ready   2       2m
 ```
 
 查看工作负载：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-team-a get deploy,svc,pod
 ```
 
 预期输出：
 
-```text
+```text linenums="0"
 NAME                                  READY   UP-TO-DATE   AVAILABLE   AGE
 deployment.apps/todo-platform-final   2/2     2            2           2m
 
@@ -1219,13 +1210,13 @@ pod/todo-platform-final-6f8d7d9c7f-vm7sk   1/1     Running   0          2m
 
 验证脚本成功时，最后会输出：
 
-```text
+```text linenums="0"
 final verification passed
 ```
 
 故障演练时，错误镜像会看到类似输出：
 
-```text
+```text linenums="0"
 Warning  Failed     kubelet  Failed to pull image "registry.cn-guangzhou.aliyuncs.com/yleoer/hello:missing-final-42"
 Warning  Failed     kubelet  Error: ImagePullBackOff
 ```
@@ -1269,34 +1260,34 @@ Warning  Failed     kubelet  Error: ImagePullBackOff
 
 如果只想清理本章创建的租户资源：
 
-```bash
+```bash linenums="0"
 kubectl delete -f deployments/final/todoapp-local-smoke.yaml --ignore-not-found
 kubectl delete -f deployments/final/todoapp-full.yaml --ignore-not-found
 ```
 
 如果删除时 `TodoApp` 卡在 `Terminating`，先查看 finalizer 和 Operator 日志：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-team-a get todoapp todo-platform-final -o yaml
 kubectl -n todo-operator-system logs deploy/todo-operator-controller-manager --tail=100
 ```
 
 确认不是生产环境、且已经理解风险后，才可以在实验环境中手动移除 finalizer：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-team-a patch todoapp todo-platform-final --type=merge \
   -p '{"metadata":{"finalizers":[]}}'
 ```
 
 如果还创建了 Argo CD Application：
 
-```bash
+```bash linenums="0"
 kubectl -n argocd delete application todo-platform-final --ignore-not-found
 ```
 
 如果你使用 Argo CD CLI，也可以执行：
 
-```bash
+```bash linenums="0"
 argocd app delete todo-platform-final
 ```
 
@@ -1308,7 +1299,7 @@ argocd app delete todo-platform-final
 
 - **现象**：
 
-  ```text
+  ```text linenums="0"
   error: resource mapping not found for name: "todo-platform-final" namespace: "todo-team-a" from "deployments/final/todoapp-local-smoke.yaml": no matches for kind "TodoApp" in version "platform.todo.example.com/v1alpha1"
   ensure CRDs are installed first
   ```
@@ -1317,7 +1308,7 @@ argocd app delete todo-platform-final
 
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   kubectl config current-context
   kubectl get crd | grep todo
   kubectl get crd todoapps.platform.todo.example.com
@@ -1333,7 +1324,7 @@ argocd app delete todo-platform-final
 
 - **现象**：
 
-  ```text
+  ```text linenums="0"
   Error from server (InternalError): error when creating "todoapp-full.yaml":
   Internal error occurred: failed calling webhook "vtodoapp.kb.io":
   failed to call webhook: Post "https://todo-operator-webhook-service...": no endpoints available for service
@@ -1343,7 +1334,7 @@ argocd app delete todo-platform-final
 
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   kubectl -n todo-operator-system get pods,svc,endpoints
   kubectl get validatingwebhookconfiguration | grep todo
   kubectl -n todo-operator-system describe certificate
@@ -1360,7 +1351,7 @@ argocd app delete todo-platform-final
 
 - **现象**：
 
-  ```text
+  ```text linenums="0"
   Name:               argocd/todo-platform-final
   Sync Status:        OutOfSync from main
   Health Status:      Missing
@@ -1370,7 +1361,7 @@ argocd app delete todo-platform-final
 
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   argocd app get todo-platform-final
   argocd app diff todo-platform-final
   kubectl -n argocd get application todo-platform-final -o yaml
@@ -1386,7 +1377,7 @@ argocd app delete todo-platform-final
 
 - **现象**：
 
-  ```text
+  ```text linenums="0"
   NAME                                   READY   STATUS             RESTARTS   AGE
   todo-platform-final-6f8d7d9c7f-abcde   0/1     ImagePullBackOff   0          2m
   ```
@@ -1395,7 +1386,7 @@ argocd app delete todo-platform-final
 
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   kubectl -n todo-team-a describe pod -l app.kubernetes.io/name=todo-platform-final
   kubectl -n todo-team-a get events --sort-by=.lastTimestamp | tail -n 20
   kubectl -n todo-team-a get deploy todo-platform-final -o jsonpath='{.spec.template.spec.containers[0].image}{"\n"}'
@@ -1411,7 +1402,7 @@ argocd app delete todo-platform-final
 
 - **现象**：
 
-  ```text
+  ```text linenums="0"
   curl: (7) Failed to connect to 127.0.0.1 port 18080 after 0 ms: Could not connect to server
   grep: /tmp/todo-final-metrics.txt: No such file or directory
   ```
@@ -1420,7 +1411,7 @@ argocd app delete todo-platform-final
 
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   kubectl -n todo-operator-system get svc
   kubectl -n todo-operator-system describe svc todo-operator-metrics
   cat /tmp/todo-final-port-forward.log
@@ -1444,109 +1435,13 @@ argocd app delete todo-platform-final
 
 5. **作品集要脱敏。** 面试或公开分享时，不要暴露真实域名、Token、Secret、客户名称、内部镜像仓库地址和生产告警截图。可以保留结构、流程、字段和排障方法，把敏感值替换为示例值。专业的脱敏比炫耀真实生产截图更能体现工程素养。
 
-## 8. 本章小项目
+## 8. 练习题与面试题
 
-本章小项目是完成 Cloud Native Todo Platform 最终交付包。你需要在项目仓库中交付：
+本章练习题和面试题已拆分到独立页面，完成正文学习后再进入题库练习与复盘。
 
-- `deployments/final/todoapp-local-smoke.yaml`：最小可执行交付入口，必须能在第 41 篇 Operator 上跑通。
-- `deployments/final/todoapp-full.yaml`：完整作品集交付入口，表达 TodoApp、TodoDatabase 和 TodoCache 平台契约。
-- `deployments/gitops/applications/todo-platform-final.yaml`：Argo CD Application 示例。
-- `.github/workflows/final-integration.yml`：最终集成 CI。
-- `scripts/final-verify.sh`：最终验收脚本。
-- `docs/portfolio/architecture.md`：项目总架构说明。
-- `docs/portfolio/deploy-runbook.md`：部署和回滚手册。
-- `docs/portfolio/troubleshooting.md`：故障演练与复盘。
-- `docs/portfolio/interview-talk-track.md`：面试讲解稿。
-- `docs/portfolio/evidence/`：最终验证证据和截图目录。
+[查看本章练习题与面试题](../../questions/stage-06-platform-operator/42-final-integration-career.md)
 
-验收标准：
-
-| 验收项 | 判断方式 |
-|---|---|
-| 最小一条 YAML 可执行 | `kubectl apply -f deployments/final/todoapp-local-smoke.yaml` 成功 |
-| Operator 自动调谐 | `TodoApp` 创建后生成同名 Deployment 和 Service |
-| 业务状态 Ready | Deployment rollout 成功，`TodoApp.status.conditions` 为 Ready |
-| 完整契约可说明 | 能解释 `todoapp-full.yaml` 中 DB/Cache 当前是 API 契约还是已调谐资源 |
-| GitOps 可接入 | Argo CD Application 能指向 `deployments/final` 并只 include `todoapp-full.yaml` |
-| CI 覆盖核心路径 | Go、Helm、YAML、docs 至少有对应验证步骤 |
-| 故障可复现 | 错误镜像演练能产生可解释的 `ImagePullBackOff` 证据 |
-| 证据可归档 | `docs/portfolio/evidence/` 包含对象状态、Events、metrics 样例和截图占位 |
-| 面试可表达 | 3 分钟讲解稿能讲清业务目标、架构、取舍和故障经验 |
-
-项目完成后，版本线可以标记为 `v5.0-final-delivery`。
-
-## 9. 本章练习题
-
-### 基础题
-
-1. 为什么“Pod Running”不能代表最终交付链路完全健康？还需要哪些证据？
-2. CI/CD、GitOps 和 Operator 分别负责哪一段自动化？它们的边界是什么？
-3. 为什么最小 YAML 中必须保留 namespace 标签和接管标签？完整 YAML 中为什么还要增加 ResourceQuota？
-4. 作品集里的架构图、部署手册、故障复盘和面试讲解稿分别回答什么问题？
-5. 使用镜像 digest 相比使用普通 tag 有什么生产价值？
-
-### 实操题
-
-1. 把 `todoapp-local-smoke.yaml` 中的 `replicas` 从 2 改为 3，通过手工 apply 触发变更。验收标准：Deployment 最终 Ready 副本数为 3，`TodoApp.status.readyReplicas` 同步更新。
-2. 给 `scripts/final-verify.sh` 增加 Ingress 或 Gateway API 验证。验收标准：当入口资源存在时脚本检查 HTTP 状态码；不存在时输出跳过说明。
-3. 在 `.github/workflows/final-integration.yml` 中增加 kind server-side dry-run job。验收标准：CI 能安装 CRD 后执行 `kubectl apply --dry-run=server -f deployments/final/todoapp-full.yaml`。
-
-### 思考题
-
-1. 如果公司不允许应用团队直接创建 CR，只允许通过内部平台页面提交，你会如何保留 GitOps 审计和回滚能力？
-2. 如果最终交付链路中 Argo CD 显示 Healthy，但 Grafana 告警显示 5xx 错误率升高，你会如何判断是发布问题、依赖问题还是观测误报？
-
-## 10. 本章面试题
-
-### 面试题 1：你如何介绍 Cloud Native Todo Platform 的整体架构？
-
-**一句话结论**：它是一套从 Go API 到 Kubernetes Operator 的端到端云原生交付项目，用 GitOps 和 Operator 把应用发布、生命周期管理和可观测性串成闭环。
-
-**展开解释**：项目前半段完成 Go API、Docker 镜像、Kubernetes 部署、Helm 和 Kustomize；中段接入 CI/CD、Argo CD、Prometheus、Grafana、Loki 和 OpenTelemetry；后半段设计 CRD 并实现 Todo Operator，让用户通过 `TodoApp` 声明应用，Operator 自动创建 Deployment 和 Service，回写 status，并暴露 metrics。
-
-**深入追问**：这个项目最核心的工程价值是什么？不是 Todo 业务本身，而是完整展示了现代云原生平台如何把代码、镜像、声明式配置、控制循环和观测反馈串起来。
-
-### 面试题 2：CI/CD、GitOps 和 Operator 有什么区别？
-
-**一句话结论**：CI/CD 负责验证和产出，GitOps 负责把期望状态同步到集群，Operator 负责在集群内持续调谐业务生命周期。
-
-**展开解释**：CI/CD 跑测试、构建镜像、渲染模板并提交变更；GitOps 以 Git 为真相源，检测 manifest 变化并 apply 到集群；Operator 监听 CR 变化，把高层声明转换为 Deployment、Service、status、Events 等底层状态。
-
-**深入追问**：为什么不让 CI 直接 `kubectl apply` 到生产？直接 apply 难以审计、回滚和漂移检测。GitOps 让集群状态和 Git revision 对齐，更适合多人协作和生产治理。
-
-### 面试题 3：为什么最终选择 Operator 作为一键交付入口？
-
-**一句话结论**：Operator 可以把平台领域知识封装到 Kubernetes API 中，让用户提交简洁的 `TodoApp`，由控制循环处理默认值、校验、子资源创建、状态回写和清理。
-
-**展开解释**：Helm 擅长安装一组静态资源，但它不持续观察业务状态，也不天然处理运行时生命周期。Operator 通过 Reconcile 循环持续比较期望态和实际态，适合做自愈、状态同步、Finalizer 清理和跨资源协同。
-
-**深入追问**：Operator 会带来什么成本？需要维护 CRD 版本、Webhook、RBAC、Controller 性能、升级兼容和故障影响面。因此第 41 篇做了最小权限、Watch 范围、leader election、metrics 和 smoke test。
-
-### 面试题 4：线上出现 `ImagePullBackOff` 时你怎么排查？
-
-**一句话结论**：先确认影响面和变更来源，再沿 `TodoApp -> Deployment -> Pod Events -> 镜像仓库 -> GitOps commit` 追踪。
-
-**展开解释**：我会先看 `TodoApp.status.conditions` 和 Deployment rollout，确认哪个实例不 Ready；再看 Pod Events 判断是 tag 不存在、认证失败还是网络问题；然后反查当前镜像来自哪个 Git commit 和 CI run；最后通过修复 GitOps manifest 或回滚 commit 恢复，而不是直接改线上 Deployment。
-
-**深入追问**：为什么不先重启 Pod？镜像拉取失败不是运行时偶发现象，重启不会改变不存在的镜像标签。应该修复声明式源头。
-
-### 面试题 5：如何把这个项目写进简历而不显得堆技术词？
-
-**一句话结论**：用“目标、动作、结果、证据”写，而不是罗列 Kubernetes、Prometheus、Operator 等关键词。
-
-**展开解释**：例如可以写：“设计并实现 Cloud Native Todo Platform，使用 GitOps + Operator 将应用交付收敛为 TodoApp 自定义资源；补齐 CI 验证、Helm 发布、最小 RBAC、Webhook 校验、Prometheus 指标和故障演练，使最终交付可通过一条 YAML 创建并通过 smoke test 验收。”
-
-**深入追问**：如果面试官问你个人贡献怎么证明？可以指向 Reconciler 代码、CRD schema、Helm Chart、CI 工作流、最终验证脚本、Grafana 截图和故障复盘文档。
-
-### 面试题 6：当前 Operator 还没有管理数据库和缓存，你如何解释项目边界？
-
-**一句话结论**：我会明确说明当前已实现的是 `TodoApp` 应用交付闭环，`TodoDatabase` 和 `TodoCache` 是已经设计好的平台 API 契约，后续可以继续实现对应 Controller。
-
-**展开解释**：项目里最小可执行路径已经能用 `TodoApp` 自动创建 Deployment 和 Service，并完成 status、Events、metrics 和故障演练。完整作品集 YAML 中保留 DB/Cache CR，是为了展示最终平台 API 设计和演进方向，但不会把尚未实现的 Controller 说成已经完成。
-
-**深入追问**：如果要补齐这部分，你会怎么做？我会先为 `TodoDatabase` 和 `TodoCache` 定义 Reconcile 边界、RBAC、OwnerReference/Finalizer 策略和 status conditions，再分别对接 PostgreSQL/Redis Helm Chart 或托管云服务，并补齐 envtest、kind e2e 和迁移回滚策略。
-
-## 11. 本章总结
+## 9. 本章总结
 
 本篇完成了 Cloud Native Todo Platform 的最终集成。知识上，你把 Go API、Docker、Kubernetes、Helm、Kustomize、CI/CD、GitOps、可观测性、CRD、Controller 和 Operator 放进同一张交付图里，理解了从代码提交到运行中 Pod 的完整状态链路。
 
@@ -1554,7 +1449,7 @@ argocd app delete todo-platform-final
 
 能力上，你已经具备把一个学习项目转换成职业作品集的基本方法：用工程证据证明技术能力，用故障复盘证明生产意识，用清晰表达证明你理解架构取舍。至此，这套课程的主线从“会写一个服务”推进到了“能交付一个可治理的平台能力”。
 
-## 12. 课程收官与后续学习路线
+## 10. 课程收官与后续学习路线
 
 这是 Cloud Native Todo Platform 主线课程的最后一篇。后续不再进入新的正文章节，但你的学习可以沿六条路线继续深入：
 

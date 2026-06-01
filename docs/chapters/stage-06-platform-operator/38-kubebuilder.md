@@ -46,23 +46,11 @@ Kubebuilder 解决的是 Operator 工程化问题：让 API 类型、Controller�
 
 SRE 负责运行和排障 Operator。他们关注 Controller 日志、Reconcile 错误、队列积压、RBAC Forbidden、leader election、`status.conditions` 和子资源状态。Kubebuilder 生成的项目结构让这些能力更容易标准化接入，但生产稳定性仍然取决于 Reconciler 的设计质量。
 
-### 2.3 课程项目关联
+### 2.3 Todo 平台模拟案例
 
-本篇承接第 34-36 篇的 API 与控制循环设计，也会对齐第 37 篇手写 Controller 的核心逻辑。我们不再手工维护 CRD YAML，而是通过 Go 类型和 marker 生成 `TodoApp` CRD；不再手工拼 Informer 和 Workqueue，而是使用 controller-runtime 的 Manager 和 Builder 注册 Controller。
+> 手写 Controller 已经证明思路可行，但工程化 Operator 需要脚手架、代码生成、CRD 管理和测试结构。你需要用 Kubebuilder 创建 `TodoApp` API 与 Controller，并自动创建 Deployment、Service 和 status。
 
-第 37 篇的手写版本位于 `<project-root>/operator/handwritten/`，本篇 Kubebuilder 版本位于 `<project-root>/operator/kubebuilder/`。两个目录在同一个项目仓库中并列存在，便于学习者直接对比“手写控制循环”和“工程化 Operator 项目”的差异。
-
-本篇只为 `TodoApp` 创建 Kubebuilder API 和 Controller，目标是先跑通“自定义资源 -> Deployment / Service / status”的应用交付闭环。第 35 篇定义过的 `TodoDatabase` 和 `TodoCache` 仍然作为平台 API 契约保留，后续可以按同样模式扩展独立 Controller，但不在本篇实现。
-
-本篇输出会被后续章节继续演进：
-
-- 第 39 篇会在本篇 Operator 上增加 OwnerReference 深化、Finalizer、Webhook、Conditions 和事件记录。
-- 第 40 篇会为本篇 Reconciler 增加 envtest、kind 集成测试、镜像构建和发布流程。
-- 第 41 篇会围绕 RBAC 最小化、性能、观测和多租户边界把 Operator 推向生产可用。
-- 第 42 篇会使用最终版 `TodoApp` 一键交付完整 Todo Platform。
-
-项目版本线进入阶段六子版本 `v4.4-kubebuilder-operator`，它仍属于 `v4.0-operator` 总版本线。这里的子版本号用于阶段六内部衔接，便于和第 37 篇手写版本以及后续高级机制版本区分。
-
+这个案例关注工程化收益：框架不能替代控制循环理解，但能把重复的项目结构、权限、生成和运行方式标准化。
 ## 3. 核心概念
 
 ### 3.1 Kubebuilder 是 Operator 项目脚手架
@@ -71,7 +59,7 @@ Kubebuilder 是 Kubernetes 官方生态中常用的 Operator 开发框架。它�
 
 一个新项目通常从两条命令开始：
 
-```bash
+```bash linenums="0"
 kubebuilder init --domain todo.example.com --repo github.com/example/todo-operator
 kubebuilder create api --group platform --version v1alpha1 --kind TodoApp --resource --controller
 ```
@@ -100,7 +88,7 @@ kubebuilder create api --group platform --version v1alpha1 --kind TodoApp --reso
 
 例如下面这个字段：
 
-```go
+```go linenums="0"
 // +kubebuilder:validation:Minimum=1
 // +kubebuilder:validation:Maximum=10
 // +kubebuilder:default:=1
@@ -130,7 +118,7 @@ Kubernetes 对象通常包含 map、slice、指针和嵌套结构。直接赋值
 
 Kubebuilder 项目中运行：
 
-```bash
+```bash linenums="0"
 make generate
 ```
 
@@ -140,7 +128,7 @@ make generate
 
 Kubebuilder 生成的 Controller 最核心方法仍然叫 `Reconcile`：
 
-```go
+```go linenums="0"
 func (r *TodoAppReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
     // 读取 TodoApp
     // 计算期望 Deployment 和 Service
@@ -173,7 +161,7 @@ controller-runtime 把 Controller 运行时拆成几类核心对象：
 
 本篇会让 `TodoApp` 创建 Deployment 和 Service。它们之间不是松散关系，而应该通过 OwnerReference 建立归属：
 
-```go
+```go linenums="0"
 if err := controllerutil.SetControllerReference(&app, deployment, r.Scheme); err != nil {
     return ctrl.Result{}, err
 }
@@ -262,6 +250,8 @@ Kubebuilder 没有改变 Controller 的本质，它只是改变了工程入口�
 
 ## 5. 手把手实验
 
+预计耗时：90 分钟，其中动手编码约 60 分钟，集群验证和排障约 30 分钟。
+
 ### 5.1 实验目标
 
 实验步骤 1：明确实验目标。
@@ -291,7 +281,7 @@ Kubebuilder 没有改变 Controller 的本质，它只是改变了工程入口�
 
     安装 Kubebuilder：
 
-    ```bash
+    ```bash linenums="0"
     curl -L -o kubebuilder "https://go.kubebuilder.io/dl/4.11.0/$(go env GOOS)/$(go env GOARCH)"
     chmod +x kubebuilder
     sudo install -m 755 kubebuilder /usr/local/bin/kubebuilder
@@ -299,14 +289,14 @@ Kubebuilder 没有改变 Controller 的本质，它只是改变了工程入口�
 
     安装 kind，并确保 Go 二进制目录在 `PATH` 中：
 
-    ```bash
+    ```bash linenums="0"
     go install sigs.k8s.io/kind@v0.31.0
     export PATH="$(go env GOPATH)/bin:$PATH"
     ```
 
     如果下载 GitHub 或 `go.kubebuilder.io` 速度很慢，可以先配置 Go 模块代理和网络代理：
 
-    ```bash
+    ```bash linenums="0"
     go env -w GOPROXY=https://goproxy.cn,direct
     export HTTPS_PROXY=<your-proxy>
     export HTTP_PROXY=<your-proxy>
@@ -320,7 +310,7 @@ Kubebuilder 没有改变 Controller 的本质，它只是改变了工程入口�
 
 === "Linux / macOS / WSL2"
 
-    ```bash
+    ```bash linenums="0"
     go version
     docker version
     kubectl version --client
@@ -331,7 +321,7 @@ Kubebuilder 没有改变 Controller 的本质，它只是改变了工程入口�
 
 === "Windows PowerShell"
 
-    ```powershell
+    ```powershell linenums="0"
     go version
     docker version
     kubectl version --client
@@ -341,7 +331,7 @@ Kubebuilder 没有改变 Controller 的本质，它只是改变了工程入口�
 
 预期输出：
 
-```text
+```text linenums="0"
 go version go1.26.x linux/amd64
 Client Version: v1.36.x
 kind v0.31.0 ...
@@ -357,7 +347,7 @@ GNU Make 4.x
 
 本实验最终目录结构如下。注意：文件系统目录使用 `<project-root>/operator/kubebuilder/`，Go module 路径仍然使用 `github.com/example/todo-operator`，二者不要求完全同名。
 
-```text
+```text linenums="0"
 operator/
 └── kubebuilder/
     ├── api/
@@ -391,20 +381,20 @@ operator/
 
 创建实验目录：
 
-```bash
+```bash linenums="0"
 mkdir -p <project-root>/operator/kubebuilder
 cd <project-root>/operator/kubebuilder
 ```
 
 初始化项目骨架。`--domain` 决定 API group 后缀，`--repo` 决定 Go module 路径；`kubebuilder init` 本身没有 `Create Resource` 或 `Create Controller` 交互确认：
 
-```bash
+```bash linenums="0"
 kubebuilder init --domain todo.example.com --repo github.com/example/todo-operator
 ```
 
 预期输出会包含项目文件生成信息：
 
-```text
+```text linenums="0"
 Writing kustomize manifests for you to edit...
 Writing scaffold for you to edit...
 Get controller runtime:
@@ -419,13 +409,13 @@ kubebuilder create api
 
 创建 `TodoApp` API 和 Controller。`kubebuilder create api` 会询问是否创建 Resource 和 Controller，都输入 `y`：
 
-```bash
+```bash linenums="0"
 kubebuilder create api --group platform --version v1alpha1 --kind TodoApp --resource --controller
 ```
 
 预期输出：
 
-```text
+```text linenums="0"
 Create Resource [y/n]
 y
 Create Controller [y/n]
@@ -442,7 +432,7 @@ internal/controller/todoapp_controller.go
 
 编辑 `api/v1alpha1/todoapp_types.go`，替换为下面的完整内容：
 
-```go
+```go linenums="0"
 package v1alpha1
 
 import (
@@ -524,25 +514,25 @@ func init() {
 
 生成 DeepCopy 代码：
 
-```bash
+```bash linenums="0"
 make generate
 ```
 
 生成 CRD 和 RBAC 清单：
 
-```bash
+```bash linenums="0"
 make manifests
 ```
 
 检查 CRD 中是否包含必填字段、打印列和状态子资源：
 
-```bash
+```bash linenums="0"
 grep -n "required:\\|subresources\\|additionalPrinterColumns\\|readyReplicas" config/crd/bases/platform.todo.example.com_todoapps.yaml
 ```
 
 预期输出：
 
-```text
+```text linenums="0"
 ...
 required:
   - spec
@@ -561,7 +551,7 @@ jsonPath: .status.readyReplicas
 
 编辑 `internal/controller/todoapp_controller.go`，替换为下面的完整内容：
 
-```go
+```go linenums="0"
 package controller
 
 import (
@@ -894,25 +884,25 @@ func (r *TodoAppReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 格式化 Go 代码：
 
-```bash
+```bash linenums="0"
 gofmt -w api/v1alpha1/todoapp_types.go internal/controller/todoapp_controller.go
 ```
 
 整理 Go module 依赖：
 
-```bash
+```bash linenums="0"
 go mod tidy
 ```
 
 根据 API marker 和 RBAC marker 重新生成清单：
 
-```bash
+```bash linenums="0"
 make manifests
 ```
 
 运行 Kubebuilder 项目的测试入口：
 
-```bash
+```bash linenums="0"
 make test
 ```
 
@@ -920,7 +910,7 @@ make test
 
 预期输出：
 
-```text
+```text linenums="0"
 ?   	github.com/example/todo-operator/api/v1alpha1	[no test files]
 ok  	github.com/example/todo-operator/internal/controller	...
 ```
@@ -931,7 +921,7 @@ ok  	github.com/example/todo-operator/internal/controller	...
 
 编辑 `config/samples/platform_v1alpha1_todoapp.yaml`：
 
-```yaml
+```yaml linenums="0"
 apiVersion: platform.todo.example.com/v1alpha1
 kind: TodoApp
 metadata:
@@ -947,14 +937,14 @@ spec:
 
 > **可选实验**：如果已经完成前面章节的 Todo API 镜像构建，可以把镜像加载到 kind 集群后再切换 `TodoApp.spec.image`。这一步不是完成本章的必需操作，目的是把本章 Operator 实验接回课程主线。
 
-```bash
+```bash linenums="0"
 docker build -t todo-api:v0.1.2-observability <todo-platform-root>/todo-api
 kind load docker-image todo-api:v0.1.2-observability --name todo-operator
 ```
 
 后续创建 `TodoApp` 后，可以把镜像切换回课程 Todo API：
 
-```bash
+```bash linenums="0"
 kubectl patch todoapp todo-platform --type merge -p '{"spec":{"image":"todo-api:v0.1.2-observability","port":8080}}'
 ```
 
@@ -964,33 +954,33 @@ kubectl patch todoapp todo-platform --type merge -p '{"spec":{"image":"todo-api:
 
 创建本地集群：
 
-```bash
+```bash linenums="0"
 kind create cluster --name todo-operator
 ```
 
 确认 kubectl 指向 kind 集群：
 
-```bash
+```bash linenums="0"
 kubectl config use-context kind-todo-operator
 kubectl cluster-info
 ```
 
 安装 CRD：
 
-```bash
+```bash linenums="0"
 make install
 ```
 
 验证 API server 已识别 `TodoApp`：
 
-```bash
+```bash linenums="0"
 kubectl api-resources | grep -i todoapp
 kubectl explain todoapp.spec
 ```
 
 预期输出：
 
-```text
+```text linenums="0"
 todoapps    platform.todo.example.com/v1alpha1    true    TodoApp
 
 GROUP:      platform.todo.example.com
@@ -1001,7 +991,7 @@ FIELD: spec <Object>
 
 验证 CRD schema 能拦截非法输入。下面的对象故意缺少 `spec.image`，并把 `replicas` 写成 `0`：
 
-```bash
+```bash linenums="0"
 kubectl apply --dry-run=server -f - <<'EOF'
 apiVersion: platform.todo.example.com/v1alpha1
 kind: TodoApp
@@ -1015,7 +1005,7 @@ EOF
 
 预期输出：
 
-```text
+```text linenums="0"
 The TodoApp "invalid-todo" is invalid: spec.image: Required value
 ...
 spec.replicas: Invalid value: 0: spec.replicas in body should be greater than or equal to 1
@@ -1027,25 +1017,25 @@ spec.replicas: Invalid value: 0: spec.replicas in body should be greater than or
 
 启动前再次确认当前 kubeconfig 指向 kind 集群，避免 Controller 连接到错误环境：
 
-```bash
+```bash linenums="0"
 kubectl config current-context
 ```
 
 预期输出：
 
-```text
+```text linenums="0"
 kind-todo-operator
 ```
 
 在第一个终端中启动 Controller：
 
-```bash
+```bash linenums="0"
 make run
 ```
 
 预期日志：
 
-```text
+```text linenums="0"
 INFO    setup    starting manager
 INFO    starting server    {"name": "health probe", "addr": "[::]:8081"}
 INFO    Starting EventSource    {"controller": "todoapp", "source": "kind source: *v1alpha1.TodoApp"}
@@ -1055,26 +1045,26 @@ INFO    Starting workers        {"controller": "todoapp", "worker count": 1}
 
 保持第一个终端不要关闭。打开第二个终端，进入同一个 `<project-root>/operator/kubebuilder/` 目录，创建示例 CR：
 
-```bash
+```bash linenums="0"
 kubectl apply -f config/samples/platform_v1alpha1_todoapp.yaml
 ```
 
 预期输出：
 
-```text
+```text linenums="0"
 todoapp.platform.todo.example.com/todo-platform created
 ```
 
 查看 `TodoApp` 和子资源：
 
-```bash
+```bash linenums="0"
 kubectl get todoapp
 kubectl get deployment,service,pods -l app.kubernetes.io/instance=todo-platform
 ```
 
 预期输出：
 
-```text
+```text linenums="0"
 NAME            IMAGE                         REPLICAS   READY   AGE
 todo-platform   registry.cn-guangzhou.aliyuncs.com/yleoer/hello:plain-text   2          2       60s
 
@@ -1087,13 +1077,13 @@ service/todo-platform-api   ClusterIP   10.96.xxx.xxx   <none>        80/TCP    
 
 查看 status：
 
-```bash
+```bash linenums="0"
 kubectl get todoapp todo-platform -o yaml
 ```
 
 关键输出：
 
-```yaml
+```yaml linenums="0"
 status:
   observedGeneration: 1
   readyReplicas: 2
@@ -1106,19 +1096,19 @@ status:
 
 验证 Service 是否能访问。先转发端口：
 
-```bash
+```bash linenums="0"
 kubectl port-forward service/todo-platform-api 8080:80
 ```
 
 在另一个终端访问：
 
-```bash
+```bash linenums="0"
 curl http://127.0.0.1:8080
 ```
 
 预期输出：
 
-```text
+```text linenums="0"
 Server address: ...
 Server name: todo-platform-api-...
 Date: ...
@@ -1131,14 +1121,14 @@ URI: /
 
 先重复提交同一份 `TodoApp`，验证无变化时不会重复创建子资源：
 
-```bash
+```bash linenums="0"
 kubectl apply -f config/samples/platform_v1alpha1_todoapp.yaml
 kubectl get deployment,service -l app.kubernetes.io/instance=todo-platform
 ```
 
 预期输出：
 
-```text
+```text linenums="0"
 todoapp.platform.todo.example.com/todo-platform unchanged
 
 NAME                            READY   UP-TO-DATE   AVAILABLE   AGE
@@ -1152,20 +1142,20 @@ service/todo-platform-api   ClusterIP   10.96.xxx.xxx   <none>        80/TCP    
 
 然后修改副本数，验证 Controller 能把新的期望状态推给 Deployment：
 
-```bash
+```bash linenums="0"
 kubectl patch todoapp todo-platform --type merge -p '{"spec":{"replicas":3}}'
 ```
 
 观察 Deployment 是否扩容：
 
-```bash
+```bash linenums="0"
 kubectl get deployment todo-platform-api
 kubectl get todoapp todo-platform
 ```
 
 预期输出：
 
-```text
+```text linenums="0"
 NAME                READY   UP-TO-DATE   AVAILABLE   AGE
 todo-platform-api   3/3     3            3           ...
 
@@ -1175,7 +1165,7 @@ todo-platform   registry.cn-guangzhou.aliyuncs.com/yleoer/hello:plain-text   3  
 
 如果现在再次执行 sample 文件，会把 `replicas` 从 `3` 回滚到文件中的 `2`，这属于一次真实变更，不是幂等验证：
 
-```bash
+```bash linenums="0"
 kubectl apply -f config/samples/platform_v1alpha1_todoapp.yaml
 ```
 
@@ -1187,35 +1177,33 @@ kubectl apply -f config/samples/platform_v1alpha1_todoapp.yaml
 
 删除示例 CR：
 
-```bash
+```bash linenums="0"
 kubectl delete -f config/samples/platform_v1alpha1_todoapp.yaml --ignore-not-found
 ```
 
 确认 Deployment 和 Service 已被 OwnerReference 级联删除：
 
-```bash
+```bash linenums="0"
 kubectl get deployment,service -l app.kubernetes.io/instance=todo-platform
 ```
 
 预期输出：
 
-```text
+```text linenums="0"
 No resources found in default namespace.
 ```
 
 回到第一个终端，按 `Ctrl+C` 停止 `make run`。然后卸载 CRD：
 
-```bash
+```bash linenums="0"
 make uninstall
 ```
 
 删除 kind 集群：
 
-```bash
+```bash linenums="0"
 kind delete cluster --name todo-operator
 ```
-
-预计耗时：90 分钟，其中动手编码约 60 分钟，集群验证和排障约 30 分钟。
 
 ## 6. 常见错误与排障
 
@@ -1223,7 +1211,7 @@ kind delete cluster --name todo-operator
 
 - **现象**：创建示例 CR 时报错：
 
-  ```text
+  ```text linenums="0"
   error: resource mapping not found for name: "todo-platform" namespace: "default" from "config/samples/platform_v1alpha1_todoapp.yaml": no matches for kind "TodoApp" in version "platform.todo.example.com/v1alpha1"
   ensure CRDs are installed first
   ```
@@ -1231,7 +1219,7 @@ kind delete cluster --name todo-operator
 - **原因**：CRD 尚未安装到当前集群，或者 kubectl 当前上下文不是你安装 CRD 的集群。
 - **排查**：查看当前上下文和 API 资源：
 
-  ```bash
+  ```bash linenums="0"
   kubectl config current-context
   kubectl api-resources | grep -i todoapp
   ```
@@ -1240,7 +1228,7 @@ kind delete cluster --name todo-operator
 
 - **修复**：确认 kubeconfig 指向 kind 集群后重新安装 CRD：
 
-  ```bash
+  ```bash linenums="0"
   kubectl config use-context kind-todo-operator
   make install
   ```
@@ -1251,14 +1239,14 @@ kind delete cluster --name todo-operator
 
 - **现象**：Controller 部署到集群后日志出现：
 
-  ```text
+  ```text linenums="0"
   deployments.apps is forbidden: User "system:serviceaccount:todo-operator-system:todo-operator-controller-manager" cannot create resource "deployments" in API group "apps"
   ```
 
 - **原因**：RBAC marker 没有声明 Deployment 权限，或者修改 marker 后没有重新执行 `make manifests` 和 `make deploy`。
 - **排查**：查看生成的 ClusterRole：
 
-  ```bash
+  ```bash linenums="0"
   grep -n "deployments" config/rbac/role.yaml
   kubectl auth can-i create deployments --as system:serviceaccount:todo-operator-system:todo-operator-controller-manager
   ```
@@ -1267,7 +1255,7 @@ kind delete cluster --name todo-operator
 
 - **修复**：补充 RBAC marker 后重新生成并部署：
 
-  ```bash
+  ```bash linenums="0"
   make manifests
   make deploy IMG=<your-registry>/todo-operator:v0.1.0
   ```
@@ -1278,14 +1266,14 @@ kind delete cluster --name todo-operator
 
 - **现象**：启动 Controller 或设置 owner reference 时报错：
 
-  ```text
+  ```text linenums="0"
   no kind is registered for the type v1alpha1.TodoApp in scheme "pkg/runtime/scheme.go"
   ```
 
 - **原因**：`TodoApp` 类型没有注册到 Manager 使用的 Scheme。Kubebuilder 默认会在 `cmd/main.go` 中调用 `platformv1alpha1.AddToScheme(scheme)`，但手动改 module 或移动包路径时容易破坏。
 - **排查**：检查 `cmd/main.go`：
 
-  ```bash
+  ```bash linenums="0"
   grep -n "AddToScheme" cmd/main.go
   ```
 
@@ -1293,13 +1281,13 @@ kind delete cluster --name todo-operator
 
   预期输出：
 
-  ```text
+  ```text linenums="0"
   35:	utilruntime.Must(platformv1alpha1.AddToScheme(scheme))
   ```
 
 - **修复**：把 API 包注册到 Scheme：
 
-  ```go
+  ```go linenums="0"
   utilruntime.Must(platformv1alpha1.AddToScheme(scheme))
   ```
 
@@ -1309,14 +1297,14 @@ kind delete cluster --name todo-operator
 
 - **现象**：Controller 更新 Service 时报错：
 
-  ```text
+  ```text linenums="0"
   Service "todo-platform-api" is invalid: spec.clusterIPs[0]: Invalid value: []string(nil): field is immutable
   ```
 
 - **原因**：代码把 `current.Spec = desired.Spec` 整体替换，导致 `clusterIP`、`clusterIPs` 等由 API server 分配的不可变字段被清空。
 - **排查**：查看 Reconciler 是否整体替换 Service spec：
 
-  ```bash
+  ```bash linenums="0"
   grep -n "current.Spec = desired.Spec" internal/controller/todoapp_controller.go
   ```
 
@@ -1327,14 +1315,14 @@ kind delete cluster --name todo-operator
 
 - **现象**：回写 status 时偶发冲突：
 
-  ```text
+  ```text linenums="0"
   Operation cannot be fulfilled on todoapps.platform.todo.example.com "todo-platform": the object has been modified; please apply your changes to the latest version and try again
   ```
 
 - **原因**：Controller 读到对象后，另一个写入已经更新了 resourceVersion。status 更新需要基于最新对象。
 - **排查**：观察是否有多个 Controller 副本、频繁 patch，或手动快速修改同一个 `TodoApp`：
 
-  ```bash
+  ```bash linenums="0"
   kubectl get todoapp todo-platform -o jsonpath='{.metadata.resourceVersion}{"\n"}'
   kubectl logs -n todo-operator-system deploy/todo-operator-controller-manager
   ```
@@ -1356,117 +1344,13 @@ kind delete cluster --name todo-operator
 
 - **Operator 自身也要被当作生产服务运行**。它需要资源 requests/limits、健康检查、日志级别、指标、告警、leader election、滚动升级和回滚策略。一个会管理业务应用的 Operator 如果自身不可观测、不可升级，就会变成新的单点风险。
 
-## 8. 本章小项目
+## 8. 练习题与面试题
 
-本章小项目是完成 `<project-root>/operator/kubebuilder/` 中的 Kubebuilder 最小版本。
+本章练习题和面试题已拆分到独立页面，完成正文学习后再进入题库练习与复盘。
 
-### 8.1 项目任务
+[查看本章练习题与面试题](../../questions/stage-06-platform-operator/38-kubebuilder.md)
 
-- 使用 Kubebuilder 初始化 `github.com/example/todo-operator` 项目。
-- 创建 `platform.todo.example.com/v1alpha1` 下的 `TodoApp` API。
-- 在 `TodoAppSpec` 中定义 `image`、`replicas`、`port`。
-- 在 `TodoAppStatus` 中定义 `observedGeneration`、`readyReplicas`、`conditions`。
-- 编写 Reconciler 自动创建 Deployment 和 Service。
-- 使用 OwnerReference 建立 `TodoApp` 与子资源关系。
-- 在 kind 集群中创建 `TodoApp` 并验证 status。
-
-### 8.2 验收标准
-
-完成后应能观察到以下结果：
-
-- `make generate`、`make manifests`、`make test` 均执行成功。
-- `kubectl api-resources | grep -i todoapp` 能看到 `todoapps`。
-- `kubectl apply --dry-run=server` 能拦截缺少 `spec.image` 或非法 `replicas` 的资源。
-- `kubectl get todoapp` 能显示 `IMAGE`、`REPLICAS`、`READY` 列。
-- 创建 `TodoApp` 后，自动生成 `todo-platform-api` Deployment 和 Service。
-- 修改 `spec.replicas` 后，Deployment 副本数随之变化。
-- `status.conditions[type=Available]` 能反映 Deployment 是否就绪。
-- 删除 `TodoApp` 后，Deployment 和 Service 被级联删除。
-
-### 8.3 建议提交内容
-
-如果把本章成果提交到项目仓库，建议提交以下文件：
-
-```text
-api/v1alpha1/todoapp_types.go
-api/v1alpha1/zz_generated.deepcopy.go
-internal/controller/todoapp_controller.go
-config/crd/bases/platform.todo.example.com_todoapps.yaml
-config/rbac/role.yaml
-config/samples/platform_v1alpha1_todoapp.yaml
-go.mod
-go.sum
-PROJECT
-Makefile
-Dockerfile
-```
-
-不要提交本地 kind 集群缓存、临时日志、构建产物或个人 IDE 配置。
-
-## 9. 本章练习题
-
-### 9.1 基础题
-
-1. Kubebuilder 项目中 `api/` 和 `internal/controller/` 分别放什么？为什么不要把 API 类型和 Reconcile 逻辑混在一个文件里？
-2. `make generate` 和 `make manifests` 的输出分别是什么？修改 `TodoAppSpec` 后为什么两个命令通常都要执行？
-3. `+kubebuilder:subresource:status` 解决了什么问题？如果没有 status subresource，用户和 Controller 同时写对象会有什么风险？
-4. controller-runtime 默认 client 为什么可能读到缓存中的旧数据？这种行为对 Reconcile 设计有什么影响？
-5. `For(&TodoApp{})` 和 `Owns(&Deployment{})` 在 Controller 注册中分别表示什么？
-
-### 9.2 实操题
-
-1. 给 `TodoAppSpec` 增加 `resources` 字段，用来声明 CPU 和内存 requests。验收标准：`make manifests` 后 CRD schema 中能看到 `resources` 字段，并且 Deployment container 中出现对应 requests。
-2. 给 `TodoApp` 增加 `Service` 打印列，显示 Service 端口。验收标准：执行 `kubectl get todoapp` 时能看到新增列，且值来自 `spec.port`。
-3. 把示例镜像从 `registry.cn-guangzhou.aliyuncs.com/yleoer/hello:plain-text` 改成课程 Todo API 镜像，并通过 `kubectl port-forward` 访问健康检查接口。验收标准：curl 返回 Todo API 的健康检查响应。
-
-### 9.3 思考题
-
-1. 如果业务团队希望一个 `TodoApp` 同时管理 PostgreSQL、Redis、Deployment、Service、Ingress、ServiceMonitor 和告警规则，你会把所有逻辑放在一个 Reconciler 里，还是拆成多个 Reconciler？为什么？
-2. 如果 Controller 创建 Deployment 成功，但回写 status 失败，下次 Reconcile 应该怎么处理？这个场景为什么能体现幂等设计的重要性？
-
-## 10. 本章面试题
-
-### 面试题 1：Kubebuilder 和 controller-runtime 的关系是什么？
-
-**一句话结论**：Kubebuilder 是项目脚手架和生成工具，controller-runtime 是运行 Controller 的库。
-
-**展开解释**：Kubebuilder 负责初始化项目、创建 API、生成 CRD/RBAC、提供 Makefile 和部署清单。controller-runtime 提供 Manager、cache、client、Reconciler、Builder、leader election 等运行时能力。Kubebuilder 生成的 Controller 代码本质上是在使用 controller-runtime。
-
-**深入追问**：不用 Kubebuilder 能不能用 controller-runtime？可以。Kubebuilder 不是必需依赖，但它提供了一套成熟目录结构和生成流程，团队协作成本更低。
-
-### 面试题 2：kubebuilder marker 是什么？为什么生产项目要重视它？
-
-**一句话结论**：marker 是写在 Go 注释里的生成指令，会被转换成 CRD、RBAC、Webhook 等配置。
-
-**展开解释**：例如 `+kubebuilder:validation:Minimum=1` 会生成 OpenAPI 数值校验，`+kubebuilder:rbac` 会生成 ClusterRole 权限，`+kubebuilder:subresource:status` 会启用 status subresource。marker 写错不是注释无效这么简单，而是会直接影响 API 校验、权限和运行行为。
-
-**深入追问**：如何避免 marker 漂移？把 `make manifests` 纳入 CI，要求生成文件无 diff，并对关键 CRD schema 做兼容性评审。
-
-### 面试题 3：controller-runtime client 为什么默认读缓存？
-
-**一句话结论**：读缓存可以减少 API server 压力，提高 Controller 在大量对象场景下的性能。
-
-**展开解释**：Controller 通常要频繁读取被管理对象和子资源。如果每次都直接访问 API server，大规模集群中很容易触发限流。cache 通过 List-Watch 同步对象，本地读取速度更快、压力更小。
-
-**深入追问**：读缓存的代价是什么？可能读到短暂旧状态。Reconcile 必须幂等并容忍重复执行，不能假设写后立即读一致。
-
-### 面试题 4：OwnerReference 在 Operator 中有什么作用？
-
-**一句话结论**：OwnerReference 表达资源归属关系，用于级联删除和子资源事件反向触发主资源 Reconcile。
-
-**展开解释**：本篇中 Deployment 和 Service 都由 `TodoApp` 拥有。删除 `TodoApp` 时，garbage collector 可以清理子资源；Deployment 状态变化时，controller-runtime 可以通过 `Owns` 把事件映射回拥有者 `TodoApp`。
-
-**深入追问**：OwnerReference 有什么限制？跨 namespace owner reference 不能随意使用，外部云资源也不能靠 Kubernetes garbage collector 清理，这些场景需要 Finalizer 或显式引用索引。
-
-### 面试题 5：如何判断一个 Reconciler 是否幂等？
-
-**一句话结论**：同一个输入状态下多次执行 Reconcile，最终集群状态一致，不产生重复资源或无意义副作用。
-
-**展开解释**：幂等 Reconciler 会先读取当前状态，再创建缺失资源、更新差异字段、跳过已满足状态。它不会因为收到重复事件就重复创建 Service，也不会每次都写 status 造成事件风暴。
-
-**深入追问**：怎么测试？连续创建同一个 `TodoApp`、重复 apply 同一份 YAML、重启 Controller，再观察 Deployment/Service 数量、status 更新频率和日志错误是否稳定。
-
-## 11. 本章总结
+## 9. 本章总结
 
 本篇把 Todo Operator 从手写 Controller 思路推进到 Kubebuilder 工程化实践。知识上，你学习了 Kubebuilder 项目结构、Go 类型与 CRD 的生成关系、DeepCopy 的作用、marker 的价值，以及 controller-runtime 中 Manager、cache、client、Scheme、Controller 和 Reconciler 的协作方式。你也看到了 Kubebuilder 并没有改变控制循环本质，只是把通用工程结构和生成流程标准化。
 
@@ -1474,7 +1358,7 @@ Dockerfile
 
 能力上，你已经能用生产团队常见方式开发 Kubernetes Operator 的第一版功能。接下来要做的不是堆更多 YAML，而是把删除清理、字段默认、校验、事件、状态和多版本演进这些生产机制补齐。学完本篇后，你可以参与企业内部平台 API 的第一版落地，也能读懂大多数 Kubebuilder Operator 项目的目录结构和调谐入口。
 
-## 12. 下一章衔接
+## 10. 下一章衔接
 
 下一篇第 39 篇会基于本篇 `<project-root>/operator/kubebuilder/` 继续增强 Operator 机制。我们会直接打开 `api/v1alpha1/todoapp_types.go` 增加 Webhook marker 和更完整的字段约束，在 `internal/controller/todoapp_controller.go` 中增加 Finalizer 删除清理、Event 记录和更细的 Conditions，并在 `config/` 目录中生成 webhook 与 RBAC 配置。
 

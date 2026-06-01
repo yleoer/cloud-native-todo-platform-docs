@@ -38,15 +38,7 @@
 - 第 26 篇：理解 ServiceAccount、RBAC、SecurityContext 和 Pod Security 基线。
 - 第 16 篇：本地已经构建过 `todo-api:v0.1.0` 镜像，并能把镜像加载到 kind 集群。
 
-本篇命令以 Linux / macOS / Windows Subsystem for Linux 2（WSL2，Windows 的 Linux 子系统）中的 Bash 为主。Windows PowerShell 用户可以把 `cat <<'YAML'` 这类 heredoc 命令改写为 here-string，例如：
-
-```powershell
-@'
-key: value
-'@ | Set-Content -Encoding utf8 deployments/helm/todo-platform/example.yaml
-```
-
-由于本篇需要创建的文件较多，Windows 用户更推荐在 WSL2 中执行实验。
+本篇命令以 Linux / macOS / Windows Subsystem for Linux 2（WSL2，Windows 的 Linux 子系统）中的 Bash 为主。需要创建文件时，请按页面给出的文件名和内容手动写入。由于本篇需要创建的文件较多，Windows 用户更推荐在 WSL2 中执行实验。
 
 !!! note "Helm 4 与 Chart API 版本"
     本课程基线使用 Helm 4.2.x。Helm 4 官方文档说明：Helm 4 对 CLI、插件、OCI、server-side apply 等能力做了演进，但 Helm 3 常用的 `apiVersion: v2` Chart 仍然可以继续使用。本篇使用 `apiVersion: v2`，这样学习者能把现有生产 Chart 经验自然迁移到 Helm 4。
@@ -78,43 +70,11 @@ Helm 的价值不只是“少写 YAML”，而是把 Kubernetes 应用变成一�
 
 好的 Chart 不应该把所有 Kubernetes 字段都暴露成参数。它应该把团队真正需要调整的字段暴露出来，把安全、标签、探针、资源限制和命名规范沉淀成默认路径。
 
-### 2.3 课程项目关联
+### 2.3 Todo 平台模拟案例
 
-第 20-26 篇已经完成了 Todo Platform 在 Kubernetes 中的主线能力：
+> Todo API 的 Kubernetes YAML 需要打包成可安装、可升级、可回滚的 Helm Chart。你需要设计 values、模板、schema、Helm test 和发布包，并验证不同参数下渲染结果符合预期。
 
-```text
-第 20 篇：kind 集群、控制面、Node、kubelet、CNI 基础
-第 21 篇：Todo API Deployment、Probe、Namespace、HPA
-第 22 篇：Service / Ingress / Gateway API 入口
-第 23 篇：ConfigMap / Secret 配置管理
-第 24 篇：PostgreSQL StatefulSet 与持久化
-第 25 篇：DNS、Service 链路、NetworkPolicy 网络隔离
-第 26 篇：ServiceAccount、RBAC、非 root、Restricted 安全基线
-第 27 篇：Helm 4 Chart、安装、升级、回滚和打包发布
-```
-
-本篇会使用独立 Namespace `todo-helm-lab`，不覆盖 `todo-workloads` 和 `todo-security-lab`。这样你可以安全地学习 Helm release 生命周期，而不会破坏前几篇保留的主线资源。
-
-为了让第一次 Helm 实验足够聚焦，本篇 Chart 只打包 Todo API 主链路：Deployment、Service、ConfigMap、Secret、ServiceAccount、RBAC、NetworkPolicy、HPA 和 Helm test。第 24 篇的 PostgreSQL StatefulSet、第 22 篇的入口资源不会在本篇一次性 Helm 化；它们会在后续多环境和生产工程章节中逐步并入完整平台交付。
-
-图 27-1 展示本篇在阶段四中的位置：
-
-```mermaid
-flowchart LR
-    Ch21["第 21 篇<br/>Deployment / Service"] --> Ch27["第 27 篇<br/>Helm 4 Chart"]
-    Ch23["第 23 篇<br/>ConfigMap / Secret"] --> Ch27
-    Ch25["第 25 篇<br/>NetworkPolicy"] --> Ch27
-    Ch26["第 26 篇<br/>安全基线"] --> Ch27
-    Ch27 --> Ch28["第 28 篇<br/>Kustomize 多环境叠加"]
-
-    Ch27 --> Install["helm install<br/>一键安装"]
-    Ch27 --> Upgrade["helm upgrade<br/>参数化更新"]
-    Ch27 --> Rollback["helm rollback<br/>回到历史 revision"]
-    Ch27 --> Package["helm package / OCI<br/>发布 Chart"]
-```
-
-第 28 篇会继续处理多环境问题。Helm 适合把应用打包成可安装单元；Kustomize 适合在已存在的 YAML 或 Chart 渲染结果上做环境叠加。两者不是互相替代，而是常常配合使用。
-
+这个案例强调交付物的产品化：使用者不应该手改多份 YAML，而应该通过清晰的 values 完成安装和升级。
 ## 3. 核心概念
 
 ### 3.1 Chart、Release、Repository 与 Registry
@@ -145,7 +105,7 @@ Helm 4 中 `--wait` 是带策略的标志：省略 `--wait` 时默认只等待 h
 
 Helm Chart 是一个固定结构的目录。最小结构如下：
 
-```text
+```text linenums="0"
 todo-platform/
 ├── Chart.yaml
 ├── values.yaml
@@ -159,7 +119,7 @@ todo-platform/
 
 `Chart.yaml` 描述 Chart 自身：
 
-```yaml
+```yaml linenums="0"
 apiVersion: v2
 name: todo-platform
 description: Helm 4 chart for Cloud Native Todo Platform
@@ -184,7 +144,7 @@ kubeVersion: ">=1.25.0-0"
 
 `values.yaml` 是 Chart 的默认参数。模板通过 `.Values` 读取这些参数：
 
-```yaml
+```yaml linenums="0"
 replicaCount: 2
 image:
   repository: todo-api
@@ -197,7 +157,7 @@ service:
 
 模板中可以这样使用：
 
-```yaml
+```yaml linenums="0"
 spec:
   replicas: {{ .Values.replicaCount }}
   containers:
@@ -207,7 +167,7 @@ spec:
 
 Helm 允许多层覆盖 values。常见优先级从低到高是：
 
-```text
+```text linenums="0"
 Chart 内置 values.yaml
 -> helm install -f values-dev.yaml
 -> helm install -f values.local.yaml
@@ -216,7 +176,7 @@ Chart 内置 values.yaml
 
 如果多次使用 `-f`，右侧文件优先级更高。例如：
 
-```bash
+```bash linenums="0"
 helm upgrade todo-platform ./deployments/helm/todo-platform \
   -f values.yaml \
   -f values-dev.yaml \
@@ -238,7 +198,7 @@ Helm 模板使用 Go template 语法。常用内置对象包括：
 
 为了避免每个模板重复写标签和名称，Helm 通常把公共片段放进 `templates/_helpers.tpl`。以下是一个简化示例：
 
-```yaml
+```yaml linenums="0"
 {{- define "todo-platform.fullname" -}}
 {{- printf "%s-%s" .Release.Name .Chart.Name | trunc 63 | trimSuffix "-" -}}
 {{- end -}}
@@ -246,7 +206,7 @@ Helm 模板使用 Go template 语法。常用内置对象包括：
 
 模板里再通过 `include` 调用：
 
-```yaml
+```yaml linenums="0"
 metadata:
   name: {{ include "todo-platform.fullname" . }}
 ```
@@ -257,7 +217,7 @@ metadata:
 
 Helm 不只是把模板渲染后 apply 到集群。它还会记录 release 历史：
 
-```bash
+```bash linenums="0"
 helm install todo-platform ./deployments/helm/todo-platform
 helm upgrade todo-platform ./deployments/helm/todo-platform --set replicaCount=3
 helm rollback todo-platform 1
@@ -278,7 +238,7 @@ release revision 的变化类似这样：
 
 Chart 可以依赖另一个 Chart。依赖声明写在父 Chart 的 `Chart.yaml` 中：
 
-```yaml
+```yaml linenums="0"
 dependencies:
   - name: todo-cache
     alias: cache
@@ -289,7 +249,7 @@ dependencies:
 
 执行：
 
-```bash
+```bash linenums="0"
 helm dependency update deployments/helm/todo-platform
 ```
 
@@ -297,13 +257,13 @@ Helm 会解析依赖，把依赖包放入父 Chart 的 `charts/` 目录，并生
 
 Chart 可以打包成 `.tgz`：
 
-```bash
+```bash linenums="0"
 helm package deployments/helm/todo-platform --destination deployments/helm/packages
 ```
 
 也可以推送到 OCI registry：
 
-```bash
+```bash linenums="0"
 helm registry login ghcr.io
 helm push deployments/helm/packages/todo-platform-0.1.0.tgz oci://ghcr.io/example/charts
 ```
@@ -365,14 +325,14 @@ Helm 模板最终必须生成合法 Kubernetes YAML。模板语法本身没有�
 
 常见错误是缩进：
 
-```yaml
+```yaml linenums="0"
 labels:
 {{ include "todo-platform.labels" . }}
 ```
 
 这会把 labels 内容顶到行首，生成无效 YAML。正确写法是：
 
-```yaml
+```yaml linenums="0"
 labels:
 {{ include "todo-platform.labels" . | nindent 4 }}
 ```
@@ -414,6 +374,8 @@ flowchart TD
 
 ## 5. 手把手实验
 
+预计耗时：90 分钟（动手操作约 65 分钟）。
+
 ### 5.1 实验目标
 
 把 Todo API 主链路打包为 Todo Platform Helm 4 Chart 第一版，在 `todo-helm-lab` Namespace 中完成安装、升级、回滚、依赖更新和本地打包。
@@ -427,12 +389,12 @@ flowchart TD
 | kubectl | 与集群小版本相近 | 查看和验证资源 |
 | kind | v0.30+ | 本地 Kubernetes 集群 |
 | Docker | 29.x | 构建和加载 `todo-api:v0.1.0` 镜像 |
-| Bash | Linux / macOS / WSL2 | 执行 heredoc 创建文件 |
+| Bash | Linux / macOS / WSL2 | 执行验证、渲染和安装命令 |
 
 检查版本：
 
-```bash
-helm version
+```bash linenums="0"
+helm version --short
 kubectl version --client
 kubectl cluster-info
 docker image inspect todo-api:v0.1.0 >/dev/null
@@ -440,7 +402,7 @@ docker image inspect todo-api:v0.1.0 >/dev/null
 
 如果 kind 节点中没有 `todo-api:v0.1.0` 镜像，先加载：
 
-```bash
+```bash linenums="0"
 kind load docker-image todo-api:v0.1.0 --name todo-k8s
 ```
 
@@ -448,7 +410,7 @@ kind load docker-image todo-api:v0.1.0 --name todo-k8s
 
 以下命令均在项目根目录执行，也就是包含 `docs/` 和 `.gitignore` 的仓库根目录。
 
-```bash
+```bash linenums="0"
 mkdir -p deployments/helm/todo-platform/templates/tests
 mkdir -p deployments/helm/todo-cache/templates
 mkdir -p deployments/helm/packages
@@ -456,7 +418,7 @@ mkdir -p deployments/helm/packages
 
 最终目录如下：
 
-```text
+```text linenums="0"
 deployments/helm/
 ├── packages/                                  # ← helm package 输出目录，不提交
 ├── todo-cache/                                # ← 本地 subchart，演示依赖
@@ -490,37 +452,38 @@ deployments/helm/
 
 确认 `.gitignore` 包含 Helm 本地文件规则：
 
-```bash
-grep -q 'deployments/helm/**/*.local.yaml' .gitignore || cat >> .gitignore <<'EOF'
+将下面内容追加到 `.gitignore`（如果已有相同内容，不需要重复添加）：
+
+```text title=".gitignore"
 deployments/helm/**/*.local.yaml
 deployments/helm/**/charts/*.tgz
 deployments/helm/packages/
-EOF
 ```
 
 ### 5.4 完整 Chart 配置
 
 先创建本地 subchart。它只生成一个 ConfigMap，用来演示 Chart 依赖和 alias，不参与 Todo API 主链路：
 
-```bash
-cat > deployments/helm/todo-cache/Chart.yaml <<'YAML'
+将下面内容写入 `deployments/helm/todo-cache/Chart.yaml`：
+
+```yaml title="deployments/helm/todo-cache/Chart.yaml"
 apiVersion: v2
 name: todo-cache
 description: A tiny local subchart used to demonstrate Helm dependencies.
 type: application
 version: 0.1.0
 appVersion: "v0.1.0"
-YAML
 ```
 
-```bash
-cat > deployments/helm/todo-cache/values.yaml <<'YAML'
+将下面内容写入 `deployments/helm/todo-cache/values.yaml`：
+
+```yaml title="deployments/helm/todo-cache/values.yaml"
 message: "todo-cache local dependency is enabled"
-YAML
 ```
 
-```bash
-cat > deployments/helm/todo-cache/templates/cache-configmap.yaml <<'YAML'
+将下面内容写入 `deployments/helm/todo-cache/templates/cache-configmap.yaml`：
+
+```yaml title="deployments/helm/todo-cache/templates/cache-configmap.yaml"
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -531,13 +494,13 @@ metadata:
     app.kubernetes.io/managed-by: {{ .Release.Service }}
 data:
   message: {{ .Values.message | quote }}
-YAML
 ```
 
 创建父 Chart 的 `Chart.yaml`。这里使用 `file://../todo-cache` 做本地依赖，避免公网仓库不稳定影响主线实验：
 
-```bash
-cat > deployments/helm/todo-platform/Chart.yaml <<'YAML'
+将下面内容写入 `deployments/helm/todo-platform/Chart.yaml`：
+
+```yaml title="deployments/helm/todo-platform/Chart.yaml"
 apiVersion: v2
 name: todo-platform
 description: Helm 4 chart for Cloud Native Todo Platform.
@@ -559,25 +522,25 @@ dependencies:
     version: 0.1.0
     repository: "file://../todo-cache"
     condition: cache.enabled
-YAML
 ```
 
 创建 `.helmignore`，避免把本地 Secret 和临时输出打进 Chart 包。不要忽略 `charts/*.tgz`，否则父 Chart 打包时会漏掉依赖包：
 
-```bash
-cat > deployments/helm/todo-platform/.helmignore <<'EOF'
+将下面内容写入 `deployments/helm/todo-platform/.helmignore`：
+
+```text title="deployments/helm/todo-platform/.helmignore"
 .git/
 .DS_Store
 *.local.yaml
 packages/
 tmp/
-EOF
 ```
 
 创建 `values.schema.json`。它不会替代业务校验，但能在 `helm lint`、`helm template`、`helm install` 和 `helm upgrade` 时提前拦住明显错误，例如副本数写成字符串、JWT Secret 太短、HPA 最大副本数小于 1：
 
-```bash
-cat > deployments/helm/todo-platform/values.schema.json <<'JSON'
+将下面内容写入 `deployments/helm/todo-platform/values.schema.json`：
+
+```json title="deployments/helm/todo-platform/values.schema.json"
 {
   "$schema": "https://json-schema.org/draft-07/schema#",
   "type": "object",
@@ -645,13 +608,13 @@ cat > deployments/helm/todo-platform/values.schema.json <<'JSON'
     }
   }
 }
-JSON
 ```
 
 创建默认 values。默认值适合本地开发，但 `auth.authUsers` 是占位值，真正安装前会由 `values.local.yaml` 覆盖：
 
-```bash
-cat > deployments/helm/todo-platform/values.yaml <<'YAML'
+将下面内容写入 `deployments/helm/todo-platform/values.yaml`：
+
+```yaml title="deployments/helm/todo-platform/values.yaml"
 nameOverride: ""
 fullnameOverride: ""
 
@@ -745,13 +708,13 @@ networkPolicy:
 cache:
   enabled: false
   message: "todo-cache dependency is disabled by default"
-YAML
 ```
 
 创建 dev values：
 
-```bash
-cat > deployments/helm/todo-platform/values-dev.yaml <<'YAML'
+将下面内容写入 `deployments/helm/todo-platform/values-dev.yaml`：
+
+```yaml title="deployments/helm/todo-platform/values-dev.yaml"
 replicaCount: 2
 
 config:
@@ -772,13 +735,13 @@ hpa:
 
 cache:
   enabled: false
-YAML
 ```
 
 创建 prod values 示例。它不直接用于本地主线安装，因为真实生产 Secret 应该由外部系统创建。注意：这里开启了 HPA，但 HPA 真正生效还依赖集群安装 metrics-server，并且容器必须配置合理的 `resources.requests`，否则 HPA 可能无法计算 CPU 利用率。
 
-```bash
-cat > deployments/helm/todo-platform/values-prod.yaml <<'YAML'
+将下面内容写入 `deployments/helm/todo-platform/values-prod.yaml`：
+
+```yaml title="deployments/helm/todo-platform/values-prod.yaml"
 replicaCount: 3
 
 config:
@@ -807,13 +770,13 @@ hpa:
 
 networkPolicy:
   enabled: true
-YAML
 ```
 
 创建 helper 模板：
 
-```bash
-cat > deployments/helm/todo-platform/templates/_helpers.tpl <<'YAML'
+将下面内容写入 `deployments/helm/todo-platform/templates/_helpers.tpl`：
+
+```text title="deployments/helm/todo-platform/templates/_helpers.tpl"
 {{/*
 Return the chart name.
 */}}
@@ -878,15 +841,15 @@ Secret name used by the API deployment.
 {{- printf "%s-auth" (include "todo-platform.fullname" .) -}}
 {{- end -}}
 {{- end -}}
-YAML
 ```
 
 创建 ConfigMap 模板：
 
 本篇没有把 PostgreSQL 纳入 Helm Chart 第一版，因此这里故意不设置 `TODO_DATABASE_DSN`。第 12 篇和第 21 篇已经说明过：Todo API 未设置 `TODO_DATABASE_DSN` 时会使用内存 Repository；设置后才切换到 PostgreSQL Repository。这个选择让本篇实验聚焦 Helm 生命周期，而不是数据库连接。
 
-```bash
-cat > deployments/helm/todo-platform/templates/configmap.yaml <<'YAML'
+将下面内容写入 `deployments/helm/todo-platform/templates/configmap.yaml`：
+
+```yaml title="deployments/helm/todo-platform/templates/configmap.yaml"
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -901,13 +864,13 @@ data:
   TODO_PPROF_ENABLED: {{ .Values.config.pprofEnabled | quote }}
   TODO_RELEASE: {{ .Values.config.release | quote }}
   # 本篇故意不设置 TODO_DATABASE_DSN；未设置时 Todo API 使用内存 Repository。
-YAML
 ```
 
 创建运行时文件 ConfigMap：
 
-```bash
-cat > deployments/helm/todo-platform/templates/runtime-configmap.yaml <<'YAML'
+将下面内容写入 `deployments/helm/todo-platform/templates/runtime-configmap.yaml`：
+
+```yaml title="deployments/helm/todo-platform/templates/runtime-configmap.yaml"
 {{- if .Values.runtimeConfig.enabled }}
 apiVersion: v1
 kind: ConfigMap
@@ -919,13 +882,13 @@ data:
   runtime-notes.txt: |-
 {{ .Values.runtimeConfig.notes | nindent 4 }}
 {{- end }}
-YAML
 ```
 
 创建 Secret 模板。它只服务本地实验；生产环境建议设置 `auth.create=false` 并使用 `auth.existingSecret`：
 
-```bash
-cat > deployments/helm/todo-platform/templates/secret.yaml <<'YAML'
+将下面内容写入 `deployments/helm/todo-platform/templates/secret.yaml`：
+
+```yaml title="deployments/helm/todo-platform/templates/secret.yaml"
 {{- if and .Values.auth.create (not .Values.auth.existingSecret) }}
 apiVersion: v1
 kind: Secret
@@ -938,13 +901,13 @@ stringData:
   TODO_JWT_SECRET: {{ .Values.auth.jwtSecret | quote }}
   TODO_AUTH_USERS: {{ .Values.auth.authUsers | quote }}
 {{- end }}
-YAML
 ```
 
 创建 ServiceAccount：
 
-```bash
-cat > deployments/helm/todo-platform/templates/serviceaccount.yaml <<'YAML'
+将下面内容写入 `deployments/helm/todo-platform/templates/serviceaccount.yaml`：
+
+```yaml title="deployments/helm/todo-platform/templates/serviceaccount.yaml"
 {{- if .Values.serviceAccount.create }}
 apiVersion: v1
 kind: ServiceAccount
@@ -954,13 +917,13 @@ metadata:
 {{ include "todo-platform.labels" . | nindent 4 }}
 automountServiceAccountToken: {{ .Values.serviceAccount.automountToken }}
 {{- end }}
-YAML
 ```
 
 创建 RBAC：
 
-```bash
-cat > deployments/helm/todo-platform/templates/rbac.yaml <<'YAML'
+将下面内容写入 `deployments/helm/todo-platform/templates/rbac.yaml`：
+
+```yaml title="deployments/helm/todo-platform/templates/rbac.yaml"
 {{- if .Values.rbac.create }}
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
@@ -990,13 +953,13 @@ roleRef:
   kind: Role
   name: {{ include "todo-platform.fullname" . }}-config-reader
 {{- end }}
-YAML
 ```
 
 创建 Deployment。这里把第 21 篇的探针、第 23 篇的 ConfigMap / Secret、第 26 篇的安全上下文组合到一个模板中：
 
-```bash
-cat > deployments/helm/todo-platform/templates/deployment.yaml <<'YAML'
+将下面内容写入 `deployments/helm/todo-platform/templates/deployment.yaml`：
+
+```yaml title="deployments/helm/todo-platform/templates/deployment.yaml"
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -1081,13 +1044,13 @@ spec:
           configMap:
             name: {{ include "todo-platform.fullname" . }}-runtime
       {{- end }}
-YAML
 ```
 
 创建 Service：
 
-```bash
-cat > deployments/helm/todo-platform/templates/service.yaml <<'YAML'
+将下面内容写入 `deployments/helm/todo-platform/templates/service.yaml`：
+
+```yaml title="deployments/helm/todo-platform/templates/service.yaml"
 apiVersion: v1
 kind: Service
 metadata:
@@ -1102,13 +1065,13 @@ spec:
     - name: http
       port: {{ .Values.service.port }}
       targetPort: http
-YAML
 ```
 
 创建 HPA：
 
-```bash
-cat > deployments/helm/todo-platform/templates/hpa.yaml <<'YAML'
+将下面内容写入 `deployments/helm/todo-platform/templates/hpa.yaml`：
+
+```yaml title="deployments/helm/todo-platform/templates/hpa.yaml"
 {{- if .Values.hpa.enabled }}
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
@@ -1131,13 +1094,13 @@ spec:
           type: Utilization
           averageUtilization: {{ .Values.hpa.averageUtilization }}
 {{- end }}
-YAML
 ```
 
 创建 NetworkPolicy。它只限制入口流量，允许同 Namespace 内的客户端访问 Todo API：
 
-```bash
-cat > deployments/helm/todo-platform/templates/networkpolicy.yaml <<'YAML'
+将下面内容写入 `deployments/helm/todo-platform/templates/networkpolicy.yaml`：
+
+```yaml title="deployments/helm/todo-platform/templates/networkpolicy.yaml"
 {{- if .Values.networkPolicy.enabled }}
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -1158,13 +1121,13 @@ spec:
         - protocol: TCP
           port: http
 {{- end }}
-YAML
 ```
 
 创建 Helm test Pod：
 
-```bash
-cat > deployments/helm/todo-platform/templates/tests/test-connection.yaml <<'YAML'
+将下面内容写入 `deployments/helm/todo-platform/templates/tests/test-connection.yaml`：
+
+```yaml title="deployments/helm/todo-platform/templates/tests/test-connection.yaml"
 apiVersion: v1
 kind: Pod
 metadata:
@@ -1184,13 +1147,13 @@ spec:
       args:
         - -qO-
         - "http://{{ include "todo-platform.fullname" . }}:{{ .Values.service.port }}/healthz"
-YAML
 ```
 
 创建 `NOTES.txt`。安装完成后 Helm 会输出这段提示：
 
-```bash
-cat > deployments/helm/todo-platform/templates/NOTES.txt <<'EOF'
+将下面内容写入 `deployments/helm/todo-platform/templates/NOTES.txt`：
+
+```text title="deployments/helm/todo-platform/templates/NOTES.txt"
 Todo Platform has been installed.
 
 Release:
@@ -1208,37 +1171,40 @@ Access locally:
 
 Run Helm test:
   helm test {{ .Release.Name }} -n {{ .Release.Namespace }} --logs
-EOF
 ```
 
 生成本地 values。`values.local.yaml` 包含本地实验 Secret，不要提交到 Git。
 
 这里要提前记住一个安全边界：Helm dry-run、`helm get manifest`、release 记录和 CI 日志都可能出现渲染后的 Secret。下面的固定 JWT Secret 和本地管理员哈希只服务于实验；生产环境应设置 `auth.create=false` 和 `auth.existingSecret`，让 External Secrets、Sealed Secrets、Vault、云密钥服务或平台流水线单独创建真实 Secret。
 
-`hash-password` 子命令来自第 14 篇，并在第 16 篇镜像构建实验中验证过。如果下面命令提示找不到镜像或子命令，请先回到第 16 篇重新构建 `todo-api:v0.1.0`。PowerShell 用户应使用 `$HASH = docker run --rm todo-api:v0.1.0 hash-password "change-me-123"`，并用 PowerShell here-string 创建 `values.local.yaml`。
+`hash-password` 子命令来自第 14 篇，并在第 16 篇镜像构建实验中验证过。如果下面命令提示找不到镜像或子命令，请先回到第 16 篇重新构建 `todo-api:v0.1.0`。
 
-```bash
+```bash linenums="0"
 HASH=$(docker run --rm todo-api:v0.1.0 hash-password "change-me-123")
+```
 
-cat > deployments/helm/todo-platform/values.local.yaml <<YAML
+将下面内容写入 `deployments/helm/todo-platform/values.local.yaml`：
+
+把 `<PASSWORD_HASH>` 替换为上一条命令输出的完整哈希值。
+
+```yaml title="deployments/helm/todo-platform/values.local.yaml"
 auth:
   create: true
   jwtSecret: "0123456789abcdef0123456789abcdef"
-  authUsers: "admin=${HASH}"
-YAML
+  authUsers: "admin=<PASSWORD_HASH>"
 ```
 
 ### 5.5 执行命令
 
 先更新 Chart 依赖。由于依赖来自本地 `file://../todo-cache`，这一步不需要访问公网：
 
-```bash
+```bash linenums="0"
 helm dependency update deployments/helm/todo-platform
 ```
 
 静态检查 Chart：
 
-```bash
+```bash linenums="0"
 helm lint deployments/helm/todo-platform \
   -f deployments/helm/todo-platform/values-dev.yaml \
   -f deployments/helm/todo-platform/values.local.yaml
@@ -1246,7 +1212,7 @@ helm lint deployments/helm/todo-platform \
 
 客户端渲染模板，确认输出 YAML：
 
-```bash
+```bash linenums="0"
 helm template todo-platform deployments/helm/todo-platform \
   -n todo-helm-lab \
   -f deployments/helm/todo-platform/values-dev.yaml \
@@ -1259,13 +1225,13 @@ grep -n "kind: NetworkPolicy" /tmp/todo-platform-rendered.yaml
 
 先确保实验 Namespace 存在。这样后面的 server-side dry-run 可以校验命名空间内资源，而不会因为 Namespace 尚不存在提前失败：
 
-```bash
+```bash linenums="0"
 kubectl create namespace todo-helm-lab --dry-run=client -o yaml | kubectl apply -f -
 ```
 
 用 API Server 做服务端 dry-run。Helm 4 的 `--dry-run=server` 会连接集群，让 API Server 检查资源字段和准入规则：
 
-```bash
+```bash linenums="0"
 helm install todo-platform deployments/helm/todo-platform \
   -n todo-helm-lab \
   --create-namespace \
@@ -1276,7 +1242,7 @@ helm install todo-platform deployments/helm/todo-platform \
 
 确认无误后安装 release。`--wait=watcher` 是 Helm 4 的等待策略写法，已经用 Helm `v4.2.0` help 输出核验；Helm 3 时代常见的布尔型 `--wait` 心智模型不要直接套用到这里：
 
-```bash
+```bash linenums="0"
 helm install todo-platform deployments/helm/todo-platform \
   -n todo-helm-lab \
   --create-namespace \
@@ -1288,7 +1254,7 @@ helm install todo-platform deployments/helm/todo-platform \
 
 查看 release 和 Kubernetes 对象：
 
-```bash
+```bash linenums="0"
 helm status todo-platform -n todo-helm-lab
 helm history todo-platform -n todo-helm-lab
 helm get values todo-platform -n todo-helm-lab
@@ -1300,13 +1266,13 @@ kubectl -n todo-helm-lab rollout status deployment/todo-platform --timeout=180s
 
 验证 Service 可访问：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-helm-lab port-forward service/todo-platform 18084:80
 ```
 
 另开一个终端执行：
 
-```bash
+```bash linenums="0"
 curl -fsS http://127.0.0.1:18084/healthz
 curl -fsS http://127.0.0.1:18084/readyz
 ```
@@ -1315,13 +1281,13 @@ curl -fsS http://127.0.0.1:18084/readyz
 
 执行 Helm test：
 
-```bash
+```bash linenums="0"
 helm test todo-platform -n todo-helm-lab --logs
 ```
 
 升级 release，把副本数改为 3，并更新发布标识。`--rollback-on-failure` 是 Helm 4 中更直白的失败回滚标志，用来替代 Helm 3 脚本中常见的 `--atomic` 表达；本地实验也可以直接使用这个参数熟悉 Helm 4 的新命名：
 
-```bash
+```bash linenums="0"
 helm upgrade todo-platform deployments/helm/todo-platform \
   -n todo-helm-lab \
   -f deployments/helm/todo-platform/values-dev.yaml \
@@ -1335,7 +1301,7 @@ helm upgrade todo-platform deployments/helm/todo-platform \
 
 查看升级结果：
 
-```bash
+```bash linenums="0"
 helm history todo-platform -n todo-helm-lab
 kubectl -n todo-helm-lab get deployment todo-platform \
   -o jsonpath='replicas={.spec.replicas}{"\n"}'
@@ -1345,7 +1311,7 @@ kubectl -n todo-helm-lab get configmap todo-platform \
 
 回滚到 revision 1：
 
-```bash
+```bash linenums="0"
 helm rollback todo-platform 1 \
   -n todo-helm-lab \
   --wait=watcher \
@@ -1354,7 +1320,7 @@ helm rollback todo-platform 1 \
 
 查看回滚结果：
 
-```bash
+```bash linenums="0"
 helm history todo-platform -n todo-helm-lab
 kubectl -n todo-helm-lab get deployment todo-platform \
   -o jsonpath='replicas={.spec.replicas}{"\n"}'
@@ -1364,7 +1330,7 @@ kubectl -n todo-helm-lab get configmap todo-platform \
 
 打包 Chart。因为本课程不提交 `charts/*.tgz` 依赖包缓存，所以在干净工作区、CI 或换机器后，打包前先执行 `helm dependency build`，用 `Chart.lock` 重新生成依赖包：
 
-```bash
+```bash linenums="0"
 helm dependency build deployments/helm/todo-platform
 helm package deployments/helm/todo-platform --destination deployments/helm/packages
 helm show chart deployments/helm/packages/todo-platform-0.1.0.tgz
@@ -1372,7 +1338,7 @@ helm show chart deployments/helm/packages/todo-platform-0.1.0.tgz
 
 可选：推送到 OCI registry。下面命令包含占位符，不要直接复制执行到真实仓库。登录 GHCR 这类私有 registry 时通常使用 GitHub PAT、CI token 或机器人账号；不要把 token 明文写进脚本或 shell 历史。
 
-```bash
+```bash linenums="0"
 helm registry login ghcr.io
 helm push deployments/helm/packages/todo-platform-0.1.0.tgz oci://ghcr.io/<github-user>/charts
 helm install todo-platform-oci oci://ghcr.io/<github-user>/charts/todo-platform \
@@ -1383,7 +1349,7 @@ helm install todo-platform-oci oci://ghcr.io/<github-user>/charts/todo-platform 
 
 Helm 4 支持按 OCI digest 安装 Chart，这能减少同名 tag 被替换带来的供应链风险。真实发布后，可以从 registry 或 CI 输出中取得 digest，再用下面这种形式安装：
 
-```bash
+```bash linenums="0"
 helm install todo-platform-oci oci://ghcr.io/<github-user>/charts/todo-platform@sha256:<digest> \
   -n todo-helm-lab-oci \
   --create-namespace
@@ -1393,14 +1359,14 @@ helm install todo-platform-oci oci://ghcr.io/<github-user>/charts/todo-platform@
 
 依赖更新成功：
 
-```text
+```text linenums="0"
 Saving 1 charts
 Deleting outdated charts
 ```
 
 lint 成功：
 
-```text
+```text linenums="0"
 ==> Linting deployments/helm/todo-platform
 [INFO] Chart.yaml: icon is recommended
 
@@ -1411,7 +1377,7 @@ lint 成功：
 
 安装成功：
 
-```text
+```text linenums="0"
 NAME: todo-platform
 LAST DEPLOYED: ...
 NAMESPACE: todo-helm-lab
@@ -1421,7 +1387,7 @@ REVISION: 1
 
 对象列表包含：
 
-```text
+```text linenums="0"
 deployment.apps/todo-platform
 service/todo-platform
 configmap/todo-platform
@@ -1434,13 +1400,13 @@ networkpolicy.networking.k8s.io/todo-platform
 
 访问健康检查：
 
-```text
+```text linenums="0"
 ok
 ```
 
 升级后，history 至少包含两条：
 
-```text
+```text linenums="0"
 REVISION  UPDATED                  STATUS      CHART                APP VERSION  DESCRIPTION
 1         ...                      superseded  todo-platform-0.1.0  v0.1.0       Install complete
 2         ...                      deployed    todo-platform-0.1.0  v0.1.0       Upgrade complete
@@ -1448,7 +1414,7 @@ REVISION  UPDATED                  STATUS      CHART                APP VERSION 
 
 回滚后，history 会新增一条 revision：
 
-```text
+```text linenums="0"
 REVISION  STATUS      DESCRIPTION
 1         superseded  Install complete
 2         superseded  Upgrade complete
@@ -1457,7 +1423,7 @@ REVISION  STATUS      DESCRIPTION
 
 打包成功：
 
-```text
+```text linenums="0"
 Successfully packaged chart and saved it to: deployments/helm/packages/todo-platform-0.1.0.tgz
 ```
 
@@ -1465,7 +1431,7 @@ Successfully packaged chart and saved it to: deployments/helm/packages/todo-plat
 
 第一层：确认 Chart 静态检查通过。
 
-```bash
+```bash linenums="0"
 helm lint deployments/helm/todo-platform \
   -f deployments/helm/todo-platform/values-dev.yaml \
   -f deployments/helm/todo-platform/values.local.yaml
@@ -1475,7 +1441,7 @@ helm lint deployments/helm/todo-platform \
 
 第二层：确认依赖锁定文件存在。
 
-```bash
+```bash linenums="0"
 test -f deployments/helm/todo-platform/Chart.lock && echo "Chart.lock exists"
 ls deployments/helm/todo-platform/charts/
 helm dependency list deployments/helm/todo-platform
@@ -1485,7 +1451,7 @@ helm dependency list deployments/helm/todo-platform
 
 第三层：确认 release 处于 deployed。
 
-```bash
+```bash linenums="0"
 helm status todo-platform -n todo-helm-lab
 helm list -n todo-helm-lab
 ```
@@ -1494,7 +1460,7 @@ helm list -n todo-helm-lab
 
 第四层：确认 Kubernetes 对象 Ready。
 
-```bash
+```bash linenums="0"
 kubectl -n todo-helm-lab get pods
 kubectl -n todo-helm-lab rollout status deployment/todo-platform --timeout=180s
 ```
@@ -1503,7 +1469,7 @@ kubectl -n todo-helm-lab rollout status deployment/todo-platform --timeout=180s
 
 第五层：确认升级和回滚改变了 release history。
 
-```bash
+```bash linenums="0"
 helm history todo-platform -n todo-helm-lab
 ```
 
@@ -1511,7 +1477,7 @@ helm history todo-platform -n todo-helm-lab
 
 第六层：确认服务仍然可用。
 
-```bash
+```bash linenums="0"
 kubectl -n todo-helm-lab port-forward service/todo-platform 18084:80
 curl -fsS http://127.0.0.1:18084/healthz
 ```
@@ -1522,25 +1488,23 @@ curl -fsS http://127.0.0.1:18084/healthz
 
 卸载 Helm release：
 
-```bash
+```bash linenums="0"
 helm uninstall todo-platform -n todo-helm-lab
 ```
 
 删除实验 Namespace：
 
-```bash
+```bash linenums="0"
 kubectl delete namespace todo-helm-lab --ignore-not-found
 ```
 
 如果你不再保留本地实验文件，可以删除目录：
 
-```bash
+```bash linenums="0"
 rm -rf deployments/helm
 ```
 
 本篇没有修改 `todo-workloads` 和 `todo-security-lab`。清理 `todo-helm-lab` 后，第 20-26 篇的主线资源不受影响。
-
-预计耗时：90 分钟（动手操作约 65 分钟）。
 
 ## 6. 常见错误与排障
 
@@ -1548,14 +1512,14 @@ rm -rf deployments/helm
 
 - **现象**：
 
-```text
+```text linenums="0"
 Error: directory ../todo-cache not found
 ```
 
 - **原因**：`Chart.yaml` 中的 `repository: "file://../todo-cache"` 是相对于父 Chart 目录解析的。如果目录创建位置不对，Helm 找不到依赖。
 - **排查**：
 
-```bash
+```bash linenums="0"
 pwd
 ls deployments/helm
 cat deployments/helm/todo-platform/Chart.yaml
@@ -1563,7 +1527,7 @@ cat deployments/helm/todo-platform/Chart.yaml
 
 - **修复**：确认目录是 `deployments/helm/todo-cache/` 和 `deployments/helm/todo-platform/` 兄弟关系，然后重新执行：
 
-```bash
+```bash linenums="0"
 helm dependency update deployments/helm/todo-platform
 ```
 
@@ -1571,7 +1535,7 @@ helm dependency update deployments/helm/todo-platform
 
 - **现象**：
 
-```text
+```text linenums="0"
 Error: YAML parse error on todo-platform/templates/deployment.yaml:
 error converting YAML to JSON: yaml: line 23: did not find expected key
 ```
@@ -1579,7 +1543,7 @@ error converting YAML to JSON: yaml: line 23: did not find expected key
 - **原因**：`include`、`toYaml` 或条件块缩进不正确。Helm 模板语法可能是合法的，但渲染出来的 YAML 不合法。
 - **排查**：
 
-```bash
+```bash linenums="0"
 helm template todo-platform deployments/helm/todo-platform \
   -n todo-helm-lab \
   -f deployments/helm/todo-platform/values.local.yaml \
@@ -1588,7 +1552,7 @@ helm template todo-platform deployments/helm/todo-platform \
 
 - **修复**：嵌入 YAML 子树时使用 `nindent`，例如：
 
-```yaml
+```yaml linenums="0"
 labels:
 {{ include "todo-platform.labels" . | nindent 4 }}
 ```
@@ -1597,14 +1561,14 @@ labels:
 
 - **现象**：
 
-```text
+```text linenums="0"
 todo-platform-xxxxx   0/1   ImagePullBackOff
 ```
 
 - **原因**：kind 节点中没有 `todo-api:v0.1.0`；镜像 tag 写错；或者 `image.pullPolicy` 设置为 `Always` 导致去远程仓库拉取本地镜像。
 - **排查**：
 
-```bash
+```bash linenums="0"
 docker image inspect todo-api:v0.1.0
 kubectl -n todo-helm-lab describe pod -l app.kubernetes.io/name=todo-platform
 helm get values todo-platform -n todo-helm-lab
@@ -1612,7 +1576,7 @@ helm get values todo-platform -n todo-helm-lab
 
 - **修复**：
 
-```bash
+```bash linenums="0"
 kind load docker-image todo-api:v0.1.0 --name todo-k8s
 helm upgrade todo-platform deployments/helm/todo-platform \
   -n todo-helm-lab \
@@ -1627,21 +1591,21 @@ helm upgrade todo-platform deployments/helm/todo-platform \
 
 - **现象**：
 
-```text
+```text linenums="0"
 Error: INSTALLATION FAILED: cannot re-use a name that is still in use
 ```
 
 - **原因**：同一 Namespace 中已经有名为 `todo-platform` 的 release。Helm release 名称在 Namespace 内必须唯一。
 - **排查**：
 
-```bash
+```bash linenums="0"
 helm list -n todo-helm-lab
 helm status todo-platform -n todo-helm-lab
 ```
 
 - **修复**：如果要更新已有 release，用 `helm upgrade`；如果要重新安装，先卸载：
 
-```bash
+```bash linenums="0"
 helm uninstall todo-platform -n todo-helm-lab
 helm install todo-platform deployments/helm/todo-platform -n todo-helm-lab --create-namespace
 ```
@@ -1650,7 +1614,7 @@ helm install todo-platform deployments/helm/todo-platform -n todo-helm-lab --cre
 
 - **现象**：
 
-```text
+```text linenums="0"
 Error: UPGRADE FAILED: cannot patch "todo-platform" with kind Deployment:
 Deployment.apps "todo-platform" is invalid: spec.selector: Invalid value: field is immutable
 ```
@@ -1658,7 +1622,7 @@ Deployment.apps "todo-platform" is invalid: spec.selector: Invalid value: field 
 - **原因**：Deployment 的 `spec.selector` 是不可变字段。常见原因是改了 helper 中的 selector labels，或者把 release 名称、Chart 名称、selector 关系改乱。
 - **排查**：
 
-```bash
+```bash linenums="0"
 helm get manifest todo-platform -n todo-helm-lab > /tmp/release-old.yaml
 helm template todo-platform deployments/helm/todo-platform \
   -n todo-helm-lab \
@@ -1686,123 +1650,19 @@ diff -u /tmp/release-old.yaml /tmp/release-new.yaml | less
 - [helm upgrade](https://helm.sh/docs/helm/helm_upgrade/)
 - [Helm v4.2.0 Release](https://github.com/helm/helm/releases/tag/v4.2.0)
 
-## 8. 本章小项目
+## 8. 练习题与面试题
 
-本章小项目是：**为 Todo API 主链路建立 Todo Platform Helm 4 Chart 第一版发布包**。
+本章练习题和面试题已拆分到独立页面，完成正文学习后再进入题库练习与复盘。
 
-### 8.1 项目产出
+[查看本章练习题与面试题](../../questions/stage-04-kubernetes/27-helm4.md)
 
-你应该得到以下产出：
-
-- `deployments/helm/todo-platform/Chart.yaml`：Todo Platform 父 Chart 元数据和本地 subchart 依赖。
-- `deployments/helm/todo-platform/values.yaml`：默认参数。
-- `deployments/helm/todo-platform/values-dev.yaml`：开发环境覆盖参数。
-- `deployments/helm/todo-platform/values-prod.yaml`：生产环境示例参数。
-- `deployments/helm/todo-platform/values.schema.json`：values 输入校验规则。
-- `deployments/helm/todo-platform/values.local.yaml`：本地实验 Secret 覆盖文件，不提交。
-- `deployments/helm/todo-platform/templates/`：Deployment、Service、ConfigMap、Secret、RBAC、NetworkPolicy、HPA 和 test 模板。
-- `deployments/helm/todo-cache/`：本地 subchart，用于演示依赖管理。
-- `deployments/helm/todo-platform/Chart.lock`：依赖锁定文件。
-- `deployments/helm/packages/todo-platform-0.1.0.tgz`：本地打包产物，不提交。
-
-图 27-6 本章小项目产出关系：
-
-```mermaid
-flowchart TD
-    Values["values.yaml<br/>values-dev.yaml<br/>values.local.yaml"] --> Chart["todo-platform Chart"]
-    Schema["values.schema.json<br/>输入校验"] --> Chart
-    Templates["templates/<br/>Deployment / Service / RBAC / NetworkPolicy"] --> Chart
-    Sub["todo-cache subchart"] --> Chart
-    Chart --> Release["Helm release<br/>todo-platform"]
-    Release --> K8s["Kubernetes objects<br/>todo-helm-lab"]
-    Chart --> Package["todo-platform-0.1.0.tgz"]
-```
-
-### 8.2 能力验收标准
-
-完成本篇后，你应该能够做到：
-
-- `helm dependency update deployments/helm/todo-platform` 成功生成 `Chart.lock`。
-- `values.schema.json` 能在 values 类型或 Secret 长度错误时阻止渲染。
-- `helm lint` 对 Todo Platform Chart 返回 0 个失败。
-- `helm template` 能渲染出 Deployment、Service、ConfigMap、Secret、RBAC 和 NetworkPolicy。
-- `helm install` 后 release 状态为 `deployed`。
-- Todo API Pod 处于 `Running`，Service 能通过 port-forward 访问。
-- `helm upgrade` 后 release history 出现新的 revision，副本数或配置确实变化。
-- `helm rollback` 后 release history 再次新增 revision，配置回到目标 revision 内容。
-- `helm dependency build` 能在干净工作区按 `Chart.lock` 重建依赖包。
-- `helm package` 能生成 `todo-platform-0.1.0.tgz`。
-
-## 9. 本章练习题
-
-### 9.1 基础题
-
-1. 用一句话解释 Chart 和 Release 的区别。
-2. `Chart.yaml` 中 `version` 和 `appVersion` 分别应该什么时候变化？
-3. 为什么 `templates/_helpers.tpl` 里的模板名称建议以 Chart 名称作为前缀？
-4. 为什么 production values 不应该直接保存真实数据库密码或 JWT Secret？
-5. `helm rollback todo-platform 1` 为什么会创建新的 revision？
-
-### 9.2 实操题
-
-1. 把 `hpa.enabled` 改为 `true`，执行 `helm upgrade`，验证 HPA 对象是否出现；如果集群没有 metrics-server，观察 HPA 指标为空时的提示。
-2. 把 `cache.enabled` 改为 `true`，执行 `helm upgrade`，验证本地 subchart 生成的 ConfigMap 是否出现。
-3. 给 Chart 增加 `values-test.yaml`，设置 `replicaCount: 1`、`config.env: test` 和 `config.release: chapter-27-test`；再故意把 `replicaCount` 写成字符串，观察 `values.schema.json` 拦截错误，修复后用 `helm template` 验证输出。
-
-### 9.3 思考题
-
-1. Helm 和 Kustomize 都能管理多环境配置。为什么本课程先讲 Helm，再讲 Kustomize？
-2. 如果一次 Helm upgrade 同时修改了镜像版本、数据库迁移 Job 和 Secret 名称，回滚时可能有哪些 Kubernetes 之外的风险？
-
-## 10. 本章面试题
-
-### 面试题 1：Helm Chart 和普通 Kubernetes YAML 的核心区别是什么？
-
-**一句话结论**：普通 YAML 描述一组固定对象，Helm Chart 描述一个可参数化、可版本化、可安装和可回滚的 Kubernetes 应用包。
-
-**展开解释**：Chart 通过 `Chart.yaml` 描述包元数据，通过 `values.yaml` 暴露参数，通过 `templates/` 渲染 Kubernetes 对象。安装后 Helm 会创建 release 记录，后续 upgrade 和 rollback 都基于 release 历史执行。
-
-**深入追问**：Helm 不会替你理解业务状态。它能回滚 Deployment、Service、ConfigMap 等对象，但不能自动回滚数据库数据或外部系统变更。
-
-### 面试题 2：`version` 和 `appVersion` 有什么区别？
-
-**一句话结论**：`version` 是 Chart 包版本，`appVersion` 是应用版本。
-
-**展开解释**：修改模板、values 默认值、依赖或 Chart 行为时，应提升 `version`。应用镜像从 `v0.1.0` 升到 `v0.1.1` 时，可以同步更新 `appVersion`。两者可以相同，也可以不同，但语义不能混。
-
-**深入追问**：如果只改了 Deployment 模板的安全上下文，镜像没变，也要提升 Chart `version`，否则使用者无法区分两个包的行为差异。
-
-### 面试题 3：Helm values 的覆盖顺序是什么？
-
-**一句话结论**：Chart 默认 values 最低，多个 `-f` 文件按从左到右覆盖，命令行 `--set` 通常优先级最高。
-
-**展开解释**：团队通常把稳定默认值放在 `values.yaml`，把环境差异放在 `values-dev.yaml` 或 `values-prod.yaml`，把本地敏感值放在不提交的 `values.local.yaml`。后面的文件覆盖前面的同名字段。
-
-**深入追问**：`--set` 适合临时覆盖少量简单值；复杂结构、字符串数字、长文本或敏感值更适合 values 文件、`--set-string`、`--set-file` 或外部 Secret 管理系统。
-
-### 面试题 4：为什么 Helm rollback 不等于万能回滚？
-
-**一句话结论**：Helm rollback 只重新应用历史 revision 的 Kubernetes Manifest 和 values，不回滚集群外部状态。
-
-**展开解释**：Deployment、Service、ConfigMap 这类对象可以随 manifest 回退，但数据库迁移、PVC 数据、外部 DNS、第三方 API 配置和消息队列状态不会自动回到过去。
-
-**深入追问**：生产发布中，数据库迁移应尽量向前兼容；危险迁移需要备份、演练、灰度和独立回滚方案，不能只依赖 `helm rollback`。
-
-### 面试题 5：Chart 依赖、OCI registry 和 Helm 4 迁移要点分别是什么？
-
-**一句话结论**：Chart 依赖解决复用和组合问题，OCI registry 解决 Chart 包分发和权限管理问题，Helm 4 迁移重点关注 CLI 标志、server-side dry-run、等待策略、registry 登录格式和 digest 安装。
-
-**展开解释**：父 Chart 可以通过 `dependencies` 引用 subchart，并用 `Chart.lock` 锁定版本。打包后的 `.tgz` 可以放在传统 Helm repository，也可以推送到 OCI registry，和容器镜像使用相似的仓库权限、tag 和 digest 机制。Helm 4 推荐用 `--rollback-on-failure` 表达失败回滚，`--dry-run=server` 明确要求连接 API Server，`--wait=watcher` 使用新的等待策略，`helm registry login` 只写 registry 域名；Chart 本身仍可继续使用 `apiVersion: v2`。
-
-**深入追问**：依赖必须固定版本，不要让生产发布依赖“最新版本”。OCI 安装时如果能使用 digest，可以进一步减少同名 tag 被替换的风险。迁移生产流水线时，不能只替换命令名；还要验证 release 历史、Secret 暴露、依赖构建、OCI 凭证和准入控制行为，确保 CI 与真实集群策略一致。
-
-## 11. 本章总结
+## 9. 本章总结
 
 本篇把 Todo API 主链路从“一组 Kubernetes YAML”推进到“可版本化发布的 Helm 4 Chart 第一版”。你已经理解 Chart、Release、Values、模板、依赖和 OCI 发布的边界，也亲手完成了安装、升级、回滚、依赖更新和本地打包。
 
 更重要的是，你现在能把平台默认规则沉淀进 Chart：统一命名、统一标签、统一安全上下文、统一 RBAC、统一探针、资源限制和 values 输入校验。Helm 的价值不只是模板语法，而是让团队在可复用的发布单元上协作。
 
-## 12. 下一章衔接
+## 10. 下一章衔接
 
 第 28 篇会进入 Kustomize 多环境配置管理。我们会继续使用 Todo Platform，学习如何用 base 和 overlay 管理 dev、test、prod 的差异，并讨论 Helm values 与 Kustomize overlay 的边界：什么时候应该在 Chart 内暴露参数，什么时候应该在环境层做补丁。
 

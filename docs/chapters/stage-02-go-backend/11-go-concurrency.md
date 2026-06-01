@@ -37,9 +37,9 @@
 - 能编写并发单元测试，并用 `go test -race` 验证无数据竞争。
 - 能编写一个简单的 API 并发压测命令，观察成功率、耗时和吞吐。
 
-本篇结束时，你至少应该能成功执行：
+你至少应该能成功执行：
 
-```bash
+```bash linenums="0"
 cd ~/workspace/cloud-native-todo-platform
 go fmt ./api/...
 go test -race ./api/...
@@ -75,31 +75,18 @@ TODO_API_ADDR=127.0.0.1:18080 ./bin/todo-api
 
 并发代码要能被别人读懂。比起“为了快开很多 goroutine”，更重要的是明确：任务从哪里来、并发数怎么控制、取消信号怎么传递、结果怎么汇总、共享状态由谁保护。
 
-### 2.3 课程项目关联
+### 2.3 Todo 平台模拟案例
 
-本篇会新增：
+> Todo 平台需要统计任务状态，并提供一个轻量压测命令对运行中的 API 发起并发请求。你需要使用 goroutine、channel、context 和同步原语控制并发、取消和结果汇总。
 
-```text
-cloud-native-todo-platform/
-├── api/
-│   ├── cmd/
-│   │   └── todo-load/
-│   │       └── main.go
-│   └── internal/
-│       └── service/
-│           ├── stats_service.go
-│           └── stats_service_test.go
-```
-
-`stats_service.go` 会复用第 10 篇的 Todo Service，只依赖一个小接口读取 Todo 列表。`todo-load` 是一个轻量压测命令，用来对运行中的 Todo API 发起并发请求。第 12 篇接入 PostgreSQL 后，这个并发统计和压测命令可以继续用来验证数据库访问是否稳定。
-
+这个案例用于判断并发代码是否真的可靠：请求可以并行，但超时、取消、错误聚合和资源释放必须可控。
 ## 3. 核心概念
 
 ### 3.1 goroutine
 
 goroutine（Go 协程）是 Go 管理的轻量并发执行单元。启动 goroutine 很简单：
 
-```go
+```go linenums="0"
 go func() {
 	// work
 }()
@@ -113,7 +100,7 @@ HTTP Server 本身已经并发处理请求，所以 Handler 内部再开 gorouti
 
 channel（通道）是 goroutine 之间传递数据的管道。worker pool（工作池）常用两个 channel：
 
-```go
+```go linenums="0"
 jobs := make(chan model.Todo)
 partials := make(chan Stats)
 ```
@@ -124,7 +111,7 @@ partials := make(chan Stats)
 
 `select` 可以同时等待多个 channel。配合 `ctx.Done()`，可以让 goroutine 在请求取消或超时时尽快退出：
 
-```go
+```go linenums="0"
 select {
 case jobs <- item:
 case <-ctx.Done():
@@ -138,7 +125,7 @@ case <-ctx.Done():
 
 `context.Context`（上下文对象）用来传递请求生命周期、超时和取消信号。第 10 篇 Gin Handler 调用 service 时已经使用：
 
-```go
+```go linenums="0"
 ctx := c.Request.Context()
 ```
 
@@ -160,7 +147,7 @@ ctx := c.Request.Context()
 
 data race（数据竞争）是多个 goroutine 同时访问同一块内存，并且至少一个是写操作，且没有同步保护。它和 race condition（竞态条件）不是一回事：后者可能是业务时序错误，即使没有内存数据竞争也会发生。Go 自带 race detector（竞态检测器）：
 
-```bash
+```bash linenums="0"
 go test -race ./api/...
 ```
 
@@ -200,7 +187,7 @@ sequenceDiagram
 
 worker pool 的思路是：任务可以很多，但同时工作的 goroutine 数量固定。
 
-```text
+```text linenums="0"
 Todos -> jobs channel -> worker 1
                        -> worker 2
                        -> worker 3
@@ -227,7 +214,7 @@ Todos -> jobs channel -> worker 1
 
 只有 `latest` 快照是共享状态，需要用 `sync.RWMutex` 保护：
 
-```go
+```go linenums="0"
 s.mu.Lock()
 s.latest = stats
 s.mu.Unlock()
@@ -235,7 +222,7 @@ s.mu.Unlock()
 
 读路径使用 `RLock`：
 
-```go
+```go linenums="0"
 s.mu.RLock()
 defer s.mu.RUnlock()
 return s.latest
@@ -244,6 +231,8 @@ return s.latest
 这个边界很清楚：worker 不共享写全局变量，Service 对外共享的只有最新快照。
 
 ## 5. 手把手实验
+
+预计耗时：15 分钟阅读，45 分钟动手实验。
 
 ### 5.1 实验目标
 
@@ -261,20 +250,20 @@ return s.latest
 
 进入课程项目根目录：
 
-```bash
+```bash linenums="0"
 cd ~/workspace/cloud-native-todo-platform
 ```
 
 确认第 10 篇文件已存在：
 
-```bash
+```bash linenums="0"
 test -f api/cmd/todo-api/main.go
 test -f api/internal/handler/gin/handler.go
 ```
 
 如果你的 Ubuntu 环境还没有 C 编译器，先安装 race detector 需要的工具链：
 
-```bash
+```bash linenums="0"
 sudo apt update
 sudo apt install -y build-essential
 ```
@@ -283,13 +272,13 @@ sudo apt install -y build-essential
 
 创建本篇新增目录：
 
-```bash
+```bash linenums="0"
 mkdir -p api/cmd/todo-load api/internal/service
 ```
 
 本篇新增文件如下：
 
-```text
+```text linenums="0"
 cloud-native-todo-platform/
 └── api/
     ├── cmd/
@@ -710,43 +699,43 @@ func doRequest(ctx context.Context, client *http.Client, url string) error {
 
 格式化代码：
 
-```bash
+```bash linenums="0"
 go fmt ./api/...
 ```
 
 运行普通测试：
 
-```bash
+```bash linenums="0"
 go test ./api/...
 ```
 
 运行竞态检测：
 
-```bash
+```bash linenums="0"
 go test -race ./api/...
 ```
 
 构建压测命令：
 
-```bash
+```bash linenums="0"
 go build -o bin/todo-load ./api/cmd/todo-load
 ```
 
 启动第 10 篇 Todo API。另开一个终端执行：
 
-```bash
+```bash linenums="0"
 TODO_API_ADDR=127.0.0.1:18080 ./bin/todo-api
 ```
 
 回到当前终端，先压测健康检查接口：
 
-```bash
+```bash linenums="0"
 ./bin/todo-load -addr http://127.0.0.1:18080 -path /healthz -requests 50 -concurrency 5
 ```
 
 再压测 Todo 列表接口：
 
-```bash
+```bash linenums="0"
 ./bin/todo-load -addr http://127.0.0.1:18080 -path /api/v2/todos -requests 50 -concurrency 5
 ```
 
@@ -754,7 +743,7 @@ TODO_API_ADDR=127.0.0.1:18080 ./bin/todo-api
 
 `go test -race ./api/...` 通过时，输出类似：
 
-```text
+```text linenums="0"
 ?   	cloud-native-todo-platform/api/cmd/todo-api	[no test files]
 ?   	cloud-native-todo-platform/api/cmd/todo-load	[no test files]
 ok  	cloud-native-todo-platform/api/internal/handler/gin	1.24s
@@ -765,7 +754,7 @@ ok  	cloud-native-todo-platform/api/internal/service	1.31s
 
 压测命令输出类似：
 
-```text
+```text linenums="0"
 requests=50 concurrency=5 ok=50 failed=0 elapsed=42ms rps=1190.48
 ```
 
@@ -781,13 +770,13 @@ requests=50 concurrency=5 ok=50 failed=0 elapsed=42ms rps=1190.48
 
 验证并发统计服务无竞态：
 
-```bash
+```bash linenums="0"
 go test -race ./api/internal/service
 ```
 
 验证整个 API 项目仍然可构建：
 
-```bash
+```bash linenums="0"
 go test -race ./api/...
 go build -o bin/todo-api ./api/cmd/todo-api
 go build -o bin/todo-load ./api/cmd/todo-load
@@ -795,13 +784,13 @@ go build -o bin/todo-load ./api/cmd/todo-load
 
 验证压测命令参数检查：
 
-```bash
+```bash linenums="0"
 ./bin/todo-load -requests 0
 ```
 
 预期输出类似：
 
-```text
+```text linenums="0"
 requests must be positive
 ```
 
@@ -811,11 +800,9 @@ requests must be positive
 
 删除本篇构建产物：
 
-```bash
+```bash linenums="0"
 rm -f bin/todo-load
 ```
-
-预计耗时：15 分钟阅读，45 分钟动手实验。
 
 ## 6. 常见错误与排障
 
@@ -823,7 +810,7 @@ rm -f bin/todo-load
 
 - **现象**：
 
-  ```text
+  ```text linenums="0"
   WARNING: DATA RACE
   Write at 0x00...
   Previous read at 0x00...
@@ -832,7 +819,7 @@ rm -f bin/todo-load
 - **原因**：多个 goroutine 同时读写共享变量，没有使用锁、channel 或原子操作保护。
 - **排查**：根据 race detector 输出中的文件名和行号定位共享变量。
 
-  ```bash
+  ```bash linenums="0"
   go test -race ./api/internal/service
   ```
 
@@ -845,7 +832,7 @@ rm -f bin/todo-load
 
 - **现象**：
 
-  ```text
+  ```text linenums="0"
   go: -race requires cgo; enable cgo by setting CGO_ENABLED=1
   cgo: C compiler "gcc" not found
   ```
@@ -853,14 +840,14 @@ rm -f bin/todo-load
 - **原因**：race detector 需要 cgo 和 C 编译器。精简 Ubuntu、容器或新装环境可能没有安装 gcc。
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   go env CGO_ENABLED
   gcc --version
   ```
 
 - **修复**：
 
-  ```bash
+  ```bash linenums="0"
   sudo apt update
   sudo apt install -y build-essential
   CGO_ENABLED=1 go test -race ./api/internal/service
@@ -872,7 +859,7 @@ rm -f bin/todo-load
 
 - **现象**：
 
-  ```text
+  ```text linenums="0"
   panic: test timed out after 30s
   ```
 
@@ -881,7 +868,7 @@ rm -f bin/todo-load
 - **原因**：某个 goroutine 卡在 channel 发送或接收上，通常是没有关闭 channel，或者 producer / worker 没有在阻塞点监听 `ctx.Done()`。
 - **排查**：给测试加超时，观察卡在哪一步，并确认 producer 和 worker 都包含取消分支：
 
-  ```bash
+  ```bash linenums="0"
   go test ./api/internal/service -run TestStatsService -count=1 -timeout=5s
   grep -n "ctx.Done" api/internal/service/stats_service.go
   ```
@@ -893,14 +880,14 @@ rm -f bin/todo-load
 
 - **现象**：
 
-  ```text
+  ```text linenums="0"
   requests=50 concurrency=5 ok=0 failed=50 elapsed=... rps=...
   ```
 
 - **原因**：Todo API 没启动、端口不对、路径不对，或返回了非 2xx 状态码。
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   curl -i -s http://127.0.0.1:18080/healthz
   ```
 
@@ -908,7 +895,7 @@ rm -f bin/todo-load
 
 - **修复**：启动服务并确认端口：
 
-  ```bash
+  ```bash linenums="0"
   TODO_API_ADDR=127.0.0.1:18080 ./bin/todo-api
   ```
 
@@ -920,7 +907,7 @@ rm -f bin/todo-load
 - **原因**：并发数设置过大，超过本机 CPU、内存或服务处理能力。
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   ./bin/todo-load -addr http://127.0.0.1:18080 -path /healthz -requests 1000 -concurrency 200
   ```
 
@@ -941,89 +928,13 @@ rm -f bin/todo-load
 
 5. **context 不是万能取消器**。context 只是一种信号传递机制；下游代码必须主动监听它。数据库查询、HTTP 请求、channel 发送接收、循环任务都要显式使用带 context 的 API 或 `select` 分支。
 
-## 8. 本章小项目
+## 8. 练习题与面试题
 
-本章小项目是 **并发 Todo 统计任务执行器 + API 并发压测命令**。项目目标是在 Todo API v2 的基础上补齐并发处理能力：用 worker pool 统计 Todo 状态，用 `context` 支持取消，用 `sync.RWMutex` 保护最新快照，用 `go test -race` 验证无数据竞争，并用 `todo-load` 对 API 发起并发请求。
+本章练习题和面试题已拆分到独立页面，完成正文学习后再进入题库练习与复盘。
 
-交付物包括：
+[查看本章练习题与面试题](../../questions/stage-02-go-backend/11-go-concurrency.md)
 
-- `api/internal/service/stats_service.go`
-- `api/internal/service/stats_service_test.go`
-- `api/cmd/todo-load/main.go`
-- `bin/todo-load` 构建产物
-
-能力验收标准：
-
-- 能执行 `go test -race ./api/...` 且全部通过。
-- 能解释 worker pool 的任务分发和结果汇总流程。
-- 能说明 `ctx.Done()` 在 producer 和 worker 中分别解决什么问题。
-- 能运行 `todo-load` 并解释 `requests`、`concurrency`、`ok`、`failed`、`rps` 的含义。
-- 能指出代码中哪些共享状态由 `sync.RWMutex` 保护。
-
-## 9. 本章练习题
-
-### 9.1 基础题
-
-1. goroutine 和线程有什么关系？为什么说 goroutine 不是越多越好？
-2. `sync.Mutex` 和 `sync.RWMutex` 的区别是什么？
-3. channel 由谁关闭？为什么接收方通常不应该关闭 channel？
-4. `context.Canceled` 和 `context.DeadlineExceeded` 分别表示什么？
-5. `go test -race` 能发现什么类型的问题？
-
-### 9.2 实操题
-
-1. 给 `Stats` 增加 `CompletionRate` 字段，表示已完成 Todo 占总数的比例。验收标准：空列表时为 `0`，有数据时计算正确，`go test -race ./api/internal/service` 通过。
-2. 给 `todo-load` 增加 `-method` 参数，支持压测 `GET` 和 `POST`。验收标准：`-method GET` 行为保持不变，非法 method 返回错误；如果选择 `POST`，需要同步处理请求体和 `Content-Type`。
-3. 给 `StatsService` 增加 Benchmark。可以参考单元测试中的数据准备方式，编写 `BenchmarkStatsServiceRefresh`，在循环中调用 `Refresh(context.Background())`。验收标准：能执行 `go test ./api/internal/service -bench . -benchmem`，并解释 `ns/op` 和 `allocs/op`。
-
-### 9.3 思考题
-
-1. 如果统计任务未来要读取 PostgreSQL，你会把并发数设置为多少？它和数据库连接池有什么关系？
-2. 如果压测时 RPS 升高但错误率也升高，你会先看哪些指标和日志？
-
-## 10. 本章面试题
-
-### 面试题 1：Go HTTP Server 如何处理并发请求？
-
-**一句话结论**：Go 的 `net/http` 会为连接和请求安排 goroutine，因此同一个 Handler 可能被多个请求同时调用。
-
-**展开解释**：Gin 运行在 `net/http` 之上，所以 Gin Handler 也处在并发请求环境中。Handler 内部访问 service、repository 或共享变量时必须考虑并发安全。内存 map 要加锁，数据库连接要走连接池，后台任务要支持取消。
-
-**深入追问**：HTTP Server 的并发不等于业务逻辑自动安全。只读无共享状态通常安全；写共享内存、缓存、统计快照、全局变量时必须有同步机制。
-
-### 面试题 2：什么时候使用 channel，什么时候使用 Mutex？
-
-**一句话结论**：channel 更适合传递任务和结果，Mutex 更适合保护共享状态。
-
-**展开解释**：如果你的问题是“把 Todo 分发给多个 worker 处理”，channel 很自然；如果问题是“保护 latest stats 这个共享字段”，Mutex 或 RWMutex 更直接。不要为了使用 channel 而绕开简单清晰的锁。
-
-**深入追问**：Go 并发不是“只能用 channel”。真实项目里 channel、Mutex、atomic、context、WaitGroup 经常组合使用。选择标准是可读性、正确性和边界清晰。
-
-### 面试题 3：如何避免 goroutine 泄漏？
-
-**一句话结论**：每个 goroutine 都要有明确退出条件，并且阻塞点要能响应取消或关闭。
-
-**展开解释**：常见泄漏来自 channel 永远没人关闭、发送方没人接收、接收方等不到数据、请求取消后后台任务还在跑。解决方式包括：用 context 传递取消信号，明确 channel 关闭责任，用 WaitGroup 等待退出，给外部请求设置超时。
-
-**深入追问**：排查时可以观察 goroutine 数量、pprof goroutine dump、日志中的请求 ID 和任务生命周期。第 14 篇会进一步讲 pprof。
-
-### 面试题 4：`go test -race` 的价值和局限是什么？
-
-**一句话结论**：race detector 能发现测试运行路径上的数据竞争，但不能证明所有并发路径永远正确。
-
-**展开解释**：它会在运行时监控内存访问，发现未同步的并发读写。价值很高，尤其适合 CI 中跑核心包测试。但如果测试没有覆盖某条并发路径，race detector 就看不到那里的问题。
-
-**深入追问**：数据竞争不等于所有竞态条件。例如两个请求都通过了“库存大于 0”的判断，最后超卖，这可能没有内存数据竞争，却是业务竞态，需要事务、锁或幂等设计解决。
-
-### 面试题 5：worker pool 如何设计才适合生产？
-
-**一句话结论**：生产级 worker pool 要控制 worker 数、队列长度、超时、错误处理和关闭流程。
-
-**展开解释**：只固定 worker 数还不够。任务队列不能无限增长，任务执行要支持 context，错误要能被观测，服务关闭时要停止接收新任务并等待已有任务结束。下游是数据库或 HTTP 服务时，还要和连接池、限流、重试策略配合。
-
-**深入追问**：如果 worker 处理速度低于任务进入速度，就会积压。此时要么扩容处理能力，要么限流、降级、丢弃低优先级任务，不能让队列无限占用内存。
-
-## 11. 本章总结
+## 9. 本章总结
 
 本篇你把 Go 并发能力放进了 Todo API 的真实后端场景：理解了 HTTP Server 的并发请求模型，使用 worker pool、channel、context、WaitGroup 和 RWMutex 实现并发统计任务，并用 `go test -race` 验证无数据竞争。你还编写了 `todo-load` 命令，能用固定请求数和并发数对 API 做基础压测。
 
@@ -1031,6 +942,6 @@ rm -f bin/todo-load
 
 能力价值上，你已经能开始判断并发代码是否可控、是否会泄漏、是否有竞态、是否能在真实服务里长期运行。进入第 12 篇后，这些能力会直接迁移到 PostgreSQL 连接池、查询超时、事务边界和并发请求排障中。
 
-## 12. 下一章衔接
+## 10. 下一章衔接
 
 第 12 篇会把 Todo API 的内存存储替换为 PostgreSQL。数据库访问同样会面对并发请求、连接池、事务和超时问题；如果不理解本篇的 context、worker pool 和竞态检测，后续很容易把数据库并发问题误判为“SQL 慢”或“框架问题”。

@@ -44,16 +44,11 @@ Operator 的测试难点不在“能不能写 Go 单元测试”，而在它横�
 
 在企业内部平台中，Operator 常常由平台团队统一发布到多个环境。开发环境可以允许快速迭代；测试环境必须跑端到端验证；生产环境则需要变更审批、镜像不可变 tag、发布前 dry-run、发布后 smoke test 和明确的 rollback 命令。本篇实验会把这些动作简化成学习者能在本地完成的版本。
 
-### 2.3 课程项目关联
+### 2.3 Todo 平台模拟案例
 
-本篇继续使用第 39 篇的 `<project-root>/operator/kubebuilder/` 项目，并新增 `<project-root>/operator/helm/todo-operator/`。项目版本线推进到阶段六子版本 `v4.6-operator-release`，它仍属于 `v4.0-operator` 总版本线。
+> Todo Operator 准备发布给团队使用。你需要编写 envtest、kind 集成测试、镜像构建流程、Helm Chart 和发布校验，证明控制器在真实集群里能工作。
 
-本篇产出会被后续章节继续复用：
-
-- 第 41 篇会基于本篇的测试和发布流水线，继续做 RBAC 最小化、Watch 范围限制、性能和可观测性增强。
-- 第 42 篇会把最终 Operator 作为 Cloud Native Todo Platform 的一键交付入口。
-- 本篇新增的 `test/envtest/`、`test/e2e/` 和 `operator/helm/todo-operator/` 会成为后续生产化改造的安全网。
-
+这个案例关注发布可信度：Controller 逻辑、RBAC、Webhook、镜像、Chart 和安装流程都必须通过自动化验证。
 ## 3. 核心概念
 
 ### 3.1 Operator 测试金字塔
@@ -177,6 +172,8 @@ sequenceDiagram
 
 ## 5. 手把手实验：为 Todo Operator 建立测试和发布流水线
 
+本实验预计耗时 80-120 分钟。首次下载 envtest、cert-manager 镜像和 kind 节点镜像时会更久。
+
 ### 5.1 步骤 1：实验目标
 
 本实验会继续使用第 39 篇的 `<project-root>/operator/kubebuilder/`，并新增以下内容：
@@ -189,7 +186,7 @@ sequenceDiagram
 
 完成后，你应该能够执行：
 
-```bash
+```bash linenums="0"
 go test ./...
 make envtest
 KUBEBUILDER_ASSETS="$(pwd)/bin/k8s/1.35.0-linux-amd64" go test ./test/envtest -v
@@ -221,19 +218,19 @@ helm rollback todo-operator 1 -n todo-operator-system
 
 确认当前目录：
 
-```bash
+```bash linenums="0"
 pwd
 ```
 
 预期输出类似：
 
-```text
+```text linenums="0"
 <project-root>/operator/kubebuilder
 ```
 
 确认工具版本：
 
-```bash
+```bash linenums="0"
 go version
 docker version --format '{{.Server.Version}}'
 kubectl version --client
@@ -244,7 +241,7 @@ helm version
 
 设置本章镜像和集群名称：
 
-```bash
+```bash linenums="0"
 export OPERATOR_IMG=todo-operator:v0.3.0-test
 export KIND_NODE_IMAGE=registry.cn-guangzhou.aliyuncs.com/yleoer/node:v1.36.0
 export KIND_CLUSTER_NAME=todo-operator-e2e
@@ -252,7 +249,7 @@ export KIND_CLUSTER_NAME=todo-operator-e2e
 
 Windows PowerShell 使用下面的等价写法：
 
-```powershell
+```powershell linenums="0"
 $env:OPERATOR_IMG = "todo-operator:v0.3.0-test"
 $env:KIND_NODE_IMAGE = "registry.cn-guangzhou.aliyuncs.com/yleoer/node:v1.36.0"
 $env:KIND_CLUSTER_NAME = "todo-operator-e2e"
@@ -260,7 +257,7 @@ $env:KIND_CLUSTER_NAME = "todo-operator-e2e"
 
 如果 envtest 首次下载较慢，先执行：
 
-```bash
+```bash linenums="0"
 make envtest
 KUBEBUILDER_ASSETS="$(pwd)/bin/k8s/1.35.0-linux-amd64" go test ./test/envtest -run TestReconcileCreatesDeploymentServiceAndStatus -v
 ```
@@ -269,7 +266,7 @@ KUBEBUILDER_ASSETS="$(pwd)/bin/k8s/1.35.0-linux-amd64" go test ./test/envtest -r
 
 本章完成后，关键目录结构如下：
 
-```text
+```text linenums="0"
 operator/
 ├── kubebuilder/
 │   ├── api/
@@ -315,7 +312,7 @@ Webhook 默认值和校验逻辑是普通 Go 代码，可以先直接测试。�
 
 创建 `internal/webhook/v1alpha1/todoapp_webhook_test.go`：
 
-```go
+```go linenums="0"
 package v1alpha1
 
 import (
@@ -395,13 +392,13 @@ func TestTodoAppValidateWarnsOnPortChange(t *testing.T) {
 
 创建目录：
 
-```bash
+```bash linenums="0"
 mkdir -p test/envtest
 ```
 
 创建 `test/envtest/todoapp_envtest_test.go`：
 
-```go
+```go linenums="0"
 package envtest
 
 import (
@@ -619,33 +616,33 @@ func eventually(t *testing.T, timeout time.Duration, condition func() bool, mess
 
 先重新生成 DeepCopy、CRD、RBAC 和 Webhook 清单：
 
-```bash
+```bash linenums="0"
 make generate
 make manifests
 ```
 
 整理依赖：
 
-```bash
+```bash linenums="0"
 go mod tidy
 ```
 
 运行全部 Go 测试：
 
-```bash
+```bash linenums="0"
 go test ./...
 ```
 
 预期输出类似：
 
-```text
+```text linenums="0"
 ok  	github.com/example/todo-operator/internal/webhook/v1alpha1	0.231s
 ok  	github.com/example/todo-operator/test/envtest	8.742s
 ```
 
 如果首次运行时 envtest 二进制缺失，先执行：
 
-```bash
+```bash linenums="0"
 make envtest
 go test ./test/envtest -run TestReconcileCreatesDeploymentServiceAndStatus -v
 ```
@@ -656,13 +653,13 @@ go test ./test/envtest -run TestReconcileCreatesDeploymentServiceAndStatus -v
 
 envtest 已经验证了 Reconciler，但 Webhook 证书、Service endpoints、RBAC 和镜像运行还需要完整集群。创建目录：
 
-```bash
+```bash linenums="0"
 mkdir -p test/e2e
 ```
 
 创建 `test/e2e/run-kind-e2e.sh`：
 
-```bash
+```bash linenums="0"
 #!/usr/bin/env bash
 set -euo pipefail
 
@@ -720,8 +717,11 @@ kubectl wait --for=condition=Available deployment/todo-operator-controller-manag
 
 kubectl get certificate,issuer -n todo-operator-system
 kubectl get svc,endpoints -n todo-operator-system
+```
 
-cat > /tmp/todoapp-e2e.yaml <<'YAML'
+将下面内容写入 `/tmp/todoapp-e2e.yaml`：
+
+```yaml title="/tmp/todoapp-e2e.yaml"
 apiVersion: platform.todo.example.com/v1alpha1
 kind: TodoApp
 metadata:
@@ -731,8 +731,11 @@ spec:
   image: registry.cn-guangzhou.aliyuncs.com/yleoer/hello:plain-text
   replicas: 2
   port: 80
-YAML
+```
 
+继续执行：
+
+```bash linenums="0"
 kubectl apply -f /tmp/todoapp-e2e.yaml
 
 for i in {1..60}; do
@@ -761,8 +764,11 @@ if [[ "${phase} ${ready}" != "Ready 2" ]]; then
 fi
 echo "${phase} ${ready}"
 kubectl get deployment,service -l app.kubernetes.io/instance=todo-e2e
+```
 
-cat > /tmp/todoapp-invalid.yaml <<'YAML'
+将下面内容写入 `/tmp/todoapp-invalid.yaml`：
+
+```yaml title="/tmp/todoapp-invalid.yaml"
 apiVersion: platform.todo.example.com/v1alpha1
 kind: TodoApp
 metadata:
@@ -772,8 +778,11 @@ spec:
   image: registry.cn-guangzhou.aliyuncs.com/yleoer/nginx:latest
   replicas: 2
   port: 80
-YAML
+```
 
+继续执行：
+
+```bash linenums="0"
 if kubectl apply -f /tmp/todoapp-invalid.yaml; then
   echo "invalid TodoApp was accepted unexpectedly"
   exit 1
@@ -789,23 +798,23 @@ fi
 
 给脚本增加执行权限：
 
-```bash
+```bash linenums="0"
 chmod +x test/e2e/run-kind-e2e.sh
 ```
 
-本脚本使用 Bash here-doc 和 `chmod`，Windows 学习者建议在 Git Bash 或 WSL 中运行。如果只能使用 PowerShell，可以把脚本内容保存为 `.ps1`，并把 `cat > file <<'YAML'` 改写为 PowerShell here-string：`@' ... '@ | Set-Content file.yaml`。
+本脚本是 Bash 脚本，内部会生成临时 YAML 文件并依赖 `chmod`。Windows 学习者建议在 Git Bash 或 WSL 中运行，不要直接粘贴到 PowerShell 执行。
 
 默认情况下脚本只把 Operator 镜像加载到本地 kind 集群。若要验证远端镜像仓库，把 `OPERATOR_IMG` 设为完整仓库地址，并设置 `PUSH_IMAGE=true`；脚本会执行 `docker push` 和 `docker manifest inspect`。如果 inspect 失败，不要继续发布 Helm Chart，因为远端集群很可能会进入 `ImagePullBackOff`。
 
 运行集成测试：
 
-```bash
+```bash linenums="0"
 test/e2e/run-kind-e2e.sh
 ```
 
 预期输出中应包含：
 
-```text
+```text linenums="0"
 deployment.apps/todo-operator-controller-manager condition met
 deployment "todo-e2e" successfully rolled out
 Ready 2
@@ -821,7 +830,7 @@ Kustomize 继续作为 Kubebuilder 项目的清单源头。这里必须把清单
 
 先生成发布目录和安装清单：
 
-```bash
+```bash linenums="0"
 mkdir -p dist
 if make -n build-installer IMG="${OPERATOR_IMG}" >/dev/null 2>&1; then
   make build-installer IMG="${OPERATOR_IMG}"
@@ -836,7 +845,7 @@ fi
 
 Kubebuilder 4.x 默认 Makefile 通常包含 `build-installer` target，它会把 `IMG` 写入 manager 镜像并输出 `dist/install.yaml`。上面的命令先用 `make -n build-installer` 做 dry-run 检查；如果本地 Makefile 没有这个 target，就自动走等价的 Kustomize 渲染路径。你也可以手工执行同样的备选命令：
 
-```bash
+```bash linenums="0"
 cd config/manager
 kustomize edit set image controller="${OPERATOR_IMG}"
 cd ../..
@@ -847,19 +856,19 @@ kubectl kustomize config/default > dist/todo-operator-v0.3.0.yaml
 
 确认清单里包含本章镜像 tag：
 
-```bash
+```bash linenums="0"
 grep -n "${OPERATOR_IMG}" dist/todo-operator-v0.3.0.yaml
 ```
 
 检查清单中是否包含关键对象：
 
-```bash
+```bash linenums="0"
 grep -E "kind: (CustomResourceDefinition|Deployment|Service|MutatingWebhookConfiguration|ValidatingWebhookConfiguration|Certificate|Issuer)" dist/todo-operator-v0.3.0.yaml
 ```
 
 预期输出类似：
 
-```text
+```text linenums="0"
 kind: CustomResourceDefinition
 kind: Service
 kind: Deployment
@@ -871,7 +880,7 @@ kind: ValidatingWebhookConfiguration
 
 使用 server-side dry-run 验证清单：
 
-```bash
+```bash linenums="0"
 kubectl get crd certificates.cert-manager.io issuers.cert-manager.io
 kubectl apply --dry-run=server -f dist/todo-operator-v0.3.0.yaml
 ```
@@ -880,13 +889,13 @@ kubectl apply --dry-run=server -f dist/todo-operator-v0.3.0.yaml
 
 如果 dry-run 通过，再应用：
 
-```bash
+```bash linenums="0"
 kubectl apply -f dist/todo-operator-v0.3.0.yaml
 ```
 
 如果你执行了真实 `apply`，进入 Helm 实验前先撤销这次 Kustomize 发布，避免 Helm 接管同名资源时报冲突：
 
-```bash
+```bash linenums="0"
 kubectl delete -f dist/todo-operator-v0.3.0.yaml --ignore-not-found
 ```
 
@@ -900,7 +909,7 @@ Kustomize 适合开发和审查，因为它直接呈现 Kubebuilder 生成清单
 
 从 `operator/kubebuilder/` 创建 Chart 目录：
 
-```bash
+```bash linenums="0"
 mkdir -p ../helm/todo-operator/crds
 mkdir -p ../helm/todo-operator/templates
 cp config/crd/bases/platform.todo.example.com_todoapps.yaml ../helm/todo-operator/crds/
@@ -910,7 +919,7 @@ Helm 的 `crds/` 目录只适合安装 CRD 初始版本：安装 release 时它�
 
 创建 `../helm/todo-operator/Chart.yaml`：
 
-```yaml
+```yaml linenums="0"
 apiVersion: v2
 name: todo-operator
 description: Helm 4 Chart for the Cloud Native Todo Operator
@@ -922,7 +931,7 @@ kubeVersion: ">=1.36.0-0"
 
 创建 `../helm/todo-operator/values.yaml`：
 
-```yaml
+```yaml linenums="0"
 image:
   repository: todo-operator # ← 本地 kind 实验镜像仓库名
   tag: v0.3.0-test # ← 必须使用不可变版本 tag，生产不要使用 latest
@@ -950,7 +959,7 @@ resources:
 
 创建 `../helm/todo-operator/templates/_helpers.tpl`：
 
-```gotemplate
+```gotemplate linenums="0"
 {{- define "todo-operator.name" -}}
 todo-operator
 {{- end -}}
@@ -974,7 +983,7 @@ todo-operator
 
 创建 `../helm/todo-operator/templates/serviceaccount.yaml`：
 
-```yaml
+```yaml linenums="0"
 {{- if .Values.serviceAccount.create }}
 apiVersion: v1
 kind: ServiceAccount
@@ -989,7 +998,7 @@ metadata:
 
 创建 RBAC 模板前，先查看 Kubebuilder marker 生成的权限：
 
-```bash
+```bash linenums="0"
 make manifests
 cat config/rbac/role.yaml
 ```
@@ -998,7 +1007,7 @@ Helm Chart 中的 RBAC 应与 `config/rbac/role.yaml` 保持一致。后续如�
 
 创建 `../helm/todo-operator/templates/rbac.yaml`：
 
-```yaml
+```yaml linenums="0"
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
@@ -1042,7 +1051,7 @@ subjects:
 
 创建 `../helm/todo-operator/templates/service.yaml`：
 
-```yaml
+```yaml linenums="0"
 {{- if .Values.webhook.enabled }}
 apiVersion: v1
 kind: Service
@@ -1066,7 +1075,7 @@ spec:
 
 创建 `../helm/todo-operator/templates/deployment.yaml`：
 
-```yaml
+```yaml linenums="0"
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -1129,7 +1138,7 @@ spec:
 
 创建 `../helm/todo-operator/templates/certificate.yaml`：
 
-```yaml
+```yaml linenums="0"
 {{- if .Values.webhook.enabled }}
 apiVersion: cert-manager.io/v1
 kind: Issuer
@@ -1159,7 +1168,7 @@ spec:
 
 创建 `../helm/todo-operator/templates/webhooks.yaml`：
 
-```yaml
+```yaml linenums="0"
 {{- if .Values.webhook.enabled }}
 apiVersion: admissionregistration.k8s.io/v1
 kind: MutatingWebhookConfiguration
@@ -1211,7 +1220,7 @@ webhooks:
 
 创建 `../helm/todo-operator/templates/NOTES.txt`：
 
-```gotemplate
+```gotemplate linenums="0"
 Todo Operator has been installed.
 
 Release:
@@ -1230,14 +1239,14 @@ Create a sample TodoApp:
 
 检查 Chart：
 
-```bash
+```bash linenums="0"
 helm lint ../helm/todo-operator
 helm template todo-operator ../helm/todo-operator -n todo-operator-system --include-crds > /tmp/todo-operator-chart.yaml
 ```
 
 预期输出类似：
 
-```text
+```text linenums="0"
 1 chart(s) linted, 0 chart(s) failed
 ```
 
@@ -1247,13 +1256,13 @@ helm template todo-operator ../helm/todo-operator -n todo-operator-system --incl
 
 确保 cert-manager 已安装：
 
-```bash
+```bash linenums="0"
 kubectl get deployment -n cert-manager
 ```
 
 如果没有安装，执行：
 
-```bash
+```bash linenums="0"
 curl -L -o cert-manager.yaml https://github.com/cert-manager/cert-manager/releases/download/v1.20.0/cert-manager.yaml
 sed -i 's|quay.io/jetstack/|registry.cn-guangzhou.aliyuncs.com/yleoer/|g' cert-manager.yaml
 kubectl apply -f cert-manager.yaml
@@ -1262,27 +1271,27 @@ kubectl wait --for=condition=Available deployment --all -n cert-manager --timeou
 
 先加载 Chart 默认使用的镜像 tag：
 
-```bash
+```bash linenums="0"
 docker tag "${OPERATOR_IMG}" todo-operator:v0.3.0-test
 kind load docker-image todo-operator:v0.3.0-test --name "${KIND_CLUSTER_NAME}"
 ```
 
 安装 Operator：
 
-```bash
+```bash linenums="0"
 helm install todo-operator ../helm/todo-operator -n todo-operator-system --create-namespace
 ```
 
 等待就绪：
 
-```bash
+```bash linenums="0"
 kubectl wait --for=condition=Available deployment/todo-operator-controller-manager -n todo-operator-system --timeout=180s
 kubectl get mutatingwebhookconfiguration,validatingwebhookconfiguration | grep todo-operator
 ```
 
 模拟升级：给镜像打一个新 tag，并通过 Helm values 升级：
 
-```bash
+```bash linenums="0"
 docker tag todo-operator:v0.3.0-test todo-operator:v0.3.1-test
 kind load docker-image todo-operator:v0.3.1-test --name "${KIND_CLUSTER_NAME}"
 helm upgrade todo-operator ../helm/todo-operator -n todo-operator-system --set image.tag=v0.3.1-test
@@ -1290,13 +1299,13 @@ helm upgrade todo-operator ../helm/todo-operator -n todo-operator-system --set i
 
 查看发布历史：
 
-```bash
+```bash linenums="0"
 helm history todo-operator -n todo-operator-system
 ```
 
 预期输出类似：
 
-```text
+```text linenums="0"
 REVISION	UPDATED                 	STATUS    	CHART               	APP VERSION	DESCRIPTION
 1       	2026-05-30 10:00:00     	superseded	todo-operator-0.3.0	v0.3.0-test	Install complete
 2       	2026-05-30 10:05:00     	deployed  	todo-operator-0.3.0	v0.3.0-test	Upgrade complete
@@ -1304,19 +1313,19 @@ REVISION	UPDATED                 	STATUS    	CHART               	APP VERSION	DE
 
 回滚到上一版：
 
-```bash
+```bash linenums="0"
 helm rollback todo-operator 1 -n todo-operator-system
 ```
 
 验证镜像 tag 已回到旧版本：
 
-```bash
+```bash linenums="0"
 kubectl get deployment todo-operator-controller-manager -n todo-operator-system -o jsonpath='{.spec.template.spec.containers[0].image}{"\n"}'
 ```
 
 预期输出：
 
-```text
+```text linenums="0"
 todo-operator:v0.3.0-test
 ```
 
@@ -1326,25 +1335,25 @@ todo-operator:v0.3.0-test
 
 本小节的目标是建立发布前 checklist，尤其是 CRD 兼容性检查。本章不引入真实 `v1beta1`，而是建立升级前必须跑的检查流程。先保存当前 CRD：
 
-```bash
+```bash linenums="0"
 kubectl get crd todoapps.platform.todo.example.com -o yaml > /tmp/todoapps-crd-before.yaml
 ```
 
 验证旧样例仍然能通过 server-side dry-run：
 
-```bash
+```bash linenums="0"
 kubectl apply --dry-run=server -f config/samples/platform_v1alpha1_todoapp.yaml
 ```
 
 查看存储版本：
 
-```bash
+```bash linenums="0"
 kubectl get crd todoapps.platform.todo.example.com -o jsonpath='{.status.storedVersions}{"\n"}'
 ```
 
 单版本课程实验中，预期输出类似：
 
-```text
+```text linenums="0"
 ["v1alpha1"]
 ```
 
@@ -1358,7 +1367,7 @@ kubectl get crd todoapps.platform.todo.example.com -o jsonpath='{.status.storedV
 
 发布前建议把下面这份 checklist 放进 PR 描述或发布单：
 
-```text
+```text linenums="0"
 - go test ./... 通过
 - test/e2e/run-kind-e2e.sh 通过
 - make manifests 后无未提交 diff
@@ -1372,7 +1381,7 @@ kubectl get crd todoapps.platform.todo.example.com -o jsonpath='{.status.storedV
 
 一个最小 GitHub Actions 示例可以写成这样。示例假设 runner 已经提供 Helm 4；如果你的 CI 环境没有 Helm，需要先用团队认可的安装步骤固定到 `4.2.x`。
 
-```yaml
+```yaml linenums="0"
 name: operator-test
 
 on:
@@ -1408,31 +1417,29 @@ jobs:
 
 删除 Helm release：
 
-```bash
+```bash linenums="0"
 helm uninstall todo-operator -n todo-operator-system
 ```
 
 删除命名空间：
 
-```bash
+```bash linenums="0"
 kubectl delete namespace todo-operator-system --ignore-not-found
 ```
 
 删除 kind 集群：
 
-```bash
+```bash linenums="0"
 kind delete cluster --name "${KIND_CLUSTER_NAME}"
 ```
 
 删除临时文件：
 
-```bash
+```bash linenums="0"
 rm -f /tmp/todoapp-e2e.yaml /tmp/todoapp-invalid.yaml /tmp/todo-operator-chart.yaml /tmp/todoapps-crd-before.yaml
 ```
 
 如果希望保留集成测试集群继续调试，可以不删除 kind 集群，但要至少卸载 Helm release 和测试 `TodoApp`，避免下一轮实验受旧资源影响。
-
-本实验预计耗时 80-120 分钟。首次下载 envtest、cert-manager 镜像和 kind 节点镜像时会更久。
 
 ## 6. 常见错误与排障
 
@@ -1440,7 +1447,7 @@ rm -f /tmp/todoapp-e2e.yaml /tmp/todoapp-invalid.yaml /tmp/todo-operator-chart.y
 
 - **现象**：
 
-  ```text
+  ```text linenums="0"
   unable to start control plane itself: failed to start the controlplane
   fork/exec .../kube-apiserver: no such file or directory
   ```
@@ -1448,7 +1455,7 @@ rm -f /tmp/todoapp-e2e.yaml /tmp/todoapp-invalid.yaml /tmp/todo-operator-chart.y
 - **原因**：envtest 需要本地 Kubernetes API server 和 etcd 二进制。Kubebuilder 项目通常通过 `make envtest` 下载，如果首次下载失败或版本缓存损坏，就会出现这个错误。
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   make envtest
   find bin -name kube-apiserver -o -name etcd
   ```
@@ -1460,14 +1467,14 @@ rm -f /tmp/todoapp-e2e.yaml /tmp/todoapp-invalid.yaml /tmp/todo-operator-chart.y
 
 - **现象**：
 
-  ```text
+  ```text linenums="0"
   no matches for kind "TodoApp" in version "platform.todo.example.com/v1alpha1"
   ```
 
 - **原因**：测试启动时没有找到 CRD 文件，或者 `make manifests` 没有生成最新 CRD。
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   ls config/crd/bases
   grep -n "kind: CustomResourceDefinition" config/crd/bases/platform.todo.example.com_todoapps.yaml
   ```
@@ -1479,21 +1486,21 @@ rm -f /tmp/todoapp-e2e.yaml /tmp/todoapp-invalid.yaml /tmp/todo-operator-chart.y
 
 - **现象**：
 
-  ```text
+  ```text linenums="0"
   failed calling webhook "vtodoapp-v1alpha1.kb.io":
   Post "https://todo-operator-webhook-service...": no endpoints available for service
   ```
 
   或：
 
-  ```text
+  ```text linenums="0"
   x509: certificate signed by unknown authority
   ```
 
 - **原因**：Controller Manager Pod 没有 Ready、Webhook Service 没有 endpoints、cert-manager 还没注入 CA，或者 Helm/Kustomize 中证书 DNS 名称与 Service 不匹配。
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   kubectl get pods -n todo-operator-system
   kubectl get svc,endpoints -n todo-operator-system
   kubectl get certificate,issuer -n todo-operator-system
@@ -1507,7 +1514,7 @@ rm -f /tmp/todoapp-e2e.yaml /tmp/todoapp-invalid.yaml /tmp/todo-operator-chart.y
 
 - **现象**：
 
-  ```text
+  ```text linenums="0"
   rendered manifests contain a resource that already exists
   CustomResourceDefinition "todoapps.platform.todo.example.com" exists and cannot be imported into the current release
   ```
@@ -1515,7 +1522,7 @@ rm -f /tmp/todoapp-e2e.yaml /tmp/todoapp-invalid.yaml /tmp/todo-operator-chart.y
 - **原因**：CRD 可能已经由 Kustomize、`make install` 或旧 Helm release 安装。Helm 对 CRD 的生命周期管理比较谨慎：`crds/` 目录中的 CRD 会在安装时先创建，但不会像普通模板一样被 Helm 自动升级或删除，因此不应该用普通模板强行覆盖生产 CRD。
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   kubectl get crd todoapps.platform.todo.example.com -o jsonpath='{.metadata.labels}{"\n"}'
   helm list -A | grep todo-operator
   ```
@@ -1527,7 +1534,7 @@ rm -f /tmp/todoapp-e2e.yaml /tmp/todoapp-invalid.yaml /tmp/todo-operator-chart.y
 
 - **现象**：
 
-  ```text
+  ```text linenums="0"
   The TodoApp "todo-platform" is invalid:
   spec.someNewField: Forbidden: unknown field
   ```
@@ -1535,7 +1542,7 @@ rm -f /tmp/todoapp-e2e.yaml /tmp/todoapp-invalid.yaml /tmp/todo-operator-chart.y
 - **原因**：你回滚了 Controller，但 CRD schema 或用户对象已经包含新版本字段。Controller 回滚不等于 API 契约回滚。
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   helm history todo-operator -n todo-operator-system
   kubectl get crd todoapps.platform.todo.example.com -o jsonpath='{.status.storedVersions}{"\n"}'
   kubectl get todoapp -A -o yaml | grep -n "someNewField"
@@ -1556,97 +1563,13 @@ rm -f /tmp/todoapp-e2e.yaml /tmp/todoapp-invalid.yaml /tmp/todo-operator-chart.y
 
 5. **Helm release 记录不是完整审计**。Helm 能记录模板资源的安装、升级和回滚，但镜像仓库、CRD 迁移、外部证书、集群策略和人工审批也要纳入发布记录。企业环境通常还会把 `helm template` 输出、镜像 digest、测试报告和审批单一起归档。
 
-## 8. 本章小项目
+## 8. 练习题与面试题
 
-本章小项目是完成 `<project-root>/operator/kubebuilder/` 的测试发布流水线，并新增 `<project-root>/operator/helm/todo-operator/` Chart。
+本章练习题和面试题已拆分到独立页面，完成正文学习后再进入题库练习与复盘。
 
-你需要交付：
+[查看本章练习题与面试题](../../questions/stage-06-platform-operator/40-operator-test-release.md)
 
-- Webhook 默认值和校验测试。
-- envtest Reconciler 测试。
-- kind 端到端集成测试脚本。
-- Kustomize 渲染发布清单。
-- Helm 4 Chart。
-- 升级和回滚验证记录。
-
-验收标准：
-
-| 验收项 | 判断方式 |
-|---|---|
-| Webhook 测试 | `go test ./internal/webhook/...` 通过 |
-| envtest | `KUBEBUILDER_ASSETS=... go test ./test/envtest -v` 通过 |
-| kind 集成测试 | `test/e2e/run-kind-e2e.sh` 成功退出 |
-| 镜像发布 | `docker build` 和 `kind load` 成功 |
-| Kustomize 清单 | `kubectl apply --dry-run=server -f dist/todo-operator-v0.3.0.yaml` 通过 |
-| Helm Chart | `helm lint`、`helm install`、`helm upgrade`、`helm rollback` 通过 |
-| CRD 兼容性 | 旧样例 server-side dry-run 通过，`storedVersions` 可解释 |
-
-项目完成后，版本线可以标记为 `v4.6-operator-release`。
-
-## 9. 练习题
-
-### 基础题
-
-1. `envtest` 和 fake client 的核心差异是什么？为什么 Operator 测试不能只依赖 fake client？
-2. kind 集成测试比 envtest 多验证了哪些内容？
-3. 为什么 Webhook 默认值和校验逻辑可以先做直接 Go 测试？
-4. Operator 发布清单通常包含哪些资源？这些资源的安装顺序为什么重要？
-5. 为什么 CRD 回滚比 Deployment 回滚更危险？
-
-### 实操题
-
-1. 为 `ValidateCreate` 增加一个测试：当 `replicas=0` 时必须被拒绝，并检查错误信息包含 `replicas must be between 1 and 10`。
-2. 修改 envtest 用例，验证 `TodoApp` 创建后 Deployment 的 `labels` 包含 `app.kubernetes.io/managed-by=todo-operator`。
-3. 给 `run-kind-e2e.sh` 增加扩缩容验证：把 `replicas` 从 2 改为 3，确认 Deployment 最终 Ready 副本数为 3。
-
-### 思考题
-
-1. 如果生产集群禁止安装 cert-manager，你会如何调整 Operator Webhook 证书发布方案？
-2. 如果一个 CRD 新版本把 `spec.image` 拆成 `spec.image.repository` 和 `spec.image.tag`，你会如何设计兼容性测试和回滚策略？
-
-## 10. 面试题
-
-### 面试题 1：Operator 的 envtest 主要测试什么？
-
-**一句话结论**：envtest 用真实 API server 和 etcd 测试 CRD、status subresource 和 Reconciler 与 Kubernetes API 的交互。
-
-**展开解释**：它比 fake client 更接近真实集群，能发现 CRD 未安装、schema 不匹配、status 更新路径错误和 deletionTimestamp 语义问题。但它不会调度 Pod，也不会验证镜像拉取和 Service 网络，所以还需要 kind 或真实集群集成测试。
-
-**深入追问**：什么时候不用 envtest？纯函数、字段解析、默认值 helper 可以用普通 Go 单元测试；完整部署链路应该用 kind 或真实集群。
-
-### 面试题 2：为什么 Operator 需要 kind 集成测试？
-
-**一句话结论**：因为 Operator 的关键风险很多发生在真实集群环境里，例如 RBAC、Webhook Service、证书、镜像和 Deployment rollout。
-
-**展开解释**：envtest 可以证明 Reconciler 逻辑大体正确，但不能证明 manager Pod 能启动、Webhook Service 有 endpoints、cert-manager 能注入 CA、镜像能拉取、RBAC 权限足够。kind 集成测试用本地真实集群把这些环节串起来。
-
-**深入追问**：kind 测试应该放在每次提交吗？小项目可以放在 PR；大型项目通常把快速单元测试放在每次提交，把 kind 集成测试放在 PR、夜间构建或发布候选阶段。
-
-### 面试题 3：Helm 发布 Operator 时，CRD 应该怎么处理？
-
-**一句话结论**：CRD 应该被当成 API 契约独立管理，不能只依赖普通 Helm 模板升级回滚。
-
-**展开解释**：CRD 影响所有用户对象和 API server 行为。新增字段、改变 schema、切换 storage version 都可能影响已有 CR。实践中常把 CRD 放在 Chart 的 `crds/` 目录或独立发布包中，升级前先做 server-side dry-run 和兼容性检查。
-
-**深入追问**：回滚时能不能直接回滚 CRD？不能盲目回滚。必须先确认没有新字段对象、没有新 storage version 依赖，并评估旧 Controller 是否能兼容当前 CRD。
-
-### 面试题 4：Operator 发布前你会检查哪些内容？
-
-**一句话结论**：检查测试、镜像、清单、权限、Webhook、CRD 兼容性和回滚路径。
-
-**展开解释**：具体包括 `go test ./...`、envtest、kind 集成测试、镜像 digest、`make manifests` 是否同步、RBAC 是否最小且足够、Webhook 证书和 endpoints 是否正常、旧 CR dry-run 是否通过、Helm `lint/template/install/upgrade/rollback` 是否通过。
-
-**深入追问**：如果只能选一个发布后 smoke test？创建一个最小 `TodoApp`，确认默认值、Deployment/Service、status Ready、Event 和删除清理都正常。
-
-### 面试题 5：为什么 Operator 回滚不能只看 Helm revision？
-
-**一句话结论**：Helm revision 只能说明模板资源回到了某个版本，不能自动证明 CRD、用户对象和外部状态都回到了兼容状态。
-
-**展开解释**：Operator 管理的是长期存在的 API 对象。升级期间用户可能已经创建了带新字段的 CR，CRD status 中可能出现新 storedVersions，外部资源也可能被新 Controller 调谐过。回滚需要同时考虑 Controller、CRD、CR 实例和外部副作用。
-
-**深入追问**：怎么降低回滚风险？保持字段向后兼容，先发布能读旧字段和新字段的 Controller，CRD 变更单独审批，发布前后都跑兼容性测试。
-
-## 11. 本章总结
+## 9. 本章总结
 
 本篇把 Todo Operator 从“功能完成”推进到“可测试、可发布、可升级”。知识上，你理解了 Operator 测试金字塔：直接 Go 测试保护默认值和校验逻辑，envtest 保护 API server 交互和 Reconciler 行为，kind 集成测试保护 Webhook、RBAC、镜像和真实集群部署链路。
 
@@ -1654,7 +1577,7 @@ rm -f /tmp/todoapp-e2e.yaml /tmp/todoapp-invalid.yaml /tmp/todo-operator-chart.y
 
 能力上，你已经不只是会写 Controller，而是能以平台工程视角回答“这个 Operator 能不能上线”。你知道上线前要测什么，发布时要按什么顺序，回滚时哪些东西不能随便动。这是从开发 Operator 走向维护 Operator 的关键一步。
 
-## 12. 下一章衔接
+## 10. 下一章衔接
 
 下一篇第 41 篇会基于本篇 `operator/kubebuilder/` 和 `operator/helm/todo-operator/` 继续推进 Operator 生产实践。我们会把 RBAC 从“能跑通”收敛到最小权限，增加 Watch 范围控制、资源限制、指标暴露、日志策略和性能优化。
 

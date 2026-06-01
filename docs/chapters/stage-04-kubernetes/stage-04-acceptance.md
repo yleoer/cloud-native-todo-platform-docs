@@ -23,7 +23,7 @@
 
 建议在应用仓库中形成以下结构：
 
-```text
+```text linenums="0"
 cloud-native-todo-platform/
 ├── api/
 │   ├── Dockerfile
@@ -74,7 +74,7 @@ cloud-native-todo-platform/
 
 从干净环境验收时，按下面顺序执行：
 
-```bash
+```bash linenums="0"
 kubectl config current-context
 kubectl get nodes -o wide
 kubectl get namespace
@@ -94,7 +94,7 @@ docker image inspect todo-api:v0.1.0
 
 交付收束验证建议按下面顺序执行：
 
-```bash
+```bash linenums="0"
 helm lint deployments/helm/todo-platform
 helm template todo-platform deployments/helm/todo-platform \
   -n todo-helm-lab \
@@ -123,7 +123,7 @@ kubectl apply --dry-run=server -k deployments/kustomize/overlays/prod
 | `todo-helm-lab` | 第 27 篇 | Helm release 生命周期实验 | 删除前可先保留 `helm history`、`helm get manifest` 输出作为作品集记录 |
 | `todo-dev` / `todo-test` / `todo-prod` | 第 28 篇 | Kustomize 三套环境 overlay | 删除前确认没有正在演示的多环境资源 |
 
-```bash
+```bash linenums="0"
 kubectl delete namespace todo-dev todo-test todo-prod --ignore-not-found
 kubectl delete namespace todo-helm-lab todo-security-lab todo-network-lab --ignore-not-found
 kubectl delete namespace todo-workloads traefik --ignore-not-found
@@ -133,7 +133,7 @@ kind delete cluster --name todo-k8s
 
 本地文件清理按需执行：
 
-```bash
+```bash linenums="0"
 rm -rf deployments/k8s-base
 rm -rf deployments/k8s-network
 rm -rf deployments/k8s-security
@@ -168,7 +168,7 @@ rm -rf deployments/kustomize
 
 出版前至少完成：
 
-```bash
+```bash linenums="0"
 mkdocs build --strict
 ```
 

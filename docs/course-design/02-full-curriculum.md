@@ -1,8 +1,8 @@
 # 完整课程目录
 
-综合项目主线：**Cloud Native Todo Platform 云原生 Todo 平台**
+贯穿模拟案例：**Cloud Native Todo Platform 云原生 Todo 平台**
 
-> **配套设计文档**：[00 章节写作规范](00-chapter-writing-standard.md) | [01 课程蓝图](01-course-blueprint.md) | [03 项目主线设计](03-project-mainline-cloud-native-todo-platform.md)
+> **配套设计文档**：[00 章节写作规范](00-chapter-writing-standard.md) | [01 课程蓝图](01-course-blueprint.md) | [03 Todo 平台模拟案例设计](03-project-mainline-cloud-native-todo-platform.md)
 
 最终形成：
 
@@ -22,9 +22,9 @@
 
 ---
 
-## 项目版本演进路线
+## 阶段性作品演进路线
 
-学习者在每篇完成一个可独立验收的项目版本，逐步构建完整平台：
+Todo 平台用于承载各篇真实工作场景。课程不再要求每篇都交付独立项目版本，而是在关键阶段形成可验收的综合作品：
 
 ```text
 Todo CLI（篇 7）
@@ -58,7 +58,7 @@ Todo Operator（篇 34-42）
   │  CRD → 手写 Controller → Kubebuilder → Webhook/Finalizer → 生产实践
 ```
 
-每个版本可独立运行、独立验收，代码在同一 git 仓库中按目录组织。
+这些阶段性作品可独立运行、独立验收。各篇课程的 `2.3 Todo 平台模拟案例` 负责说明当篇技术如何落入当前业务或工程场景。
 
 ---
 
@@ -74,7 +74,7 @@ Todo Operator（篇 34-42）
 
 **大篇学习目标**
 
-建立完整学习地图，理解课程项目演进路线，准备 Go、Docker、Kubernetes、Operator 开发所需环境，掌握 YAML 语法基础。
+建立完整学习地图，理解 Todo 平台模拟案例的阶段性演进，准备 Go、Docker、Kubernetes、Operator 开发所需环境，掌握 YAML 语法基础。
 
 **章节列表**
 
@@ -85,7 +85,7 @@ Todo Operator（篇 34-42）
 - 1.5 安装 Go、Git、Docker、kubectl、kind、Helm
 - 1.6 版本环境锁定与 `check-env.sh` 检查脚本
 
-**本篇特色项目**
+**本篇模拟案例**
 
 搭建统一实验环境，初始化 `cloud-native-todo-platform` 仓库，运行环境检查脚本确认所有工具版本一致。
 
@@ -109,7 +109,7 @@ Todo Operator（篇 34-42）
 - 2.4 文本查看、搜索与处理命令
 - 2.5 压缩、解压、软链接与环境变量
 
-**本篇特色项目**
+**本篇模拟案例**
 
 搭建 Todo 平台服务器目录结构，创建日志、配置、数据目录并设置权限。
 
@@ -133,7 +133,7 @@ Todo Operator（篇 34-42）
 - 3.4 软件包管理：apt、yum、dnf
 - 3.5 CPU、内存、磁盘基础排查
 
-**本篇特色项目**
+**本篇模拟案例**
 
 将一个简单 Go HTTP 程序注册为 Linux systemd 服务。
 
@@ -158,7 +158,7 @@ Todo Operator（篇 34-42）
 - 4.5 防火墙、监听地址与端口冲突
 - 4.6 tcpdump 抓包入门
 
-**本篇特色项目**
+**本篇模拟案例**
 
 编写并排查一个本地 Todo HTTP 服务访问链路，用 curl 构造请求、用 tcpdump 观察数据包。
 
@@ -181,9 +181,9 @@ Todo Operator（篇 34-42）
 - 5.3 GitHub / GitLab 远程仓库与 Pull Request 工作流
 - 5.4 tag、stash 与版本发布
 
-**本篇特色项目**
+**本篇模拟案例**
 
-为课程项目建立 Git 分支模型和提交规范，完成一次完整的 PR 工作流演练。
+为 Todo 平台模拟仓库建立 Git 分支模型和提交规范，完成一次完整的 PR 工作流演练。
 
 **本篇能力验收标准**
 
@@ -204,7 +204,7 @@ Todo Operator（篇 34-42）
 - 6.3 编写项目启动、健康检查和清理脚本
 - 6.4 Shell 脚本常见问题与环境变量管理
 
-**本篇特色项目**
+**本篇模拟案例**
 
 为 Todo 平台编写 `dev.sh`、`check.sh`、`clean.sh` 脚本，实现一键启动/检查/清理。
 
@@ -236,7 +236,7 @@ Todo Operator（篇 34-42）
 - 7.4 interface、error 与 defer
 - 7.5 Go module 与包管理（含 replace、vendor、indirect 依赖）
 
-**本篇特色项目**
+**本篇模拟案例**
 
 开发命令行版 Todo 管理器 `todo-cli`，支持增删改查，内存存储。
 
@@ -260,7 +260,7 @@ Todo Operator（篇 34-42）
 - 8.4 单元测试、表驱动测试与 Mock
 - 8.5 集成测试、覆盖率与 Benchmark
 
-**本篇特色项目**
+**本篇模拟案例**
 
 搭建 Todo 平台后端工程骨架，编写首个单元测试。
 
@@ -283,7 +283,7 @@ Todo Operator（篇 34-42）
 - 9.3 JSON 序列化、请求绑定与基础参数校验
 - 9.4 中间件模式：请求日志、恢复 panic、链路追踪
 
-**本篇特色项目**
+**本篇模拟案例**
 
 用 net/http 标准库实现 Todo API v1（内存存储），包含 CRUD 接口和基础中间件。
 
@@ -307,7 +307,7 @@ Todo Operator（篇 34-42）
 - 10.4 参数校验、错误码与异常处理
 - 10.5 健康检查、优雅关闭与 OpenAPI 文档生成
 
-**本篇特色项目**
+**本篇模拟案例**
 
 用 Gin 重构 Todo API v2，对比标准库版本理解框架价值。
 
@@ -332,7 +332,7 @@ Todo Operator（篇 34-42）
 - 11.5 并发安全与竞态检测（`go test -race`）
 - 11.6 HTTP Server 中的并发模式实战（优雅关闭、worker pool）
 
-**本篇特色项目**
+**本篇模拟案例**
 
 开发并发 Todo 统计任务执行器，支持超时取消、并发数控制；对 Todo API 做并发压测并分析竞态问题。
 
@@ -356,7 +356,7 @@ Todo Operator（篇 34-42）
 - 12.4 事务、隔离级别与数据一致性
 - 12.5 数据库迁移与版本管理
 
-**本篇特色项目**
+**本篇模拟案例**
 
 为 Todo API v3 接入 PostgreSQL 持久化，编写迁移脚本和事务逻辑。
 
@@ -380,7 +380,7 @@ Todo Operator（篇 34-42）
 - 13.4 分布式锁、计数器与接口限流
 - 13.5 简单任务队列与异步处理模型
 
-**本篇特色项目**
+**本篇模拟案例**
 
 为 Todo API v4 增加缓存、接口限流和异步统计任务。
 
@@ -406,7 +406,7 @@ Todo Operator（篇 34-42）
 - 14.6 服务启动、优雅关闭与运维命令设计
 - 14.7 Go pprof 性能分析入门（CPU profile、heap profile、goroutine profile）
 
-**本篇特色项目**
+**本篇模拟案例**
 
 将 Todo 平台升级为 Todo API v5 生产风格 API 服务。
 
@@ -452,7 +452,7 @@ Todo Operator（篇 34-42）
 - 15.4 Docker 数据卷与端口映射
 - 15.5 Docker 网络基础
 
-**本篇特色项目**
+**本篇模拟案例**
 
 使用 Docker 运行 Todo API、PostgreSQL、Redis，验证容器间网络通信。
 
@@ -477,7 +477,7 @@ Todo Operator（篇 34-42）
 - 16.5 镜像版本、标签和推送仓库
 - 16.6 镜像调试与优化工具（dive 分析镜像层、hadolint 检查 Dockerfile、trivy 漏洞扫描）
 
-**本篇特色项目**
+**本篇模拟案例**
 
 为 Todo 平台构建安全、小体积、可发布的 Go 服务镜像。
 
@@ -501,7 +501,7 @@ Todo Operator（篇 34-42）
 - 17.4 本地开发、测试、调试工作流
 - 17.5 Compose 常见故障排查
 
-**本篇特色项目**
+**本篇模拟案例**
 
 一条命令启动 Todo Platform 完整本地环境（API + PostgreSQL + Redis + Traefik）。
 
@@ -525,7 +525,7 @@ Todo Operator（篇 34-42）
 - 18.4 UnionFS 与镜像分层原理
 - 18.5 手动模拟一个简化容器
 
-**本篇特色项目**
+**本篇模拟案例**
 
 用 Linux 命令（`unshare`、`nsenter`、cgroup v2）手动模拟容器隔离与资源限制，`cgcreate` 作为 cgroup v1 历史对照。
 
@@ -549,7 +549,7 @@ Todo Operator（篇 34-42）
 - 19.4 CRI、crictl 与 Kubernetes 运行时接口
 - 19.5 Docker、containerd、nerdctl、cri-o 的关系与演进
 
-**本篇特色项目**
+**本篇模拟案例**
 
 使用 `crictl` 和 `ctr` 观察 Todo 平台容器运行状态，并用 `nerdctl` 作为 Docker 风格命令的可选对照。
 
@@ -595,7 +595,7 @@ Todo Operator（篇 34-42）
 - 20.4 使用 kind 搭建本地集群
 - 20.5 kubectl、kubeconfig 与资源操作基础
 
-**本篇特色项目**
+**本篇模拟案例**
 
 搭建本地 Kubernetes 集群并部署第一个测试应用。
 
@@ -619,7 +619,7 @@ Todo Operator（篇 34-42）
 - 21.4 DaemonSet 与节点级服务
 - 21.5 Probe（liveness/readiness/startup）、Resource Request/Limit 与 HPA 基础
 
-**本篇特色项目**
+**本篇模拟案例**
 
 将 Todo API 部署为 Kubernetes Deployment，配置存活探针和就绪探针，验证滚动更新和回滚。
 
@@ -644,7 +644,7 @@ Todo Operator（篇 34-42）
 - 22.5 社区 Ingress NGINX 配置方式与迁移路径（了解）
 - 22.6 TLS 证书基础与 HTTPS 终止
 
-**本篇特色项目**
+**本篇模拟案例**
 
 为 Todo Platform 配置 Service、Traefik Ingress 和 HTTPS 访问，同时对比 Gateway API 的配置方式。
 
@@ -668,7 +668,7 @@ Todo Operator（篇 34-42）
 - 23.4 配置文件变更触发 Pod 重启策略
 - 23.5 Secret 安全进阶：etcd 加密、外部 Secret 管理（Sealed Secrets）
 
-**本篇特色项目**
+**本篇模拟案例**
 
 将 Todo Platform 的 dev/test/prod 配置迁移到 ConfigMap 和 Secret，验证配置热更新。
 
@@ -692,7 +692,7 @@ Todo Operator（篇 34-42）
 - 24.4 PostgreSQL 在 Kubernetes 中的部署方式
 - 24.5 数据备份、恢复与迁移注意事项
 
-**本篇特色项目**
+**本篇模拟案例**
 
 将 Todo Platform 数据库迁移到 Kubernetes PVC 持久化方案，验证 Pod 重建后数据完整性。
 
@@ -717,7 +717,7 @@ Todo Operator（篇 34-42）
 - 25.5 kube-proxy IPVS 模式（了解·K8s 1.36 已移除，旧集群仍在使用）
 - 25.6 NetworkPolicy 与服务间网络隔离
 
-**本篇特色项目**
+**本篇模拟案例**
 
 为 Todo Platform 设计网络访问路径和命名空间隔离策略，验证 NetworkPolicy 拒绝非授权流量。
 
@@ -742,7 +742,7 @@ Todo Operator（篇 34-42）
 - 26.5 Pod Security Standards（baseline/restricted）与最小权限原则
 - 26.6 Secret 安全、镜像拉取密钥与私有仓库
 
-**本篇特色项目**
+**本篇模拟案例**
 
 为 Todo Platform 制定最小权限部署方案：专用 ServiceAccount、非 root 容器、Restricted Pod Security。
 
@@ -766,7 +766,7 @@ Todo Operator（篇 34-42）
 - 27.4 Helm install、upgrade、rollback 与 release 记录
 - 27.5 Chart 依赖（subchart）、版本管理和 OCI 仓库发布
 
-**本篇特色项目**
+**本篇模拟案例**
 
 将 Todo Platform 打包为 Helm 4 Chart，实现一条命令安装和升级。
 
@@ -789,7 +789,7 @@ Todo Operator（篇 34-42）
 - 28.3 ConfigMapGenerator 与 SecretGenerator
 - 28.4 镜像版本替换与 Helm / Kustomize 使用边界
 
-**本篇特色项目**
+**本篇模拟案例**
 
 为 Todo Platform 建立 dev、test、prod 三套 Kustomize overlay 环境配置。
 
@@ -837,7 +837,7 @@ Todo Operator（篇 34-42）
 - 29.4 自动构建并推送 Docker 镜像（多阶段构建 + 镜像标签策略）
 - 29.5 自动部署到 Kubernetes 环境（更新 Deployment 镜像版本）
 
-**本篇特色项目**
+**本篇模拟案例**
 
 为 Todo Platform 建立完整 CI/CD 流水线：push 代码 → 自动测试 → 构建镜像 → 推送仓库 → 更新 K8s。
 
@@ -861,7 +861,7 @@ Todo Operator（篇 34-42）
 - 30.4 自动同步、手动同步、回滚与配置漂移检测
 - 30.5 多环境、多集群发布策略（ApplicationSet）
 
-**本篇特色项目**
+**本篇模拟案例**
 
 使用 Argo CD 管理 Todo Platform 的 dev 和 prod 两套 Kubernetes 环境发布。
 
@@ -885,7 +885,7 @@ Todo Operator（篇 34-42）
 - 31.4 PromQL 实战（上）：瞬时向量、范围向量、聚合运算
 - 31.5 PromQL 实战（下）：rate、histogram_quantile、recording rules 与 Grafana 面板
 
-**本篇特色项目**
+**本篇模拟案例**
 
 为 Todo Platform 建立 API 延迟（P50/P95/P99）、错误率、QPS、资源使用监控面板，配置 P95 延迟超过 500ms 的告警规则。
 
@@ -910,7 +910,7 @@ Todo Operator（篇 34-42）
 - 32.5 Jaeger / Grafana Tempo 快速上手（了解）
 - 32.6 日志、指标、链路追踪联合排障（通过 request_id 关联）
 
-**本篇特色项目**
+**本篇模拟案例**
 
 为 Todo Platform 接入 Loki 日志采集和 OpenTelemetry 请求链路追踪，快速部署 Jaeger 或 Grafana Tempo 查看 Trace 瀑布图，通过 request_id 在日志和 Trace 之间跳转排查一次慢请求。
 
@@ -934,7 +934,7 @@ Todo Operator（篇 34-42）
 - 33.4 PVC 挂载失败、StorageClass 不匹配与存储故障排查
 - 33.5 Kubernetes 调试工具链（k9s 交互式管理、stern 多 Pod 日志、kubectl debug 临时容器）
 
-**本篇特色项目**
+**本篇模拟案例**
 
 Todo Platform 故障注入与恢复演练：模拟 OOMKilled、DNS 中断、PVC 挂载失败，按照标准流程排查并修复。
 
@@ -966,7 +966,7 @@ Todo Platform 故障注入与恢复演练：模拟 OOMKilled、DNS 中断、PVC 
 - 34.4 CRD 的作用和基本结构
 - 34.5 自定义资源状态设计思想（spec 是输入，status 是输出）
 
-**本篇特色项目**
+**本篇模拟案例**
 
 设计 Todo 平台的 `TodoApp` 自定义资源模型（spec 描述期望的平台配置，status 反映实际运行状态）。
 
@@ -990,7 +990,7 @@ Todo Platform 故障注入与恢复演练：模拟 OOMKilled、DNS 中断、PVC 
 - 35.4 CRD 版本升级（v1alpha1 → v1beta1 → v1）与兼容性
 - 35.5 使用 kubectl 操作自定义资源（create、get、describe、edit、delete）
 
-**本篇特色项目**
+**本篇模拟案例**
 
 实现 `TodoApp`、`TodoDatabase`、`TodoCache` 三个 CRD，定义完整的 spec schema 和 status subresource。
 
@@ -1015,7 +1015,7 @@ Todo Platform 故障注入与恢复演练：模拟 OOMKilled、DNS 中断、PVC 
 - 36.5 controller-runtime 基础抽象入门：Manager、Client、Scheme
 - 36.6 Controller 常见问题：重复 Reconcile、热点资源、Finalizer 阻塞删除
 
-**本篇特色项目**
+**本篇模拟案例**
 
 分析 Todo Operator 的控制循环需求：需要 Watch 哪些资源、Reconcile 要做什么、需要哪些 Index。并用 Go 编写一个最小 Informer-Workqueue 模拟程序（不依赖 client-go），理解"事件入队→出队处理→幂等调谐"的简化流程。
 
@@ -1038,7 +1038,7 @@ Todo Platform 故障注入与恢复演练：模拟 OOMKilled、DNS 中断、PVC 
 - 37.3 实现 Reconcile 逻辑：根据 spec 计算期望状态并回写 status
 - 37.4 部署手写 Controller 到 kind 集群并端到端验证
 
-**本篇特色项目**
+**本篇模拟案例**
 
 手写 TodoApp Controller（约 200 行 Go），实现：创建 TodoApp CR → Controller 检测到变更 → 回写 status.conditions 为 "Reconciled"。让学习者真正理解控制循环的运作方式。
 
@@ -1062,7 +1062,7 @@ Todo Platform 故障注入与恢复演练：模拟 OOMKilled、DNS 中断、PVC 
 - 38.4 controller-runtime：Manager、Client、Scheme、Controller 的协作关系
 - 38.5 本地运行 Controller 并使用 kind 集群验证
 
-**本篇特色项目**
+**本篇模拟案例**
 
 使用 Kubebuilder 重写 Todo Operator：自动为 TodoApp CR 创建对应的 Deployment 和 Service。
 
@@ -1088,7 +1088,7 @@ Todo Platform 故障注入与恢复演练：模拟 OOMKilled、DNS 中断、PVC 
 - 39.6 事件记录（Event）、重试策略与错误处理
 - 39.7 多版本 CRD 管理与转换 Webhook（conversion）
 
-**本篇特色项目**
+**本篇模拟案例**
 
 让 Todo Operator 完整实现：通过 OwnerReference 管理子资源、通过 Finalizer 实现删除前资源清理、通过 Webhook 校验 TodoApp spec、通过 Conditions 暴露平台健康状态。
 
@@ -1112,7 +1112,7 @@ Todo Platform 故障注入与恢复演练：模拟 OOMKilled、DNS 中断、PVC 
 - 40.4 Helm 4 Chart / Kustomize 发布 Operator
 - 40.5 CRD 升级策略、兼容性测试与回滚
 
-**本篇特色项目**
+**本篇模拟案例**
 
 为 Todo Operator 建立测试和发布流水线：envtest 单元测试 → kind 集成测试 → 构建 Operator 镜像 → Helm 4 Chart 发布。
 
@@ -1136,7 +1136,7 @@ Todo Platform 故障注入与恢复演练：模拟 OOMKilled、DNS 中断、PVC 
 - 41.4 Operator 自身监控、日志和告警
 - 41.5 生产事故案例与设计反思
 
-**本篇特色项目**
+**本篇模拟案例**
 
 将 Todo Operator 升级为生产可用版本：实施最小 RBAC 权限、添加 Prometheus 指标暴露、限制 Watch 范围、处理大规模 TodoApp 实例场景。
 
@@ -1178,7 +1178,7 @@ Todo Platform 故障注入与恢复演练：模拟 OOMKilled、DNS 中断、PVC 
 - 42.5 项目答辩、简历包装与面试题复盘
 - 42.6 云原生能力进阶图谱与后续学习路线（Service Mesh、WASM、eBPF）
 
-**本篇特色项目**
+**本篇模拟案例**
 
 整理最终作品集：架构图、部署说明、Grafana 面板截图、Operator CRD 示例、故障排查文档、面试讲解稿。
 
@@ -1195,8 +1195,8 @@ Todo Platform 故障注入与恢复演练：模拟 OOMKilled、DNS 中断、PVC 
 | 阶段数 | 6 个 |
 | 大篇数量 | 42 篇 |
 | 章节数量 | 约 230 章 |
-| 阶段项目数量 | 42 个 |
-| 综合项目主线 | Cloud Native Todo Platform |
+| 阶段性综合作品 | 按阶段验收，不按每篇强制项目 |
+| 贯穿模拟案例 | Cloud Native Todo Platform |
 
 ## 建议学习周期
 

@@ -58,7 +58,7 @@
 
 如果只会 `docker run`，这些问题像一堆孤立报错。理解底层后，它们会串成一条链路：
 
-```text
+```text linenums="0"
 Docker CLI / Compose
   -> containerd / runc
   -> Linux namespace
@@ -79,25 +79,18 @@ Docker CLI / Compose
 
 本篇会用实验把这些抽象概念落到可观察的文件、进程和命令输出上。
 
-### 2.3 课程项目关联
+### 2.3 Todo 平台模拟案例
 
-第 17 篇已经启动了 Todo Platform 本地环境。本篇会基于这个环境观察 `api` 容器的宿主机 PID、namespace、cgroup 和挂载信息。也就是说：
+> Todo API 容器已经能够运行，但团队需要理解它为什么像一个隔离环境。你需要观察容器的 PID、namespace、cgroup、rootfs、挂载点和网络视图。
 
-```text
-第 17 篇：Compose 编排出 api / postgres / redis / traefik
-第 18 篇：拆开 api 容器，观察它为什么像一个隔离环境
-第 19 篇：继续往下，看 Docker 如何通过 containerd / runc / CRI 启动容器
-```
-
-完成本篇后，你不仅知道 Todo API 容器能跑，还能解释它是如何被 Linux 内核隔离、限制和挂载出来的。
-
+这个案例把容器从“黑盒命令”拆成 Linux 内核机制：定位容器问题时，要能说清隔离、限制和文件系统从哪里来。
 ## 3. 核心概念
 
 ### 3.1 容器与虚拟机的本质区别
 
 虚拟机通过 Hypervisor 虚拟硬件，并在虚拟硬件上运行完整 Guest OS。容器不虚拟硬件，也不启动独立内核。容器进程共享宿主机 Linux 内核。
 
-```text
+```text linenums="0"
 虚拟机：
 应用 -> Guest OS -> 虚拟硬件 -> Hypervisor -> Host OS / 硬件
 
@@ -116,13 +109,13 @@ Docker CLI / Compose
 
 启动一个容器后，容器内通常会看到自己的 1 号进程：
 
-```bash
+```bash linenums="0"
 docker run --rm registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23 sh -c 'ps -o pid,ppid,comm'
 ```
 
 预期类似：
 
-```text
+```text linenums="0"
 PID   PPID  COMMAND
 1     0     sh
 7     1     ps
@@ -164,13 +157,13 @@ cgroups 是 control groups 的缩写，用来限制、统计和隔离资源使�
 
 Docker 中这些参数背后都离不开 cgroups：
 
-```bash
+```bash linenums="0"
 docker run --rm --memory=128m --cpus=0.5 registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23 sh -c 'cat /proc/self/cgroup'
 ```
 
 Kubernetes 中这些字段最终也会落到节点上的 cgroups：
 
-```yaml
+```yaml linenums="0"
 resources:
   requests:
     cpu: "100m"
@@ -186,7 +179,7 @@ resources:
 
 容器内看到的 `/` 不是宿主机的 `/`，而是容器 rootfs。rootfs 可以理解为容器进程看到的根文件系统：
 
-```text
+```text linenums="0"
 /
 ├── bin
 ├── etc
@@ -203,7 +196,7 @@ UnionFS 不是特指某一个文件系统实现，而是一类“把多个目录
 
 镜像分层可以理解为：
 
-```text
+```text linenums="0"
 merged  合并视图：容器看到的文件系统
 upper   可写层：容器运行时写入或修改的文件
 lower   只读层：镜像层 3
@@ -224,7 +217,7 @@ lower   只读层：镜像层 1
 
 现代 Docker 链路大致是：
 
-```text
+```text linenums="0"
 docker CLI
   -> Docker Engine
   -> containerd
@@ -247,7 +240,7 @@ docker CLI
 
 执行：
 
-```bash
+```bash linenums="0"
 docker run --rm -m 128m --cpus=0.5 --name demo registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23 sh
 ```
 
@@ -272,7 +265,7 @@ flowchart TB
 
 假设宿主机上有很多进程：
 
-```text
+```text linenums="0"
 宿主机 PID namespace
 ├── PID 1 systemd
 ├── PID 821 dockerd
@@ -283,7 +276,7 @@ flowchart TB
 
 容器内可能只看到：
 
-```text
+```text linenums="0"
 容器 PID namespace
 ├── PID 1 todo-api
 └── PID 12 ps
@@ -301,7 +294,7 @@ namespace 让进程“看不到别人”，cgroups 让进程“不能无限用�
 
 以 cgroup v2 为例：
 
-```text
+```text linenums="0"
 /sys/fs/cgroup/
 ├── cgroup.controllers
 ├── cpu.max
@@ -325,7 +318,7 @@ namespace 让进程“看不到别人”，cgroups 让进程“不能无限用�
 
 例如：
 
-```text
+```text linenums="0"
 cpu.max = 50000 100000
 ```
 
@@ -335,7 +328,7 @@ cpu.max = 50000 100000
 
 Dockerfile 中每个会改变文件系统的步骤通常会形成一个镜像层：
 
-```dockerfile
+```dockerfile linenums="0"
 FROM registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23
 RUN apk add --no-cache ca-certificates
 COPY todo-api /app/todo-api
@@ -359,13 +352,13 @@ flowchart TB
 
 很多容器内显示用户是 root：
 
-```bash
+```bash linenums="0"
 docker run --rm registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23 id
 ```
 
 输出可能是：
 
-```text
+```text linenums="0"
 uid=0(root) gid=0(root)
 ```
 
@@ -389,6 +382,8 @@ uid=0(root) gid=0(root)
 
 ## 5. 手把手实验
 
+预计耗时：150 分钟（基础观察约 45 分钟，手动模拟约 75 分钟，排障和记录约 30 分钟）。
+
 ### 5.1 实验目标
 
 在 Linux / WSL2 Ubuntu / Linux 虚拟机中创建 `~/container-lab`，观察真实容器的 PID、namespace、cgroup 和挂载信息，并用 `unshare`、`chroot`、cgroup v2、OverlayFS 和 `nsenter` 手动模拟一个简化容器。
@@ -410,7 +405,7 @@ uid=0(root) gid=0(root)
 
 环境自检：
 
-```bash
+```bash linenums="0"
 uname -a
 id
 docker version
@@ -444,14 +439,14 @@ test -f /sys/fs/cgroup/cgroup.controllers && cat /sys/fs/cgroup/cgroup.controlle
 
 === "Ubuntu / Debian"
 
-    ```bash
+    ```bash linenums="0"
     sudo apt update
     sudo apt install -y util-linux iproute2 procps python3
     ```
 
 === "Fedora / RHEL 系"
 
-    ```bash
+    ```bash linenums="0"
     sudo dnf install -y util-linux iproute procps-ng python3
     ```
 
@@ -463,7 +458,7 @@ test -f /sys/fs/cgroup/cgroup.controllers && cat /sys/fs/cgroup/cgroup.controlle
 
 本篇实验目录如下：
 
-```text
+```text linenums="0"
 container-lab/
 ├── rootfs/                 # 从 registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23 导出的 rootfs
 ├── image-layers/
@@ -479,7 +474,7 @@ container-lab/
 
 创建目录：
 
-```bash
+```bash linenums="0"
 export LAB="$HOME/container-lab"
 mkdir -p "$LAB"
 cd "$LAB"
@@ -488,7 +483,7 @@ pwd
 
 预期输出：
 
-```text
+```text linenums="0"
 /home/your-user/container-lab
 ```
 
@@ -498,8 +493,9 @@ pwd
 
 创建内存实验脚本：
 
-```bash
-cat > "$LAB/allocate-memory.py" <<'PY'
+将下面内容写入 `$LAB/allocate-memory.py`：
+
+```python title="$LAB/allocate-memory.py"
 import time
 
 chunks = []
@@ -508,15 +504,15 @@ for i in range(128):
     chunks.append(bytearray(1024 * 1024))
     print(f"allocated {i + 1} MiB", flush=True)
     time.sleep(0.05)
-PY
 ```
 
 这个脚本最多分配 128 次，每次 1 MiB，总计 128 MiB。后面的 cgroup 实验会把内存限制设为 64 MiB，因此它通常会在接近或略超过 64 MiB 时被内核终止。
 
 创建简化容器脚本：
 
-```bash
-cat > "$LAB/mini-container.sh" <<'EOF'
+将下面内容写入 `$LAB/mini-container.sh`：
+
+```bash title="$LAB/mini-container.sh"
 #!/usr/bin/env bash
 set -euo pipefail
 
@@ -577,8 +573,11 @@ ps -o pid,ppid,comm
 echo "[cgroup]"
 cat /proc/1/cgroup
 '
-EOF
+```
 
+继续执行：
+
+```bash linenums="0"
 chmod +x "$LAB/mini-container.sh"
 ```
 
@@ -607,7 +606,7 @@ chmod +x "$LAB/mini-container.sh"
 
 如果你已经完成第 17 篇，请先进入 Cloud Native Todo Platform 应用仓库根目录，也就是包含 `deployments/docker-compose/compose.yaml` 的目录。然后进入 Compose 目录启动本地环境：
 
-```bash
+```bash linenums="0"
 test -f deployments/docker-compose/compose.yaml
 cd deployments/docker-compose
 test -f .env
@@ -617,7 +616,7 @@ docker compose --env-file .env ps
 
 获取 API 容器 ID 和宿主机 PID：
 
-```bash
+```bash linenums="0"
 TODO_API_CONTAINER="$(docker compose --env-file .env ps -q api)"
 TODO_API_PID="$(docker inspect "$TODO_API_CONTAINER" --format '{{.State.Pid}}')"
 echo "$TODO_API_CONTAINER"
@@ -627,7 +626,7 @@ ps -o pid,ppid,comm -p "$TODO_API_PID"
 
 查看 namespace、cgroup 和挂载：
 
-```bash
+```bash linenums="0"
 sudo ls -l /proc/"$TODO_API_PID"/ns
 cat /proc/"$TODO_API_PID"/cgroup
 docker inspect "$TODO_API_CONTAINER" --format '{{json .Mounts}}'
@@ -636,7 +635,7 @@ docker inspect "$TODO_API_CONTAINER" --format 'Memory={{.HostConfig.Memory}} Nan
 
 如果你没有应用仓库，也可以启动独立 demo 容器：
 
-```bash
+```bash linenums="0"
 docker run -d --name internals-demo registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23 sleep 1d
 HOST_PID="$(docker inspect internals-demo --format '{{.State.Pid}}')"
 echo "$HOST_PID"
@@ -648,7 +647,7 @@ ps -o pid,ppid,comm -p "$HOST_PID"
 
 清理 demo 容器：
 
-```bash
+```bash linenums="0"
 docker rm -f internals-demo
 ```
 
@@ -656,19 +655,19 @@ docker rm -f internals-demo
 
 查看当前主机名：
 
-```bash
+```bash linenums="0"
 hostname
 ```
 
 进入新的 UTS namespace：
 
-```bash
+```bash linenums="0"
 sudo unshare --uts --fork bash
 ```
 
 在新 shell 中执行：
 
-```bash
+```bash linenums="0"
 hostname todo-uts
 hostname
 exit
@@ -676,7 +675,7 @@ exit
 
 回到原 shell 后验证：
 
-```bash
+```bash linenums="0"
 hostname
 ```
 
@@ -686,13 +685,13 @@ hostname
 
 进入新的 PID namespace，并挂载新的 `/proc`：
 
-```bash
+```bash linenums="0"
 sudo unshare --pid --fork --mount-proc bash
 ```
 
 在新 shell 中执行：
 
-```bash
+```bash linenums="0"
 echo "inside pid namespace"
 ps -ef
 echo "my pid is $$"
@@ -705,13 +704,13 @@ exit
 
 进入新的 Network namespace：
 
-```bash
+```bash linenums="0"
 sudo unshare --net --fork bash
 ```
 
 在新 shell 中执行：
 
-```bash
+```bash linenums="0"
 ip addr
 ip route
 ip link set lo up
@@ -725,19 +724,19 @@ exit
 
 准备目录：
 
-```bash
+```bash linenums="0"
 mkdir -p "$LAB/mnt"
 ```
 
 进入新的 Mount namespace：
 
-```bash
+```bash linenums="0"
 sudo env LAB="$LAB" unshare --mount --propagation private --fork bash
 ```
 
 在新 shell 中执行：
 
-```bash
+```bash linenums="0"
 mount -t tmpfs tmpfs "$LAB/mnt"
 echo "hello from mount namespace" > "$LAB/mnt/message.txt"
 findmnt "$LAB/mnt"
@@ -747,14 +746,14 @@ exit
 
 回到原 shell 后验证：
 
-```bash
+```bash linenums="0"
 findmnt "$LAB/mnt" || echo "not mounted outside"
 ls -la "$LAB/mnt"
 ```
 
 如果仍看到挂载，说明实验环境的挂载传播策略不符合预期，执行清理：
 
-```bash
+```bash linenums="0"
 sudo umount "$LAB/mnt" 2>/dev/null || true
 ```
 
@@ -762,7 +761,7 @@ sudo umount "$LAB/mnt" 2>/dev/null || true
 
 导出 rootfs：
 
-```bash
+```bash linenums="0"
 cd "$LAB"
 sudo rm -rf rootfs
 mkdir -p rootfs
@@ -774,20 +773,20 @@ docker rm "$CID"
 
 查看 rootfs：
 
-```bash
+```bash linenums="0"
 ls rootfs
 cat rootfs/etc/os-release
 ```
 
 使用 `chroot`：
 
-```bash
+```bash linenums="0"
 sudo chroot "$LAB/rootfs" /bin/sh
 ```
 
 在 chroot 中执行：
 
-```bash
+```bash linenums="0"
 cat /etc/os-release
 pwd
 ls /
@@ -800,7 +799,7 @@ exit
 
 先确认 cgroup v2：
 
-```bash
+```bash linenums="0"
 stat -fc %T /sys/fs/cgroup
 test -f /sys/fs/cgroup/cgroup.controllers && cat /sys/fs/cgroup/cgroup.controllers || true
 ```
@@ -809,7 +808,7 @@ test -f /sys/fs/cgroup/cgroup.controllers && cat /sys/fs/cgroup/cgroup.controlle
 
 创建实验 cgroup：
 
-```bash
+```bash linenums="0"
 CG=/sys/fs/cgroup/todo-lab
 sudo mkdir -p "$CG"
 test -f "$CG/memory.max" || echo "memory controller is not available"
@@ -820,14 +819,14 @@ test -f "$CG/cpu.max" && echo "50000 100000" | sudo tee "$CG/cpu.max"
 
 运行内存分配实验：
 
-```bash
+```bash linenums="0"
 test -f "$CG/cgroup.procs"
 env CG="$CG" LAB="$LAB" bash -c 'echo $$ | sudo tee "$CG/cgroup.procs" >/dev/null; python3 "$LAB/allocate-memory.py"'
 ```
 
 观察事件：
 
-```bash
+```bash linenums="0"
 sudo cat "$CG/memory.events"
 sudo cat "$CG/cpu.stat"
 ```
@@ -836,7 +835,7 @@ sudo cat "$CG/cpu.stat"
 
 历史对照：如果你的实验机是 cgroup v1 且安装了 cgroup-tools，可以用 `cgcreate` 理解早期 cgroup 工具链。本节不是现代主线，命令不可用时直接跳过。
 
-```bash
+```bash linenums="0"
 command -v cgcreate || echo "cgroup-tools is not installed"
 sudo cgcreate -g memory,cpu:/todo-lab-v1
 sudo cgset -r memory.limit_in_bytes=67108864 todo-lab-v1
@@ -849,13 +848,13 @@ sudo cgexec -g memory,cpu:todo-lab-v1 python3 "$LAB/allocate-memory.py"
 
 Docker 参数能观察同样思想：
 
-```bash
+```bash linenums="0"
 docker run --rm --memory=64m --cpus=0.5 registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23 sh -c 'cat /proc/self/cgroup; echo ok'
 ```
 
 查看容器资源配置：
 
-```bash
+```bash linenums="0"
 docker run -d --name limit-demo --memory=64m --cpus=0.5 registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23 sleep 1d
 docker inspect limit-demo --format 'Memory={{.HostConfig.Memory}} NanoCpus={{.HostConfig.NanoCpus}}'
 docker rm -f limit-demo
@@ -867,7 +866,7 @@ docker rm -f limit-demo
 
 准备模拟目录：
 
-```bash
+```bash linenums="0"
 cd "$LAB"
 sudo umount merged 2>/dev/null || true
 rm -rf image-layers upper work merged
@@ -878,7 +877,7 @@ echo "app layer" > image-layers/app/app.txt
 
 确认文件系统类型：
 
-```bash
+```bash linenums="0"
 df -T "$LAB"
 ```
 
@@ -886,7 +885,7 @@ OverlayFS 要求 `upperdir` 和 `workdir` 所在文件系统支持 overlay。通
 
 挂载 overlay：
 
-```bash
+```bash linenums="0"
 sudo mount -t overlay overlay \
   -o lowerdir="$LAB/image-layers/app:$LAB/image-layers/base",upperdir="$LAB/upper",workdir="$LAB/work" \
   "$LAB/merged"
@@ -894,7 +893,7 @@ sudo mount -t overlay overlay \
 
 观察合并视图：
 
-```bash
+```bash linenums="0"
 ls "$LAB/merged"
 cat "$LAB/merged/layer.txt"
 cat "$LAB/merged/app.txt"
@@ -902,7 +901,7 @@ cat "$LAB/merged/app.txt"
 
 修改合并视图中的文件：
 
-```bash
+```bash linenums="0"
 echo "changed in container writable layer" | sudo tee "$LAB/merged/app.txt"
 cat "$LAB/image-layers/app/app.txt"
 cat "$LAB/upper/app.txt"
@@ -912,7 +911,7 @@ cat "$LAB/upper/app.txt"
 
 卸载：
 
-```bash
+```bash linenums="0"
 sudo umount "$LAB/merged"
 ```
 
@@ -920,14 +919,14 @@ sudo umount "$LAB/merged"
 
 确保 rootfs 和脚本存在：
 
-```bash
+```bash linenums="0"
 test -x "$LAB/rootfs/bin/sh"
 test -x "$LAB/mini-container.sh"
 ```
 
 使用 `unshare` 创建 PID、UTS、Mount namespace，再执行脚本。`INSIDE_MINI_NS=1` 是脚本的防误执行开关：
 
-```bash
+```bash linenums="0"
 sudo env LAB="$LAB" INSIDE_MINI_NS=1 \
   unshare --fork --pid --uts --mount --propagation private \
   "$LAB/mini-container.sh"
@@ -946,7 +945,7 @@ sudo env LAB="$LAB" INSIDE_MINI_NS=1 \
 
 启动 demo 容器：
 
-```bash
+```bash linenums="0"
 docker run -d --name nsenter-demo registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23 sleep 1d
 DEMO_PID="$(docker inspect nsenter-demo --format '{{.State.Pid}}')"
 echo "$DEMO_PID"
@@ -954,7 +953,7 @@ echo "$DEMO_PID"
 
 从宿主机进入目标 namespace：
 
-```bash
+```bash linenums="0"
 sudo nsenter --target "$DEMO_PID" --uts hostname
 sudo nsenter --target "$DEMO_PID" --pid --mount ps -o pid,ppid,comm
 sudo nsenter --target "$DEMO_PID" --net ip addr
@@ -964,7 +963,7 @@ sudo nsenter --target "$DEMO_PID" --net ip addr
 
 清理：
 
-```bash
+```bash linenums="0"
 docker rm -f nsenter-demo
 ```
 
@@ -974,7 +973,7 @@ docker rm -f nsenter-demo
 
 查看容器 namespace 时应看到类似：
 
-```text
+```text linenums="0"
 pid -> pid:[402653xxxx]
 net -> net:[402653xxxx]
 mnt -> mnt:[402653xxxx]
@@ -984,7 +983,7 @@ ipc -> ipc:[402653xxxx]
 
 PID namespace 实验中，`ps -ef` 应只显示新 namespace 内进程：
 
-```text
+```text linenums="0"
 UID          PID    PPID  C STIME TTY          TIME CMD
 root           1       0  0 ...   pts/0    00:00:00 bash
 root           8       1  0 ...   pts/0    00:00:00 ps
@@ -992,7 +991,7 @@ root           8       1  0 ...   pts/0    00:00:00 ps
 
 `chroot` 后应看到 Alpine 信息：
 
-```text
+```text linenums="0"
 NAME="Alpine Linux"
 ID=alpine
 VERSION_ID=3.23.0
@@ -1000,7 +999,7 @@ VERSION_ID=3.23.0
 
 cgroup 内存实验触发限制时可能输出：
 
-```text
+```text linenums="0"
 allocated 61 MiB
 allocated 62 MiB
 Killed
@@ -1010,7 +1009,7 @@ OverlayFS 修改后，`upper/app.txt` 应显示新内容，而 `image-layers/app
 
 简化容器运行时应看到：
 
-```text
+```text linenums="0"
 [inside mini container]
 hostname=todo-mini
 [os-release]
@@ -1026,7 +1025,7 @@ PID   PPID  COMMAND
 
 最小验证：
 
-```bash
+```bash linenums="0"
 docker run --rm registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23 sh -c 'ps -o pid,ppid,comm; cat /proc/1/cgroup'
 sudo unshare --uts --fork bash -c 'hostname todo-uts; hostname'
 sudo unshare --pid --fork --mount-proc bash -c 'ps -o pid,ppid,comm'
@@ -1037,7 +1036,7 @@ docker run --rm --memory=64m --cpus=0.5 registry.cn-guangzhou.aliyuncs.com/yleoe
 
 进阶验证：
 
-```bash
+```bash linenums="0"
 stat -fc %T /sys/fs/cgroup
 test -f /sys/fs/cgroup/cgroup.controllers && cat /sys/fs/cgroup/cgroup.controllers || true
 test -x "$LAB/mini-container.sh"
@@ -1059,13 +1058,13 @@ sudo env LAB="$LAB" INSIDE_MINI_NS=1 \
 
 回到实验目录：
 
-```bash
+```bash linenums="0"
 cd "$LAB"
 ```
 
 卸载挂载：
 
-```bash
+```bash linenums="0"
 sudo umount "$LAB/merged" 2>/dev/null || true
 sudo umount "$LAB/rootfs/proc" 2>/dev/null || true
 sudo umount "$LAB/mnt" 2>/dev/null || true
@@ -1073,20 +1072,20 @@ sudo umount "$LAB/mnt" 2>/dev/null || true
 
 删除实验 cgroup：
 
-```bash
+```bash linenums="0"
 sudo rmdir /sys/fs/cgroup/todo-lab 2>/dev/null || true
 sudo rmdir /sys/fs/cgroup/todo-mini 2>/dev/null || true
 ```
 
 删除 demo 容器：
 
-```bash
+```bash linenums="0"
 docker rm -f internals-demo nsenter-demo limit-demo 2>/dev/null || true
 ```
 
 删除实验目录：
 
-```bash
+```bash linenums="0"
 cd "$HOME"
 if [ "${LAB:-}" = "$HOME/container-lab" ]; then
   sudo rm -rf "$LAB"
@@ -1097,11 +1096,9 @@ fi
 
 再次确认没有残留挂载：
 
-```bash
+```bash linenums="0"
 findmnt | grep container-lab || echo "no container-lab mounts"
 ```
-
-预计耗时：150 分钟（基础观察约 45 分钟，手动模拟约 75 分钟，排障和记录约 30 分钟）。
 
 ## 6. 常见错误与排障
 
@@ -1109,14 +1106,14 @@ findmnt | grep container-lab || echo "no container-lab mounts"
 
 - **现象**：
 
-  ```text
+  ```text linenums="0"
   unshare: unshare failed: Operation not permitted
   ```
 
 - **原因**：当前用户缺少权限，系统禁用了某些 namespace，或者你在 macOS / Windows PowerShell / 受限容器内执行实验。
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   uname -a
   id
   command -v unshare
@@ -1132,13 +1129,13 @@ findmnt | grep container-lab || echo "no container-lab mounts"
 
 - **现象**：
 
-  ```text
+  ```text linenums="0"
   tee: /sys/fs/cgroup/todo-lab/memory.max: Permission denied
   ```
 
   或：
 
-  ```text
+  ```text linenums="0"
   mkdir: cannot create directory '/sys/fs/cgroup/todo-lab': Read-only file system
   ```
 
@@ -1148,7 +1145,7 @@ findmnt | grep container-lab || echo "no container-lab mounts"
 
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   stat -fc %T /sys/fs/cgroup
   mount | grep cgroup
   test -f /sys/fs/cgroup/cgroup.controllers && cat /sys/fs/cgroup/cgroup.controllers || true
@@ -1156,7 +1153,7 @@ findmnt | grep container-lab || echo "no container-lab mounts"
 
 - **修复**：跳过手动 cgroup，使用 Docker 替代实验：
 
-  ```bash
+  ```bash linenums="0"
   docker run --rm --memory=64m --cpus=0.5 registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23 sh -c 'cat /proc/self/cgroup; echo ok'
   ```
 
@@ -1166,20 +1163,20 @@ findmnt | grep container-lab || echo "no container-lab mounts"
 
 - **现象**：
 
-  ```text
+  ```text linenums="0"
   mount: wrong fs type, bad option, bad superblock on overlay
   ```
 
   或：
 
-  ```text
+  ```text linenums="0"
   workdir and upperdir must reside under the same mount
   ```
 
 - **原因**：当前文件系统不支持 overlay，`upperdir` 和 `workdir` 不在同一个文件系统，或 WSL2 / 网络文件系统有限制。
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   df -T "$LAB"
   findmnt "$LAB"
   ls -ld "$LAB/upper" "$LAB/work" "$LAB/merged"
@@ -1192,14 +1189,14 @@ findmnt | grep container-lab || echo "no container-lab mounts"
 
 - **现象**：
 
-  ```text
+  ```text linenums="0"
   chroot: failed to run command '/bin/sh': No such file or directory
   ```
 
 - **原因**：rootfs 没有正确导出，`/bin/sh` 不存在，或 rootfs 文件权限损坏。
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   ls -l "$LAB/rootfs/bin/sh"
   file "$LAB/rootfs/bin/sh"
   cat "$LAB/rootfs/etc/os-release"
@@ -1207,7 +1204,7 @@ findmnt | grep container-lab || echo "no container-lab mounts"
 
 - **修复**：重新导出 rootfs：
 
-  ```bash
+  ```bash linenums="0"
   sudo rm -rf "$LAB/rootfs"
   mkdir -p "$LAB/rootfs"
   CID="$(docker create registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23)"
@@ -1221,21 +1218,21 @@ findmnt | grep container-lab || echo "no container-lab mounts"
 
 - **现象**：
 
-  ```text
+  ```text linenums="0"
   nsenter: cannot open /proc/0/ns/uts: No such file or directory
   ```
 
 - **原因**：目标容器已经退出，`docker inspect` 得到的 `State.Pid` 是 0，或者你没有 sudo 权限。
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   docker ps -a --filter name=nsenter-demo
   docker inspect nsenter-demo --format 'Status={{.State.Status}} Pid={{.State.Pid}}'
   ```
 
 - **修复**：重新启动容器并获取 PID：
 
-  ```bash
+  ```bash linenums="0"
   docker rm -f nsenter-demo 2>/dev/null || true
   docker run -d --name nsenter-demo registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23 sleep 1d
   DEMO_PID="$(docker inspect nsenter-demo --format '{{.State.Pid}}')"
@@ -1256,147 +1253,13 @@ findmnt | grep container-lab || echo "no container-lab mounts"
 
 5. **容器 PID 1 要正确处理信号。** 容器主进程是 PID 1 时，信号和子进程回收行为会影响优雅退出。Go 服务要正确处理 SIGTERM，必要时使用合适的 init 进程或确保应用能回收子进程，避免发布、扩缩容和节点排空时出现脏退出。
 
-## 8. 本章小项目
+## 8. 练习题与面试题
 
-本章小项目：**完成 Todo Platform 容器运行原理观察记录**。
+本章练习题和面试题已拆分到独立页面，完成正文学习后再进入题库练习与复盘。
 
-### 8.1 项目产出
+[查看本章练习题与面试题](../../questions/stage-03-docker/18-container-internals.md)
 
-完成后，你应该得到：
-
-- `~/container-lab/mini-container.sh`
-- 从 `registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23` 导出的 `rootfs/`
-- OverlayFS 模拟目录：`image-layers/`、`upper/`、`work/`、`merged/`
-- 一份 `docs/docker/chapter-18-runtime-internals-record.md` 记录
-
-记录模板：
-
-```markdown
-# Chapter 18 Runtime Internals Record
-
-## 环境信息
-
-- OS：
-- Docker 版本：
-- cgroup 类型：
-- 是否支持 OverlayFS：
-
-## Todo API 容器观察
-
-- 容器 ID：
-- 宿主机 PID：
-- namespace 输出摘要：
-- cgroup 输出摘要：
-- 挂载输出摘要：
-
-## 手动实验结果
-
-- UTS namespace：
-- PID namespace：
-- Network namespace：
-- Mount namespace：
-- chroot：
-- cgroup v2：
-- OverlayFS：
-- mini-container.sh：
-
-## 排障记录
-
-- 问题：
-- 现象：
-- 根因：
-- 修复：
-```
-
-### 8.2 验收标准
-
-最小验收：
-
-- 能通过 `docker inspect` 找到容器宿主机 PID。
-- 能查看 `/proc/<pid>/ns` 和 `/proc/<pid>/cgroup`。
-- 能用 `unshare --uts` 验证 hostname 隔离。
-- 能用 `unshare --pid --mount-proc` 验证 PID 隔离。
-- 能用 Docker `--memory`、`--cpus` 观察资源限制配置。
-
-进阶验收：
-
-- 能导出 Alpine rootfs 并 `chroot` 进入。
-- 能完成 OverlayFS lower / upper / merged 实验。
-- 能运行 `mini-container.sh`。
-- 能解释 `mini-container.sh` 不是完整容器运行时，还缺少 OCI spec、`pivot_root`、User namespace 映射、capabilities、seccomp、网络配置和生命周期管理等能力。
-
-## 9. 本章练习题
-
-### 基础题
-
-1. 容器和虚拟机最大的区别是什么？为什么容器启动通常更快？
-2. namespace 和 cgroups 分别解决什么问题？
-3. 为什么容器内看到 PID 1，而宿主机上同一个进程有另一个 PID？
-4. rootfs、chroot、OverlayFS 三者分别解决什么问题？
-5. 为什么生产环境不建议把业务数据写入容器可写层？
-
-### 实操题
-
-1. 使用 `unshare --uts` 修改新 namespace 中的 hostname，退出后验证宿主机 hostname 没有变化。当原 shell 中 `hostname` 仍为原值时，说明成功。
-2. 使用 `docker run --rm --memory=64m --cpus=0.5 registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23 ...` 观察 `/proc/self/cgroup`，再用 `docker inspect` 查看 `HostConfig.Memory` 和 `HostConfig.NanoCpus`。当两处都能看到资源限制信息时，说明成功。
-3. 修改 OverlayFS 合并视图中的 `app.txt`，确认只读层文件未变化、`upper/app.txt` 出现修改后的内容。当 lower 不变、upper 改变时，说明你理解了 copy-up。
-
-### 思考题
-
-1. 如果 Go 服务在 Kubernetes 中被 `OOMKilled`，但应用日志没有错误，你会从哪些层面排查？
-2. 如果安全团队要求禁止 privileged 和 Docker socket 挂载，你会如何向业务团队解释这些配置的风险？
-
-## 10. 本章面试题
-
-### 面试题 1：容器和虚拟机有什么区别？
-
-**一句话结论**：虚拟机有独立 Guest OS 和内核，容器共享宿主机 Linux 内核，只是通过 namespace、cgroups 和 rootfs 等机制隔离进程。
-
-**展开解释**：虚拟机通过 Hypervisor 虚拟硬件，在上面运行完整操作系统。容器不虚拟硬件，也不启动新内核，容器进程仍然是宿主机上的普通 Linux 进程。容器启动快、镜像小，但隔离边界依赖共享内核和运行时安全配置。
-
-**深入追问**：如果面试官问安全边界，要说明容器不是强沙箱，生产环境还需要非 root、capabilities 收敛、seccomp、AppArmor / SELinux、镜像扫描、节点隔离和最小权限。
-
-### 面试题 2：namespace 和 cgroups 分别解决什么问题？
-
-**一句话结论**：namespace 解决“进程能看到什么”，cgroups 解决“进程能用多少资源”。
-
-**展开解释**：PID namespace 让容器内有自己的进程树，Network namespace 让容器有自己的网卡和路由，Mount namespace 让容器看到自己的挂载点。cgroups 则限制 CPU、内存、IO、进程数量等资源，并提供统计信息。
-
-**深入追问**：如果面试官问 Kubernetes limit 背后是什么，要说明 Pod 或容器的资源限制最终会由容器运行时写入节点上的 cgroup。
-
-### 面试题 3：为什么容器主进程退出后容器会停止？
-
-**一句话结论**：容器本质上围绕一个主进程运行，主进程通常是容器 namespace 内的 PID 1，PID 1 退出意味着容器生命周期结束。
-
-**展开解释**：容器不是虚拟机，没有传统 init 系统维持整台机器状态。Docker 和运行时跟踪容器主进程，主进程退出后，容器就进入 exited 状态。这也是为什么容器镜像的 `ENTRYPOINT` / `CMD` 要直接运行前台服务。
-
-**深入追问**：PID 1 还涉及信号处理和子进程回收。生产 Go 服务应正确处理 SIGTERM，保证滚动发布和节点排空时能优雅退出。
-
-### 面试题 4：Docker `--memory` 和 Kubernetes memory limit 背后是什么？
-
-**一句话结论**：它们最终都会落到 Linux cgroups 的内存控制上，限制进程组可使用的内存。
-
-**展开解释**：在 cgroup v2 中，可以通过 `memory.max` 设置内存上限，通过 `memory.current` 查看当前使用，通过 `memory.events` 查看 OOM 等事件。超过限制时，内核可能直接 kill 进程，应用不一定有机会输出错误。
-
-**深入追问**：排查 OOM 不能只看应用日志，还要看容器退出状态、Pod 事件、节点内存、应用指标、GC 指标和 cgroup 事件。
-
-### 面试题 5：UnionFS / OverlayFS 与镜像分层有什么关系？
-
-**一句话结论**：镜像层通常是只读层，容器运行时在其上叠加可写层，OverlayFS 把它们合并成容器看到的统一文件系统。
-
-**展开解释**：lowerdir 表示只读镜像层，upperdir 表示容器可写层，merged 表示容器看到的视图。修改只读层文件时会 copy-up 到可写层，删除容器后可写层消失，但镜像层不变。
-
-**深入追问**：这解释了为什么日志和业务数据不应长期写在容器层，也解释了 Dockerfile 中复制大文件、删除密钥、频繁改动依赖层会影响镜像体积和安全。
-
-### 面试题 6：`nsenter` 在容器排障中有什么作用？
-
-**一句话结论**：`nsenter` 可以从宿主机进入目标进程所在的 namespace，用于底层网络、进程和挂载排障。
-
-**展开解释**：当容器镜像没有 shell 或缺少网络工具时，管理员可以通过宿主机找到容器主进程 PID，再用 `nsenter --target <pid> --net` 进入它的 Network namespace 查看网卡、路由和监听端口。
-
-**深入追问**：`nsenter` 权限很高，生产环境使用必须受控和审计。Kubernetes 中更常用受控的 debug container、节点排障流程和审计系统。
-
-## 11. 本章总结
+## 9. 本章总结
 
 本篇把容器从“Docker 命令”拆回到 Linux 内核机制：namespace 负责隔离视图，cgroups 负责限制和统计资源，rootfs 与 OverlayFS 提供容器看到的文件系统，容器主进程本质上仍然是宿主机上的普通进程。
 
@@ -1404,7 +1267,7 @@ findmnt | grep container-lab || echo "no container-lab mounts"
 
 能力价值上，你已经能解释 OOMKilled、CPU throttling、容器内 PID 1、容器可写层丢失、privileged 风险和镜像分层等真实工作问题，为后续学习 containerd、runc、CRI 和 Kubernetes 运行时打下基础。
 
-## 12. 下一章衔接
+## 10. 下一章衔接
 
 回顾阶段三前四篇的递进：Ch15 手工运行容器，Ch16 构建镜像，Ch17 编排多服务，本篇拆解底层机制。第 19 篇会继续向下拆解 OCI 运行时规范。
 

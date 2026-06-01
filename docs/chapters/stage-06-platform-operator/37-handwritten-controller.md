@@ -48,17 +48,11 @@
 
 SRE 负责部署 Controller、观察日志、确认 status 是否回写、定位 RBAC 权限不足、cache sync 失败或 queue 重试风暴。生产中 Controller 本身也属于关键控制面组件，不能只按普通业务 Pod 对待。
 
-### 2.3 课程项目关联
+### 2.3 Todo 平台模拟案例
 
-本篇承接第 35-36 篇，产出第一个能运行在 Kubernetes 集群中的 TodoApp Controller：
+> Todo 平台需要第一个可运行的 `TodoApp` Controller。你需要用 client-go 手写监听逻辑、队列处理、RBAC、Deployment 部署和 status 回写，让自定义资源状态能被控制器持续更新。
 
-- 输入：`operator/crds/base/todoapps.platform.todo.example.com.yaml` 和 `operator/handwritten/samples/todoapp.yaml`。
-- 代码：`operator/handwritten/main.go`、`operator/handwritten/controller.go`。
-- 部署：`operator/handwritten/manifests/rbac.yaml`、`operator/handwritten/manifests/deployment.yaml`。
-- 输出：`TodoApp.status.observedGeneration` 和 `TodoApp.status.conditions` 由 Controller 自动回写。
-
-项目版本线进入阶段六子版本 `v4.3-handwritten-controller`，它仍属于 `v4.0-operator` 总版本线。第 38 篇会用 Kubebuilder 重写同一件事，并开始自动创建 Deployment 与 Service。
-
+这个案例用于拆开 Operator 的底层机制：在使用框架前，先看清 informer、workqueue、client 和状态回写分别承担什么职责。
 ## 3. 核心概念
 
 ### 3.1 为什么本篇使用 dynamic client
@@ -74,7 +68,7 @@ client-go 有两类常见客户端：
 
 TodoApp 的 GVR 是：
 
-```go
+```go linenums="0"
 var todoAppGVR = schema.GroupVersionResource{
 	Group:    "platform.todo.example.com",
 	Version:  "v1alpha1",
@@ -84,7 +78,7 @@ var todoAppGVR = schema.GroupVersionResource{
 
 这对应第 35 篇 CRD 里的：
 
-```yaml
+```yaml linenums="0"
 spec:
   group: platform.todo.example.com
   names:
@@ -99,7 +93,7 @@ spec:
 
 SharedInformer 负责把 API server 中的对象变化同步到本地缓存，并把事件分发给处理函数。对于 dynamic client，创建 Informer 的核心代码是：
 
-```go
+```go linenums="0"
 factory := dynamicinformer.NewFilteredDynamicSharedInformerFactory(
 	dynamicClient,
 	10*time.Minute,
@@ -115,7 +109,7 @@ informer := factory.ForResource(todoAppGVR).Informer()
 
 Informer 收到事件后，不把整个对象塞进队列，而是只保存 `namespace/name`：
 
-```go
+```go linenums="0"
 key, err := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
 queue.Add(key)
 ```
@@ -124,7 +118,7 @@ queue.Add(key)
 
 本篇使用 client-go 1.36 的 typed workqueue：
 
-```go
+```go linenums="0"
 queue := workqueue.NewTypedRateLimitingQueueWithConfig(
 	workqueue.DefaultTypedControllerRateLimiter[string](),
 	workqueue.TypedRateLimitingQueueConfig[string]{Name: "todoapp"},
@@ -148,20 +142,20 @@ queue := workqueue.NewTypedRateLimitingQueueWithConfig(
 
 第 35 篇已经为 `TodoApp` 开启了：
 
-```yaml
+```yaml linenums="0"
 subresources:
   status: {}
 ```
 
 这意味着 Controller 回写状态时要请求：
 
-```text
+```text linenums="0"
 PATCH /apis/platform.todo.example.com/v1alpha1/namespaces/todo-dev/todoapps/todo-platform/status
 ```
 
 RBAC 也要分别授权：
 
-```yaml
+```yaml linenums="0"
 resources:
   - todoapps
 verbs:
@@ -221,7 +215,7 @@ flowchart TD
 
 Controller 正确启动顺序是：
 
-```text
+```text linenums="0"
 create dynamic client
 create informer and event handler
 start informer factory
@@ -232,7 +226,7 @@ process queue
 
 如果不等 cache sync 就启动 worker，第一次 Reconcile 可能从缓存里读不到刚刚 List 到的对象，误以为对象已经删除。第 36 篇用日志模拟了这个边界，本篇用真实的：
 
-```go
+```go linenums="0"
 factory.Start(ctx.Done())
 if ok := cache.WaitForCacheSync(ctx.Done(), informer.HasSynced); !ok {
 	log.Fatal("wait for cache sync failed")
@@ -269,7 +263,7 @@ if ok := cache.WaitForCacheSync(ctx.Done(), informer.HasSynced); !ok {
 
 Reconcile 返回错误时，本篇通过 rate limiting queue 重试：
 
-```go
+```go linenums="0"
 if c.queue.NumRequeues(key) < 5 {
 	c.queue.AddRateLimited(key)
 	return true
@@ -281,11 +275,11 @@ c.queue.Forget(key)
 
 ## 5. 手把手实验
 
+预计耗时：120 分钟（动手操作约 80 分钟）。
+
 ### 5.1 实验目标
 
 本实验会手写一个 client-go Controller，部署到 kind 集群，创建 `TodoApp` CR 后自动回写 `status.conditions`。
-
-预计耗时：120 分钟（动手操作约 80 分钟）。
 
 ### 5.2 实验环境
 
@@ -302,7 +296,7 @@ c.queue.Forget(key)
 
 确认环境：
 
-```bash
+```bash linenums="0"
 git status --short
 go version
 kubectl config current-context
@@ -313,7 +307,7 @@ docker version
 
 PowerShell：
 
-```powershell
+```powershell linenums="0"
 git status --short
 go version
 kubectl config current-context
@@ -328,19 +322,19 @@ docker version
 
 创建目录：
 
-```bash
+```bash linenums="0"
 mkdir -p operator/handwritten/manifests operator/handwritten/samples
 ```
 
 PowerShell：
 
-```powershell
+```powershell linenums="0"
 New-Item -ItemType Directory -Force -Path operator/handwritten/manifests,operator/handwritten/samples
 ```
 
 最终目录：
 
-```text
+```text linenums="0"
 operator/
 ├── crds/
 │   └── base/
@@ -359,7 +353,7 @@ operator/
 
 ### 5.4 完整代码或配置
 
-下面的 here-doc 写文件方式适用于 Linux、macOS、Git Bash 和 WSL。PowerShell 用户可以用编辑器创建同名文件，或使用 PowerShell here-string，文件内容保持一致；如果本机装了 Git Bash 或 WSL，直接在其中执行 here-doc 命令会更省事。
+本节按文件名给出完整内容。请用编辑器创建同名文件，并复制对应内容。
 
 本节会创建 7 个文件：
 
@@ -377,8 +371,9 @@ operator/
 
 创建 `operator/handwritten/go.mod`：
 
-```bash
-cat > operator/handwritten/go.mod <<'EOF'
+将下面内容写入 `operator/handwritten/go.mod`：
+
+```text title="operator/handwritten/go.mod"
 module todo-handwritten-controller
 
 go 1.26
@@ -387,7 +382,6 @@ require (
 	k8s.io/apimachinery v0.36.1
 	k8s.io/client-go v0.36.1
 )
-EOF
 ```
 
 版本选择说明：
@@ -401,8 +395,9 @@ EOF
 
 创建 `operator/handwritten/main.go`：
 
-```bash
-cat > operator/handwritten/main.go <<'EOF'
+将下面内容写入 `operator/handwritten/main.go`：
+
+```go title="operator/handwritten/main.go"
 package main
 
 import (
@@ -487,7 +482,6 @@ func defaultKubeconfig() string {
 	}
 	return ""
 }
-EOF
 ```
 
 关键点：
@@ -500,8 +494,9 @@ EOF
 
 创建 `operator/handwritten/controller.go`：
 
-```bash
-cat > operator/handwritten/controller.go <<'EOF'
+将下面内容写入 `operator/handwritten/controller.go`：
+
+```go title="operator/handwritten/controller.go"
 package main
 
 import (
@@ -810,7 +805,6 @@ func int64Value(value any) (int64, bool) {
 	}
 	return 0, false
 }
-EOF
 ```
 
 关键点：
@@ -826,8 +820,9 @@ EOF
 
 创建 `operator/handwritten/Dockerfile`：
 
-```bash
-cat > operator/handwritten/Dockerfile <<'EOF'
+将下面内容写入 `operator/handwritten/Dockerfile`：
+
+```dockerfile title="operator/handwritten/Dockerfile"
 FROM registry.cn-guangzhou.aliyuncs.com/yleoer/golang:1.26-bookworm AS build
 WORKDIR /src
 
@@ -842,15 +837,15 @@ FROM registry.cn-guangzhou.aliyuncs.com/yleoer/static-debian12:nonroot
 COPY --from=build /out/todo-handwritten-controller /todo-handwritten-controller
 USER 65532:65532
 ENTRYPOINT ["/todo-handwritten-controller"]
-EOF
 ```
 
 #### 5.4.5 RBAC
 
 创建 `operator/handwritten/manifests/rbac.yaml`：
 
-```bash
-cat > operator/handwritten/manifests/rbac.yaml <<'YAML'
+将下面内容写入 `operator/handwritten/manifests/rbac.yaml`：
+
+```yaml title="operator/handwritten/manifests/rbac.yaml"
 apiVersion: v1
 kind: ServiceAccount
 metadata:
@@ -893,7 +888,6 @@ roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
   name: todo-handwritten-controller
-YAML
 ```
 
 这份 RBAC 只允许读取 `todoapps` 和写 `todoapps/status`，不会授予 Deployment、Service、Secret 等权限。第 38 篇开始创建子资源后，再扩展 RBAC。
@@ -902,8 +896,9 @@ YAML
 
 创建 `operator/handwritten/manifests/deployment.yaml`：
 
-```bash
-cat > operator/handwritten/manifests/deployment.yaml <<'YAML'
+将下面内容写入 `operator/handwritten/manifests/deployment.yaml`：
+
+```yaml title="operator/handwritten/manifests/deployment.yaml"
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -949,15 +944,15 @@ spec:
       securityContext:
         seccompProfile:
           type: RuntimeDefault
-YAML
 ```
 
 #### 5.4.7 样例 TodoApp
 
 创建 `operator/handwritten/samples/todoapp.yaml`：
 
-```bash
-cat > operator/handwritten/samples/todoapp.yaml <<'YAML'
+将下面内容写入 `operator/handwritten/samples/todoapp.yaml`：
+
+```yaml title="operator/handwritten/samples/todoapp.yaml"
 apiVersion: platform.todo.example.com/v1alpha1
 kind: TodoApp
 metadata:
@@ -978,14 +973,13 @@ spec:
     tracing: true
   rollout:
     strategy: RollingUpdate
-YAML
 ```
 
 ### 5.5 执行命令
 
 #### 5.5.1 准备命名空间和 CRD
 
-```bash
+```bash linenums="0"
 ls operator/crds/base/todoapps.platform.todo.example.com.yaml
 kubectl create namespace todo-dev --dry-run=client -o yaml | kubectl apply -f -
 kubectl apply --server-side -f operator/crds/base
@@ -996,7 +990,7 @@ kubectl wait --for=condition=Established crd/todoapps.platform.todo.example.com 
 
 #### 5.5.2 本地编译检查
 
-```bash
+```bash linenums="0"
 cd operator/handwritten
 go mod tidy
 go fmt ./...
@@ -1010,7 +1004,7 @@ cd ../..
 
 如果 `go mod tidy` 下载依赖较慢，可以临时设置 Go 代理后重试：
 
-```bash
+```bash linenums="0"
 go env -w GOPROXY=https://proxy.golang.org,direct
 ```
 
@@ -1018,14 +1012,14 @@ go env -w GOPROXY=https://proxy.golang.org,direct
 
 开一个终端运行：
 
-```bash
+```bash linenums="0"
 cd operator/handwritten
 go run . --namespace=todo-dev
 ```
 
 保持这个终端不要关闭。再开另一个终端，在仓库根目录执行：
 
-```bash
+```bash linenums="0"
 kubectl apply -f operator/handwritten/samples/todoapp.yaml
 kubectl -n todo-dev get todoapp todo-platform
 kubectl -n todo-dev get todoapp todo-platform -o jsonpath='{.status.observedGeneration}{"\n"}'
@@ -1038,7 +1032,7 @@ kubectl -n todo-dev get todoapp todo-platform -o jsonpath='{.status.conditions[*
 
 请先完成 5.5.2 节的 `go mod tidy`，确保 `operator/handwritten/go.sum` 已生成，否则 Dockerfile 中的 `COPY go.mod go.sum ./` 会找不到 `go.sum`。
 
-```bash
+```bash linenums="0"
 docker build -t todo-handwritten-controller:v0.1.0 operator/handwritten
 kind load docker-image todo-handwritten-controller:v0.1.0 --name todo-gitops
 ```
@@ -1047,7 +1041,7 @@ kind load docker-image todo-handwritten-controller:v0.1.0 --name todo-gitops
 
 #### 5.5.5 部署到集群
 
-```bash
+```bash linenums="0"
 kubectl apply -f operator/handwritten/manifests/rbac.yaml
 kubectl apply -f operator/handwritten/manifests/deployment.yaml
 kubectl -n todo-dev rollout status deployment/todo-handwritten-controller --timeout=90s
@@ -1058,14 +1052,14 @@ kubectl -n todo-dev logs deployment/todo-handwritten-controller --tail=50
 
 先重新应用样例 CR：
 
-```bash
+```bash linenums="0"
 kubectl apply -f operator/handwritten/samples/todoapp.yaml
 kubectl -n todo-dev get todoapp todo-platform -o yaml
 ```
 
 再修改 spec，触发 Update 事件：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-dev patch todoapp todo-platform --type=merge -p '{"spec":{"replicas":3}}'
 kubectl -n todo-dev get todoapp todo-platform \
   -o jsonpath='generation={.metadata.generation} observed={.status.observedGeneration} reasons={.status.conditions[*].reason}{"\n"}'
@@ -1073,7 +1067,7 @@ kubectl -n todo-dev get todoapp todo-platform \
 
 PowerShell：
 
-```powershell
+```powershell linenums="0"
 kubectl -n todo-dev patch todoapp todo-platform --type=merge -p '{\"spec\":{\"replicas\":3}}'
 kubectl -n todo-dev get todoapp todo-platform `
   -o jsonpath='generation={.metadata.generation} observed={.status.observedGeneration} reasons={.status.conditions[*].reason}{"\n"}'
@@ -1085,7 +1079,7 @@ kubectl -n todo-dev get todoapp todo-platform `
 
 本地或集群日志应包含类似内容：
 
-```text
+```text linenums="0"
 starting TodoApp controller namespace=todo-dev workers=1
 enqueue todo-dev/todo-platform
 reconciled todo-dev/todo-platform generation=1 observedGeneration=1
@@ -1097,14 +1091,14 @@ skip status-only update todo-dev/todo-platform generation=2
 
 查看 CR：
 
-```text
+```text linenums="0"
 NAME            IMAGE                          REPLICAS   READY   AVAILABLE   AGE
 todo-platform   todo-api:v0.1.2-observability  3          0       False       2m
 ```
 
 查看 conditions：
 
-```text
+```text linenums="0"
 Reconciled WorkloadNotCreated
 ```
 
@@ -1114,7 +1108,7 @@ Reconciled WorkloadNotCreated
 
 **第一层：代码可编译**
 
-```bash
+```bash linenums="0"
 cd operator/handwritten
 go test ./...
 go vet ./...
@@ -1126,7 +1120,7 @@ cd ../..
 
 **第二层：CRD 已安装**
 
-```bash
+```bash linenums="0"
 kubectl get crd todoapps.platform.todo.example.com
 kubectl api-resources --api-group=platform.todo.example.com
 ```
@@ -1135,7 +1129,7 @@ kubectl api-resources --api-group=platform.todo.example.com
 
 **第三层：Controller Pod 正常**
 
-```bash
+```bash linenums="0"
 kubectl -n todo-dev get deployment,pod -l app.kubernetes.io/name=todo-handwritten-controller
 kubectl -n todo-dev logs deployment/todo-handwritten-controller --tail=20
 ```
@@ -1144,7 +1138,7 @@ kubectl -n todo-dev logs deployment/todo-handwritten-controller --tail=20
 
 **第四层：status 由 Controller 回写**
 
-```bash
+```bash linenums="0"
 kubectl -n todo-dev get todoapp todo-platform \
   -o jsonpath='observed={.status.observedGeneration} reasons={.status.conditions[*].reason}{"\n"}'
 ```
@@ -1153,7 +1147,7 @@ kubectl -n todo-dev get todoapp todo-platform \
 
 **第五层：RBAC 权限最小化**
 
-```bash
+```bash linenums="0"
 kubectl auth can-i list todoapps \
   --api-group=platform.todo.example.com \
   --as=system:serviceaccount:todo-dev:todo-handwritten-controller \
@@ -1175,7 +1169,7 @@ kubectl auth can-i create deployments \
 
 如果准备继续第 38 篇，可以保留 CRD 和样例 CR，只删除本篇手写 Controller：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-dev delete deployment todo-handwritten-controller --ignore-not-found
 kubectl -n todo-dev delete rolebinding todo-handwritten-controller --ignore-not-found
 kubectl -n todo-dev delete role todo-handwritten-controller --ignore-not-found
@@ -1184,7 +1178,7 @@ kubectl -n todo-dev delete serviceaccount todo-handwritten-controller --ignore-n
 
 如果要彻底清理本篇样例 CR：
 
-```bash
+```bash linenums="0"
 kubectl -n todo-dev delete todoapp todo-platform --ignore-not-found
 ```
 
@@ -1198,7 +1192,7 @@ kubectl -n todo-dev delete todoapp todo-platform --ignore-not-found
 
 - **现象**：
 
-  ```text
+  ```text linenums="0"
   the server could not find the requested resource
   ```
 
@@ -1206,7 +1200,7 @@ kubectl -n todo-dev delete todoapp todo-platform --ignore-not-found
 
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   kubectl get crd todoapps.platform.todo.example.com
   kubectl api-resources --api-group=platform.todo.example.com
   ```
@@ -1215,7 +1209,7 @@ kubectl -n todo-dev delete todoapp todo-platform --ignore-not-found
 
 - **修复**：
 
-  ```bash
+  ```bash linenums="0"
   kubectl apply --server-side -f operator/crds/base
   kubectl wait --for=condition=Established crd/todoapps.platform.todo.example.com --timeout=60s
   ```
@@ -1228,7 +1222,7 @@ kubectl -n todo-dev delete todoapp todo-platform --ignore-not-found
 
 - **现象**：
 
-  ```text
+  ```text linenums="0"
   forbidden: User "system:serviceaccount:todo-dev:todo-handwritten-controller" cannot patch resource "todoapps/status"
   ```
 
@@ -1236,7 +1230,7 @@ kubectl -n todo-dev delete todoapp todo-platform --ignore-not-found
 
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   kubectl auth can-i patch todoapps \
     --api-group=platform.todo.example.com \
     --subresource=status \
@@ -1256,7 +1250,7 @@ kubectl -n todo-dev delete todoapp todo-platform --ignore-not-found
 
 - **现象**：
 
-  ```text
+  ```text linenums="0"
   the server doesn't have a resource type "TodoApp"
   ```
 
@@ -1264,7 +1258,7 @@ kubectl -n todo-dev delete todoapp todo-platform --ignore-not-found
 
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   grep -n 'Resource:' operator/handwritten/main.go
   kubectl api-resources --api-group=platform.todo.example.com
   ```
@@ -1273,7 +1267,7 @@ kubectl -n todo-dev delete todoapp todo-platform --ignore-not-found
 
 - **修复**：
 
-  ```go
+  ```go linenums="0"
   Resource: "todoapps",
   ```
 
@@ -1285,7 +1279,7 @@ kubectl -n todo-dev delete todoapp todo-platform --ignore-not-found
 
 - **现象**：
 
-  ```text
+  ```text linenums="0"
   ErrImagePull
   ImagePullBackOff
   ```
@@ -1294,7 +1288,7 @@ kubectl -n todo-dev delete todoapp todo-platform --ignore-not-found
 
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   kind get clusters
   kubectl -n todo-dev describe pod -l app.kubernetes.io/name=todo-handwritten-controller
   ```
@@ -1303,7 +1297,7 @@ kubectl -n todo-dev delete todoapp todo-platform --ignore-not-found
 
 - **修复**：
 
-  ```bash
+  ```bash linenums="0"
   docker build -t todo-handwritten-controller:v0.1.0 operator/handwritten
   kind load docker-image todo-handwritten-controller:v0.1.0 --name todo-gitops
   kubectl -n todo-dev rollout restart deployment/todo-handwritten-controller
@@ -1317,7 +1311,7 @@ kubectl -n todo-dev delete todoapp todo-platform --ignore-not-found
 
 - **现象**：没有修改 `spec`，日志里仍然反复出现同一个对象的 `enqueue` 和 `reconciled`。
 
-  ```text
+  ```text linenums="0"
   enqueue todo-dev/todo-platform
   reconciled todo-dev/todo-platform generation=3 observedGeneration=3
   enqueue todo-dev/todo-platform
@@ -1328,7 +1322,7 @@ kubectl -n todo-dev delete todoapp todo-platform --ignore-not-found
 
 - **排查**：
 
-  ```bash
+  ```bash linenums="0"
   kubectl -n todo-dev get todoapp todo-platform \
     -o jsonpath='generation={.metadata.generation} observed={.status.observedGeneration}{"\n"}'
   kubectl -n todo-dev logs deployment/todo-handwritten-controller --tail=80
@@ -1359,109 +1353,13 @@ kubectl -n todo-dev delete todoapp todo-platform --ignore-not-found
 - [client-go dynamic informer package](https://pkg.go.dev/k8s.io/client-go/dynamic/dynamicinformer)
 - [client-go workqueue package](https://pkg.go.dev/k8s.io/client-go/util/workqueue)
 
-## 8. 本章小项目
+## 8. 练习题与面试题
 
-### 8.1 项目产出
+本章练习题和面试题已拆分到独立页面，完成正文学习后再进入题库练习与复盘。
 
-本章完成手写 TodoApp Controller，产出：
+[查看本章练习题与面试题](../../questions/stage-06-platform-operator/37-handwritten-controller.md)
 
-- `operator/handwritten/go.mod`
-- `operator/handwritten/main.go`
-- `operator/handwritten/controller.go`
-- `operator/handwritten/Dockerfile`
-- `operator/handwritten/manifests/rbac.yaml`
-- `operator/handwritten/manifests/deployment.yaml`
-- `operator/handwritten/samples/todoapp.yaml`
-
-图 37-2 展示本章产物和后续章节关系：
-
-```mermaid
-flowchart TD
-    CRD["Ch35 TodoApp CRD"] --> Design["Ch36 Controller Design"]
-    Design --> Handwritten["Ch37 Handwritten Controller"]
-    Handwritten --> Status["Patch TodoApp Status"]
-    Handwritten --> Kubebuilder["Ch38 Kubebuilder Controller"]
-    Kubebuilder --> Workload["Create Deployment and Service"]
-    Workload --> Advanced["Ch39 OwnerReference / Finalizer / Webhook"]
-```
-
-### 8.2 能力验收标准
-
-| 能力 | 验收标准 |
-|---|---|
-| client-go 项目搭建 | 能完成 `go mod tidy`、`go test ./...`、`go vet ./...`、`go build ./...` |
-| Informer 监听 | 能解释 dynamic informer 如何通过 GVR Watch `TodoApp` |
-| Workqueue 使用 | 能说明 `AddRateLimited`、`Forget`、`Done` 的职责 |
-| Reconcile 编写 | 能从缓存读取对象，并在对象删除时正常返回 |
-| status 回写 | 能通过 `/status` 子资源 patch `conditions` |
-| RBAC 最小化 | 能证明 SA 可以写 `todoapps/status`，但不能创建 Deployment |
-| 集群部署 | 能把镜像加载到 kind，并让 Controller Pod 正常运行 |
-
-## 9. 本章练习题
-
-**基础题**
-
-1. dynamic client 为什么使用 GVR，而不是直接使用 YAML 中的 kind？
-2. 为什么事件处理器只入队 `namespace/name`，不直接在事件回调里 patch status？
-3. `WaitForCacheSync` 解决了什么启动竞态？
-4. 为什么 status 子资源需要单独的 RBAC？
-5. 本篇为什么不写 `Available=True`？
-
-**实操题**
-
-1. 把 `--workers=1` 改成 `--workers=2` 部署，观察日志是否仍然能正常 Reconcile 同一个 `TodoApp`。
-2. 修改 `TodoApp.spec.image`，验证 `metadata.generation` 增加后 `status.observedGeneration` 会跟上。
-3. 临时删除 `todoapps/status` RBAC 权限，观察 Controller 日志中的 forbidden 错误，再恢复权限。
-
-**思考题**
-
-1. 如果要让本篇 Controller 创建 Deployment，需要新增哪些 RBAC、代码结构和状态判断？
-2. 为什么生产 Controller 通常需要 leader election？
-3. 如果 `TodoApp` 有上千个实例，Informer 缓存、worker 数和队列指标应该如何设计？
-
-## 10. 本章面试题
-
-### 面试题 1：手写 Controller 的核心组件有哪些？
-
-**一句话结论**：client-go 手写 Controller 通常由 client、Informer、Indexer、Workqueue、Worker 和 Reconcile 组成。
-
-**展开解释**：client 负责访问 API server；Informer 负责 List-Watch 并维护本地缓存；Indexer 提供按 key 读取对象；Workqueue 提供去重、重试和限速；Worker 从队列取 key；Reconcile 根据当前状态做调谐并写回 status。
-
-**深入追问**：为什么不是收到事件就直接处理？因为事件对象可能过期，Reconcile 应该从缓存或 API server 读取当前状态。
-
-### 面试题 2：dynamic client 和 typed client 怎么选？
-
-**一句话结论**：dynamic client 适合不想生成类型的通用操作，typed client 适合生产 Operator 的类型安全开发。
-
-**展开解释**：dynamic client 操作 `unstructured.Unstructured`，只需要 GVR，不需要 Go 类型；typed client 需要类型、Scheme 和 clientset，但字段访问有编译期检查。Kubebuilder 会生成类型并使用 controller-runtime client，属于 typed 开发体验。
-
-**深入追问**：dynamic client 最大风险是什么？字段路径是字符串，重构时编译器帮不上忙，容易把 `spec.replicas`、`status.conditions` 这类字段拼错。
-
-### 面试题 3：为什么写 status 要走 `/status` 子资源？
-
-**一句话结论**：`spec` 是用户期望，`status` 是系统观察结果，二者应由不同主体写入并分别授权。
-
-**展开解释**：用户或 GitOps 系统修改 spec；Controller 回写 status。开启 status subresource 后，主资源 update/patch 不会顺手修改 status，Controller 必须请求 `/status` 路径。RBAC 也可以只授予 Controller 写 status 的权限，减少误改 spec 的风险。
-
-**深入追问**：如果 RBAC 只有 `todoapps` 的 patch 权限，能写 status 吗？不能。需要 `todoapps/status` 的 patch 或 update 权限。
-
-### 面试题 4：Workqueue 中 `Forget` 和 `Done` 有什么区别？
-
-**一句话结论**：`Done` 表示本次处理结束，`Forget` 表示清理该 key 的重试历史。
-
-**展开解释**：每次 `Get` 之后都应该 `Done`，否则队列会认为该 key 仍在处理。Reconcile 成功后还要 `Forget`，否则 rate limiter 可能保留失败历史，后续同一个 key 的重试延迟会异常增长。
-
-**深入追问**：失败时先 `Done` 还是先 `AddRateLimited`？本篇用 `defer Done`，失败分支调用 `AddRateLimited` 后返回。client-go 队列会处理好重入队状态，但生产代码要遵循官方推荐模式，避免漏掉 `Done` 和 `Forget`。
-
-### 面试题 5：为什么本篇没有创建 Deployment？
-
-**一句话结论**：本篇目标是理解手写控制循环，创建子资源会引入 OwnerReference、资源模板、更新策略、RBAC 扩展和真实 Ready 判断，适合放到下一步。
-
-**展开解释**：一个能写 status 的最小 Controller 已经覆盖 Informer、Workqueue、Reconcile、RBAC、status subresource 和部署流程。第 38 篇使用 Kubebuilder 后再创建 Deployment/Service，能更清楚地对比框架封装和手写样板代码。
-
-**深入追问**：如果非要在本篇创建 Deployment，最容易出错的地方是什么？幂等更新、OwnerReference、selector 不可变字段、status 真实性和 RBAC 权限范围。
-
-## 11. 本章总结
+## 9. 本章总结
 
 本篇完成了阶段六的第一个真实 Controller。知识上，你理解了 dynamic client、GVR、SharedInformer、Indexer、Workqueue、Reconcile、status subresource 和 RBAC 如何组合成一个最小控制循环。
 
@@ -1469,7 +1367,7 @@ flowchart TD
 
 工程价值上，你已经能解释 Kubebuilder 之前的“裸机制”。这很重要：未来使用框架时，你知道它在帮你管理什么，也知道权限、缓存、队列和 status 出问题时应该从哪里查。
 
-## 12. 下一章衔接
+## 10. 下一章衔接
 
 下一篇第 38 篇会进入 Kubebuilder 入门。我们会用 controller-runtime 重写本篇能力，并进一步让 `TodoApp` 自动创建 Deployment 和 Service。
 

@@ -96,9 +96,42 @@ code, pre {
 }
 
 /* 优化代码块样式 */
+.md-typeset .highlight,
+.md-typeset .highlight pre {
+  border-radius: 0.3rem;
+}
+
 .md-typeset pre > code {
   padding: 1rem;
-  border-radius: 0.3rem;
+  border-radius: 0;
+  font-size: inherit;
+}
+
+.md-typeset .highlight pre:has(> code > span:only-child) .md-code__nav {
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.md-typeset .highlighttable .linenos pre,
+.md-typeset .highlighttable .code pre,
+.md-typeset .highlighttable .code pre > code {
+  line-height: 1.5;
+  padding: 0;
+}
+
+.md-typeset .highlighttable .linenos {
+  padding-top: 0;
+  padding-bottom: 0;
+  font-size: inherit;
+  line-height: 1.5;
+}
+
+.md-typeset .highlighttable .linenodiv,
+.md-typeset .highlighttable .linenos pre,
+.md-typeset .highlighttable .linenos .normal,
+.md-typeset .highlighttable .linenos a {
+  font-size: inherit;
+  line-height: 1.5;
 }
 
 .md-typeset .highlight.terminal-prompt .code code > span,
@@ -128,7 +161,7 @@ code, pre {
 }
 
 /* 优化行内代码样式 */
-.md-typeset code {
+.md-typeset :not(pre) > code {
   padding: 0.2rem 0.4rem;
   border-radius: 0.2rem;
   font-size: 0.9em;
