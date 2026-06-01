@@ -1,0 +1,56 @@
+# 阶段五验证总结
+
+- 阶段结论：修改后通过
+- 已验证章节：29-cicd, 30-gitops-argocd, 31-prometheus-grafana, 32-logging-opentelemetry, 33-k8s-troubleshooting
+- 已验证产物：
+  - GitHub Actions / 镜像构建链路
+  - Argo CD Application / AppProject / GitOps dev overlay
+  - PrometheusRule / ServiceMonitor / Grafana dashboard
+  - Loki / Tempo / Grafana Alloy / OTel trace 链路
+  - 7 类故障演练 YAML 与 cleanup 脚本
+  - 阶段五总体验收命令
+- 失败项：
+  - P0：无
+  - P1：
+    - `observability/loki/loki-values.yaml` 需要临时将 `loki-gateway` 改成 `Recreate`，否则单节点 kind 上会被 `podAntiAffinity` + RollingUpdate 卡住
+    - `observability/loki/loki-values.yaml` / 运行时 Helm 状态需要回收旧 gateway ReplicaSet，避免残留 Docker Hub 镜像引用
+    - `docs/chapters/stage-05-production-engineering/33-k8s-troubleshooting.md` 里的原始故障 Pod/容器清单在 `pod-security.kubernetes.io/enforce=restricted` 命名空间下会被拒绝，实际演练需补齐 securityContext
+  - P2：
+    - `mkdocs build --strict` 在当前仓库因全局 nav 警告失败，不是阶段五章节本身语法错误
+    - `kubectl -n observability port-forward service/tempo 3200:3100` 与实际 Service 端口不符，真实端口是 `3200:3200`
+    - 课程文本里 `X-Request-ID` 关联日志的实测路径和章节描述不完全一致，日志里可稳定拿到 `trace_id`，但阶段验证中需要按实际输出再对齐查询窗口
+- 网络/镜像源问题：
+  - 外网依赖已按代理执行
+  - 所需镜像可在 `registry.cn-guangzhou.aliyuncs.com/yleoer` 获取
+  - `mkdocs` 安装依赖时可通过代理访问 PyPI
+- 需要修改的课程文档位置：
+  - `docs/chapters/stage-05-production-engineering/33-k8s-troubleshooting.md`
+  - `docs/chapters/stage-05-production-engineering/32-logging-opentelemetry.md`
+  - `docs/chapters/stage-05-production-engineering/stage-05-acceptance.md`
+  - `docs/chapters/stage-05-production-engineering/30-gitops-argocd.md`
+- 需要实机复测的命令：
+  - `kubectl -n todo-dev port-forward service/todo-platform 18080:http`
+  - `kubectl -n observability port-forward service/loki-gateway 3100:80`
+  - `kubectl -n observability port-forward service/tempo 3200:3200`
+  - `kubectl -n monitoring port-forward service/monitoring-grafana 3000:80`
+  - `kubectl -n todo-dev exec todo-dns-client -- nslookup kubernetes.default.svc.cluster.local`
+  - `kubectl -n todo-dev describe pod todo-oom-demo`
+  - `kubectl -n todo-dev describe pvc todo-trouble-data`
+  - `kubectl -n todo-dev describe pod todo-pending-demo`
+  - `kubectl -n argocd get applications.argoproj.io todo-platform-dev -o yaml`
+- 可加入教材附录的命令清单：
+  - `mkdocs build --strict`
+  - `go test ./...`
+  - `go build ./...`
+  - `kubectl get nodes`
+  - `kubectl get namespace todo-dev monitoring observability argocd`
+  - `kubectl -n todo-dev rollout status deployment/todo-platform --timeout=180s`
+  - `kubectl -n todo-dev get svc,endpointslice,pod`
+  - `argocd app get todo-platform-dev`
+  - `argocd app sync todo-platform-dev --timeout 300`
+  - `argocd app wait todo-platform-dev --sync --health --timeout 300`
+  - `kubectl -n monitoring get pod`
+  - `kubectl -n monitoring get servicemonitor,prometheusrule`
+  - `kubectl -n observability get pod,svc`
+  - `kubectl -n observability logs daemonset/alloy --tail=80`
+  - `./troubleshooting/k8s/99-cleanup.sh`
