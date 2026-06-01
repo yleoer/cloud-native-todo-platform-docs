@@ -37,23 +37,6 @@ Go 服务运行在 Linux 之上，无论是物理服务器、虚拟机、Docker 
 - 能使用 `ln -s` 创建软链接，并解释它在版本发布和回滚中的作用。
 - 能为 Todo 平台创建服务器目录结构，并运行脚本验证目录、文件、权限和软链接是否正确。
 
-你至少应该能独立完成下面这组任务：
-
-```bash linenums="0"
-pwd
-ls -lah
-mkdir -p server/todo-platform/{config,logs,data,tmp,releases}
-cp server/todo-platform/config/app.env server/todo-platform/config/app.env.bak
-grep "ERROR" server/todo-platform/logs/todo-api.log
-find server/todo-platform -name "*.env"
-chmod 640 server/todo-platform/config/app.env
-stat server/todo-platform/config/app.env
-tar -czf server/todo-platform-backup.tar.gz server/todo-platform
-ln -sfn releases/2026-05-27-001 server/todo-platform/current
-```
-
-这些命令看起来朴素，却是后端开发、DevOps、SRE 和 Kubernetes 排障每天都会用到的基本功。
-
 ## 2. 本章工作场景与真实案例
 
 ### 2.1 技术痛点
@@ -439,15 +422,6 @@ flowchart LR
 cd ~/workspace/cloud-native-todo-platform
 ```
 
-推荐环境：
-
-| 项目 | 要求 |
-|---|---|
-| 操作系统 | Ubuntu 24.04 LTS |
-| Shell | Bash 5.x |
-| Git | 已初始化课程仓库 |
-| 核心命令 | `pwd`、`ls`、`mkdir`、`cp`、`mv`、`rm`、`chmod`、`chown`、`id`、`stat`、`cat`、`less`、`grep`、`find`、`tar`、`ln` |
-
 课程示例只按 Ubuntu 24.04 编写。执行实验前用 `pwd` 确认仓库位于 `~/workspace/cloud-native-todo-platform`，不要在临时目录或系统目录中练习删除、权限和软链接命令。
 
 ### 5.3 文件目录结构
@@ -481,15 +455,27 @@ cloud-native-todo-platform/
 tree -a -L 4 server scripts
 ```
 
-如果没有 `tree`，可以用：
+### 5.4 执行命令
+
+先确认你在课程仓库根目录：
 
 ```bash linenums="0"
-find server scripts -maxdepth 4 -print
+pwd
+ls
 ```
 
-### 5.4 完整配置和脚本
+预期能看到 `README.md`、`docs/`、`scripts/` 等目录或文件。
 
-配置文件 `server/todo-platform/config/app.env`：
+创建目录：
+
+```bash linenums="0"
+mkdir -p server/todo-platform/{config,logs,data,tmp,releases/2026-05-27-001}
+mkdir -p scripts
+```
+
+写入配置文件：
+
+将下面内容写入 `server/todo-platform/config/app.env`：
 
 ```text title="server/todo-platform/config/app.env"
 TODO_ENV=dev
@@ -499,7 +485,9 @@ TODO_LOG_DIR=server/todo-platform/logs
 TODO_DATA_DIR=server/todo-platform/data
 ```
 
-示例日志 `server/todo-platform/logs/todo-api.log`：
+写入示例日志：
+
+将下面内容写入 `server/todo-platform/logs/todo-api.log`：
 
 ```text title="server/todo-platform/logs/todo-api.log"
 2026-05-27T09:00:00+08:00 INFO todo-api started env=dev addr=127.0.0.1:8080
@@ -507,7 +495,71 @@ TODO_DATA_DIR=server/todo-platform/data
 2026-05-27T09:00:10+08:00 ERROR request_id=req-002 method=GET path=/todos status=500 error="database not configured"
 ```
 
-检查脚本 `scripts/check-server-layout.sh`：
+写入版本说明和数据目录占位文件：
+
+将下面内容写入 `server/todo-platform/releases/2026-05-27-001/README.md`：
+
+```markdown title="server/todo-platform/releases/2026-05-27-001/README.md"
+# Todo Platform Release 2026-05-27-001
+
+This directory simulates an application release package.
+```
+
+继续执行：
+
+```bash linenums="0"
+touch server/todo-platform/data/.keep
+```
+
+创建当前版本软链接：
+
+```bash linenums="0"
+ln -sfn releases/2026-05-27-001 server/todo-platform/current
+```
+
+设置权限：
+
+```bash linenums="0"
+chmod 750 server/todo-platform/{config,logs,data,releases}
+chmod 700 server/todo-platform/tmp
+chmod 640 server/todo-platform/config/app.env
+chmod 640 server/todo-platform/logs/todo-api.log
+```
+
+练习复制、重命名和删除。这里先复制配置文件，再把备份文件重命名为更清晰的 `.backup` 后缀：
+
+```bash linenums="0"
+cp server/todo-platform/config/app.env server/todo-platform/config/app.env.bak
+mv server/todo-platform/config/app.env.bak server/todo-platform/config/app.env.backup
+chmod 640 server/todo-platform/config/app.env.backup
+```
+
+练习查看用户、用户组和权限。`id` 让你知道当前终端用户是谁，`stat` 用来确认文件权限和所有者：
+
+```bash linenums="0"
+id
+stat server/todo-platform/config/app.env
+ls -ld server/todo-platform/{config,logs,data,tmp,releases}
+```
+
+`chown` 用来修改文件所有者，真实服务器通常由管理员或部署脚本执行。本实验目录已经属于当前用户，默认不需要执行 `chown`。如果你曾经误用 `sudo` 创建了 root 拥有的实验文件，可以用下面命令把目录恢复给当前用户：
+
+```bash linenums="0"
+# 可选，仅当实验目录的所有者异常时执行
+sudo chown -R "$(id -un):$(id -gn)" server/todo-platform
+```
+
+练习安全删除。先创建一个明确的临时文件，再删除它；不要对不确定的路径执行 `rm -rf`：
+
+```bash linenums="0"
+touch server/todo-platform/tmp/delete-me.txt
+ls -l server/todo-platform/tmp/delete-me.txt
+rm server/todo-platform/tmp/delete-me.txt
+```
+
+写入检查脚本：
+
+将下面内容写入 `scripts/check-server-layout.sh`，并确认文件使用 LF 换行：
 
 ```bash title="scripts/check-server-layout.sh"
 #!/usr/bin/env bash
@@ -636,112 +688,6 @@ main() {
 main "$@"
 ```
 
-### 5.5 执行命令
-
-先确认你在课程仓库根目录：
-
-```bash linenums="0"
-pwd
-ls
-```
-
-预期能看到 `README.md`、`docs/`、`scripts/` 等目录或文件。
-
-创建目录：
-
-```bash linenums="0"
-mkdir -p server/todo-platform/{config,logs,data,tmp,releases/2026-05-27-001}
-mkdir -p scripts
-```
-
-写入配置文件：
-
-将下面内容写入 `server/todo-platform/config/app.env`：
-
-```text title="server/todo-platform/config/app.env"
-TODO_ENV=dev
-TODO_HTTP_ADDR=127.0.0.1:8080
-TODO_CONFIG_DIR=server/todo-platform/config
-TODO_LOG_DIR=server/todo-platform/logs
-TODO_DATA_DIR=server/todo-platform/data
-```
-
-写入示例日志：
-
-将下面内容写入 `server/todo-platform/logs/todo-api.log`：
-
-```text title="server/todo-platform/logs/todo-api.log"
-2026-05-27T09:00:00+08:00 INFO todo-api started env=dev addr=127.0.0.1:8080
-2026-05-27T09:00:05+08:00 INFO request_id=req-001 method=GET path=/healthz status=200
-2026-05-27T09:00:10+08:00 ERROR request_id=req-002 method=GET path=/todos status=500 error="database not configured"
-```
-
-写入版本说明和数据目录占位文件：
-
-将下面内容写入 `server/todo-platform/releases/2026-05-27-001/README.md`：
-
-```markdown title="server/todo-platform/releases/2026-05-27-001/README.md"
-# Todo Platform Release 2026-05-27-001
-
-This directory simulates an application release package.
-```
-
-继续执行：
-
-```bash linenums="0"
-touch server/todo-platform/data/.keep
-```
-
-创建当前版本软链接：
-
-```bash linenums="0"
-ln -sfn releases/2026-05-27-001 server/todo-platform/current
-```
-
-设置权限：
-
-```bash linenums="0"
-chmod 750 server/todo-platform/{config,logs,data,releases}
-chmod 700 server/todo-platform/tmp
-chmod 640 server/todo-platform/config/app.env
-chmod 640 server/todo-platform/logs/todo-api.log
-```
-
-练习复制、重命名和删除。这里先复制配置文件，再把备份文件重命名为更清晰的 `.backup` 后缀：
-
-```bash linenums="0"
-cp server/todo-platform/config/app.env server/todo-platform/config/app.env.bak
-mv server/todo-platform/config/app.env.bak server/todo-platform/config/app.env.backup
-chmod 640 server/todo-platform/config/app.env.backup
-```
-
-练习查看用户、用户组和权限。`id` 让你知道当前终端用户是谁，`stat` 用来确认文件权限和所有者：
-
-```bash linenums="0"
-id
-stat server/todo-platform/config/app.env
-ls -ld server/todo-platform/{config,logs,data,tmp,releases}
-```
-
-`chown` 用来修改文件所有者，真实服务器通常由管理员或部署脚本执行。本实验目录已经属于当前用户，默认不需要执行 `chown`。如果你曾经误用 `sudo` 创建了 root 拥有的实验文件，可以用下面命令把目录恢复给当前用户：
-
-```bash linenums="0"
-# 可选，仅当实验目录的所有者异常时执行
-sudo chown -R "$(id -un):$(id -gn)" server/todo-platform
-```
-
-练习安全删除。先创建一个明确的临时文件，再删除它；不要对不确定的路径执行 `rm -rf`：
-
-```bash linenums="0"
-touch server/todo-platform/tmp/delete-me.txt
-ls -l server/todo-platform/tmp/delete-me.txt
-rm server/todo-platform/tmp/delete-me.txt
-```
-
-写入检查脚本：
-
-将 5.4 中的完整脚本保存为 `scripts/check-server-layout.sh`。推荐用 VS Code 新建文件后粘贴脚本内容，并确认文件使用 LF 换行。
-
 保存后赋予执行权限：
 
 ```bash linenums="0"
@@ -774,7 +720,7 @@ tar -tzf server/todo-platform-backup.tar.gz | head
 ./scripts/check-server-layout.sh
 ```
 
-### 5.6 预期输出
+### 5.5 预期输出
 
 查看软链接时，预期类似：
 
@@ -817,7 +763,7 @@ current -> releases/2026-05-27-001
 Server layout check completed.
 ```
 
-### 5.7 验证方法
+### 5.6 验证方法
 
 集中执行下面命令：
 
@@ -848,7 +794,7 @@ tar -tzf server/todo-platform-backup.tar.gz | head
 - 检查脚本输出 `Server layout check completed.`。
 - 备份包能列出内容。
 
-### 5.8 清理步骤
+### 5.7 清理步骤
 
 如果你只想清理备份包：
 
