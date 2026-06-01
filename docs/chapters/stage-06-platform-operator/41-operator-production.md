@@ -44,16 +44,11 @@
 
 真实企业环境通常会把 Operator 分成开发、预发和生产三套配置。开发环境可以 Watch 一个实验命名空间；预发环境模拟多个租户命名空间；生产环境必须有明确的租户准入标签、资源配额、发布后 smoke test、告警和回滚记录。本篇实验会把这些动作压缩到本地 kind 集群中完成。
 
-### 2.3 课程项目关联
+### 2.3 Todo 平台模拟案例
 
-本篇继续使用第 40 篇的 `<project-root>/operator/kubebuilder/` 和 `<project-root>/operator/helm/todo-operator/`。项目版本线推进到阶段六子版本 `v4.7-operator-production`，它仍属于 `v4.0-operator` 总版本线。
+> Todo Operator 需要进入生产化演练。你需要收敛 RBAC 权限、限制 watch 范围、补充 metrics 和告警、优化性能，并通过 smoke test 验证关键路径。
 
-本篇产出会被后续章节复用：
-
-- 第 42 篇会把生产化后的 Operator 作为 Cloud Native Todo Platform 的最终一键交付入口。
-- 本篇新增的最小权限、Watch 范围、metrics、告警和 smoke test 会成为最终作品集中的“生产可用性证据”。
-- 本篇的事故案例和 checklist 会被第 42 篇整理成面试讲解稿和项目复盘材料。
-
+这个案例用于训练平台工程视角：Operator 自身也是生产组件，它的权限、性能、观测和故障行为都必须被审查。
 ## 3. 核心概念
 
 ### 3.1 Operator 生产化评估矩阵
@@ -206,6 +201,8 @@ flowchart TD
 初学者容易直接调 `MaxConcurrentReconciles`，以为并发提高就能解决性能问题。实际生产中，先减少无关对象和无效事件更重要。如果一个 Operator 本不该处理某个租户命名空间，就不要把它同步进 cache；如果一个 `TodoApp` 没有接管标签，就不要让它进入队列。
 
 ## 5. 手把手实验：把 Todo Operator 收敛到生产基线
+
+本实验预计耗时 90-120 分钟。首次拉取 kind 节点镜像、cert-manager 镜像或重新构建 Operator 镜像时会更久。
 
 ### 5.1 步骤 1：实验目标
 
@@ -1029,7 +1026,11 @@ Kubernetes 对自定义资源配额使用 `count/<resource>.<group>` 形式；�
 
 ```bash linenums="0"
 mkdir -p test/e2e
-cat > test/e2e/run-production-smoke.sh <<'EOF'
+```
+
+将下面内容写入 `test/e2e/run-production-smoke.sh`：
+
+```bash title="test/e2e/run-production-smoke.sh"
 #!/usr/bin/env bash
 set -euo pipefail
 
@@ -1162,7 +1163,11 @@ kubectl delete -f "${managed_file}"
 kubectl wait --for=delete "todoapp/${MANAGED_NAME}" -n "${TENANT_NAMESPACE}" --timeout=120s
 
 echo "production smoke test passed"
-EOF
+```
+
+继续执行：
+
+```bash linenums="0"
 chmod +x test/e2e/run-production-smoke.sh
 ```
 
@@ -1266,8 +1271,9 @@ no
 
 创建被接管的 `TodoApp`：
 
-```bash linenums="0"
-cat >/tmp/todoapp-production-smoke.yaml <<'YAML'
+将下面内容写入 `/tmp/todoapp-production-smoke.yaml`：
+
+```yaml title="/tmp/todoapp-production-smoke.yaml"
 apiVersion: platform.todo.example.com/v1alpha1
 kind: TodoApp
 metadata:
@@ -1279,8 +1285,11 @@ spec:
   image: registry.cn-guangzhou.aliyuncs.com/yleoer/hello:plain-text
   replicas: 2
   port: 80
-YAML
+```
 
+继续执行：
+
+```bash linenums="0"
 kubectl apply -f /tmp/todoapp-production-smoke.yaml
 kubectl rollout status deployment/todo-production-smoke -n todo-team-a --timeout=180s
 kubectl get todoapp todo-production-smoke -n todo-team-a -o yaml
@@ -1295,8 +1304,9 @@ kubectl get todoapp todo-production-smoke -n todo-team-a -o yaml
 
 再创建一个未打接管标签的对象：
 
-```bash linenums="0"
-cat >/tmp/todoapp-unmanaged.yaml <<'YAML'
+将下面内容写入 `/tmp/todoapp-unmanaged.yaml`：
+
+```yaml title="/tmp/todoapp-unmanaged.yaml"
 apiVersion: platform.todo.example.com/v1alpha1
 kind: TodoApp
 metadata:
@@ -1306,8 +1316,11 @@ spec:
   image: registry.cn-guangzhou.aliyuncs.com/yleoer/hello:plain-text
   replicas: 1
   port: 80
-YAML
+```
 
+继续执行：
+
+```bash linenums="0"
 kubectl apply -f /tmp/todoapp-unmanaged.yaml
 sleep 10
 kubectl get deployment todo-unmanaged -n todo-team-a
@@ -1381,8 +1394,6 @@ rm -f /tmp/todo-team-a-quota.yaml /tmp/todoapp-production-smoke.yaml /tmp/todoap
 kubectl get todoapp -A
 helm list -A | grep todo-operator
 ```
-
-本实验预计耗时 90-120 分钟。首次拉取 kind 节点镜像、cert-manager 镜像或重新构建 Operator 镜像时会更久。
 
 ## 6. 常见错误与排障
 
@@ -1513,40 +1524,13 @@ helm list -A | grep todo-operator
 
 **事故案例：RBAC 从 ClusterRole 收敛到 Role 后漏绑租户命名空间。** 某平台团队为了最小权限，把 Operator 从全局 `ClusterRoleBinding` 改成每个租户 namespace 一个 `RoleBinding`。变更在 `todo-team-a` 验证通过后直接推广，但 `todo-team-b` 的 RoleBinding 没有随租户清单同步创建，结果业务方提交的 `TodoApp` 一直处于 Pending，Controller 日志反复出现 forbidden，GitOps 却只显示 CR 已经 apply 成功。复盘结论是：RBAC 收敛不能只看模板 diff，必须把“租户 namespace 列表、ServiceAccount 名称、RoleBinding 生成结果、`kubectl auth can-i` 输出、smoke test”作为同一张发布检查表。这个案例也解释了为什么本篇强调 Watch 范围、RBAC、Helm values 和发布后验证必须一起变更。
 
-## 8. 本章小项目
-
-本章小项目是完成 `<project-root>/operator/kubebuilder/` 和 `<project-root>/operator/helm/todo-operator/` 的生产基线改造。
-
-你需要交付：
-
-- 收敛后的 RBAC marker 和生成的 `config/rbac/role.yaml`。
-- 支持 `WATCH_NAMESPACE` 和 `WATCH_LABEL_SELECTOR` 的 `cmd/main.go`。
-- 支持 predicate 和 Deployment owner index 的 `TodoAppReconciler`。
-- 增强后的 Helm Chart：多副本、leader election、资源限制、安全上下文、PDB、metrics Service、ServiceMonitor、PrometheusRule 和 Webhook namespace selector。
-- 租户命名空间配额样例和发布后 smoke test 脚本。
-
-验收标准：
-
-| 验收项 | 判断方式 |
-|---|---|
-| RBAC 最小权限 | `delete todoapps` 返回 `no`，目标 namespace 创建 Deployment 返回 `yes`，`default` namespace 创建 Deployment 返回 `no` |
-| Watch 范围 | 目标 namespace 中带标签 `TodoApp` 被调谐，未带标签对象不创建 Deployment |
-| 多副本可用 | `replicaCount=2` 时只产生一个 leader，两个 Pod Ready |
-| 资源与安全 | Deployment 中存在 requests/limits、非 root、只读 rootfs 和 drop capabilities |
-| Webhook 范围 | 只有带 admission 标签的 namespace 触发 Webhook |
-| Metrics | `/metrics` 暴露 controller-runtime reconcile 指标 |
-| 告警资源 | 有 Prometheus Operator CRD 时 `ServiceMonitor` 和 `PrometheusRule` 可 apply |
-| Smoke test | 创建、Ready、扩缩容、删除和 finalizer 清理均通过 |
-
-项目完成后，版本线可以标记为 `v4.7-operator-production`。
-
-## 9. 练习题与面试题
+## 8. 练习题与面试题
 
 本章练习题和面试题已拆分到独立页面，完成正文学习后再进入题库练习与复盘。
 
 [查看本章练习题与面试题](../../questions/stage-06-platform-operator/41-operator-production.md)
 
-## 10. 本章总结
+## 9. 本章总结
 
 本篇把 Todo Operator 从“可测试、可发布、可升级”推进到“具备生产基线”。知识上，你建立了 Operator 生产化评估矩阵，理解了最小 RBAC、租户隔离、Watch 范围、cache 调优、predicate、field index、leader election、metrics、日志、Events 和 Conditions 的职责边界。
 
@@ -1554,7 +1538,7 @@ helm list -A | grep todo-operator
 
 能力上，你已经可以从平台工程视角评估一个 Operator 是否适合进入生产：它能影响哪些对象，失败时影响哪些租户，出问题时谁会收到告警，值班人员如何定位，回滚时有哪些边界。这比“能写 Controller”更接近真实岗位要求。
 
-## 11. 下一章衔接
+## 10. 下一章衔接
 
 下一篇第 42 篇会进入阶段六最终综合集成与能力验收。我们会把第 34-41 篇的 Operator 能力串起来，完成 Cloud Native Todo Platform 的最终交付视图：从 Git Push、CI/CD、GitOps、Helm Chart 到 Todo Operator 一键交付整套 Todo 平台。
 

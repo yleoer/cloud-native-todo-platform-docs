@@ -60,19 +60,11 @@ Controller 的价值不是“收到事件就执行一次脚本”，而是把用
 
 SRE 负责观察 Controller 运行状态：队列是否积压、Reconcile 是否频繁失败、API server 是否被打爆、leader election 是否正常、删除是否卡 finalizer。生产 Controller 不是写完逻辑就结束，它本身也要被监控、限流、排障和升级。
 
-### 2.3 课程项目关联
+### 2.3 Todo 平台模拟案例
 
-本篇承接第 35 篇的三个 CRD，输出第 37 篇手写 Controller 的设计草图：
+> Todo 平台需要一个控制循环来响应 `TodoApp` 和底层资源变化。你需要用简化程序模拟 watch、队列、去重、重试和 reconcile 决策，看清 Controller 如何把期望状态推进到实际状态。
 
-- `TodoApp` 变化时，Controller 要创建或更新 Deployment、Service、Ingress 和观测配置。
-- `TodoDatabase`、`TodoCache` 变化时，可能影响 `TodoApp` 的连接信息和 Ready 状态。
-- Deployment、Service、Ingress 等底层资源变化时，也要反向触发拥有者 `TodoApp` 的 Reconcile。
-- Controller 每次 Reconcile 后要更新 `status.observedGeneration`、`readyReplicas` 和 `conditions`。
-
-本篇不连接真实 Kubernetes API，也不依赖 client-go。我们先用一个小程序模拟核心思想，把“控制循环”这件事看清楚。第 37 篇再把同样的模型搬进真实 client-go Controller。
-
-项目版本线进入阶段六子版本 `v4.2-controller-design`，它仍属于 `v4.0-operator` 总版本线。
-
+这个案例不依赖真实 Kubernetes 集群，重点是理解控制器工作模型：事件只负责触发，最终一致性来自可重复执行的 Reconcile。
 ## 3. 核心概念
 
 ### 3.1 Controller 是控制循环
@@ -335,11 +327,11 @@ Index 的意义是把“底层资源变化”快速映射回“哪个主资源�
 
 ## 5. 手把手实验
 
+预计耗时：75 分钟（动手操作约 45 分钟）。
+
 ### 5.1 实验目标
 
 本实验会编写一个不依赖 client-go 的 Go 程序，模拟 Todo Operator 的事件入队、队列去重、失败重试和幂等 Reconcile。
-
-预计耗时：75 分钟（动手操作约 45 分钟）。
 
 ### 5.2 实验环境
 
@@ -395,16 +387,16 @@ operator/
 
 #### 5.4.1 go.mod
 
-下面的 here-doc 写文件方式适用于 Linux、macOS、Git Bash 和 WSL。PowerShell 用户可以用编辑器创建同名文件，或用 PowerShell here-string，文件内容保持一致。
+本节按文件名给出完整内容。请用编辑器创建同名文件，并复制对应内容。
 
 创建 `operator/controller-lab/go.mod`：
 
-```bash linenums="0"
-cat > operator/controller-lab/go.mod <<'EOF'
+将下面内容写入 `operator/controller-lab/go.mod`：
+
+```text title="operator/controller-lab/go.mod"
 module todo-controller-lab
 
 go 1.26
-EOF
 ```
 
 PowerShell 可以使用编辑器创建同名文件，内容保持一致。
@@ -413,8 +405,9 @@ PowerShell 可以使用编辑器创建同名文件，内容保持一致。
 
 创建 `operator/controller-lab/main.go`：
 
-```bash linenums="0"
-cat > operator/controller-lab/main.go <<'GO'
+将下面内容写入 `operator/controller-lab/main.go`：
+
+```go title="operator/controller-lab/main.go"
 package main
 
 import (
@@ -732,10 +725,7 @@ func main() {
 	queue.Shutdown()
 	wg.Wait()
 }
-GO
 ```
-
-这里的 `GO` 只是 here-doc 定界符，作用和常见的 `EOF` 一样；用单引号包住定界符可以避免 shell 展开代码里的变量或反斜杠。
 
 这段程序模拟了几件事：
 
@@ -751,8 +741,9 @@ GO
 
 创建 `operator/controller-lab/controller-design.md`：
 
-```bash linenums="0"
-cat > operator/controller-lab/controller-design.md <<'EOF'
+将下面内容写入 `operator/controller-lab/controller-design.md`：
+
+```markdown title="operator/controller-lab/controller-design.md"
 # Todo Operator Controller Design
 
 ## Primary resource
@@ -799,7 +790,6 @@ cat > operator/controller-lab/controller-design.md <<'EOF'
 - Ingress owner -> TodoApp key
 - TodoDatabase reference -> TodoApp key
 - TodoCache reference -> TodoApp key
-EOF
 ```
 
 ### 5.5 执行命令
@@ -1026,46 +1016,13 @@ Remove-Item -Recurse -Force operator/controller-lab
 - [client-go workqueue package](https://pkg.go.dev/k8s.io/client-go/util/workqueue)
 - [controller-runtime package](https://pkg.go.dev/sigs.k8s.io/controller-runtime)
 
-## 8. 本章小项目
-
-### 8.1 项目产出
-
-本章完成 Todo Operator 控制循环设计，产出：
-
-- `operator/controller-lab/go.mod`
-- `operator/controller-lab/main.go`
-- `operator/controller-lab/controller-design.md`
-
-图 36-3 展示本章产物和后续章节的关系：
-
-```mermaid
-flowchart TD
-    CRD["Ch35 CRDs"] --> Design["Ch36 Controller Design"]
-    Design --> Sim["Informer-Workqueue Simulator"]
-    Design --> Handwritten["Ch37 client-go Controller"]
-    Handwritten --> Runtime["Ch38 controller-runtime / Kubebuilder"]
-    Sim --> Queue["Queue semantics"]
-    Sim --> Reconcile["Idempotent Reconcile"]
-```
-
-### 8.2 能力验收标准
-
-| 能力 | 验收标准 |
-|---|---|
-| 控制循环 | 能画出 Informer、Workqueue、Worker、Reconcile 的关系 |
-| 缓存机制 | 能解释 List-Watch、resourceVersion、缓存同步的作用 |
-| 队列机制 | 能说明去重、dirty、重试和限速的意义 |
-| Reconcile 设计 | 能为 TodoApp 写出幂等 Reconcile 步骤 |
-| Watch 设计 | 能列出 TodoApp 的 primary 和 secondary resources |
-| 实验运行 | 能运行模拟程序并观察 Available=True 输出 |
-
-## 9. 练习题与面试题
+## 8. 练习题与面试题
 
 本章练习题和面试题已拆分到独立页面，完成正文学习后再进入题库练习与复盘。
 
 [查看本章练习题与面试题](../../questions/stage-06-platform-operator/36-controller-informer-workqueue.md)
 
-## 10. 本章总结
+## 9. 本章总结
 
 本篇把第 35 篇的 CRD API 推进到了 Controller 控制循环。你理解了 Controller 为什么要通过 List-Watch 和 Informer 获取变化，为什么要用 Workqueue 把事件变成可控任务，也理解了 Reconcile 为什么必须幂等。
 
@@ -1073,7 +1030,7 @@ flowchart TD
 
 能力上，你已经能为 Todo Operator 设计 Watch、Index 和 Reconcile 步骤。下一篇就可以把这些设计落实到真实 Kubernetes 集群里，用 client-go 手写一个最小 Controller。
 
-## 11. 下一章衔接
+## 10. 下一章衔接
 
 下一篇第 37 篇会进入手写简化版 Controller。我们会把本篇的模拟程序替换成真实 client-go 组件：
 

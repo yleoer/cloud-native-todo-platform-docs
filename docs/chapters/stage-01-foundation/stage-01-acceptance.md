@@ -71,10 +71,13 @@ cloud-native-todo-platform/
 
 创建 `docs/stage-01-acceptance.md`：
 
-````bash linenums="0"
+```bash linenums="0"
 mkdir -p docs
+```
 
-cat > docs/stage-01-acceptance.md <<'EOF'
+将下面内容写入 `docs/stage-01-acceptance.md`：
+
+````markdown title="docs/stage-01-acceptance.md"
 # 阶段一验收记录
 
 ## 基础信息
@@ -145,7 +148,6 @@ bash --version:
 - [ ] 增加 Dockerfile。
 - [ ] 增加 GitHub Actions。
 - [ ] 增加 Kubernetes 部署 YAML。
-EOF
 ````
 
 这份文档是作品集入口之一。面试或复盘时，它能证明你不是只照抄命令，而是能记录环境、验证结果和排障过程。
@@ -156,8 +158,11 @@ EOF
 
 ```bash linenums="0"
 mkdir -p scripts
+```
 
-cat > scripts/check-foundation.sh <<'EOF'
+将下面内容写入 `scripts/check-foundation.sh`：
+
+```bash title="scripts/check-foundation.sh"
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
@@ -260,8 +265,11 @@ main() {
 }
 
 main "$@"
-EOF
+```
 
+继续执行：
+
+```bash linenums="0"
 chmod +x scripts/check-foundation.sh
 ```
 

@@ -31,7 +31,7 @@
 - 能使用 `go fmt`、`go test`、`go run`、`go build` 完成基础开发闭环。
 - 能根据 Go 编译错误定位 package 名、导出标识符、参数数量和类型错误。
 
-本篇结束时，你至少应该能成功执行：
+你至少应该能成功执行：
 
 ```bash linenums="0"
 cd ~/workspace/cloud-native-todo-platform
@@ -55,10 +55,11 @@ go build -o bin/todo-cli ./cmd/todo-cli
 
 本篇的 `todo-cli` 不追求功能复杂，而是训练最基本的协作边界：入口程序放在 `cmd/todo-cli`，业务对象和内存仓库放在 `internal/todo`，命令行解析只负责把用户输入转换为业务调用，业务包不依赖终端输出。
 
-### 2.3 课程项目关联
+### 2.3 Todo 平台模拟案例
 
-`todo-cli` 是 `Cloud Native Todo Platform` 的第一个 Go 业务程序。它的内存存储只适合本篇学习；后续第 8 篇会在此基础上补工程化结构和测试，第 9 篇开始把 Todo 能力迁移到 HTTP API，第 12 篇会引入 PostgreSQL 持久化。你在本篇写下的 `Item`、`Repository`、错误处理和 package 边界，会反复出现在后续章节中。
+> Todo 平台需要一个最小命令行程序，用内存保存待办事项，并支持新增、完成、删除和列表输出。你需要把业务对象、仓储接口、错误处理和输出格式组织成清晰的 Go 代码。
 
+这个案例用于练习 Go 的基础语法和工程边界：即使业务很小，也要让状态变化、输入校验和错误返回可读、可测、可维护。
 ## 3. 核心概念
 
 ### 3.1 Go 程序结构
@@ -343,6 +344,8 @@ if err := run(os.Args[1:], os.Stdin, os.Stdout, os.Stderr); err != nil {
 - 失败时显式 `os.Exit(1)`，方便脚本判断。
 
 ## 5. 手把手实验
+
+预计耗时：70 分钟（动手操作约 45 分钟）。
 
 ### 5.1 实验目标
 
@@ -951,8 +954,6 @@ rm -rf cmd/todo-cli internal/todo bin/todo-cli
 
 本篇使用内存存储，不会产生 `.todo-cli` 数据目录或 JSON 文件。
 
-预计耗时：70 分钟（动手操作约 45 分钟）。
-
 ## 6. 常见错误与排障
 
 ### 错误 1：`go: cannot find main module`
@@ -1129,50 +1130,17 @@ rm -rf cmd/todo-cli internal/todo bin/todo-cli
 5. **错误信息要帮助定位，但不要泄露敏感信息。**
    本篇的错误会告诉你 `id=9` 不存在，这有助于调试。生产系统中，错误信息同样要有上下文，但不能输出密钥、Token、数据库连接串或用户隐私数据。CLI 工具尤其容易被放进 CI 日志，输出内容要经过安全审查。
 
-## 8. 本章小项目
-
-本章小项目：**内存版 Todo CLI v0.1**。
-
-交付物：
-
-- `go.mod`
-- `cmd/todo-cli/main.go`
-- `internal/todo/item.go`
-- `internal/todo/memory_store.go`
-- `bin/todo-cli` 构建产物（可本地生成，不提交）
-
-验收命令：
-
-```bash linenums="0"
-cd ~/workspace/cloud-native-todo-platform
-go fmt ./cmd/todo-cli ./internal/todo
-go test ./...
-go build -o bin/todo-cli ./cmd/todo-cli
-./bin/todo-cli add "验收 todo-cli" add "检查内存存储" list done 1 update 2 "检查 Go module" list delete 1 list
-```
-
-能力验收标准：
-
-| 能力项 | 验收方式 |
-|---|---|
-| Go module | `go list ./...` 能列出本篇两个 package |
-| 结构体与方法 | 能解释 `Item` 和 `Status()` 的职责 |
-| 切片与 map | 能解释为什么 `MemoryStore` 用 map 保存、用切片排序输出 |
-| interface | 能解释 `Repository` 为什么能隔离存储实现 |
-| error | 能解释 `ErrNotFound` 和 `%w` 的作用 |
-| CLI | 能用一条命令完成 add/list/done/update/delete |
-
-## 9. 练习题与面试题
+## 8. 练习题与面试题
 
 本章练习题和面试题已拆分到独立页面，完成正文学习后再进入题库练习与复盘。
 
 [查看本章练习题与面试题](../../questions/stage-02-go-backend/07-go-basics.md)
 
-## 10. 本章总结
+## 9. 本章总结
 
 本篇完成了阶段二的第一步：用 Go 写出一个能运行的业务小程序。你学习了 Go 程序结构、变量和类型、控制流、切片与 map、函数、指针、结构体、方法、interface、error、defer 和 Go module。项目成果上，你创建了 `cmd/todo-cli` 和 `internal/todo`，实现了内存版 Todo CLI v0.1，能在一个进程内完成增删改查。能力价值上，你已经不只是能写零散语法，而是能把业务对象、业务行为、错误边界和工程目录组织成可继续演进的 Go 代码。
 
-## 11. 下一章衔接
+## 10. 下一章衔接
 
 下一篇将进入 Go 工程化与测试。
 

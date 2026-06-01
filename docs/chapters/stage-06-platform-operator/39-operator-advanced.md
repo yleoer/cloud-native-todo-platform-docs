@@ -46,16 +46,11 @@
 
 在真实团队里，Webhook 和 Finalizer 通常需要更严格的变更评审。Webhook 一旦故障，可能导致所有相关 CR 创建或更新失败；Finalizer 一旦写错，可能导致大量资源长期停留在 `Terminating`。因此本篇实验会刻意让每个机制都有验证命令和排障入口，而不是只展示“理想路径”。
 
-### 2.3 课程项目关联
+### 2.3 Todo 平台模拟案例
 
-本篇继续使用第 38 篇的 `<project-root>/operator/kubebuilder/` 项目，并把版本线推进到阶段六子版本 `v4.5-operator-lifecycle`。它仍属于 `v4.0-operator` 总版本线。
+> Todo Operator 需要处理真实生命周期问题。你需要为 `TodoApp` 增加 OwnerReference、Finalizer、Webhook 校验、Conditions、事件记录和异常路径处理。
 
-本篇产出会被后续章节继续复用：
-
-- 第 40 篇会基于本篇的 Webhook、Finalizer 和 Conditions 编写 envtest 与 kind 集成测试，并构建 Operator 镜像。
-- 第 41 篇会在本篇基础上做 RBAC 最小化、Watch 范围限制、性能优化和可观测性增强。
-- 第 42 篇会把最终版 `TodoApp` 用于一条 YAML 交付完整 Todo Platform。
-
+这个案例强调 Operator 不是简单创建 Deployment：删除、升级、非法输入、依赖缺失和状态解释都需要明确的生命周期设计。
 ## 3. 核心概念
 
 ### 3.1 OwnerReference：资源归属关系
@@ -204,7 +199,7 @@ v1alpha1
 | 端口 | `spec.port: integer` | 保持 `spec.port`，但增加命名端口 | 视字段结构而定 |
 | 资源限制 | 无 | `spec.resources.requests/limits` | 可通过默认值补齐 |
 
-本篇小项目的验收重点仍是 `v1alpha1` 生命周期机制，但学习者需要能说清楚：如果下一篇或生产版本把 `spec.image` 拆成结构体，旧 YAML 不能直接失效，必须提供版本转换或至少提供清晰迁移路径。
+本篇实验的验收重点仍是 `v1alpha1` 生命周期机制，但学习者需要能说清楚：如果下一篇或生产版本把 `spec.image` 拆成结构体，旧 YAML 不能直接失效，必须提供版本转换或至少提供清晰迁移路径。
 
 ## 4. 原理深入
 
@@ -280,6 +275,8 @@ flowchart TD
 事件也不能滥用。生产 Controller 不应该每秒记录一次 Normal Event，否则会造成事件噪声。建议只在关键生命周期节点记录，例如 `FinalizerAdded`、`DeploymentCreated`、`Ready`、`CleanupFailed`。
 
 ## 5. 手把手实验
+
+预计耗时：90 分钟（动手操作约 65 分钟）。
 
 ### 5.1 实验目标
 
@@ -1264,15 +1261,15 @@ validatingwebhookconfiguration.admissionregistration.k8s.io/todo-operator-valida
 
 创建一个省略 `image`、`replicas` 和 `port` 的样例，验证 Mutating Webhook 默认值：
 
-```bash linenums="0"
-cat > config/samples/platform_v1alpha1_todoapp_defaults.yaml <<'EOF'
+将下面内容写入 `config/samples/platform_v1alpha1_todoapp_defaults.yaml`：
+
+```yaml title="config/samples/platform_v1alpha1_todoapp_defaults.yaml"
 apiVersion: platform.todo.example.com/v1alpha1
 kind: TodoApp
 metadata:
   name: todo-defaults
   namespace: default
 spec: {}
-EOF
 ```
 
 提交样例：
@@ -1295,8 +1292,9 @@ registry.cn-guangzhou.aliyuncs.com/yleoer/hello:plain-text 2 80
 
 创建一个非法样例，验证 Validating Webhook：
 
-```bash linenums="0"
-cat > config/samples/platform_v1alpha1_todoapp_invalid.yaml <<'EOF'
+将下面内容写入 `config/samples/platform_v1alpha1_todoapp_invalid.yaml`：
+
+```yaml title="config/samples/platform_v1alpha1_todoapp_invalid.yaml"
 apiVersion: platform.todo.example.com/v1alpha1
 kind: TodoApp
 metadata:
@@ -1306,7 +1304,6 @@ spec:
   image: registry.cn-guangzhou.aliyuncs.com/yleoer/nginx:latest
   replicas: 2
   port: 80
-EOF
 ```
 
 提交非法样例：
@@ -1547,8 +1544,6 @@ make undeploy
 kind delete cluster --name todo-operator
 ```
 
-预计耗时：90 分钟（动手操作约 65 分钟）。
-
 ## 6. 常见错误与排障
 
 ### 错误 1：Webhook 报 `x509: certificate signed by unknown authority`
@@ -1685,52 +1680,13 @@ kind delete cluster --name todo-operator
 
 - **不要把所有逻辑都塞进 Webhook**。Webhook 应该快速、确定、无副作用。它不应该访问慢速外部系统，也不应该创建资源。需要长时间等待、调用外部 API、反复重试的工作应该放在 Reconciler 中，通过 Conditions 和 Events 暴露进度。
 
-## 8. 本章小项目
-
-本章小项目是完成 `<project-root>/operator/kubebuilder/` 的 Todo Operator 生命周期增强版。
-
-### 8.1 项目任务
-
-你需要在第 38 篇基础上完成：
-
-- 为 `TodoApp` 增加默认值 Webhook：缺省 `image`、`replicas`、`port` 时自动填入课程默认值。
-- 为 `TodoApp` 增加校验 Webhook：拒绝 `latest` 镜像、超出范围的副本数和非法端口。
-- 为 Reconciler 增加 Finalizer：删除前执行幂等清理函数。
-- 为 Reconciler 增加 Event 和 Conditions：能通过 `kubectl describe` 和 `kubectl get -o yaml` 判断状态。
-- 为 `TodoApp` 写出 `v1alpha1 -> v1beta1` 字段演进表，说明哪些字段需要 conversion webhook。
-- 可选增加 `MutatingAdmissionPolicy` 示例，用于理解 Kubernetes 1.36 的 CEL-based 准入能力。
-
-### 8.2 验收标准
-
-完成后应满足：
-
-- `make generate && make manifests && make test` 通过。
-- `kubectl apply` 省略字段的 `TodoApp` 后，能看到默认 `image`、`replicas`、`port`。
-- `kubectl apply` 非法 `TodoApp` 会被 Webhook 拒绝，并返回可读错误。
-- 删除 `TodoApp` 时能观察到 finalizer，然后对象最终被清理。
-- `kubectl describe todoapp` 能看到关键 Event。
-- `kubectl get todoapp -o yaml` 能看到 `Ready` 或 `Deleting` Condition。
-- 能解释 `spec.image` 从字符串拆分为结构体时为什么需要 conversion webhook。
-
-### 8.3 建议提交内容
-
-```text linenums="0"
-operator/kubebuilder/api/v1alpha1/todoapp_types.go
-operator/kubebuilder/internal/controller/todoapp_controller.go
-operator/kubebuilder/internal/webhook/v1alpha1/todoapp_webhook.go
-operator/kubebuilder/cmd/main.go
-operator/kubebuilder/config/
-```
-
-不要提交本地 kind 集群缓存、临时日志、构建产物、二进制文件或个人 IDE 配置。
-
-## 9. 练习题与面试题
+## 8. 练习题与面试题
 
 本章练习题和面试题已拆分到独立页面，完成正文学习后再进入题库练习与复盘。
 
 [查看本章练习题与面试题](../../questions/stage-06-platform-operator/39-operator-advanced.md)
 
-## 10. 本章总结
+## 9. 本章总结
 
 本篇把 Todo Operator 从“能创建子资源”推进到“能管理生命周期”。知识上，你理解了 OwnerReference、Finalizer、Admission Webhook、MutatingAdmissionPolicy、Conditions、Events、重试策略和多版本 CRD 的职责边界。它们不是零散高级特性，而是生产 Operator 必须面对的 API 生命周期问题。
 
@@ -1738,7 +1694,7 @@ operator/kubebuilder/config/
 
 能力上，你已经能从平台工程视角评价一个 Operator 是否具备生产雏形：输入是否被约束，删除是否可控，状态是否可读，错误是否可排查，API 是否有升级路径。下一步要把这些能力纳入自动化测试、镜像构建、发布和升级流程。
 
-## 11. 下一章衔接
+## 10. 下一章衔接
 
 下一篇第 40 篇会基于本篇 `operator/kubebuilder/` 继续推进 Operator 测试、发布与升级。我们会为 Webhook 默认值、Webhook 校验、Finalizer 删除、Conditions 回写和 Deployment/Service 调谐编写 envtest 与 kind 集成测试。
 

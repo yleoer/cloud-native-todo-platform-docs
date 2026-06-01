@@ -35,7 +35,7 @@
 - 第 16 篇：本地已经构建 `todo-api:v0.1.0` 镜像。
 - 第 17 篇：理解容器如何通过环境变量读取配置。
 
-本篇命令以 Linux / macOS / WSL2 Bash 为主。Windows 用户建议在 WSL2 Ubuntu 中完成实验；如果使用 PowerShell，请手动创建 YAML 文件，或把 heredoc 改写为 PowerShell here-string。
+本篇命令以 Linux / macOS / WSL2 Bash 为主。Windows 用户建议在 WSL2 Ubuntu 中完成实验；需要创建 YAML 文件时，请按页面给出的文件名手动创建同名文件，并复制对应内容。
 
 !!! warning "不要把本篇示例 Secret 复用到真实环境"
     文中的 JWT Secret、用户名和密码只用于本地教学。真实环境必须使用随机 Secret、受控密钥系统和最小权限 RBAC，不要把真实密码、Token、证书私钥或生产 DSN 提交到 Git。
@@ -67,20 +67,11 @@
 
 配置管理做得好，应用 YAML 会更稳定，环境差异会更可见，敏感信息也不会在仓库、日志和命令历史里到处扩散。
 
-### 2.3 课程项目关联
+### 2.3 Todo 平台模拟案例
 
-阶段四正在把 Todo Platform 从“容器化服务”迁移到 Kubernetes 应用交付：
+> Todo API 的配置不能继续硬编码在 Deployment 中。你需要把普通配置迁移到 ConfigMap，把敏感信息迁移到 Secret，并让 Pod 通过环境变量或文件挂载读取它们。
 
-```text linenums="0"
-第 20 篇：kind 集群和基础对象
-第 21 篇：Todo API Deployment + Probe + HPA
-第 22 篇：Service + Ingress + Gateway API
-第 23 篇：ConfigMap + Secret 配置迁移
-第 24 篇：PostgreSQL + PersistentVolumeClaim（PVC）持久化
-```
-
-第 21 篇为了降低难度，把部分配置直接写在 Deployment 中，并生成了一个本地 Secret。第 23 篇会把这些配置正式拆出来，为后续第 24 篇数据库 DSN、第 27 篇 Helm values、第 28 篇 Kustomize overlay 打好基础。
-
+这个案例关注配置边界：什么能进 Git，什么必须作为敏感信息管理，配置变更后如何触发应用重新加载或重新发布。
 ## 3. 核心概念
 
 ### 3.1 ConfigMap 是什么
@@ -264,9 +255,11 @@ Kubernetes 不会因为 ConfigMap / Secret 更新而自动重建 Deployment Pod�
 
 ## 5. 手把手实验
 
+预计耗时：90 分钟（动手操作约 60 分钟）。
+
 ### 5.1 实验目标
 
-本实验会完成第 23 篇小项目：
+本实验会完成以下配置迁移任务：
 
 - 创建 Todo API 的 ConfigMap，保存非敏感运行参数。
 - 创建 Todo API 的 Secret，保存 JWT Secret 和管理员用户哈希。
@@ -343,8 +336,9 @@ git status --short
 
 创建非敏感配置 `deployments/k8s-base/todo-api-configmap.yaml`：
 
-```bash linenums="0"
-cat > deployments/k8s-base/todo-api-configmap.yaml <<'YAML'
+将下面内容写入 `deployments/k8s-base/todo-api-configmap.yaml`：
+
+```yaml title="deployments/k8s-base/todo-api-configmap.yaml"
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -361,13 +355,13 @@ data:
   TODO_CORS_ALLOWED_ORIGINS: "https://todo.localhost:18443,https://todo-gateway.localhost:18443"
   TODO_PPROF_ENABLED: "false"
   TODO_RELEASE: "chapter-23-config"
-YAML
 ```
 
 创建用于演示文件挂载和热更新的 ConfigMap `deployments/k8s-base/todo-api-config-file.yaml`：
 
-```bash linenums="0"
-cat > deployments/k8s-base/todo-api-config-file.yaml <<'YAML'
+将下面内容写入 `deployments/k8s-base/todo-api-config-file.yaml`：
+
+```yaml title="deployments/k8s-base/todo-api-config-file.yaml"
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -381,7 +375,6 @@ data:
     config version: chapter-23-initial
     owner: platform-team
     purpose: demonstrate ConfigMap volume update
-YAML
 ```
 
 生成本地实验 Secret。`hash-password` 子命令来自第 14 篇，并在第 16 篇镜像构建实验中验证过；如果下面命令提示找不到镜像或子命令，请先回到第 16 篇重新构建 `todo-api:v0.1.0`。
@@ -415,8 +408,9 @@ stringData:
 
 更新 Todo API Deployment，让容器从 ConfigMap / Secret 注入环境变量，并挂载 `runtime-notes.txt`：
 
-```bash linenums="0"
-cat > deployments/k8s-base/todo-api-deployment.yaml <<'YAML'
+将下面内容写入 `deployments/k8s-base/todo-api-deployment.yaml`：
+
+```yaml title="deployments/k8s-base/todo-api-deployment.yaml"
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -488,7 +482,6 @@ spec:
         - name: runtime-config
           configMap:
             name: todo-api-config-file
-YAML
 ```
 
 关键变化：
@@ -502,8 +495,9 @@ YAML
 
 dev 配置：
 
-```bash linenums="0"
-cat > deployments/k8s-base/environments/dev/todo-api-configmap.yaml <<'YAML'
+将下面内容写入 `deployments/k8s-base/environments/dev/todo-api-configmap.yaml`：
+
+```yaml title="deployments/k8s-base/environments/dev/todo-api-configmap.yaml"
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -517,13 +511,13 @@ data:
   TODO_CORS_ALLOWED_ORIGINS: "https://todo.localhost:18443,https://todo-gateway.localhost:18443"
   TODO_PPROF_ENABLED: "false"
   TODO_RELEASE: "chapter-23-dev"
-YAML
 ```
 
 test 配置：
 
-```bash linenums="0"
-cat > deployments/k8s-base/environments/test/todo-api-configmap.yaml <<'YAML'
+将下面内容写入 `deployments/k8s-base/environments/test/todo-api-configmap.yaml`：
+
+```yaml title="deployments/k8s-base/environments/test/todo-api-configmap.yaml"
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -537,13 +531,13 @@ data:
   TODO_CORS_ALLOWED_ORIGINS: "https://todo-test.localhost:18443"
   TODO_PPROF_ENABLED: "false"
   TODO_RELEASE: "chapter-23-test"
-YAML
 ```
 
 prod 配置：
 
-```bash linenums="0"
-cat > deployments/k8s-base/environments/prod/todo-api-configmap.yaml <<'YAML'
+将下面内容写入 `deployments/k8s-base/environments/prod/todo-api-configmap.yaml`：
+
+```yaml title="deployments/k8s-base/environments/prod/todo-api-configmap.yaml"
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -557,7 +551,6 @@ data:
   TODO_CORS_ALLOWED_ORIGINS: "https://todo.example.com"
   TODO_PPROF_ENABLED: "false"
   TODO_RELEASE: "chapter-23-prod"
-YAML
 ```
 
 这三份文件暂时只是教学示例，本篇主线只应用根目录下的 `todo-api-configmap.yaml`。由于它们的对象名和 Namespace 都相同，直接 `kubectl apply -f environments/test/todo-api-configmap.yaml` 会覆盖当前 `todo-api-config`。第 28 篇会用 Kustomize 把这些差异整理成更标准的 overlay；如果你现在就想隔离验证，建议为 dev / test / prod 使用不同 Namespace。
@@ -856,8 +849,6 @@ kubectl auth can-i get secrets -n todo-workloads
 - Pod 内 `TODO_RELEASE` 在 rollout restart 后更新为 `chapter-23-env-updated`。
 - `/healthz` 和 `/readyz` 通过 Service port-forward 返回成功。
 
-预计耗时：90 分钟（动手操作约 60 分钟）。
-
 ### 5.12 清理步骤
 
 如果继续学习第 24 篇，建议保留 `todo-workloads`、Todo API Deployment、Service、Ingress 和本篇 ConfigMap / Secret。第 24 篇会继续在这个 Namespace 中加入 PostgreSQL 和 PVC。
@@ -992,45 +983,13 @@ kubectl -n todo-workloads get secret
 
 8. **稳定配置可以考虑 `immutable: true`。** 对很少变化的 ConfigMap / Secret，设置 immutable 可以减少误改和 kubelet watch 压力。但一旦设置后不能原地修改，只能删除重建，因此不适合频繁变化的运行参数。
 
-## 8. 本章小项目
-
-本章小项目是：**Todo API ConfigMap / Secret 配置迁移**。
-
-### 8.1 项目产出
-
-- `deployments/k8s-base/todo-api-configmap.yaml`：Todo API 非敏感运行配置。
-- `deployments/k8s-base/todo-api-config-file.yaml`：用于演示文件挂载更新的 ConfigMap。
-- `deployments/k8s-base/todo-api-secret.local.yaml`：本地实验 Secret，不提交公开仓库。
-- `deployments/k8s-base/todo-api-deployment.yaml`：引用 ConfigMap / Secret 的 Deployment。
-- `deployments/k8s-base/environments/dev/test/prod/`：三套环境配置示例。
-
-### 8.2 验收标准
-
-基础验收：
-
-- `kubectl -n todo-workloads get configmap todo-api-config` 成功。
-- `kubectl -n todo-workloads get secret todo-api-auth` 成功。
-- `todo-api` Deployment 处于 Ready 状态。
-- Pod 中 `TODO_ENV`、`TODO_API_ADDR`、`TODO_RELEASE` 来自 ConfigMap。
-- Pod 中 JWT Secret 和管理员用户配置来自 Secret。
-- `curl http://127.0.0.1:18082/readyz` 返回成功。
-
-进阶验收：
-
-- 修改 `todo-api-config-file` 后，Pod 内挂载文件能看到新内容。
-- 修改 `TODO_RELEASE` 后，旧 Pod 环境变量不变；执行 `rollout restart` 后新 Pod 获得新值。
-- 能解释 `Opaque`、`tls`、`dockerconfigjson` 三类 Secret 的用途。
-- 能说清为什么 base64 不是加密。
-- 能使用 `kubectl auth can-i get secrets -n todo-workloads` 检查 Secret 读取权限。
-- 能写出 dev / test / prod 配置差异表。
-
-## 9. 练习题与面试题
+## 8. 练习题与面试题
 
 本章练习题和面试题已拆分到独立页面，完成正文学习后再进入题库练习与复盘。
 
 [查看本章练习题与面试题](../../questions/stage-04-kubernetes/23-k8s-config-secret.md)
 
-## 10. 本章总结
+## 9. 本章总结
 
 本篇把 Todo API 的 Kubernetes 部署从“Deployment 里直接写配置值”推进到“ConfigMap / Secret 管理配置来源”。你学习了 ConfigMap 与 Secret 的职责边界，掌握了 `envFrom`、`configMapKeyRef`、`secretKeyRef` 和卷挂载的用法，也验证了环境变量和挂载文件在配置更新时的不同表现。
 
@@ -1038,7 +997,7 @@ kubectl -n todo-workloads get secret
 
 能力价值上，你已经能排查 Kubernetes 配置类故障：对象缺失、key 写错、Secret 引用失败、配置更新不生效、base64 误解和权限边界不清。这些问题在生产集群里非常常见，也是 Kubernetes 应用交付的核心能力。
 
-## 11. 下一章衔接
+## 10. 下一章衔接
 
 第 24 篇会进入 Kubernetes 存储，把 PostgreSQL 迁移进集群，并用 PVC 保存数据库数据。本篇的 ConfigMap / Secret 会直接被下一章复用：数据库用户名、密码、数据库名、连接地址会进入 Secret 和 ConfigMap；PostgreSQL Pod 会依赖 PVC；Todo API 会通过配置切换到集群内数据库。
 

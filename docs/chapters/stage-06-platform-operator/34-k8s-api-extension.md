@@ -67,20 +67,11 @@ spec:
 
 SRE 负责基于 `status.conditions`、Event、日志和指标判断平台是否按预期工作。第 33 篇已经强调：一个合格的系统必须可排障。Operator 不是“把 YAML 藏起来”，而是把意图、实际状态和异常原因写得更清楚。
 
-### 2.3 课程项目关联
+### 2.3 Todo 平台模拟案例
 
-本篇承接第 29-33 篇的生产工程闭环。Todo Platform 已经具备交付、GitOps、监控、日志、Trace 和排障能力；阶段六会把这些能力进一步抽象为平台 API。
+> Todo 平台团队希望应用团队只写一份 `TodoApp` YAML，就能声明镜像、副本、入口、资源规格和观测开关。你需要先设计这个平台 API 的 `spec` 与 `status`，明确用户想要什么、平台反馈什么。
 
-从本篇开始，项目进入 `v4.0-operator` 阶段：
-
-- 第 34 篇：设计 `TodoApp` 自定义资源模型，明确 `spec` 和 `status`。
-- 第 35 篇：实现 `TodoApp`、`TodoDatabase`、`TodoCache` 三个 CRD。
-- 第 36 篇：分析 Controller 需要 Watch 哪些资源，以及 Reconcile 要做什么。
-- 第 37 篇：手写简化版 Controller，理解控制循环本质。
-- 第 38 篇：使用 Kubebuilder 重写 Todo Operator。
-
-本篇产物是 `operator/api-model/` 下的 API 模型草案。它不会直接部署到集群，但会被第 35 篇改造成正式 CRD。
-
+这个案例用于理解 Kubernetes API 扩展：好的自定义资源不是把内部实现暴露出来，而是提供稳定、清晰、可验证的产品契约。
 ## 3. 核心概念
 
 ### 3.1 Kubernetes API 是资源化 API
@@ -401,6 +392,8 @@ flowchart LR
 
 ## 5. 手把手实验
 
+预计耗时：70 分钟。
+
 ### 5.1 实验目标
 
 本篇实验不安装 CRD，也不写 Controller，而是完成三件事：
@@ -408,8 +401,6 @@ flowchart LR
 1. 使用 kubectl 探查 Kubernetes API discovery、GVK、GVR 和 status subresource。
 2. 设计 `TodoApp` 自定义资源实例草案。
 3. 验证在 CRD 尚未安装时，API server 会拒绝未知 kind，从而理解“先有 CRD，再有自定义资源实例”的顺序。
-
-预计耗时：70 分钟。
 
 ### 5.2 实验环境
 
@@ -511,8 +502,9 @@ operator/
 
 创建 `operator/api-model/todoapp-example.yaml`：
 
-```bash linenums="0"
-cat > operator/api-model/todoapp-example.yaml <<'YAML'
+将下面内容写入 `operator/api-model/todoapp-example.yaml`：
+
+```yaml title="operator/api-model/todoapp-example.yaml"
 apiVersion: platform.todo.example.com/v1alpha1
 kind: TodoApp
 metadata:
@@ -537,7 +529,6 @@ spec:
     tracing: true
   rollout:
     strategy: RollingUpdate
-YAML
 ```
 
 PowerShell：
@@ -577,8 +568,9 @@ spec:
 
 创建 `operator/api-model/todoapp-status-example.yaml`：
 
-```bash linenums="0"
-cat > operator/api-model/todoapp-status-example.yaml <<'YAML'
+将下面内容写入 `operator/api-model/todoapp-status-example.yaml`：
+
+```yaml title="operator/api-model/todoapp-status-example.yaml"
 apiVersion: platform.todo.example.com/v1alpha1
 kind: TodoApp
 metadata:
@@ -605,7 +597,6 @@ status:
       message: Latest desired state has been reconciled.
       observedGeneration: 3
       lastTransitionTime: "2026-05-29T10:00:00Z"
-YAML
 ```
 
 PowerShell：
@@ -647,8 +638,9 @@ status:
 
 创建 `operator/api-model/todoapp-api-map.md`：
 
-```bash linenums="0"
-cat > operator/api-model/todoapp-api-map.md <<'MD'
+将下面内容写入 `operator/api-model/todoapp-api-map.md`：
+
+```markdown title="operator/api-model/todoapp-api-map.md"
 # TodoApp API Model
 
 ## GVK
@@ -676,7 +668,6 @@ cat > operator/api-model/todoapp-api-map.md <<'MD'
 | status.readyReplicas | Controller | Observed ready replicas |
 | status.url | Controller | Observed external URL |
 | status.conditions | Controller | Machine-readable resource state |
-MD
 ```
 
 PowerShell：
@@ -1177,12 +1168,12 @@ kubectl -n todo-dev delete deployment api-shape-demo --ignore-not-found
 - **修复**：使用 Conditions 表达状态，包含 `type`、`status`、`reason`、`message`、`lastTransitionTime`。
 - **预防**：把第 33 篇的排障视角前置到 API 设计阶段。
 
-### 错误 7：在 PowerShell 中使用了 Bash heredoc 语法（对应 5.4 节）
+### 错误 7：在 PowerShell 中直接执行 Bash 脚本片段（对应 5.4 节）
 
-- **现象**：复制 `cat <<'YAML'` 后 PowerShell 报语法错误。
-- **原因**：heredoc 是 Bash 语法，PowerShell 使用 here-string，也就是 `@' ... '@`。
+- **现象**：把 Bash 脚本片段直接粘贴到 PowerShell 后报语法错误。
+- **原因**：Bash 与 PowerShell 的重定向、变量和多行文本语法不同。
 - **排查**：确认当前终端是 Git Bash、WSL、Linux/macOS shell，还是 PowerShell。
-- **修复**：使用本篇给出的 PowerShell 版本，或在 Windows 中切换到 Git Bash / WSL。
+- **修复**：按页面给出的文件内容创建文件后，在 Bash、Git Bash 或 WSL 中执行；如果必须使用 PowerShell，需要单独改写为 PowerShell 语法。
 - **预防**：课程命令涉及文件生成时，先看是否有对应操作系统标签。
 
 ## 7. 生产环境注意事项
@@ -1209,47 +1200,13 @@ kubectl -n todo-dev delete deployment api-shape-demo --ignore-not-found
 - [Custom Resources](https://kubernetes.io/docs/concepts/api-extension/custom-resources/)
 - [Extend the Kubernetes API with CustomResourceDefinitions](https://kubernetes.io/docs/tasks/access-kubernetes-api/extend-api-custom-resource-definitions/)
 
-## 8. 本章小项目
-
-### 8.1 项目产出
-
-本章完成 Todo Platform 的第一版 API 模型设计，产出：
-
-- `operator/api-model/todoapp-example.yaml`：`TodoApp` 自定义资源实例草案。
-- `operator/api-model/todoapp-status-example.yaml`：未来 Controller 应回写的 status 草案。
-- `operator/api-model/todoapp-api-map.md`：GVK、GVR 和字段归属说明。
-
-图 34-3 是本章产物和后续章节的关系：
-
-```mermaid
-flowchart TD
-    Model["TodoApp API model"] --> CRD["Ch35 CRD schema"]
-    CRD --> CtrlDesign["Ch36 Controller design"]
-    CtrlDesign --> Handwritten["Ch37 Handwritten controller"]
-    Handwritten --> Kubebuilder["Ch38 Kubebuilder operator"]
-    Model --> Spec["spec: desired platform config"]
-    Model --> Status["status: observed platform state"]
-```
-
-### 8.2 能力验收标准
-
-| 能力 | 验收标准 |
-|---|---|
-| API discovery | 能用 `kubectl api-resources` 找到 Deployment 与 CRD |
-| GVK/GVR 区分 | 能说出 `apps/v1 Deployment` 与 `apps/v1 deployments` 的区别 |
-| 声明式 API | 能解释 `spec.replicas` 和 `status.readyReplicas` 的不同 |
-| CRD 边界 | 能说明 CRD 不会自动创建业务资源，必须有 Controller |
-| status 设计 | 能设计包含 `observedGeneration` 和 `conditions` 的 status |
-| TodoApp 模型 | 能写出 `TodoApp` 的初版 `spec` 与字段归属表 |
-| 跨平台执行 | 能在 Bash 或 PowerShell 中生成同样的 API 模型文件 |
-
-## 9. 练习题与面试题
+## 8. 练习题与面试题
 
 本章练习题和面试题已拆分到独立页面，完成正文学习后再进入题库练习与复盘。
 
 [查看本章练习题与面试题](../../questions/stage-06-platform-operator/34-k8s-api-extension.md)
 
-## 10. 本章总结
+## 9. 本章总结
 
 本篇打开了阶段六的大门。知识上，你理解了 Kubernetes API Machinery 的基本组成：资源化 API、API discovery、GVK、GVR、声明式 API、CRD、自定义资源、Controller、`spec`、`status` 和 Conditions。
 
@@ -1257,7 +1214,7 @@ flowchart TD
 
 能力价值上，你开始从“Kubernetes 使用者”转向“平台 API 设计者”。这一步非常关键：Operator 的核心不是写一堆 Go 代码，而是先设计一个稳定、可演进、可排障的 API。
 
-## 11. 下一章衔接
+## 10. 下一章衔接
 
 下一篇第 35 篇会进入 CRD 设计与实践。我们会把本篇的 `TodoApp` 模型变成真正的 `CustomResourceDefinition`，并继续设计 `TodoDatabase`、`TodoCache` 两个资源。
 

@@ -47,7 +47,7 @@
 - 能继续使用 `http.Server` 设置超时和优雅关闭。
 - 能用 `curl`、`go test ./api/...` 和 `go build` 验证 Gin API 行为。
 
-本篇结束时，你至少应该能成功执行：
+你至少应该能成功执行：
 
 ```bash linenums="0"
 cd ~/workspace/cloud-native-todo-platform
@@ -88,27 +88,11 @@ Gin 解决的不是“不会写 HTTP”的问题，而是“把常见 Web API �
 
 本篇会保持第 9 篇的 `model`、`repository`、`service` 分层，只替换 HTTP 入口层。这样你能清楚看到框架应该停留在哪一层：Gin 属于 Handler 层，它不应该渗透进业务服务层和存储层。
 
-### 2.3 课程项目关联
+### 2.3 Todo 平台模拟案例
 
-本篇会把项目推进到 `v0.3-api-gin`：
+> Todo API 的标准库版本已经能工作，但团队希望引入更完整的 Web 框架能力。你需要使用 Gin 组织路由分组、中间件、参数校验、统一错误返回和 OpenAPI 描述。
 
-```text linenums="0"
-cloud-native-todo-platform/
-├── api/
-│   ├── cmd/todo-api/
-│   └── internal/
-│       ├── handler/
-│       │   └── gin/
-│       ├── model/
-│       ├── repository/
-│       └── service/
-├── cmd/todo-cli/
-├── internal/todo/
-└── go.mod
-```
-
-`api/internal/handler/gin` 是本篇新增的框架版 Handler。第 9 篇留下的 `api/internal/handler/http` 可以继续保留，用来对比标准库版和 Gin 版的差异；本篇会在 service 层保留少量兼容函数，确保 `go test ./api/...` 同时覆盖两套 Handler 时也能通过。第 11 篇会继续围绕这个 API 讲并发、压测和 `context`；第 12 篇会把内存存储替换成 PostgreSQL；后续 Docker 和 Kubernetes 章节会直接运行这个服务。
-
+这个案例关注 API 设计的可维护性：当接口数量变多时，路由、鉴权、日志、错误模型和文档必须保持一致。
 ## 3. 核心概念
 
 ### 3.1 Gin 与 net/http 的关系
@@ -282,6 +266,8 @@ type todoService interface {
 真实生产环境里，API 版本不是随便升级的。只有当响应结构、字段语义、兼容性或行为约定发生破坏性变化时，才应该发布新的主版本路径。
 
 ## 5. 手把手实验
+
+预计耗时：15 分钟阅读，45 分钟动手实验。
 
 ### 5.1 实验目标
 
@@ -1641,8 +1627,6 @@ rm -f bin/todo-api /tmp/todo-openapi.yaml
 
 如果你已经生成了 `api/openapi.yaml`，可以保留它作为接口契约，也可以在最终提交前根据团队约定决定是否纳入版本控制。
 
-预计耗时：15 分钟阅读，45 分钟动手实验。
-
 ## 6. 常见错误与排障
 
 ### 错误 1：`go mod tidy` 拉不到 Gin
@@ -1783,38 +1767,18 @@ rm -f bin/todo-api /tmp/todo-openapi.yaml
 
 5. **优雅关闭要和部署平台配合**。应用调用 `server.Shutdown` 只解决进程内停止接收新请求的问题。进入 Kubernetes 后，还要配合 readiness probe、terminationGracePeriodSeconds、preStop hook 和负载均衡摘流，才能降低滚动更新期间的请求失败率。
 
-## 8. 本章小项目
-
-本章小项目是 **Todo API v2（Gin 框架版）**。项目目标是用 Gin 重构第 9 篇标准库 API，保留业务分层，新增 OpenAPI 文档入口，并通过测试验证核心行为。
-
-交付物包括：
-
-- `api/internal/handler/gin/`：Gin Handler、中间件、响应封装、OpenAPI 文档和测试。
-- `api/cmd/todo-api/main.go`：基于 Gin router 的启动入口。
-- `api/openapi.yaml`：通过 `go run ./api/cmd/todo-api openapi` 生成的 API 文档。
-- 可执行二进制 `bin/todo-api`。
-
-能力验收标准：
-
-- 能执行 `go test ./api/...` 且全部通过。
-- 能执行 `go build -o bin/todo-api ./api/cmd/todo-api` 成功构建。
-- 能启动服务并通过 `curl` 创建、查询、完成和删除 Todo。
-- 能访问 `GET /openapi.yaml` 获取 OpenAPI 文档。
-- 能解释 `gin.Context` 与 `context.Context` 的区别。
-- 能说清楚为什么 Handler 层依赖 `todoService` 接口，而不是直接依赖具体存储。
-
-## 9. 练习题与面试题
+## 8. 练习题与面试题
 
 本章练习题和面试题已拆分到独立页面，完成正文学习后再进入题库练习与复盘。
 
 [查看本章练习题与面试题](../../questions/stage-02-go-backend/10-go-web-api.md)
 
-## 10. 本章总结
+## 9. 本章总结
 
 本篇你完成了 Todo API v2 的 Gin 重构。知识上，你理解了 Gin 与 `net/http` 的关系，掌握了 `gin.Context`、路由组、JSON 绑定、中间件、统一响应、错误码和 OpenAPI 文档。项目成果上，你新增了 `api/internal/handler/gin`，并让 `todo-api` 具备 Gin 路由、结构化日志、请求 ID、panic 恢复、请求超时、请求体限制和文档生成能力。
 
 能力价值上，你现在不仅能“用框架写接口”，还能解释框架背后的 HTTP 模型，知道哪些能力属于 Gin，哪些能力仍然属于标准库和工程治理。这是从初级 API 开发走向可维护后端服务的关键一步。
 
-## 11. 下一章衔接
+## 10. 下一章衔接
 
 第 11 篇会继续基于这个 Todo API 服务讲 Go 并发：请求并发、后台统计任务、`context` 取消、压测和竞态检测都会围绕本篇的 Gin API 展开。如果跳过本篇，后续看到并发请求进入 Handler、Service 和 Repository 时，会缺少清晰的 Web API 边界感。

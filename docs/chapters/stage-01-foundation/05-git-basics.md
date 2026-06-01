@@ -36,7 +36,7 @@
 - 能使用 `git stash` 保存临时修改，使用 `git tag` 标记发布版本。
 - 能为课程项目新增 `.gitignore`、`.gitattributes`、`.gitmessage`、PR 模板和 Git 工作流文档。
 
-本篇结束时，你至少应该能独立完成下面这组任务：
+你至少应该能独立完成下面这组任务：
 
 ```bash linenums="0"
 git status --short --branch
@@ -77,20 +77,11 @@ Git 流程的价值不是让命令变复杂，而是让每次变更都能回答 
 
 本篇训练的不是孤立命令，而是一条真实工作流：从 Issue 创建分支，用清晰提交表达变更，通过 PR/MR 接受审查，合并后用 tag 和历史记录支撑发布追溯。
 
-### 2.3 课程项目关联
+### 2.3 Todo 平台模拟案例
 
-本篇产出会被后续多章复用：
+> Todo 平台进入多人协作阶段。你需要建立分支命名规则、提交信息规范、忽略规则、换行规则和 Pull Request 模板，并完成一次从分支开发到审查合并的模拟流程。
 
-- 第 6 篇会把 `dev.sh`、`check.sh`、`clean.sh` 等脚本纳入 Git 管理。
-- 第 8 到第 14 篇会持续提交 Go API 代码、测试、配置和日志组件。
-- 第 15 到第 19 篇会通过 PR/MR 审查 Dockerfile、Compose 和镜像构建脚本。
-- 第 20 到第 33 篇会通过 Git 管理 Kubernetes YAML、Helm Chart、监控和排障记录。
-- 第 34 到第 41 篇会通过分支和 PR/MR 管理 CRD、Controller、Operator 和发布版本。
-
-本篇真实案例是：
-
-> 团队准备让 `cloud-native-todo-platform` 进入多人协作阶段。你需要建立分支命名规则、提交信息规范、PR/MR 模板、忽略规则和换行规则，并完成一次从分支开发到 PR/MR 合并的完整演练。
-
+这个案例强调 Git 不是单机存档工具，而是团队协作、变更审计和发布追踪的基础设施。
 ## 3. 核心概念
 
 ### 3.1 仓库、工作区、暂存区和提交
@@ -320,6 +311,8 @@ sequenceDiagram
 一个合格 PR/MR 至少应该包含：变更背景、核心改动、验证方法、风险、回滚方案和关联 Issue。
 
 ## 5. 手把手实验
+
+预计耗时：90 分钟（动手操作约 60 分钟）。
 
 ### 5.1 实验目标
 
@@ -613,11 +606,16 @@ git merge docs/issue-5-pr-workflow
 
 预期 `git merge` 会提示冲突。解决冲突：
 
-```bash linenums="0"
-cat > workflow.txt <<'EOF'
+将下面内容写入 `workflow.txt`：
+
+```text title="workflow.txt"
 workflow=main-and-feature
 review=required
-EOF
+```
+
+继续执行：
+
+```bash linenums="0"
 git add workflow.txt
 git commit -m "docs: resolve workflow conflict"
 ```
@@ -900,7 +898,6 @@ git branch -D docs/issue-5-git-workflow
 git push origin --delete docs/issue-5-git-workflow
 ```
 
-预计耗时：90 分钟（动手操作约 60 分钟）。
 
 ## 6. 常见错误与排障
 
@@ -1075,50 +1072,13 @@ git log --all -- .env
 5. **发布必须能从运行版本追溯回源码。**
    后续 Docker 镜像、Helm Chart 和 Operator 版本都应包含 Git commit SHA 或 release tag。线上问题发生时，团队需要从运行中的镜像 tag 反查源码提交、PR/MR、发布说明和回滚目标。不要用不可追溯的 `latest` 作为生产发布依据。
 
-## 8. 本章小项目
-
-本章小项目：**为 `cloud-native-todo-platform` 建立 Git 分支模型和 PR/MR 工作流**。
-
-交付物：
-
-- `.gitattributes`
-- `.gitignore`
-- `.gitmessage`
-- `.github/pull_request_template.md`
-- `docs/contributing/git-workflow.md`
-- 一个功能或文档分支，例如 `docs/issue-5-git-workflow`
-- 一个包含 Summary、Verification、Risk 的 PR/MR
-- 一个本地或远程 tag，例如 `v0.1.0`
-
-验收命令：
-
-```bash linenums="0"
-git status --short --branch
-ls .gitattributes .gitignore .gitmessage .github/pull_request_template.md docs/contributing/git-workflow.md
-git log --oneline -n 5
-git show --check --stat --oneline HEAD
-git branch -vv
-```
-
-能力验收标准：
-
-| 能力项 | 验收方式 |
-|---|---|
-| 分支开发 | 当前变更来自非 `main` 分支，或已通过 PR/MR 合并回 `main` |
-| 提交规范 | `git log --oneline -n 5` 能看出提交目的 |
-| 冲突解决 | 临时仓库中能展示一次冲突和解决提交 |
-| 远程协作 | 分支已推送，`git branch -vv` 显示跟踪远程 |
-| PR/MR 描述 | 真实 PR/MR 或学习笔记中包含 Summary、Verification、Risk |
-| 版本标记 | 能创建并解释 `v0.1.0` tag 的作用 |
-| 安全规则 | `.gitignore` 覆盖 `.env`、密钥和构建产物 |
-
-## 9. 练习题与面试题
+## 8. 练习题与面试题
 
 本章练习题和面试题已拆分到独立页面，完成正文学习后再进入题库练习与复盘。
 
 [查看本章练习题与面试题](../../questions/stage-01-foundation/05-git-basics.md)
 
-## 10. 本章总结
+## 9. 本章总结
 
 本篇建立了企业级 Git 协作的基础模型。你学习了工作区、暂存区、本地仓库、远程仓库、提交历史、分支、`HEAD`、tag、merge、rebase、stash 和 PR/MR 的关系，也理解了冲突、非快进推送和敏感信息泄露这些常见问题如何发生。
 
@@ -1126,7 +1086,7 @@ git branch -vv
 
 能力价值上，你现在可以完成一次从分支开发到 PR/MR 合并的闭环，能写清楚变更背景、验证方法和风险，也能在排障或发布时从 Git 历史追溯变更来源。
 
-## 11. 下一章衔接
+## 10. 下一章衔接
 
 下一篇进入 **第 6 篇：Shell 脚本与自动化基础**。本篇建立的 Git 分支模型、提交规范和 PR/MR 模板，会直接用于管理下一篇的 `dev.sh`、`check.sh`、`clean.sh` 等脚本。
 

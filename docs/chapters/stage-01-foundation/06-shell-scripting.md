@@ -36,7 +36,7 @@
 - 能编写 `clean.sh` 安全清理服务进程、日志和本地运行时目录。
 - 能通过 `bash -n`、ShellCheck 和退出码判断脚本是否适合进入 PR。
 
-本篇结束时，你至少应该能独立完成下面这组命令：
+你至少应该能独立完成下面这组命令：
 
 ```bash linenums="0"
 ./scripts/dev.sh
@@ -83,20 +83,11 @@ flowchart LR
     Check --> CI["CI/CD\n根据退出码判断是否通过"]
 ```
 
-### 2.3 课程项目关联
+### 2.3 Todo 平台模拟案例
 
-本篇产出会被后续章节直接复用：
+> Todo 平台团队希望把“启动服务、检查健康状态、清理旧进程”从口头说明变成固定脚本。你需要编写 `dev.sh`、`check.sh` 和 `clean.sh`，让任何成员都能用同样入口完成本地开发闭环。
 
-- 第 7 篇会在脚本基础上进入 Go CLI 开发。
-- 第 8 到第 14 篇会用 `dev.sh` 和 `check.sh` 支撑本地 Go API 开发。
-- 第 15 到第 19 篇会把本地启动逻辑逐步演进到 Docker 和 Docker Compose。
-- 第 20 到第 33 篇会把健康检查、日志和清理思路迁移到 Kubernetes、Helm 和生产排障。
-- 第 34 到第 41 篇会在 Operator 开发中继续依赖脚本完成代码生成、测试和本地调试。
-
-本篇真实案例是：
-
-> Todo 平台团队希望把“启动服务、检查健康状态、清理旧进程”从口头说明变成固定脚本。你需要编写 `dev.sh`、`check.sh`、`clean.sh`，让任何成员都能在同样的入口上完成本地开发闭环。
-
+这个案例要求脚本具备清晰参数、可重复执行、明确退出码和可读错误信息，避免把人工经验藏在个人终端历史里。
 ## 3. 核心概念
 
 ### 3.1 Shell、Bash 与 shebang
@@ -336,6 +327,8 @@ Shell 不会替代 Docker、Kubernetes、Helm 或 Operator，但它会出现在�
 
 ## 5. 手把手实验
 
+预计耗时：45 到 70 分钟。
+
 ### 5.1 实验目标
 
 本实验会在 `cloud-native-todo-platform` 仓库中创建一套本地自动化脚本：
@@ -347,8 +340,6 @@ Shell 不会替代 Docker、Kubernetes、Helm 或 Operator，但它会出现在�
 - `.github/workflows/scripts-check.yml`：可选 CI 检查脚本语法和 ShellCheck。
 
 完成后，你可以用一组固定命令启动、检查和清理本地 Todo 服务。
-
-预计耗时：45 到 70 分钟。
 
 ### 5.2 实验环境
 
@@ -1443,53 +1434,13 @@ date --version | head -n 1
 5. **脚本也需要代码审查和静态检查。**
    Shell 脚本经常拥有很高权限，质量要求不应低于 Go 代码。关键脚本应经过 PR/MR Review，执行 `bash -n`、ShellCheck 和最小化集成测试。涉及部署、回滚和清理的脚本，还要在预发环境演练后再进入生产流程。
 
-## 8. 本章小项目
-
-本章小项目：**为 `cloud-native-todo-platform` 建立本地 Shell 自动化入口**。
-
-交付物：
-
-- `.env.example`
-- 更新后的 `.gitignore`
-- `scripts/dev.sh`
-- `scripts/check.sh`
-- `scripts/clean.sh`
-- 可选 `.github/workflows/scripts-check.yml`
-- 由脚本生成的 `cmd/todo-dev-server/main.go`
-
-验收命令：
-
-```bash linenums="0"
-test -f .env.example
-test -x scripts/dev.sh
-test -x scripts/check.sh
-test -x scripts/clean.sh
-bash -n scripts/dev.sh scripts/check.sh scripts/clean.sh
-./scripts/dev.sh
-./scripts/check.sh
-curl -fsS http://127.0.0.1:18080/healthz
-./scripts/clean.sh --all
-```
-
-能力验收标准：
-
-| 能力项 | 验收方式 |
-|---|---|
-| 脚本结构 | 3 个脚本都有 shebang、严格模式、函数和清晰日志 |
-| 启动能力 | `dev.sh` 能构建并启动 Todo HTTP 服务 |
-| 检查能力 | `check.sh` 能检查依赖、权限、语法和健康状态 |
-| 清理能力 | `clean.sh --all` 能停止进程并删除运行时目录 |
-| 环境变量 | `.env.example` 存在，`TODO_PORT` 能改变监听端口 |
-| 退出码 | 成功返回 `0`，失败返回非 `0` |
-| 安全性 | `.env` 和 `.todo-platform/` 不进入 Git，删除路径受限制，清理进程前有身份校验思路 |
-
-## 9. 练习题与面试题
+## 8. 练习题与面试题
 
 本章练习题和面试题已拆分到独立页面，完成正文学习后再进入题库练习与复盘。
 
 [查看本章练习题与面试题](../../questions/stage-01-foundation/06-shell-scripting.md)
 
-## 10. 本章总结
+## 9. 本章总结
 
 本篇建立了课程项目的 Shell 自动化基础。你学习了 Shell、Bash、shebang、变量、环境变量、位置参数、条件判断、循环、函数、管道、退出码和 `set -Eeuo pipefail`，也理解了 `.env` 管理、幂等性和安全删除的边界。
 
@@ -1497,7 +1448,7 @@ curl -fsS http://127.0.0.1:18080/healthz
 
 能力价值上，你已经不只是会输入命令，而是能把团队共识沉淀成可复用、可审查、可进入 CI 的自动化入口。后续 Go、Docker、Kubernetes 和 Operator 章节都会建立在这个能力之上。
 
-## 11. 下一章衔接
+## 10. 下一章衔接
 
 下一篇进入 **第 7 篇：Go 语言基础与命令行程序**。本篇的 `dev.sh` 先生成了一个最小 Go HTTP 服务；下一篇会开始正式编写 Go 代码，用命令行方式管理 Todo 数据。
 

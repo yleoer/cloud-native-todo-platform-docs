@@ -17,7 +17,7 @@
 1. 使用 `kubectl get --raw /apis/apps/v1` 找到 `deployments` 的 discovery 信息。验收标准：能指出 `kind`、`namespaced` 和 `verbs`。
 2. 为 `TodoApp` 增加一个 `spec.autoscaling` 草案字段。验收标准：字段只描述期望状态，不包含实际副本数。
 3. 为 `TodoApp` 设计一个 `Degraded` condition 示例。验收标准：包含 `type`、`status`、`reason`、`message` 和 `lastTransitionTime`。
-4. 如果你使用 Windows PowerShell，把本篇 Bash 文件生成命令改写成 PowerShell here-string。验收标准：三个文件内容与 Bash 版本等价。
+4. 如果你使用 Windows PowerShell，手动创建本篇示例文件并复制对应内容。验收标准：三个文件内容与课程正文一致。
 
 **思考题**
 

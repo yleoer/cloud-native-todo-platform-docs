@@ -87,32 +87,11 @@ Dockerfile 的工作不是“把命令写进文件”这么简单。它把服务
 
 本篇实验会模拟这条协作链路：先写 Dockerfile，再构建、运行、扫描、分析和推送镜像。你不仅要能让镜像跑起来，还要能解释为什么这样构建更适合生产交付。
 
-### 2.3 课程项目关联
+### 2.3 Todo 平台模拟案例
 
-本篇会把第 15 篇的临时运行方式：
+> Todo API 需要从“源码挂载后 go run”升级为可发布镜像。你需要编写多阶段 Dockerfile，把二进制、配置、迁移脚本、OCI Label 和非 root 运行用户放进可审查的镜像构建流程。
 
-```text linenums="0"
-registry.cn-guangzhou.aliyuncs.com/yleoer/golang:1.26-bookworm + 源码挂载 + go run ./api/cmd/todo-api serve
-```
-
-升级为可发布镜像：
-
-```text linenums="0"
-todo-api:v0.1.0
-├── /app/todo-api          # 已编译 Go 二进制
-├── /app/configs           # 配置文件
-├── /app/api/migrations    # 数据库迁移脚本
-├── OCI Labels             # 版本、commit、构建时间
-└── nonroot 用户            # 非 root 运行
-```
-
-本篇产出会被后续章节复用：
-
-- 第 17 篇会在 Docker Compose 中直接使用 `todo-api:v0.1.0`，不再用 `golang` 镜像临时运行源码。
-- 第 18 篇会基于本篇镜像观察镜像层、rootfs、进程和文件系统隔离。
-- 第 19 篇会把本篇镜像导入 containerd / kind 节点，观察 Docker、containerd、runc 和 CRI 的关系。
-- 第 29 篇 CI/CD 会把本篇手工构建和推送流程自动化。
-
+这个案例关注镜像质量：体积、权限、构建缓存、版本信息和运行用户都会影响交付安全性和可维护性。
 ## 3. 核心概念
 
 ### 3.1 Dockerfile 是什么
@@ -402,6 +381,8 @@ flowchart LR
 工具只能降低风险，不能替代人工审查。比如漏洞扫描可能发现不了你把 `.env` 复制进镜像，也不能判断某个 Secret 是否已经泄露到构建日志。
 
 ## 5. 手把手实验
+
+预计耗时：120 分钟（阅读约 40 分钟，动手实验约 80 分钟）。
 
 ### 5.1 实验目标
 
@@ -1209,8 +1190,6 @@ docker image ls todo-api
 
 清理时不要删除团队共享 registry 里的生产镜像。生产镜像的删除需要遵守保留策略、回滚策略和审计流程。
 
-预计耗时：120 分钟（阅读约 40 分钟，动手实验约 80 分钟）。
-
 ## 6. 常见错误与排障
 
 ### 错误 1：Dockerfile 找不到 `go.mod` 或 `configs`
@@ -1375,87 +1354,13 @@ docker image ls todo-api
 
 5. **构建流程必须可复现、可缓存、可审计**。本地构建成功不代表 CI 构建稳定。生产流水线应固定 Go 版本、基础镜像标签、构建参数和构建平台；记录 commit、构建时间、构建人或流水线编号；使用 registry 保留策略支持回滚，而不是只保留最新镜像。
 
-## 8. 本章小项目
-
-本章小项目是 **Todo API 生产风格镜像**。目标是把第 15 篇的源码挂载运行方式升级为可发布镜像。
-
-项目产出：
-
-- 根目录 `.dockerignore`。
-- `api/Dockerfile`。
-- 本地镜像 `todo-api:v0.1.0`。
-- Git 标签镜像 `todo-api:git-<commit>`。
-- 本地 registry 镜像 `localhost:5000/todo-api:v0.1.0`。
-- 一份镜像构建记录，可以放入应用仓库 `docs/docker/chapter-16-image-build-record.md`。
-
-最小验收标准：
-
-- `docker build -f api/Dockerfile -t todo-api:v0.1.0 .` 构建成功。
-- `docker image inspect todo-api:v0.1.0 --format '{{.Config.User}}'` 输出 `nonroot:nonroot`。
-- `docker run --rm todo-api:v0.1.0 hash-password "change-me-123"` 能输出 bcrypt 哈希。
-- `docker run --rm ... todo-api:v0.1.0 config-check` 能通过配置检查。
-- `docker run -d --name todo-api ... todo-api:v0.1.0` 后 `/healthz` 返回 `200 OK`。
-- 登录接口能返回 JWT，带 Token 创建 Todo 返回 `201 Created`。
-- 你能解释为什么 Dockerfile 在 `api/` 目录，而构建上下文仍然使用项目根目录。
-
-进阶验收标准：
-
-- `hadolint api/Dockerfile` 无严重问题，或你能解释并记录每个告警的处理决定。
-- `docker history todo-api:v0.1.0` 或 `dive todo-api:v0.1.0` 的层分析结果已记录。
-- `trivy image --severity HIGH,CRITICAL todo-api:v0.1.0` 或 Docker Scout 扫描结果已记录。
-- `docker push localhost:5000/todo-api:v0.1.0` 成功，并能重新 `docker pull`。
-- 你能说明本地教学工具可以临时使用浮动标签，但 CI 中应固定工具版本或 digest。
-
-构建记录模板：
-
-```markdown title="docs/docker/chapter-16-image-build-record.md"
-# Chapter 16 Image Build Record
-
-## 基础信息
-
-- 操作系统：
-- Docker 版本：
-- Git commit：
-- 镜像标签：
-- 构建时间：
-
-## 构建结果
-
-- 构建命令：
-- 镜像大小：
-- Config.User：
-- Entrypoint / Cmd：
-- OCI Label：
-
-## 工具检查
-
-- hadolint 结果：
-- docker history 观察：
-- dive 观察：
-- trivy / Docker Scout 结果：
-
-## 运行验证
-
-- config-check：
-- migrate：
-- /healthz：
-- 登录：
-- 创建 Todo：
-
-## 排障记录
-
-| 问题 | 现象 | 原因 | 修复 | 预防 |
-|---|---|---|---|---|
-|  |  |  |  |  |
-```
-
-## 9. 练习题与面试题
+## 8. 练习题与面试题
 
 本章练习题和面试题已拆分到独立页面，完成正文学习后再进入题库练习与复盘。
 
 [查看本章练习题与面试题](../../questions/stage-03-docker/16-dockerfile.md)
 
-## 10. 本章总结
+## 9. 本章总结
 
 本章把 Todo API 从“用 Go 工具链容器临时运行源码”推进到“可构建、可运行、可扫描、可推送的应用镜像”。你学习了 Dockerfile 指令、构建上下文、`.dockerignore`、镜像层缓存、多阶段构建、非 root 用户、distroless 运行镜像、镜像标签、OCI Label、镜像分析和漏洞扫描。
 
@@ -1463,7 +1368,7 @@ docker image ls todo-api
 
 掌握本章后，你已经具备企业后端服务镜像化的核心能力：能写出可审查的 Dockerfile，能解释镜像每一层为什么存在，能排查构建和运行问题，也能和 DevOps、安全、SRE 团队围绕镜像交付进行有效协作。
 
-## 11. 下一章衔接
+## 10. 下一章衔接
 
 第 17 篇会把本篇构建出的 `todo-api:v0.1.0`、PostgreSQL 18、Redis 8.2 和端口、网络、数据卷、环境变量整理成 Docker Compose 本地编排。也就是说，第 15 篇手动理解运行参数，第 16 篇把 API 变成镜像，第 17 篇再把多容器环境变成一条 `docker compose up` 命令。
 

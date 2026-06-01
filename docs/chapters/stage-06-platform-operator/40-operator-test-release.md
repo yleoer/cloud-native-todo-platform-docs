@@ -44,16 +44,11 @@ Operator 的测试难点不在“能不能写 Go 单元测试”，而在它横�
 
 在企业内部平台中，Operator 常常由平台团队统一发布到多个环境。开发环境可以允许快速迭代；测试环境必须跑端到端验证；生产环境则需要变更审批、镜像不可变 tag、发布前 dry-run、发布后 smoke test 和明确的 rollback 命令。本篇实验会把这些动作简化成学习者能在本地完成的版本。
 
-### 2.3 课程项目关联
+### 2.3 Todo 平台模拟案例
 
-本篇继续使用第 39 篇的 `<project-root>/operator/kubebuilder/` 项目，并新增 `<project-root>/operator/helm/todo-operator/`。项目版本线推进到阶段六子版本 `v4.6-operator-release`，它仍属于 `v4.0-operator` 总版本线。
+> Todo Operator 准备发布给团队使用。你需要编写 envtest、kind 集成测试、镜像构建流程、Helm Chart 和发布校验，证明控制器在真实集群里能工作。
 
-本篇产出会被后续章节继续复用：
-
-- 第 41 篇会基于本篇的测试和发布流水线，继续做 RBAC 最小化、Watch 范围限制、性能和可观测性增强。
-- 第 42 篇会把最终 Operator 作为 Cloud Native Todo Platform 的一键交付入口。
-- 本篇新增的 `test/envtest/`、`test/e2e/` 和 `operator/helm/todo-operator/` 会成为后续生产化改造的安全网。
-
+这个案例关注发布可信度：Controller 逻辑、RBAC、Webhook、镜像、Chart 和安装流程都必须通过自动化验证。
 ## 3. 核心概念
 
 ### 3.1 Operator 测试金字塔
@@ -176,6 +171,8 @@ sequenceDiagram
 回滚也要分层处理。镜像回滚可以通过 `helm rollback` 或重新 `make deploy IMG=...` 完成；CRD 回滚必须先确认没有新字段、新存储版本或新对象依赖。真实生产中，CRD 变化通常需要单独审批和更严格的迁移计划。
 
 ## 5. 手把手实验：为 Todo Operator 建立测试和发布流水线
+
+本实验预计耗时 80-120 分钟。首次下载 envtest、cert-manager 镜像和 kind 节点镜像时会更久。
 
 ### 5.1 步骤 1：实验目标
 
@@ -720,8 +717,11 @@ kubectl wait --for=condition=Available deployment/todo-operator-controller-manag
 
 kubectl get certificate,issuer -n todo-operator-system
 kubectl get svc,endpoints -n todo-operator-system
+```
 
-cat > /tmp/todoapp-e2e.yaml <<'YAML'
+将下面内容写入 `/tmp/todoapp-e2e.yaml`：
+
+```yaml title="/tmp/todoapp-e2e.yaml"
 apiVersion: platform.todo.example.com/v1alpha1
 kind: TodoApp
 metadata:
@@ -731,8 +731,11 @@ spec:
   image: registry.cn-guangzhou.aliyuncs.com/yleoer/hello:plain-text
   replicas: 2
   port: 80
-YAML
+```
 
+继续执行：
+
+```bash linenums="0"
 kubectl apply -f /tmp/todoapp-e2e.yaml
 
 for i in {1..60}; do
@@ -761,8 +764,11 @@ if [[ "${phase} ${ready}" != "Ready 2" ]]; then
 fi
 echo "${phase} ${ready}"
 kubectl get deployment,service -l app.kubernetes.io/instance=todo-e2e
+```
 
-cat > /tmp/todoapp-invalid.yaml <<'YAML'
+将下面内容写入 `/tmp/todoapp-invalid.yaml`：
+
+```yaml title="/tmp/todoapp-invalid.yaml"
 apiVersion: platform.todo.example.com/v1alpha1
 kind: TodoApp
 metadata:
@@ -772,8 +778,11 @@ spec:
   image: registry.cn-guangzhou.aliyuncs.com/yleoer/nginx:latest
   replicas: 2
   port: 80
-YAML
+```
 
+继续执行：
+
+```bash linenums="0"
 if kubectl apply -f /tmp/todoapp-invalid.yaml; then
   echo "invalid TodoApp was accepted unexpectedly"
   exit 1
@@ -793,7 +802,7 @@ fi
 chmod +x test/e2e/run-kind-e2e.sh
 ```
 
-本脚本使用 Bash here-doc 和 `chmod`，Windows 学习者建议在 Git Bash 或 WSL 中运行。如果只能使用 PowerShell，可以把脚本内容保存为 `.ps1`，并把 `cat > file <<'YAML'` 改写为 PowerShell here-string：`@' ... '@ | Set-Content file.yaml`。
+本脚本是 Bash 脚本，内部会生成临时 YAML 文件并依赖 `chmod`。Windows 学习者建议在 Git Bash 或 WSL 中运行，不要直接粘贴到 PowerShell 执行。
 
 默认情况下脚本只把 Operator 镜像加载到本地 kind 集群。若要验证远端镜像仓库，把 `OPERATOR_IMG` 设为完整仓库地址，并设置 `PUSH_IMAGE=true`；脚本会执行 `docker push` 和 `docker manifest inspect`。如果 inspect 失败，不要继续发布 Helm Chart，因为远端集群很可能会进入 `ImagePullBackOff`。
 
@@ -1432,8 +1441,6 @@ rm -f /tmp/todoapp-e2e.yaml /tmp/todoapp-invalid.yaml /tmp/todo-operator-chart.y
 
 如果希望保留集成测试集群继续调试，可以不删除 kind 集群，但要至少卸载 Helm release 和测试 `TodoApp`，避免下一轮实验受旧资源影响。
 
-本实验预计耗时 80-120 分钟。首次下载 envtest、cert-manager 镜像和 kind 节点镜像时会更久。
-
 ## 6. 常见错误与排障
 
 ### 错误 1：envtest 启动失败，提示找不到 kube-apiserver
@@ -1556,40 +1563,13 @@ rm -f /tmp/todoapp-e2e.yaml /tmp/todoapp-invalid.yaml /tmp/todo-operator-chart.y
 
 5. **Helm release 记录不是完整审计**。Helm 能记录模板资源的安装、升级和回滚，但镜像仓库、CRD 迁移、外部证书、集群策略和人工审批也要纳入发布记录。企业环境通常还会把 `helm template` 输出、镜像 digest、测试报告和审批单一起归档。
 
-## 8. 本章小项目
-
-本章小项目是完成 `<project-root>/operator/kubebuilder/` 的测试发布流水线，并新增 `<project-root>/operator/helm/todo-operator/` Chart。
-
-你需要交付：
-
-- Webhook 默认值和校验测试。
-- envtest Reconciler 测试。
-- kind 端到端集成测试脚本。
-- Kustomize 渲染发布清单。
-- Helm 4 Chart。
-- 升级和回滚验证记录。
-
-验收标准：
-
-| 验收项 | 判断方式 |
-|---|---|
-| Webhook 测试 | `go test ./internal/webhook/...` 通过 |
-| envtest | `KUBEBUILDER_ASSETS=... go test ./test/envtest -v` 通过 |
-| kind 集成测试 | `test/e2e/run-kind-e2e.sh` 成功退出 |
-| 镜像发布 | `docker build` 和 `kind load` 成功 |
-| Kustomize 清单 | `kubectl apply --dry-run=server -f dist/todo-operator-v0.3.0.yaml` 通过 |
-| Helm Chart | `helm lint`、`helm install`、`helm upgrade`、`helm rollback` 通过 |
-| CRD 兼容性 | 旧样例 server-side dry-run 通过，`storedVersions` 可解释 |
-
-项目完成后，版本线可以标记为 `v4.6-operator-release`。
-
-## 9. 练习题与面试题
+## 8. 练习题与面试题
 
 本章练习题和面试题已拆分到独立页面，完成正文学习后再进入题库练习与复盘。
 
 [查看本章练习题与面试题](../../questions/stage-06-platform-operator/40-operator-test-release.md)
 
-## 10. 本章总结
+## 9. 本章总结
 
 本篇把 Todo Operator 从“功能完成”推进到“可测试、可发布、可升级”。知识上，你理解了 Operator 测试金字塔：直接 Go 测试保护默认值和校验逻辑，envtest 保护 API server 交互和 Reconciler 行为，kind 集成测试保护 Webhook、RBAC、镜像和真实集群部署链路。
 
@@ -1597,7 +1577,7 @@ rm -f /tmp/todoapp-e2e.yaml /tmp/todoapp-invalid.yaml /tmp/todo-operator-chart.y
 
 能力上，你已经不只是会写 Controller，而是能以平台工程视角回答“这个 Operator 能不能上线”。你知道上线前要测什么，发布时要按什么顺序，回滚时哪些东西不能随便动。这是从开发 Operator 走向维护 Operator 的关键一步。
 
-## 11. 下一章衔接
+## 10. 下一章衔接
 
 下一篇第 41 篇会基于本篇 `operator/kubebuilder/` 和 `operator/helm/todo-operator/` 继续推进 Operator 生产实践。我们会把 RBAC 从“能跑通”收敛到最小权限，增加 Watch 范围控制、资源限制、指标暴露、日志策略和性能优化。
 

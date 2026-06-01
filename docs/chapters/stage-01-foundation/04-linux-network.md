@@ -36,9 +36,9 @@
 - 能使用 `curl`、`wget` 验证 HTTP 状态码、响应头和响应体。
 - 能使用 `dig`、`nslookup`、`getent hosts` 排查 DNS 与系统解析问题。
 - 能使用 `tcpdump` 抓取本机 HTTP 请求，并解释抓包输出中的源地址、目标地址和端口。
-- 能完成 Todo HTTP 服务访问链路小项目，并输出一份排障报告。
+- 能完成 Todo HTTP 服务访问链路排障实验，并输出一份排障报告。
 
-本篇结束时，你至少应该能独立完成下面这组任务：
+你至少应该能独立完成下面这组任务：
 
 ```bash linenums="0"
 ip -br addr
@@ -80,20 +80,11 @@ sudo tcpdump -i lo -nn 'tcp port 18080' -c 6
 
 本篇训练的不是“记住几个命令”，而是建立一套能和团队沟通的排障语言：请求从哪里来，解析到哪里，连到哪个端口，返回了什么状态码，包有没有到达服务端。
 
-### 2.3 课程项目关联
+### 2.3 Todo 平台模拟案例
 
-本篇产出会被后续多章复用：
+> Todo 服务已经监听在本机端口，并提供 `/healthz` 和 `/todos` 两个 HTTP 路径。你需要验证监听地址、DNS 解析、HTTP 状态码和请求链路，并在必要时通过抓包证明请求经过了预期网卡。
 
-- 第 6 篇会把网络检查命令沉淀为 Shell 自动化脚本。
-- 第 9 到第 14 篇会在 Todo API 中继续使用 `/healthz`、`/readyz`、HTTP 状态码和 `curl` 验证。
-- 第 15 到第 17 篇会把本机端口监听扩展到 Docker 端口映射和 Compose 服务访问。
-- 第 20 到第 25 篇会把访问链路扩展到 Kubernetes Pod、Service、Ingress、Gateway API、CoreDNS 和 NetworkPolicy。
-- 第 33 篇生产排障会继续使用本篇的 DNS、端口、HTTP、抓包和排障记录方法。
-
-本篇真实案例是：
-
-> 团队把 Todo 服务启动在本地 Linux 环境中，健康检查路径是 `/healthz`，Todo 查询路径是 `/todos`。你需要验证这个服务是否监听正确端口，HTTP 是否成功，DNS 是否按预期解析，并用抓包证明请求确实经过本机回环网卡。
-
+这个案例把网络命令放进真实排障语境：服务访问失败时，要能判断问题发生在端口、解析、路由、防火墙还是应用响应。
 ## 3. 核心概念
 
 ### 3.1 一次 HTTP 请求经过哪些层
@@ -371,6 +362,8 @@ sudo tcpdump -i any -nn 'tcp port 18080' -c 6
 进入 Docker 阶段后要特别注意：如果容器内进程只监听容器自己的 `127.0.0.1`，即使宿主机写了 `-p 18080:8080`，外部也可能无法访问。容器内服务通常应监听 `0.0.0.0:8080` 或具体容器网卡地址，再由宿主机端口映射转发流量。
 
 ## 5. 手把手实验
+
+预计耗时：75 分钟（动手操作约 50 分钟）。
 
 ### 5.1 实验目标
 
@@ -1020,8 +1013,6 @@ Makefile.network
 rm -f bin/todo-network-demo
 ```
 
-预计耗时：75 分钟（动手操作约 50 分钟）。
-
 ## 6. 常见错误与排障
 
 ### 错误 1：`Connection refused`
@@ -1170,68 +1161,13 @@ rm -f bin/todo-network-demo
 5. **不要只依赖 ping 作为监控。**
    `ping` 只说明 ICMP 层面的响应，不能代表 DNS、TLS、HTTP 状态码、业务依赖和响应时间都正常。生产监控应从用户真实路径出发，检查域名、证书、HTTP 状态码、延迟和关键业务接口。
 
-## 8. 本章小项目
-
-本章小项目：**Todo HTTP 服务访问链路排障记录**。
-
-交付物：
-
-- `api/cmd/todo-network-demo/main.go`
-- `scripts/check-network-demo.sh`
-- `Makefile.network`
-- `bin/todo-network-demo`
-- `network-debug-report.txt`
-- 一次 `tcpdump` 抓包观察记录，可以是终端输出，也可以保存为 `/tmp/todo-network-demo.pcap`
-
-验收命令分三个终端执行。终端一启动服务并保持运行：
-
-```bash linenums="0"
-make -f Makefile.network network-build
-TODO_ADDR=127.0.0.1:18080 ./bin/todo-network-demo
-```
-
-终端二启动抓包并等待请求：
-
-```bash linenums="0"
-sudo tcpdump -i lo -nn 'tcp port 18080' -c 6
-```
-
-如果 `lo` 抓不到包，可以改为：
-
-```bash linenums="0"
-sudo tcpdump -i any -nn 'tcp port 18080' -c 6
-```
-
-终端三执行 HTTP 检查和报告生成：
-
-```bash linenums="0"
-curl -i http://127.0.0.1:18080/healthz
-./scripts/check-network-demo.sh
-make -f Makefile.network network-report
-cat network-debug-report.txt
-```
-
-当终端三发起 `/healthz` 请求后，终端二应能看到 `127.0.0.1.<client-port> > 127.0.0.1.18080` 或类似方向的数据包。看到这个输出，说明请求确实经过了本机网络栈。
-
-能力验收标准：
-
-| 能力项 | 验收方式 |
-|---|---|
-| 地址理解 | 能解释 `127.0.0.1` 和 `0.0.0.0` 的区别 |
-| 端口定位 | 能用 `ss` 找到 `18080` 监听 |
-| HTTP 验证 | 能用 `curl -i` 查看状态码、Header、Body |
-| DNS 排查 | 能用 `getent hosts`、`dig`、`nslookup` 对比解析结果 |
-| 端口冲突 | 能制造并解释 `address already in use` |
-| 抓包观察 | 能用 `tcpdump` 看到本机 HTTP 请求经过回环网卡 |
-| 排障记录 | 能生成并解释 `network-debug-report.txt` |
-
-## 9. 练习题与面试题
+## 8. 练习题与面试题
 
 本章练习题和面试题已拆分到独立页面，完成正文学习后再进入题库练习与复盘。
 
 [查看本章练习题与面试题](../../questions/stage-01-foundation/04-linux-network.md)
 
-## 10. 本章总结
+## 9. 本章总结
 
 本篇建立了后端服务网络排障的基础模型。你学习了 TCP/IP、端口、DNS、HTTP 的关系，理解了 `127.0.0.1`、`0.0.0.0`、内网 IP 和域名的区别，也掌握了 `ip`、`ss`、`curl`、`dig`、`getent`、`tcpdump` 这些工具分别适合排查哪一层问题。
 
@@ -1239,6 +1175,6 @@ cat network-debug-report.txt
 
 能力价值上，你现在可以把“访问不了”拆解成 DNS、路由、端口、HTTP、应用日志等可验证问题。后续学习 Docker 端口映射、Kubernetes Service、Ingress、CoreDNS、NetworkPolicy 和生产故障排查时，本篇方法会反复复用。
 
-## 11. 下一章衔接
+## 10. 下一章衔接
 
 下一篇进入 **第 5 篇：Git 基础与团队协作**。本篇已经产生了 Go 服务源码、检查脚本、Makefile 和排障报告；下一篇会学习如何用 Git 管理这些实验成果，让每次修改都有提交记录、分支、审查和可追溯的历史。

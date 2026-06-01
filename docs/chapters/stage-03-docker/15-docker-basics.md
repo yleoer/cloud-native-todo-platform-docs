@@ -79,30 +79,11 @@ Docker 的价值不是“命令更酷”，而是把依赖运行环境变成可�
 
 本篇先让你手动执行 Docker 命令，是为了看清每个运行参数的意义。第 17 篇再写 Compose 时，你会知道 YAML 中的 `ports`、`volumes`、`networks`、`environment` 分别来自哪里。
 
-### 2.3 课程项目关联
+### 2.3 Todo 平台模拟案例
 
-本篇会把第 14 篇 Todo API v5 的运行环境改成三类容器：
+> Todo 平台需要在开发机上用容器运行 API、PostgreSQL 和 Redis。你需要理解镜像、容器、端口映射、环境变量、网络和数据卷如何共同组成本地运行环境。
 
-```text linenums="0"
-宿主机 curl
-  |
-  | 127.0.0.1:18080
-  v
-todo-api 容器
-  |
-  | Docker network: todo-net
-  +-- todo-postgres:5432
-  |
-  +-- todo-redis:6379
-```
-
-本篇产出会被后续章节直接复用：
-
-- 第 16 篇会把当前用 `registry.cn-guangzhou.aliyuncs.com/yleoer/golang:1.26-bookworm` 临时运行的 Todo API，构建成 `todo-api` 应用镜像。
-- 第 17 篇会把本篇多条 `docker run` 命令整理为 `compose.yaml`。
-- 第 18 篇会深入解释本篇已经使用过的容器进程、文件系统、网络和数据卷隔离。
-- 第 19 篇会把 Docker 背后的 containerd、runc 和 CRI 调用链拆开观察。
-
+这个案例要求你能解释每个容器承担什么职责，以及服务之间如何通过容器网络和持久化卷协作。
 ## 3. 核心概念
 
 ### 3.1 Docker 解决什么问题
@@ -380,6 +361,8 @@ sequenceDiagram
 如果跳过本篇直接写 Compose，很多 YAML 字段会变成“照抄模板”。先手动运行一次，后面才能知道哪些字段是必需的，哪些只是工具生成的包装。
 
 ## 5. 手把手实验
+
+预计耗时：90 分钟（阅读约 30 分钟，动手实验约 60 分钟）。
 
 ### 5.1 实验目标
 
@@ -978,8 +961,6 @@ docker volume rm todo-postgres-data todo-redis-data todo-go-mod-cache todo-go-bu
 
 `docker volume rm` 会删除 PostgreSQL、Redis 和 Go 缓存数据。生产环境或重要开发环境不要随手删除数据卷。
 
-预计耗时：90 分钟（阅读约 30 分钟，动手实验约 60 分钟）。
-
 ## 6. 常见错误与排障
 
 ### 错误 1：Docker daemon 没有启动
@@ -1129,36 +1110,13 @@ curl -i -H 'Content-Type: application/json' \
 
 5. **有状态数据必须有备份和生命周期策略**。Docker Volume 能让删除容器时数据不丢，但它不是备份方案。生产数据库需要定期备份、恢复演练、容量监控、权限隔离和升级方案。清理命令中带 `-v` 或 `docker volume rm` 时要格外小心。
 
-## 8. 本章小项目
-
-本章小项目是 **Todo Platform Docker 基础运行环境**。项目目标是不用 Dockerfile 和 Compose，完全通过 Docker CLI 手动运行 Todo API、PostgreSQL 和 Redis，并记录关键排障命令。
-
-项目产出：
-
-- 一个名为 `todo-net` 的 Docker 网络。
-- 两个持久化数据卷：`todo-postgres-data`、`todo-redis-data`。
-- 三个容器：`todo-postgres`、`todo-redis`、`todo-api`。
-- 一次成功的 Todo API 登录和带 Token 创建 Todo 记录。
-- 一份你自己的 Docker 运行记录，可以放入 `docs/docker/chapter-15-run-record.md`。
-
-验收标准：
-
-- `docker ps` 能看到三个容器运行。
-- `curl -i http://127.0.0.1:18080/healthz` 返回 `200 OK`。
-- `/api/v2/auth/login` 能返回 JWT。
-- 带 Token 调用 `POST /api/v2/todos` 返回 `201 Created`。
-- `docker network inspect todo-net` 中能看到三个容器。
-- `docker volume ls` 中能看到 PostgreSQL 和 Redis 数据卷。
-- 你能解释为什么 `TODO_DATABASE_DSN` 使用 `todo-postgres:5432`，不是 `127.0.0.1:15432`。
-- 你能解释为什么容器内 API 要监听 `0.0.0.0:18080`，不是只监听 `127.0.0.1:18080`。
-
-## 9. 练习题与面试题
+## 8. 练习题与面试题
 
 本章练习题和面试题已拆分到独立页面，完成正文学习后再进入题库练习与复盘。
 
 [查看本章练习题与面试题](../../questions/stage-03-docker/15-docker-basics.md)
 
-## 10. 本章总结
+## 9. 本章总结
 
 本篇把阶段二的 Todo API 放进了 Docker 运行环境。你学习了镜像、容器、仓库、端口映射、数据卷和 Docker 网络，理解了 Docker CLI 到 Docker daemon、镜像仓库、本地镜像和容器进程之间的基本链路。你还手动启动了 PostgreSQL、Redis 和 Todo API 三个容器，完成了迁移、登录、带 Token 创建 Todo、日志查看、网络检查和资源清理。
 
@@ -1166,6 +1124,6 @@ curl -i -H 'Content-Type: application/json' \
 
 能力价值上，你已经能胜任基础容器运行、容器日志查看、端口和网络排障、数据卷生命周期管理等工作任务。后续写 Dockerfile、Compose 和 Kubernetes YAML 时，本篇的每一个命令参数都会变成更高层配置的一部分。
 
-## 11. 下一章衔接
+## 10. 下一章衔接
 
 第 16 篇会把本篇的 `registry.cn-guangzhou.aliyuncs.com/yleoer/golang:1.26-bookworm + 源码挂载 + go run` 改造成真正的 Todo API 镜像。你将学习 Dockerfile、多阶段构建、构建缓存、`.dockerignore`、非 root 用户和镜像安全。如果跳过本篇，下一章里 `EXPOSE`、`CMD`、镜像标签、端口映射和运行用户这些概念会缺少运行经验支撑。

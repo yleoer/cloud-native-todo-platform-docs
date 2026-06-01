@@ -33,19 +33,6 @@
 - 能阅读和编写基础 Kubernetes YAML 资源文件。
 - 能编写并运行 `scripts/check-env.sh` 脚本，检查工具链版本是否符合课程基线。
 
-本篇结束时，你至少应该能在自己的主力学习终端中成功执行：
-
-```bash linenums="0"
-go version
-git --version
-docker --version
-kubectl version --client
-kind version
-helm version
-```
-
-预期结果不是每个人输出完全相同，而是这些命令都能返回版本信息，且版本符合团队或课程约定。
-
 ## 2. 本章工作场景与真实案例
 
 ### 2.1 技术痛点
@@ -67,14 +54,11 @@ helm version
 
 后续 Go 后端、平台工程、DevOps、SRE 都会围绕同一个仓库工作。目录边界清楚，脚本可复用，环境版本可检查，协作成本就会低很多。
 
-### 2.3 课程项目关联
+### 2.3 Todo 平台模拟案例
 
-本篇的真实案例是：
+> 你加入一个云原生平台团队，团队准备用 Todo 平台作为内部培训样例。你的第一项任务不是写业务代码，而是在 Ubuntu Server 上准备统一终端、工具链、Docker、kubectl、kind 和 Helm，并留下可复查的环境验证记录。
 
-> 你加入一个云原生平台团队，团队准备从零建设 `Cloud Native Todo Platform`。你需要在本机完成开发环境准备，初始化项目仓库，写出一个环境检查脚本，让后续同学可以用同样方式验证自己的环境。
-
-如果这一步做得扎实，后面学习 Go、Docker、Kubernetes、Helm 和 Operator 时，问题会少很多。反过来，如果第一天环境混乱，后面经常会出现“教程没错，但我机器跑不起来”的挫败感。
-
+这个案例用来说明为什么课程一开始要统一环境、版本、YAML 和基础命令：只有机器状态清楚，后面的本地开发、容器实验和 Kubernetes 实验才有稳定前提。
 ## 3. 核心概念
 
 ### 3.1 YAML 是什么
@@ -208,9 +192,11 @@ kubectl config get-contexts
 
 ## 5. 手把手实验
 
+预计耗时：首次安装工具需要 1-3 小时；如果工具已安装，完成仓库初始化和脚本验证约 30-45 分钟。
+
 ### 5.1 实验目标
 
-本实验会完成本篇小项目：**搭建统一实验环境，初始化 `cloud-native-todo-platform` 仓库，并运行 `check-env.sh` 验证工具链**。
+本实验会完成：**搭建统一实验环境，初始化 `cloud-native-todo-platform` 仓库，并运行 `check-env.sh` 验证工具链**。
 
 本课程默认使用 **Ubuntu Server 24.04 LTS**，命令在 Bash 或 Zsh 中执行。不要使用 Windows PowerShell、CMD 或普通 `sh` 直接运行本篇命令；后续章节会大量依赖 Bash/Zsh、apt、systemd 和 Linux 权限模型。
 
@@ -629,7 +615,7 @@ kubectl config current-context
 如果没有可用 context，本地实验可以先创建课程临时集群：
 
 ```bash
-kind create cluster --name todo-dev --image kindest/node:v1.35.0
+kind create cluster --name todo-dev --image registry.cn-guangzhou.aliyuncs.com/yleoer/node:v1.35.0
 ```
 
 然后执行 dry-run：
@@ -651,8 +637,9 @@ configmap/todo-env created (dry run)
 
 创建环境记录：
 
-```bash linenums="0"
-cat > docs/environment.md <<'EOF'
+将下面内容写入 `docs/environment.md`：
+
+```markdown title="docs/environment.md"
 # 开发环境记录
 
 ## 基础信息
@@ -674,13 +661,13 @@ cat > docs/environment.md <<'EOF'
 ## 备注
 
 - 记录 Ubuntu 版本、CPU 架构、Docker Engine 安装方式和是否使用国内镜像源。
-EOF
 ```
 
 创建 README：
 
-```bash linenums="0"
-cat > README.md <<'EOF'
+将下面内容写入 `README.md`：
+
+```markdown title="README.md"
 # Cloud Native Todo Platform
 
 这是《从 Go 后端开发、Docker 容器化、Kubernetes 到 Operator 开发与生产实践》课程的综合项目仓库。
@@ -694,13 +681,13 @@ cat > README.md <<'EOF'
 请先运行：
 
 ./scripts/check-env.sh
-EOF
 ```
 
 创建 `.gitignore`：
 
-```bash linenums="0"
-cat > .gitignore <<'EOF'
+将下面内容追加到 `.gitignore`（如果已有相同内容，不需要重复添加）：
+
+```text title=".gitignore"
 .DS_Store
 .idea/
 .vscode/
@@ -714,7 +701,6 @@ coverage.out
 .env.*
 !.env.example
 kubeconfig*
-EOF
 ```
 
 `.env`、kubeconfig、私钥、Token 都不应该提交到 Git。
@@ -730,21 +716,7 @@ DOCKER_REQUIRED_PREFIX="Docker version 29."
 KUBECTL_REQUIRED_PREFIX=v1.36
 KIND_REQUIRED_PREFIX=kind
 HELM_REQUIRED_PREFIX=v4.
-KIND_NODE_IMAGE=registry.cn-guangzhou.aliyuncs.com/yleoer/node:v1.35.0@sha256:452d707d4862f52530247495d180205e029056831160e22870e37e3f6c1ac31f
-```
-
-写入文件：
-
-```bash linenums="0"
-cat > scripts/versions.conf <<'EOF'
-GO_REQUIRED_PREFIX=go1.26
-GO_PROXY_REQUIRED=https://goproxy.cn,direct
-DOCKER_REQUIRED_PREFIX="Docker version 29."
-KUBECTL_REQUIRED_PREFIX=v1.36
-KIND_REQUIRED_PREFIX=kind
-HELM_REQUIRED_PREFIX=v4.
-KIND_NODE_IMAGE=registry.cn-guangzhou.aliyuncs.com/yleoer/node:v1.35.0@sha256:452d707d4862f52530247495d180205e029056831160e22870e37e3f6c1ac31f
-EOF
+KIND_NODE_IMAGE=registry.cn-guangzhou.aliyuncs.com/yleoer/node:v1.35.0@sha256:986401fce0e567a9860075ba9df8c8459bd99a35f79024d8a682773fb40f0753
 ```
 
 这个文件不是为了让所有机器永远固定死，而是让团队知道当前课程基线是什么。脚本发现版本不一致时先给出警告，由你判断是否需要升级。这里使用 `.conf` 后缀，是为了避免新手把它和存放密钥的 `.env` 文件混淆。
@@ -761,7 +733,7 @@ docker inspect registry.cn-guangzhou.aliyuncs.com/yleoer/node:v1.35.0 --format '
 预期输出应包含：
 
 ```text linenums="0"
-kindest/node@sha256:452d707d4862f52530247495d180205e029056831160e22870e37e3f6c1ac31f
+[registry.cn-guangzhou.aliyuncs.com/yleoer/node@sha256:986401fce0e567a9860075ba9df8c8459bd99a35f79024d8a682773fb40f0753]
 ```
 
 kind v0.31 官方发布的预构建节点镜像中没有 1.36.x 节点镜像，因此本篇先锁定 `v1.35.0` 作为 kind 烟测集群。后续如果 kind 官方发布 `kindest/node:v1.36.x`，再把 `KIND_NODE_IMAGE` 和 5.9 的预期节点版本一起升级。
@@ -872,7 +844,7 @@ main() {
 main "$@"
 ```
 
-把上面的完整脚本保存为 `scripts/check-env.sh`。推荐直接用 VS Code 新建文件；如果使用终端粘贴，可执行 `cat > scripts/check-env.sh <<'EOF'`，粘贴完整脚本，最后单独输入一行 `EOF` 结束。
+把上面的完整脚本保存为 `scripts/check-env.sh`。
 
 Helm 版本检查使用 `helm version --template '{{.Version}}'`，是为了只取 `v4.2.x` 这样的语义版本，避免默认输出中的 Git commit、GoVersion 等字段影响脚本判断。
 
@@ -897,13 +869,15 @@ chmod +x scripts/check-env.sh
 预期输出会包含：
 
 ```text linenums="0"
-[OK] go found: ...
+[OK] Go matches expected prefix: go1.26
 [OK] Go proxy matches expected prefix: https://goproxy.cn,direct
-[OK] git found: ...
-[OK] docker found: ...
-[OK] kubectl found: ...
-[OK] kind found: ...
-[OK] helm found: ...
+[OK] Docker CLI matches expected prefix: Docker version 29.
+[OK] kubectl matches expected prefix: v1.36
+[OK] kind matches expected prefix: kind
+[OK] Helm matches expected prefix: v4.
+
+==> Docker daemon
+[OK] Docker daemon is reachable
 
 Environment check completed.
 ```
@@ -1027,16 +1001,6 @@ kind delete cluster --name todo-dev
 kubectl config get-contexts
 ```
 
-如果只是想重新做一遍仓库初始化实验，可以删除本地练习仓库：
-
-```bash linenums="0"
-cd ~/workspace
-rm -rf cloud-native-todo-platform
-```
-
-删除仓库前请确认里面没有你想保留的笔记或提交记录。课程后续章节会继续使用这个仓库；如果你准备接着学习下一篇，不需要删除仓库，只需要保留当前成果即可。
-
-预计耗时：首次安装工具需要 1-3 小时；如果工具已安装，完成仓库初始化和脚本验证约 30-45 分钟。
 
 ## 6. 常见错误与排障
 
@@ -1198,52 +1162,13 @@ chmod +x scripts/check-env.sh
 - 团队项目应锁定版本范围，并通过脚本或 CI 检查，而不是依赖口头约定。
 - kind 适合本地学习和集成测试，不代表生产 Kubernetes 高可用架构。
 
-## 8. 本章小项目
-
-本章小项目：**统一实验环境与 `cloud-native-todo-platform` 仓库初始化**。
-
-交付物：
-
-- 一套可运行的本地学习环境。
-- 已安装并能验证版本的 `go`、`git`、`docker`、`kubectl`、`kind`、`helm`。
-- 一个课程主线仓库 `cloud-native-todo-platform`。
-- 基础 YAML 示例文件。
-- 一个环境记录文件 `docs/environment.md`。
-- 一个版本锁文件 `scripts/versions.conf`。
-- 一个环境检查脚本 `scripts/check-env.sh`。
-- 至少一次 Git 提交。
-
-验收命令：
-
-```bash linenums="0"
-cd ~/workspace/cloud-native-todo-platform
-./scripts/check-env.sh
-kubectl apply --dry-run=client --validate=false -f docs/examples/multi-doc.yaml
-test -f scripts/versions.conf
-git log --oneline -1
-```
-
-能力验收标准：
-
-| 能力项 | 验收方式 |
-|---|---|
-| 环境基线 | 能确认并说明课程统一使用 Ubuntu 24.04 的原因 |
-| YAML 基础 | 能解释缩进、列表、多文档、锚点和别名 |
-| 工具安装 | 6 个核心工具都能输出版本 |
-| Docker | `docker info` 能成功或能解释为什么 daemon 暂不可用 |
-| kubectl / kind | 能说明 kubectl、kubeconfig、kind 的关系 |
-| 仓库规范 | 能解释每个一级目录的用途 |
-| 自动化意识 | 能通过 `scripts/check-env.sh` 做环境自检 |
-| 版本锁定 | 能解释 `scripts/versions.conf` 中每个版本前缀的作用 |
-| Git 基础 | 仓库有初始化提交和清晰提交信息 |
-
-## 9. 练习题与面试题
+## 8. 练习题与面试题
 
 本章练习题和面试题已拆分到独立页面，完成正文学习后再进入题库练习与复盘。
 
 [查看本章练习题与面试题](../../questions/stage-01-foundation/01-course-guide-env.md)
 
-## 10. 本章总结
+## 9. 本章总结
 
 本篇完成了整套课程的第一块地基。你看到了 6 个阶段、42 篇内容如何围绕 `Cloud Native Todo Platform` 逐步展开；掌握了 YAML 的最小可用语法；明确了课程统一基于 Ubuntu 24.04；知道了 PATH、Docker daemon、kubeconfig 这些基础机制为什么会影响后续实验。
 
@@ -1251,7 +1176,7 @@ git log --oneline -1
 
 能力价值上，本篇训练的是工程化学习的第一种习惯：不要只靠“我机器上能跑”，而要用可记录、可检查、可复现的方式管理环境。这个习惯会直接影响真实团队协作、CI/CD 稳定性、生产排障效率，也会成为面试中展示项目经验时很有分量的基础能力。
 
-## 11. 下一章衔接
+## 10. 下一章衔接
 
 下一篇进入 **Linux 文件系统与命令基础**。
 

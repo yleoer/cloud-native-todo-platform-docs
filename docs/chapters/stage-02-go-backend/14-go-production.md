@@ -39,7 +39,7 @@
 - 能使用 `serve`、`config-check`、`hash-password`、`migrate` 等运维命令。
 - 能启用 pprof 并用 `go tool pprof` 抓取 goroutine、heap 或 CPU profile。
 
-本篇结束时，你至少应该能成功执行：
+你至少应该能成功执行：
 
 ```bash linenums="0"
 cd ~/workspace/cloud-native-todo-platform
@@ -81,41 +81,11 @@ curl -i -H "Authorization: Bearer $TOKEN" http://127.0.0.1:18080/api/v2/todos
 - 安全工程师关注密码哈希、JWT Secret、CORS、Header、Token 泄露和敏感日志。
 - 架构师关注生产能力是否能延续到 Docker、Kubernetes、ConfigMap、Secret 和 Ingress。
 
-### 2.3 课程项目关联
+### 2.3 Todo 平台模拟案例
 
-本篇会新增或修改：
+> Todo API 准备进入生产化演练。你需要补齐 JWT 鉴权、配置分层、审计日志、安全中间件、运维命令和 pprof 排障入口。
 
-```text linenums="0"
-cloud-native-todo-platform/
-├── configs/
-│   ├── base.json
-│   ├── dev.json
-│   ├── test.json
-│   └── prod.json
-└── api/
-    ├── cmd/
-    │   └── todo-api/
-    │       └── main.go
-    └── internal/
-        ├── auth/
-        │   ├── jwt.go
-        │   ├── jwt_test.go
-        │   ├── password.go
-        │   └── user_store.go
-        ├── config/
-        │   ├── config.go
-        │   └── config_test.go
-        └── handler/
-            └── gin/
-                ├── auth.go
-                ├── handler.go
-                ├── middleware.go
-                ├── openapi.go
-                └── response.go
-```
-
-第 13 篇的 PostgreSQL、Redis、限流和 worker 能力仍然保留。本篇新增的生产化能力主要包在入口配置和 Gin middleware 里：公开接口负责健康检查、OpenAPI 和登录；受保护接口负责 Todo CRUD；运维命令负责配置检查、密码哈希、迁移和服务启动。
-
+这个案例把后端服务从“功能可用”推进到“可上线评审”：安全、配置、日志、诊断和运行开关都要能被明确检查。
 ## 3. 核心概念
 
 ### 3.1 JWT 鉴权与用户登录
@@ -289,6 +259,8 @@ pprof 能暴露函数名、goroutine 栈、内存对象和运行状态，里面�
 本篇默认不启动 pprof。只有设置 `TODO_PPROF_ENABLED=true` 时才启动，并默认绑定 `127.0.0.1:18081`。`net/http/pprof` 会把调试路由注册到 `http.DefaultServeMux`，因此生产项目要避免把业务路由和默认 mux 混在一起暴露。
 
 ## 5. 手把手实验
+
+预计耗时：30 分钟阅读，90 分钟动手实验。
 
 ### 5.1 实验目标
 
@@ -2519,8 +2491,6 @@ Remove-Item Env:TODO_CORS_ALLOWED_ORIGINS -ErrorAction SilentlyContinue
 Remove-Item Env:TODO_PPROF_ENABLED -ErrorAction SilentlyContinue
 ```
 
-预计耗时：30 分钟阅读，90 分钟动手实验。
-
 ## 6. 常见错误与排障
 
 ### 错误 1：启动时报 JWT Secret 太短
@@ -2605,48 +2575,13 @@ Remove-Item Env:TODO_PPROF_ENABLED -ErrorAction SilentlyContinue
 
 5. **生产化能力需要持续演进**。本篇只实现最小 JWT、日志、配置和安全 Header。真实系统还需要 HTTPS、Secret 轮换、Token 撤销、指标、链路追踪、集中日志和更细粒度授权。
 
-## 8. 本章小项目
-
-本章小项目是 **Todo API v5 生产风格 API 服务**。项目目标是在 Todo API v4 的 PostgreSQL + Redis 基础上，增加认证、安全、配置、日志、运维命令和 pprof 排障入口。
-
-交付物包括：
-
-- `configs/base.json`
-- `configs/dev.json`
-- `configs/test.json`
-- `configs/prod.json`
-- `api/internal/config/config.go`
-- `api/internal/config/config_test.go`
-- `api/internal/auth/jwt.go`
-- `api/internal/auth/jwt_test.go`
-- `api/internal/auth/password.go`
-- `api/internal/auth/user_store.go`
-- `api/internal/auth/service.go`
-- 更新后的 `api/internal/handler/gin/response.go`
-- 更新后的 `api/internal/handler/gin/middleware.go`
-- 更新后的 `api/internal/handler/gin/handler.go`
-- 更新后的 `api/internal/handler/gin/openapi.go`
-- 更新后的 `api/internal/handler/gin/handler_test.go`
-- 更新后的 `api/cmd/todo-api/main.go`
-
-能力验收标准：
-
-- 能执行 `config-check` 并解释配置加载顺序。
-- 能用 `hash-password` 生成 bcrypt 密码哈希。
-- 能登录并获取 JWT。
-- 能证明无 Token 访问 Todo CRUD 返回 401。
-- 能证明 `/openapi.yaml` 声明登录接口、`bearerAuth` 和受保护接口的 401 响应。
-- 能在访问日志和审计日志中看到 `request_id` 和 `user`。
-- 能验证安全 Header 和 CORS 行为。
-- 能启用 pprof 并抓取一个 profile。
-
-## 9. 练习题与面试题
+## 8. 练习题与面试题
 
 本章练习题和面试题已拆分到独立页面，完成正文学习后再进入题库练习与复盘。
 
 [查看本章练习题与面试题](../../questions/stage-02-go-backend/14-go-production.md)
 
-## 10. 本章总结
+## 9. 本章总结
 
 本篇把 Todo API 从“具备数据库、缓存和限流能力”推进到“具备生产运行边界”的 Todo API v5。你实现了 JWT 登录与认证中间件，补齐了请求 ID、访问日志、审计日志、安全 Header、CORS、配置分层、运维命令和 pprof 排障入口。
 
@@ -2654,7 +2589,7 @@ Remove-Item Env:TODO_PPROF_ENABLED -ErrorAction SilentlyContinue
 
 能力价值上，你已经能把 Go API 的功能实现和生产运行需求连起来。下一阶段进入 Docker 和容器化时，这些配置、日志、健康检查和关闭逻辑会直接影响镜像构建、容器启动、Compose 编排和 Kubernetes 部署。
 
-## 11. 下一章衔接
+## 10. 下一章衔接
 
 第 15 篇会进入 Docker 基础与镜像构建。Todo API v5 的配置、健康检查、启动命令和优雅关闭会成为容器化的基础：镜像里运行哪个命令、容器如何注入环境变量、健康检查打哪个端点、日志如何输出到 stdout，都会复用本篇成果。
 

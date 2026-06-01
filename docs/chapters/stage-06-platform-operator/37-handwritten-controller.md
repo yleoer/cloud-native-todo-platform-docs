@@ -48,17 +48,11 @@
 
 SRE 负责部署 Controller、观察日志、确认 status 是否回写、定位 RBAC 权限不足、cache sync 失败或 queue 重试风暴。生产中 Controller 本身也属于关键控制面组件，不能只按普通业务 Pod 对待。
 
-### 2.3 课程项目关联
+### 2.3 Todo 平台模拟案例
 
-本篇承接第 35-36 篇，产出第一个能运行在 Kubernetes 集群中的 TodoApp Controller：
+> Todo 平台需要第一个可运行的 `TodoApp` Controller。你需要用 client-go 手写监听逻辑、队列处理、RBAC、Deployment 部署和 status 回写，让自定义资源状态能被控制器持续更新。
 
-- 输入：`operator/crds/base/todoapps.platform.todo.example.com.yaml` 和 `operator/handwritten/samples/todoapp.yaml`。
-- 代码：`operator/handwritten/main.go`、`operator/handwritten/controller.go`。
-- 部署：`operator/handwritten/manifests/rbac.yaml`、`operator/handwritten/manifests/deployment.yaml`。
-- 输出：`TodoApp.status.observedGeneration` 和 `TodoApp.status.conditions` 由 Controller 自动回写。
-
-项目版本线进入阶段六子版本 `v4.3-handwritten-controller`，它仍属于 `v4.0-operator` 总版本线。第 38 篇会用 Kubebuilder 重写同一件事，并开始自动创建 Deployment 与 Service。
-
+这个案例用于拆开 Operator 的底层机制：在使用框架前，先看清 informer、workqueue、client 和状态回写分别承担什么职责。
 ## 3. 核心概念
 
 ### 3.1 为什么本篇使用 dynamic client
@@ -281,11 +275,11 @@ c.queue.Forget(key)
 
 ## 5. 手把手实验
 
+预计耗时：120 分钟（动手操作约 80 分钟）。
+
 ### 5.1 实验目标
 
 本实验会手写一个 client-go Controller，部署到 kind 集群，创建 `TodoApp` CR 后自动回写 `status.conditions`。
-
-预计耗时：120 分钟（动手操作约 80 分钟）。
 
 ### 5.2 实验环境
 
@@ -359,7 +353,7 @@ operator/
 
 ### 5.4 完整代码或配置
 
-下面的 here-doc 写文件方式适用于 Linux、macOS、Git Bash 和 WSL。PowerShell 用户可以用编辑器创建同名文件，或使用 PowerShell here-string，文件内容保持一致；如果本机装了 Git Bash 或 WSL，直接在其中执行 here-doc 命令会更省事。
+本节按文件名给出完整内容。请用编辑器创建同名文件，并复制对应内容。
 
 本节会创建 7 个文件：
 
@@ -377,8 +371,9 @@ operator/
 
 创建 `operator/handwritten/go.mod`：
 
-```bash linenums="0"
-cat > operator/handwritten/go.mod <<'EOF'
+将下面内容写入 `operator/handwritten/go.mod`：
+
+```text title="operator/handwritten/go.mod"
 module todo-handwritten-controller
 
 go 1.26
@@ -387,7 +382,6 @@ require (
 	k8s.io/apimachinery v0.36.1
 	k8s.io/client-go v0.36.1
 )
-EOF
 ```
 
 版本选择说明：
@@ -401,8 +395,9 @@ EOF
 
 创建 `operator/handwritten/main.go`：
 
-```bash linenums="0"
-cat > operator/handwritten/main.go <<'EOF'
+将下面内容写入 `operator/handwritten/main.go`：
+
+```go title="operator/handwritten/main.go"
 package main
 
 import (
@@ -487,7 +482,6 @@ func defaultKubeconfig() string {
 	}
 	return ""
 }
-EOF
 ```
 
 关键点：
@@ -500,8 +494,9 @@ EOF
 
 创建 `operator/handwritten/controller.go`：
 
-```bash linenums="0"
-cat > operator/handwritten/controller.go <<'EOF'
+将下面内容写入 `operator/handwritten/controller.go`：
+
+```go title="operator/handwritten/controller.go"
 package main
 
 import (
@@ -810,7 +805,6 @@ func int64Value(value any) (int64, bool) {
 	}
 	return 0, false
 }
-EOF
 ```
 
 关键点：
@@ -826,8 +820,9 @@ EOF
 
 创建 `operator/handwritten/Dockerfile`：
 
-```bash linenums="0"
-cat > operator/handwritten/Dockerfile <<'EOF'
+将下面内容写入 `operator/handwritten/Dockerfile`：
+
+```dockerfile title="operator/handwritten/Dockerfile"
 FROM registry.cn-guangzhou.aliyuncs.com/yleoer/golang:1.26-bookworm AS build
 WORKDIR /src
 
@@ -842,15 +837,15 @@ FROM registry.cn-guangzhou.aliyuncs.com/yleoer/static-debian12:nonroot
 COPY --from=build /out/todo-handwritten-controller /todo-handwritten-controller
 USER 65532:65532
 ENTRYPOINT ["/todo-handwritten-controller"]
-EOF
 ```
 
 #### 5.4.5 RBAC
 
 创建 `operator/handwritten/manifests/rbac.yaml`：
 
-```bash linenums="0"
-cat > operator/handwritten/manifests/rbac.yaml <<'YAML'
+将下面内容写入 `operator/handwritten/manifests/rbac.yaml`：
+
+```yaml title="operator/handwritten/manifests/rbac.yaml"
 apiVersion: v1
 kind: ServiceAccount
 metadata:
@@ -893,7 +888,6 @@ roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
   name: todo-handwritten-controller
-YAML
 ```
 
 这份 RBAC 只允许读取 `todoapps` 和写 `todoapps/status`，不会授予 Deployment、Service、Secret 等权限。第 38 篇开始创建子资源后，再扩展 RBAC。
@@ -902,8 +896,9 @@ YAML
 
 创建 `operator/handwritten/manifests/deployment.yaml`：
 
-```bash linenums="0"
-cat > operator/handwritten/manifests/deployment.yaml <<'YAML'
+将下面内容写入 `operator/handwritten/manifests/deployment.yaml`：
+
+```yaml title="operator/handwritten/manifests/deployment.yaml"
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -949,15 +944,15 @@ spec:
       securityContext:
         seccompProfile:
           type: RuntimeDefault
-YAML
 ```
 
 #### 5.4.7 样例 TodoApp
 
 创建 `operator/handwritten/samples/todoapp.yaml`：
 
-```bash linenums="0"
-cat > operator/handwritten/samples/todoapp.yaml <<'YAML'
+将下面内容写入 `operator/handwritten/samples/todoapp.yaml`：
+
+```yaml title="operator/handwritten/samples/todoapp.yaml"
 apiVersion: platform.todo.example.com/v1alpha1
 kind: TodoApp
 metadata:
@@ -978,7 +973,6 @@ spec:
     tracing: true
   rollout:
     strategy: RollingUpdate
-YAML
 ```
 
 ### 5.5 执行命令
@@ -1359,51 +1353,13 @@ kubectl -n todo-dev delete todoapp todo-platform --ignore-not-found
 - [client-go dynamic informer package](https://pkg.go.dev/k8s.io/client-go/dynamic/dynamicinformer)
 - [client-go workqueue package](https://pkg.go.dev/k8s.io/client-go/util/workqueue)
 
-## 8. 本章小项目
-
-### 8.1 项目产出
-
-本章完成手写 TodoApp Controller，产出：
-
-- `operator/handwritten/go.mod`
-- `operator/handwritten/main.go`
-- `operator/handwritten/controller.go`
-- `operator/handwritten/Dockerfile`
-- `operator/handwritten/manifests/rbac.yaml`
-- `operator/handwritten/manifests/deployment.yaml`
-- `operator/handwritten/samples/todoapp.yaml`
-
-图 37-2 展示本章产物和后续章节关系：
-
-```mermaid
-flowchart TD
-    CRD["Ch35 TodoApp CRD"] --> Design["Ch36 Controller Design"]
-    Design --> Handwritten["Ch37 Handwritten Controller"]
-    Handwritten --> Status["Patch TodoApp Status"]
-    Handwritten --> Kubebuilder["Ch38 Kubebuilder Controller"]
-    Kubebuilder --> Workload["Create Deployment and Service"]
-    Workload --> Advanced["Ch39 OwnerReference / Finalizer / Webhook"]
-```
-
-### 8.2 能力验收标准
-
-| 能力 | 验收标准 |
-|---|---|
-| client-go 项目搭建 | 能完成 `go mod tidy`、`go test ./...`、`go vet ./...`、`go build ./...` |
-| Informer 监听 | 能解释 dynamic informer 如何通过 GVR Watch `TodoApp` |
-| Workqueue 使用 | 能说明 `AddRateLimited`、`Forget`、`Done` 的职责 |
-| Reconcile 编写 | 能从缓存读取对象，并在对象删除时正常返回 |
-| status 回写 | 能通过 `/status` 子资源 patch `conditions` |
-| RBAC 最小化 | 能证明 SA 可以写 `todoapps/status`，但不能创建 Deployment |
-| 集群部署 | 能把镜像加载到 kind，并让 Controller Pod 正常运行 |
-
-## 9. 练习题与面试题
+## 8. 练习题与面试题
 
 本章练习题和面试题已拆分到独立页面，完成正文学习后再进入题库练习与复盘。
 
 [查看本章练习题与面试题](../../questions/stage-06-platform-operator/37-handwritten-controller.md)
 
-## 10. 本章总结
+## 9. 本章总结
 
 本篇完成了阶段六的第一个真实 Controller。知识上，你理解了 dynamic client、GVR、SharedInformer、Indexer、Workqueue、Reconcile、status subresource 和 RBAC 如何组合成一个最小控制循环。
 
@@ -1411,7 +1367,7 @@ flowchart TD
 
 工程价值上，你已经能解释 Kubebuilder 之前的“裸机制”。这很重要：未来使用框架时，你知道它在帮你管理什么，也知道权限、缓存、队列和 status 出问题时应该从哪里查。
 
-## 11. 下一章衔接
+## 10. 下一章衔接
 
 下一篇第 38 篇会进入 Kubebuilder 入门。我们会用 controller-runtime 重写本篇能力，并进一步让 `TodoApp` 自动创建 Deployment 和 Service。
 

@@ -53,44 +53,11 @@ CI/CD 的价值不只是“自动化省时间”，而是把团队约定变成�
 
 一个成熟的流程通常不是“所有事情放进一个 job”。更合理的拆分是：PR 只做不需要敏感凭据的检查；main push 才构建并推送镜像；部署 job 需要 environment 审批、并发控制和更严格的权限。
 
-### 2.3 课程项目关联
+### 2.3 Todo 平台模拟案例
 
-阶段四已经准备好流水线输入：
+> Todo 平台需要一条自动化流水线，在代码提交后完成 Go 测试、镜像构建、SBOM 或基础扫描、Helm/Kustomize 渲染校验和部署清单产出。
 
-```text linenums="0"
-第 16 篇：api/Dockerfile 多阶段构建
-第 21-24 篇：基础 Kubernetes YAML（内存模式起步，第 24 篇接入 PostgreSQL）
-第 26 篇：RBAC、SecurityContext、Pod Security 安全基线
-第 27 篇：Helm 4 Chart 和 values.schema.json
-第 28 篇：Kustomize dev/test/prod overlay
-第 29 篇：GitHub Actions 自动化交付
-```
-
-本篇会在应用仓库新增：
-
-```text linenums="0"
-.github/
-├── ci/
-│   └── helm-values-ci.yaml
-└── workflows/
-    └── todo-platform-ci-cd.yml
-```
-
-注意：这是应用仓库里的产物，不是本教材仓库的实际 workflow。教材仓库只保存教程正文；如果把示例 workflow 直接放到本仓库，它会因为缺少 `go.mod`、`api/Dockerfile` 和 Kubernetes 交付物而失败。
-
-图 29-1 展示本篇在阶段五中的位置：
-
-```mermaid
-flowchart LR
-    PR["Pull Request"] --> Validate["validate<br/>Go test / govulncheck / Helm / Kustomize"]
-    Push["push main"] --> Validate
-    Validate --> Build["build-image<br/>Docker Buildx / GHCR"]
-    Build --> Deploy["deploy-kind<br/>kind 临时集群验证"]
-    Deploy --> GitOps["第 30 篇<br/>Argo CD / GitOps"]
-```
-
-第 30 篇会把“流水线直接部署”演进为 GitOps：CI 负责构建、验证和更新交付仓库，Argo CD 负责从 Git 同步到集群。
-
+这个案例关注交付入口：人工本地成功不等于团队可交付，流水线必须把构建、验证和发布证据固定下来。
 ## 3. 核心概念
 
 ### 3.1 CI、CD 和流水线边界
@@ -322,6 +289,8 @@ permissions:
 
 ## 5. 手把手实验
 
+预计耗时：70 分钟（动手操作约 45 分钟）。
+
 ### 5.1 实验目标
 
 在 Todo Platform 应用仓库中新增 GitHub Actions CI/CD 流水线，实现：
@@ -329,8 +298,6 @@ permissions:
 - PR 自动执行 Go 检查、漏洞扫描、Helm 和 Kustomize 静态验证。
 - main push 自动构建 Todo API 镜像并推送到 GHCR。
 - main push 自动创建临时 kind 集群，加载新镜像，执行 server-side dry-run，并部署 dev overlay 做健康检查。
-
-预计耗时：70 分钟（动手操作约 45 分钟）。
 
 ### 5.2 实验环境
 
@@ -404,8 +371,9 @@ mkdir -p .github/workflows .github/ci
 
 创建 CI 专用 Helm values。它只用于模板渲染和本地 kind 验证，不包含真实生产 Secret：
 
-```bash linenums="0"
-cat > .github/ci/helm-values-ci.yaml <<'YAML'
+将下面内容写入 `.github/ci/helm-values-ci.yaml`：
+
+```yaml title=".github/ci/helm-values-ci.yaml"
 replicaCount: 1
 
 image:
@@ -429,7 +397,6 @@ hpa:
 
 cache:
   enabled: false
-YAML
 ```
 
 注意：CI 环境不部署 PostgreSQL，因此这里故意不设置 `TODO_DATABASE_DSN`。Todo API v0.1.0 检测到没有 DSN 时会自动使用内存 Repository，这是第 12 篇建立的行为。部署验证只检查 API 能否启动并响应健康检查，不依赖真实数据库。
@@ -456,8 +423,9 @@ ARG BUILD_DATE
 
 创建 GitHub Actions workflow：
 
-```bash linenums="0"
-cat > .github/workflows/todo-platform-ci-cd.yml <<'YAML'
+将下面内容写入 `.github/workflows/todo-platform-ci-cd.yml`：
+
+```yaml title=".github/workflows/todo-platform-ci-cd.yml"
 name: Todo Platform CI/CD
 
 on:
@@ -729,7 +697,6 @@ jobs:
           sleep 5
           curl -fsS http://127.0.0.1:18085/healthz
           curl -fsS http://127.0.0.1:18085/readyz
-YAML
 ```
 
 关键字段解释：
@@ -1069,41 +1036,13 @@ deploy-prod:
 - [actions/setup-go](https://github.com/actions/setup-go)
 - [golang/govulncheck-action](https://github.com/golang/govulncheck-action)
 
-## 8. 本章小项目
-
-本章小项目是：**Todo Platform GitHub Actions CI/CD Pipeline**。
-
-### 8.1 项目产出
-
-- `.github/ci/helm-values-ci.yaml`：CI 专用 Helm values，不包含真实生产 Secret。
-- `.github/workflows/todo-platform-ci-cd.yml`：完整 GitHub Actions workflow。
-- GHCR 中的 `todo-api` 镜像：至少包含 `sha-<commit>` tag。
-- Actions 运行记录：PR validate、main push build-image、deploy-kind 三段记录。
-- 一份发布证据：镜像 digest、workflow run 链接、部署验证日志。
-
-### 8.2 能力验收标准
-
-基础验收：
-
-- PR 打开后能自动触发 `validate` job。
-- `go vet`、`go test`、`govulncheck`、`helm lint`、`helm template`、`kubectl kustomize` 全部通过。
-- main push 后能构建并推送 GHCR 镜像。
-
-进阶验收：
-
-- `deploy-kind` 能创建临时 kind 集群并加载新镜像。
-- server-side dry-run 通过。
-- dev overlay 部署成功，`/healthz` 和 `/readyz` 可访问。
-- workflow 权限符合最小权限：默认 `contents: read`，只有构建镜像 job 使用 `packages: write`。
-- 能解释为什么本篇没有直接部署生产集群，以及第 30 篇 GitOps 会如何改进。
-
-## 9. 练习题与面试题
+## 8. 练习题与面试题
 
 本章练习题和面试题已拆分到独立页面，完成正文学习后再进入题库练习与复盘。
 
 [查看本章练习题与面试题](../../questions/stage-05-production-engineering/29-cicd.md)
 
-## 10. 本章总结
+## 9. 本章总结
 
 本篇把 Todo Platform 从“手工执行交付命令”推进到“由 GitHub Actions 自动执行交付门禁”。你学习了 CI/CD 的边界、GitHub Actions 的 workflow/job/step 模型、`GITHUB_TOKEN` 最小权限、GHCR 镜像推送、镜像标签策略和 kind 临时集群部署验证。
 
@@ -1111,7 +1050,7 @@ deploy-prod:
 
 能力价值上，你现在能把“我本机能跑”升级成“每次提交都自动证明能跑”。这是进入生产工程的第一道门：没有可靠流水线，后面的 GitOps、监控、日志、链路追踪和生产排障都会缺少可信入口。
 
-## 11. 下一章衔接
+## 10. 下一章衔接
 
 第 30 篇会进入 GitOps 与 Argo CD。本篇的 CI/CD 流水线已经能测试、构建、推镜像和验证 Kubernetes 交付物；下一篇会进一步回答一个生产问题：**如果不希望 CI 直接持有生产集群写权限，怎样让 Git 成为部署事实来源，并由 Argo CD 自动同步到集群？**
 

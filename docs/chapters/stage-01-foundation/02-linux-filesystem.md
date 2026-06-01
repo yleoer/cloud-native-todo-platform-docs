@@ -37,7 +37,7 @@ Go 服务运行在 Linux 之上，无论是物理服务器、虚拟机、Docker 
 - 能使用 `ln -s` 创建软链接，并解释它在版本发布和回滚中的作用。
 - 能为 Todo 平台创建服务器目录结构，并运行脚本验证目录、文件、权限和软链接是否正确。
 
-本篇结束时，你至少应该能独立完成下面这组任务：
+你至少应该能独立完成下面这组任务：
 
 ```bash linenums="0"
 pwd
@@ -80,20 +80,11 @@ ln -sfn releases/2026-05-27-001 server/todo-platform/current
 
 本篇不是让你背命令清单，而是让你围绕 Todo 平台服务器目录结构，练习真实团队都能看懂、能审查、能复用的文件组织方式。
 
-### 2.3 课程项目关联
+### 2.3 Todo 平台模拟案例
 
-本篇产出会被后续多章复用：
+> Todo 平台准备部署到一台测试服务器。你需要先规划一套模拟服务器目录结构，分别存放配置、日志、数据、临时文件、发布版本、当前版本软链接和备份文件，并用脚本验证路径和权限是否符合约定。
 
-- 第 3 篇会继续使用日志目录和脚本思路，学习进程、服务和 systemd。
-- 第 6 篇会把目录检查扩展成更完整的 Shell 自动化脚本。
-- 第 9 到第 14 篇会在 Go 后端项目中继续使用配置、日志、数据目录。
-- 第 15 到第 19 篇会把这些目录映射到 Docker 镜像、数据卷和容器运行时中。
-- 第 20 篇以后会在 Kubernetes 的 ConfigMap、Secret、PVC、SecurityContext 中继续使用路径和权限知识。
-
-本篇真实案例是：
-
-> 团队准备把 Todo 平台从“课程仓库”逐步演进为可部署服务。你需要先在仓库中创建一套模拟服务器目录结构，包含配置、日志、数据、临时目录、发布版本目录和当前版本软链接，并用脚本验证目录权限是否符合要求。
-
+这个案例把 Linux 文件系统从“命令练习”变成“服务部署前的目录治理”：每个目录都要能解释用途、权限和故障影响。
 ## 3. 核心概念
 
 ### 3.1 Linux 目录结构与路径规则
@@ -420,9 +411,11 @@ flowchart LR
 
 ## 5. 手把手实验
 
+预计耗时：60 分钟（动手操作约 40 分钟）。
+
 ### 5.1 实验目标
 
-本实验会完成本篇小项目：**在课程仓库中搭建 Todo 平台服务器目录结构，写入配置、日志、数据目录，设置基础权限，并用脚本验证目录是否符合约定**。
+本实验会完成：**在课程仓库中搭建 Todo 平台服务器目录结构，写入配置、日志、数据目录，设置基础权限，并用脚本验证目录是否符合约定**。
 
 最终交付物包括：
 
@@ -663,34 +656,39 @@ mkdir -p scripts
 
 写入配置文件：
 
-```bash linenums="0"
-cat > server/todo-platform/config/app.env <<'EOF'
+将下面内容写入 `server/todo-platform/config/app.env`：
+
+```text title="server/todo-platform/config/app.env"
 TODO_ENV=dev
 TODO_HTTP_ADDR=127.0.0.1:8080
 TODO_CONFIG_DIR=server/todo-platform/config
 TODO_LOG_DIR=server/todo-platform/logs
 TODO_DATA_DIR=server/todo-platform/data
-EOF
 ```
 
 写入示例日志：
 
-```bash linenums="0"
-cat > server/todo-platform/logs/todo-api.log <<'EOF'
+将下面内容写入 `server/todo-platform/logs/todo-api.log`：
+
+```text title="server/todo-platform/logs/todo-api.log"
 2026-05-27T09:00:00+08:00 INFO todo-api started env=dev addr=127.0.0.1:8080
 2026-05-27T09:00:05+08:00 INFO request_id=req-001 method=GET path=/healthz status=200
 2026-05-27T09:00:10+08:00 ERROR request_id=req-002 method=GET path=/todos status=500 error="database not configured"
-EOF
 ```
 
 写入版本说明和数据目录占位文件：
 
-```bash linenums="0"
-cat > server/todo-platform/releases/2026-05-27-001/README.md <<'EOF'
+将下面内容写入 `server/todo-platform/releases/2026-05-27-001/README.md`：
+
+```markdown title="server/todo-platform/releases/2026-05-27-001/README.md"
 # Todo Platform Release 2026-05-27-001
 
 This directory simulates an application release package.
-EOF
+```
+
+继续执行：
+
+```bash linenums="0"
 touch server/todo-platform/data/.keep
 ```
 
@@ -742,7 +740,7 @@ rm server/todo-platform/tmp/delete-me.txt
 
 写入检查脚本：
 
-将 5.4 中的完整脚本保存为 `scripts/check-server-layout.sh`。推荐用 VS Code 新建文件后粘贴脚本内容；如果必须在终端中粘贴，可以执行 `cat > scripts/check-server-layout.sh <<'EOF'`，粘贴 5.4 的完整脚本，最后单独输入一行 `EOF` 结束。
+将 5.4 中的完整脚本保存为 `scripts/check-server-layout.sh`。推荐用 VS Code 新建文件后粘贴脚本内容，并确认文件使用 LF 换行。
 
 保存后赋予执行权限：
 
@@ -875,8 +873,6 @@ rm -f scripts/check-server-layout.sh
 
 如果准备继续学习第 3 篇，不建议清理 `server/todo-platform`，因为后续会继续使用日志、配置和脚本思路。
 
-预计耗时：60 分钟（动手操作约 40 分钟）。
-
 ## 6. 常见错误与排障
 
 ### 错误 1：`No such file or directory`
@@ -887,7 +883,7 @@ rm -f scripts/check-server-layout.sh
   cat: server/todo-platform/config/app.env: No such file or directory
   ```
 
-- **原因**：当前目录不对，或者前面的 `mkdir`、`cat > app.env` 没有执行成功。
+- **原因**：当前目录不对，或者前面的目录创建、文件写入步骤没有完成。
 
 - **排查**：
 
@@ -1050,53 +1046,13 @@ rm -f scripts/check-server-layout.sh
 5. **环境变量适合运行参数，不适合无边界地堆配置。**
    环境变量很方便，但也容易被进程列表、调试输出或日志泄露。生产环境中的密码、证书和 Token 应使用 Secret 管理，并控制谁能读取。
 
-## 8. 本章小项目
-
-本章小项目：**Todo 平台服务器目录结构初始化**。
-
-交付物：
-
-- `server/todo-platform/config/app.env`
-- `server/todo-platform/config/app.env.backup`
-- `server/todo-platform/logs/todo-api.log`
-- `server/todo-platform/data/.keep`
-- `server/todo-platform/tmp/`
-- `server/todo-platform/releases/2026-05-27-001/README.md`
-- `server/todo-platform/current` 软链接
-- `server/todo-platform-backup.tar.gz`
-- `scripts/check-server-layout.sh`
-
-验收命令：
-
-```bash linenums="0"
-cd ~/workspace/cloud-native-todo-platform
-./scripts/check-server-layout.sh
-grep -n "ERROR" server/todo-platform/logs/todo-api.log
-find server/todo-platform \( -name "*.env" -o -name "*.log" \) -print
-ls -l server/todo-platform/current
-tar -tzf server/todo-platform-backup.tar.gz | head
-```
-
-能力验收标准：
-
-| 能力项 | 验收方式 |
-|---|---|
-| 路径理解 | 能说明 `server/todo-platform/config/app.env` 是相对路径还是绝对路径 |
-| 文件操作 | 能用 `cp`、`mv`、`rm` 创建备份、重命名和安全删除实验文件 |
-| 权限理解 | 能解释 `640`、`700`、`750` 的含义，并能用 `id`、`stat` 查看所有者和权限 |
-| 文本搜索 | 能用 `grep -n` 找到错误日志 |
-| 文件查找 | 能用 `find` 找到 `.env` 和 `.log` 文件 |
-| 软链接 | 能解释 `current -> releases/2026-05-27-001` |
-| 备份恢复 | 能用 `tar -tzf` 检查备份包内容 |
-| 自动化检查 | 能运行 `scripts/check-server-layout.sh` 并读懂输出 |
-
-## 9. 练习题与面试题
+## 8. 练习题与面试题
 
 本章练习题和面试题已拆分到独立页面，完成正文学习后再进入题库练习与复盘。
 
 [查看本章练习题与面试题](../../questions/stage-01-foundation/02-linux-filesystem.md)
 
-## 10. 本章总结
+## 9. 本章总结
 
 本篇系统训练了 Linux 文件系统与命令基础。你理解了目录树、路径规则、文件操作、权限位、文本查看、搜索、压缩、软链接和环境变量这些核心概念，也知道它们为什么会影响后端服务、容器和 Kubernetes 工作负载。
 
@@ -1104,7 +1060,7 @@ tar -tzf server/todo-platform-backup.tar.gz | head
 
 能力价值上，本篇训练的是“能在服务器上稳稳操作”的基本功。真正的工程能力不是记住某个命令，而是知道操作前如何确认路径，出错后如何查看证据，修改权限时如何控制风险，发布目录如何支持回滚。这些习惯会直接影响你未来排查线上问题的速度和安全边界。
 
-## 11. 下一章衔接
+## 10. 下一章衔接
 
 下一篇进入 **Linux 进程、服务与软件管理**。
 

@@ -36,7 +36,7 @@ Go 服务运行在 Linux 之上，无论它将来是在虚拟机、Docker 容器
 - 能使用 `ss`、`free`、`df`、`du` 定位端口监听、内存紧张和磁盘空间问题。
 - 能将 `todo-process-demo` 作为 systemd 服务运行，并用检查脚本完成验收。
 
-本篇结束时，你至少应该能独立完成下面这组任务：
+你至少应该能独立完成下面这组任务：
 
 ```bash linenums="0"
 systemctl status todo-process-demo --no-pager
@@ -76,20 +76,11 @@ sudo systemctl restart todo-process-demo
 
 本篇不是背命令清单，而是围绕一个真实服务生命周期来学习：如何让 Todo 平台的一个 Go HTTP 服务可启动、可停止、可观察、可排障。
 
-### 2.3 课程项目关联
+### 2.3 Todo 平台模拟案例
 
-本篇产出会被后续多章复用：
+> Todo 平台有一个最小 Go HTTP 服务，需要在 Ubuntu Server 上长期运行。你需要把它作为 Linux 进程启动，观察 PID、端口、日志、CPU 和内存，再用 systemd 托管它的启动、停止、重启和状态查看。
 
-- 第 4 篇会继续使用本篇服务监听的 `127.0.0.1:18080`，学习端口、DNS、HTTP 和抓包。
-- 第 6 篇会把服务启动、检查和清理固化成 Shell 自动化脚本。
-- 第 9 到第 14 篇会复用本篇的健康检查、启动参数、优雅关闭、日志输出和服务运行思路，并逐步演进为真正的 Todo API。
-- 第 15 到第 19 篇会把进程管理迁移到 Docker 容器、Compose 和容器运行时中。
-- 第 20 篇以后会把 systemd 中的重启、日志、运行用户和资源限制思想迁移到 Pod、Deployment、Probe 和 `resources` 中。
-
-本篇真实案例是：
-
-> 团队已经为 Todo 平台设计了服务器目录结构，现在需要把一个 Go HTTP 程序部署到 Linux 测试机，由 systemd 托管，并提供标准的启动、停止、状态查看、日志查看和资源排查方法。
-
+这个案例关注服务生命周期：程序不只是“能跑起来”，还要能被系统管理、被日志追踪、被资源命令定位问题。
 ## 3. 核心概念
 
 ### 3.1 程序、进程、PID 与 PPID
@@ -345,6 +336,8 @@ systemd 管理单机服务，Kubernetes 管理集群应用。它们不是同一�
 所以本篇并不是传统运维知识的孤岛，而是后续理解容器主进程、Pod 重启、日志输出、探针和资源限制的底层铺垫。
 
 ## 5. 手把手实验
+
+预计耗时：75 分钟（动手操作约 50 分钟）。
 
 ### 5.1 实验目标
 
@@ -911,17 +904,22 @@ sudo install -o root -g root -m 0755 bin/todo-process-demo /opt/todo-platform/bi
 
 写入配置文件：
 
-```bash linenums="0"
-sudo tee /etc/todo-platform/process-demo.env >/dev/null <<'EOF'
+使用管理员权限将下面内容写入 `/etc/todo-platform/process-demo.env`：
+
+```text title="/etc/todo-platform/process-demo.env"
 TODO_ENV=dev
 TODO_HTTP_ADDR=127.0.0.1:18080
 TODO_PID_FILE=/run/todo-platform/todo-process-demo.pid
-EOF
+```
+
+继续执行：
+
+```bash linenums="0"
 sudo chown root:todo /etc/todo-platform/process-demo.env
 sudo chmod 640 /etc/todo-platform/process-demo.env
 ```
 
-这里使用 `<<'EOF'` 是为了让 Shell 原样写入内容，不展开文件里的 `$VARIABLE`。写配置文件时推荐使用这种写法，避免环境变量被当前终端提前替换。
+配置文件内容需要原样保存，不要把文件里的 `$VARIABLE` 误写成当前终端变量的展开结果。
 
 将 5.4 中的 unit 内容保存为 `deployments/systemd/todo-process-demo.service`，再安装到 systemd：
 
@@ -1097,8 +1095,6 @@ sudo rmdir /var/lib/todo-platform /var/log/todo-platform 2>/dev/null || true
 
 `/run/todo-platform` 由 systemd 的 `RuntimeDirectory` 管理，服务停止后会自动清理。不建议自动删除 `todo` 用户和 `/opt/todo-platform`、`/etc/todo-platform` 目录，因为它们可能被后续章节复用。
 
-预计耗时：75 分钟（动手操作约 50 分钟）。
-
 ## 6. 常见错误与排障
 
 ### 错误 1：`System has not been booted with systemd`
@@ -1265,54 +1261,13 @@ sudo rmdir /var/lib/todo-platform /var/log/todo-platform 2>/dev/null || true
 5. **软件包来源要可信且可追溯。**
    生产环境不要随意从公网复制脚本执行，也不要在关键机器上临时安装来历不明的工具。常见做法是使用公司内部软件源、固定版本、审计安装记录，并在镜像或基础环境中预置必要排障工具。
 
-## 8. 本章小项目
-
-本章小项目：**Todo Go HTTP 服务的 systemd 托管**。
-
-交付物：
-
-- `api/cmd/todo-process-demo/main.go`
-- `bin/todo-process-demo`
-- `deployments/systemd/todo-process-demo.service`
-- `scripts/check-process-service.sh`
-- `/opt/todo-platform/bin/todo-process-demo`
-- `/etc/todo-platform/process-demo.env`
-- `/etc/systemd/system/todo-process-demo.service`
-- 一个处于 `active (running)` 状态的 `todo-process-demo` systemd 服务
-
-验收命令：
-
-```bash linenums="0"
-systemctl status todo-process-demo --no-pager
-journalctl -u todo-process-demo -n 20 --no-pager
-curl -fsS http://127.0.0.1:18080/healthz
-PID="$(systemctl show -p MainPID --value todo-process-demo)"
-ps -p "$PID" -o pid,ppid,user,stat,%cpu,%mem,etime,cmd
-sudo ss -lntp | grep 18080
-./scripts/check-process-service.sh
-```
-
-能力验收标准：
-
-| 能力项 | 验收方式 |
-|---|---|
-| 进程理解 | 能说明程序、进程、PID、PPID 的关系 |
-| 任务管理 | 能使用 `command &`、`jobs`、`fg`、`bg`、`kill` 管理临时任务 |
-| 进程查看 | 能用 `ps`、`pgrep` 找到 Todo 服务进程 |
-| 服务管理 | 能用 `systemctl` 启动、停止、重启、查看服务 |
-| 日志查看 | 能用 `journalctl -u` 查看服务日志 |
-| 端口定位 | 能用 `ss` 或 `lsof` 找到监听 `18080` 的进程 |
-| 资源观察 | 能用 `top`、`free`、`df` 查看 CPU、内存、磁盘 |
-| unit 编写 | 能解释 `User`、`EnvironmentFile`、`ExecStart`、`Restart`、`RuntimeDirectory` 字段 |
-| 自动化检查 | 能运行 `scripts/check-process-service.sh` 完成验收 |
-
-## 9. 练习题与面试题
+## 8. 练习题与面试题
 
 本章练习题和面试题已拆分到独立页面，完成正文学习后再进入题库练习与复盘。
 
 [查看本章练习题与面试题](../../questions/stage-01-foundation/03-linux-process.md)
 
-## 10. 本章总结
+## 9. 本章总结
 
 本篇完成了从“文件如何组织”到“程序如何运行”的过渡。你学习了程序、进程、PID、PPID、前台后台任务、信号、systemd、service unit、软件包管理，以及 CPU、内存、磁盘和端口排查命令。它们看起来是 Linux 基础，实际是后端服务和云原生排障的底座。
 
@@ -1320,6 +1275,6 @@ sudo ss -lntp | grep 18080
 
 能力价值上，你现在可以在 Linux 测试机上独立启动、停止、观察和排查一个后端服务。后续学习 Docker、Kubernetes、Probe、资源限制、日志和服务暴露时，本篇的进程、信号、端口和资源证据会反复出现。
 
-## 11. 下一章衔接
+## 10. 下一章衔接
 
 下一篇进入 **Linux 网络基础与排障**。本篇已经让 `todo-process-demo` 监听 `127.0.0.1:18080`，并学会用 `ss` 找到端口和进程；下一篇会继续追问为什么本机能访问、其他机器不一定能访问，以及如何用 `curl`、`dig`、`tcpdump` 排查 HTTP 访问链路。

@@ -46,23 +46,11 @@ Kubebuilder 解决的是 Operator 工程化问题：让 API 类型、Controller�
 
 SRE 负责运行和排障 Operator。他们关注 Controller 日志、Reconcile 错误、队列积压、RBAC Forbidden、leader election、`status.conditions` 和子资源状态。Kubebuilder 生成的项目结构让这些能力更容易标准化接入，但生产稳定性仍然取决于 Reconciler 的设计质量。
 
-### 2.3 课程项目关联
+### 2.3 Todo 平台模拟案例
 
-本篇承接第 34-36 篇的 API 与控制循环设计，也会对齐第 37 篇手写 Controller 的核心逻辑。我们不再手工维护 CRD YAML，而是通过 Go 类型和 marker 生成 `TodoApp` CRD；不再手工拼 Informer 和 Workqueue，而是使用 controller-runtime 的 Manager 和 Builder 注册 Controller。
+> 手写 Controller 已经证明思路可行，但工程化 Operator 需要脚手架、代码生成、CRD 管理和测试结构。你需要用 Kubebuilder 创建 `TodoApp` API 与 Controller，并自动创建 Deployment、Service 和 status。
 
-第 37 篇的手写版本位于 `<project-root>/operator/handwritten/`，本篇 Kubebuilder 版本位于 `<project-root>/operator/kubebuilder/`。两个目录在同一个项目仓库中并列存在，便于学习者直接对比“手写控制循环”和“工程化 Operator 项目”的差异。
-
-本篇只为 `TodoApp` 创建 Kubebuilder API 和 Controller，目标是先跑通“自定义资源 -> Deployment / Service / status”的应用交付闭环。第 35 篇定义过的 `TodoDatabase` 和 `TodoCache` 仍然作为平台 API 契约保留，后续可以按同样模式扩展独立 Controller，但不在本篇实现。
-
-本篇输出会被后续章节继续演进：
-
-- 第 39 篇会在本篇 Operator 上增加 OwnerReference 深化、Finalizer、Webhook、Conditions 和事件记录。
-- 第 40 篇会为本篇 Reconciler 增加 envtest、kind 集成测试、镜像构建和发布流程。
-- 第 41 篇会围绕 RBAC 最小化、性能、观测和多租户边界把 Operator 推向生产可用。
-- 第 42 篇会使用最终版 `TodoApp` 一键交付完整 Todo Platform。
-
-项目版本线进入阶段六子版本 `v4.4-kubebuilder-operator`，它仍属于 `v4.0-operator` 总版本线。这里的子版本号用于阶段六内部衔接，便于和第 37 篇手写版本以及后续高级机制版本区分。
-
+这个案例关注工程化收益：框架不能替代控制循环理解，但能把重复的项目结构、权限、生成和运行方式标准化。
 ## 3. 核心概念
 
 ### 3.1 Kubebuilder 是 Operator 项目脚手架
@@ -261,6 +249,8 @@ Kubebuilder 没有改变 Controller 的本质，它只是改变了工程入口�
 所以学习顺序不能倒过来：如果完全不懂控制循环，Kubebuilder 会像魔法；理解第 36 篇后再看 Kubebuilder，它只是把同样的模型做成工程框架。
 
 ## 5. 手把手实验
+
+预计耗时：90 分钟，其中动手编码约 60 分钟，集群验证和排障约 30 分钟。
 
 ### 5.1 实验目标
 
@@ -1215,8 +1205,6 @@ make uninstall
 kind delete cluster --name todo-operator
 ```
 
-预计耗时：90 分钟，其中动手编码约 60 分钟，集群验证和排障约 30 分钟。
-
 ## 6. 常见错误与排障
 
 ### 错误 1：`no matches for kind "TodoApp"`
@@ -1356,60 +1344,13 @@ kind delete cluster --name todo-operator
 
 - **Operator 自身也要被当作生产服务运行**。它需要资源 requests/limits、健康检查、日志级别、指标、告警、leader election、滚动升级和回滚策略。一个会管理业务应用的 Operator 如果自身不可观测、不可升级，就会变成新的单点风险。
 
-## 8. 本章小项目
-
-本章小项目是完成 `<project-root>/operator/kubebuilder/` 中的 Kubebuilder 最小版本。
-
-### 8.1 项目任务
-
-- 使用 Kubebuilder 初始化 `github.com/example/todo-operator` 项目。
-- 创建 `platform.todo.example.com/v1alpha1` 下的 `TodoApp` API。
-- 在 `TodoAppSpec` 中定义 `image`、`replicas`、`port`。
-- 在 `TodoAppStatus` 中定义 `observedGeneration`、`readyReplicas`、`conditions`。
-- 编写 Reconciler 自动创建 Deployment 和 Service。
-- 使用 OwnerReference 建立 `TodoApp` 与子资源关系。
-- 在 kind 集群中创建 `TodoApp` 并验证 status。
-
-### 8.2 验收标准
-
-完成后应能观察到以下结果：
-
-- `make generate`、`make manifests`、`make test` 均执行成功。
-- `kubectl api-resources | grep -i todoapp` 能看到 `todoapps`。
-- `kubectl apply --dry-run=server` 能拦截缺少 `spec.image` 或非法 `replicas` 的资源。
-- `kubectl get todoapp` 能显示 `IMAGE`、`REPLICAS`、`READY` 列。
-- 创建 `TodoApp` 后，自动生成 `todo-platform-api` Deployment 和 Service。
-- 修改 `spec.replicas` 后，Deployment 副本数随之变化。
-- `status.conditions[type=Available]` 能反映 Deployment 是否就绪。
-- 删除 `TodoApp` 后，Deployment 和 Service 被级联删除。
-
-### 8.3 建议提交内容
-
-如果把本章成果提交到项目仓库，建议提交以下文件：
-
-```text linenums="0"
-api/v1alpha1/todoapp_types.go
-api/v1alpha1/zz_generated.deepcopy.go
-internal/controller/todoapp_controller.go
-config/crd/bases/platform.todo.example.com_todoapps.yaml
-config/rbac/role.yaml
-config/samples/platform_v1alpha1_todoapp.yaml
-go.mod
-go.sum
-PROJECT
-Makefile
-Dockerfile
-```
-
-不要提交本地 kind 集群缓存、临时日志、构建产物或个人 IDE 配置。
-
-## 9. 练习题与面试题
+## 8. 练习题与面试题
 
 本章练习题和面试题已拆分到独立页面，完成正文学习后再进入题库练习与复盘。
 
 [查看本章练习题与面试题](../../questions/stage-06-platform-operator/38-kubebuilder.md)
 
-## 10. 本章总结
+## 9. 本章总结
 
 本篇把 Todo Operator 从手写 Controller 思路推进到 Kubebuilder 工程化实践。知识上，你学习了 Kubebuilder 项目结构、Go 类型与 CRD 的生成关系、DeepCopy 的作用、marker 的价值，以及 controller-runtime 中 Manager、cache、client、Scheme、Controller 和 Reconciler 的协作方式。你也看到了 Kubebuilder 并没有改变控制循环本质，只是把通用工程结构和生成流程标准化。
 
@@ -1417,7 +1358,7 @@ Dockerfile
 
 能力上，你已经能用生产团队常见方式开发 Kubernetes Operator 的第一版功能。接下来要做的不是堆更多 YAML，而是把删除清理、字段默认、校验、事件、状态和多版本演进这些生产机制补齐。学完本篇后，你可以参与企业内部平台 API 的第一版落地，也能读懂大多数 Kubebuilder Operator 项目的目录结构和调谐入口。
 
-## 11. 下一章衔接
+## 10. 下一章衔接
 
 下一篇第 39 篇会基于本篇 `<project-root>/operator/kubebuilder/` 继续增强 Operator 机制。我们会直接打开 `api/v1alpha1/todoapp_types.go` 增加 Webhook marker 和更完整的字段约束，在 `internal/controller/todoapp_controller.go` 中增加 Finalizer 删除清理、Event 记录和更细的 Conditions，并在 `config/` 目录中生成 webhook 与 RBAC 配置。
 

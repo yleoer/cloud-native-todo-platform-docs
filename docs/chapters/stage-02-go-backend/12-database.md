@@ -36,7 +36,7 @@
 - 能编写需要真实 PostgreSQL 的集成测试，并用环境变量控制是否运行。
 - 能启动 Todo API v3，验证服务重启后数据不丢失。
 
-本篇结束时，你至少应该能成功执行：
+你至少应该能成功执行：
 
 ```bash linenums="0"
 cd ~/workspace/cloud-native-todo-platform
@@ -74,30 +74,11 @@ TODO_DATABASE_DSN='postgres://todo:todo_password@127.0.0.1:5432/todo_platform?ss
 
 本篇会刻意保持 API 契约不变：Handler 仍然调用 Service，Service 仍然依赖 Repository 接口，只是 Repository 的实现从内存换成 PostgreSQL。
 
-### 2.3 课程项目关联
+### 2.3 Todo 平台模拟案例
 
-本篇会新增和修改：
+> Todo 平台不能只依赖内存保存数据。你需要接入 PostgreSQL，编写数据库连接、迁移脚本、仓储实现和集成测试，让待办事项在服务重启后仍然存在。
 
-```text linenums="0"
-cloud-native-todo-platform/
-├── docker-compose.yml
-└── api/
-    ├── cmd/
-    │   └── todo-api/
-    │       └── main.go
-    ├── internal/
-    │   ├── database/
-    │   │   └── postgres.go
-    │   └── repository/
-    │       ├── postgres.go
-    │       └── postgres_integration_test.go
-    └── migrations/
-        ├── 000001_create_todos.up.sql
-        └── 000001_create_todos.down.sql
-```
-
-第 10 篇的 Gin Handler 不需要改。第 11 篇的 `StatsService` 也不需要改，因为它只依赖 `List(ctx, status)` 这个读接口。换成 PostgreSQL 后，统计任务和压测命令可以继续用来观察数据库访问是否稳定。
-
+这个案例强调持久化边界：业务代码不应该直接散落 SQL 细节，连接配置、迁移、事务和测试数据清理都要有明确位置。
 ## 3. 核心概念
 
 ### 3.1 PostgreSQL
@@ -275,6 +256,8 @@ api/migrations/
 本篇为了教学清晰，用 `psql -f` 手动执行迁移，并创建 `schema_migrations` 表记录版本。真实团队通常会使用 golang-migrate、Flyway、Liquibase 或平台内置迁移工具。
 
 ## 5. 手把手实验
+
+预计耗时：20 分钟阅读，70 分钟动手实验。
 
 ### 5.1 实验目标
 
@@ -1198,8 +1181,6 @@ docker compose down -v
 
 `-v` 会删除数据卷，Todo 数据会丢失。只有确认不需要保留本地实验数据时再执行。
 
-预计耗时：20 分钟阅读，70 分钟动手实验。
-
 ## 6. 常见错误与排障
 
 ### 错误 1：`connection refused`
@@ -1319,36 +1300,13 @@ docker compose down -v
 
 5. **集成测试和错误信息都要隔离风险**。本篇用 `todo_platform_test` 跑会重置 schema 的测试，避免误删开发库。生产团队通常会让 CI 为每次测试创建临时数据库、临时 schema 或容器化数据库实例，测试结束后整体销毁。服务端日志可以记录数据库错误细节，但 HTTP 响应不要暴露 SQL、表名、连接串或内部结构。
 
-## 8. 本章小项目
-
-本章小项目是 **Todo API v3 PostgreSQL 持久化**。项目目标是在不改变 HTTP API 契约的前提下，把 Todo 数据从内存切换到 PostgreSQL，让数据在服务重启后仍然存在，并用事务记录 Todo 事件。
-
-交付物包括：
-
-- `docker-compose.yml`
-- `api/migrations/000001_create_todos.up.sql`
-- `api/migrations/000001_create_todos.down.sql`
-- `api/internal/database/postgres.go`
-- `api/internal/repository/postgres.go`
-- `api/internal/repository/postgres_integration_test.go`
-- 更新后的 `api/cmd/todo-api/main.go`
-
-能力验收标准：
-
-- 能启动 PostgreSQL 18 并执行迁移。
-- 能解释 `todos` 和 `todo_events` 的字段、约束和索引。
-- 能运行 PostgreSQL 集成测试。
-- 能启动 `TODO_DATABASE_DSN=... ./bin/todo-api` 并完成 Todo CRUD。
-- 能停止并重启 API 后确认 Todo 数据仍然存在。
-- 能说明事务如何保证 Todo 变更和事件记录一致。
-
-## 9. 练习题与面试题
+## 8. 练习题与面试题
 
 本章练习题和面试题已拆分到独立页面，完成正文学习后再进入题库练习与复盘。
 
 [查看本章练习题与面试题](../../questions/stage-02-go-backend/12-database.md)
 
-## 10. 本章总结
+## 9. 本章总结
 
 本篇把 Todo API 从内存存储升级到了 PostgreSQL 持久化。你设计了 `todos` 和 `todo_events` 两张表，编写了 up/down 迁移脚本，使用 Docker Compose 启动 PostgreSQL 18，并通过 `database/sql` + pgx 实现了 PostgreSQL Repository。
 
@@ -1356,7 +1314,7 @@ docker compose down -v
 
 能力价值上，你已经具备了后端工程师最常见的数据层能力：建表、写 SQL、设计索引、管理迁移、配置连接池、处理事务和编写数据库集成测试。后续进入 Redis、Docker 和 Kubernetes 时，PostgreSQL 会继续作为 Todo Platform 的核心依赖存在。
 
-## 11. 下一章衔接
+## 10. 下一章衔接
 
 第 13 篇会在 PostgreSQL 持久化的基础上引入 Redis。数据库适合保存权威数据，但高频读取、限流计数、短期缓存和简单异步任务更适合交给 Redis 这类内存数据系统处理。
 

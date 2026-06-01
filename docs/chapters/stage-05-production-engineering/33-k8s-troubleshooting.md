@@ -33,12 +33,11 @@ Kubernetes 排障要解决的是证据链问题：先确认影响范围，再找
 
 在 GitOps 环境中，排障还有一个边界：集群里的对象由 Argo CD 管理，临时 `kubectl patch` 可以用于故障注入和快速验证，但最终修复必须回到 Git 仓库，或者通过 `argocd app sync` 恢复期望状态。
 
-### 2.3 课程项目关联
+### 2.3 Todo 平台模拟案例
 
-本篇承接第 30 篇的 Argo CD、第 31 篇的 Prometheus/Grafana、第 32 篇的 Loki/Tempo/Alloy。实验对象仍是 `todo-dev` namespace 中的 Todo Platform，并额外创建若干 `todo-trouble-*` 临时故障资源。
+> Todo 平台在集群中出现访问失败、Pod 异常、配置错误、DNS 不通或存储挂载失败。你需要按固定流程收集现象、定位层级、修复问题、验证恢复并写出复盘记录。
 
-完成本篇后，Todo Platform 进入 `v3.3-troubleshooting` 阶段：你不只是“部署了一个应用”，而是能在它出故障时按流程定位、修复、验证和复盘。下一篇第 34 篇进入 Kubernetes API 扩展机制，本篇积累的排障视角会帮助你理解后续 Controller 和 Operator 为什么必须持续写 `status.conditions`、Event 和日志。
-
+这个案例把排障从“凭经验试命令”改成可复用流程：每一步都要有证据、判断和下一步动作。
 ## 3. 核心概念
 
 ### 3.1 Kubernetes 排障的四类证据
@@ -255,13 +254,13 @@ kubectl -n todo-dev set image deployment/todo-platform todo-api=todo-api:v0.1.2-
 
 ## 5. 手把手实验
 
+预计耗时：120 分钟（动手操作约 90 分钟）。
+
 ### 5.1 实验目标
 
 在 `todo-dev` 中完成一组安全的故障注入与恢复演练：模拟 `Pending`、`ImagePullBackOff`、`CrashLoopBackOff`、`OOMKilled`、Service endpoints 为空、DNS 配置错误、PVC 绑定失败，并按标准流程定位和修复。
 
 本篇沿用前序章节的 Todo Platform dev 环境。若 `TODO_DATABASE_DSN` 为空，Todo API 使用内存 Repository；本篇故障注入只修改 Kubernetes 对象和演练资源，不依赖 PostgreSQL，也不会验证持久化数据能力。
-
-预计耗时：120 分钟（动手操作约 90 分钟）。
 
 > 注意：本实验只允许在本地 kind 或一次性 dev 集群执行，不要在共享测试、预发或生产集群直接注入故障。
 
@@ -269,7 +268,7 @@ kubectl -n todo-dev set image deployment/todo-platform todo-api=todo-api:v0.1.2-
 
 本篇命令默认在 **Cloud Native Todo Platform 应用仓库根目录** 执行，也就是包含 `api/`、`deployments/`、`observability/` 的仓库根目录。
 
-本篇命令默认使用 Bash 语法，例如 here-doc、`tail`、`awk`、`grep` 和 JSON patch 的单引号。Windows 用户建议在 Git Bash 或 WSL 中执行；如果必须使用 PowerShell，请把 `cat > file <<'EOF'` 这类命令改为手工创建文件，或使用 PowerShell 的 here-string。
+本篇命令默认使用 Bash 语法，例如 `tail`、`awk`、`grep` 和 JSON patch 的单引号。Windows 用户建议在 Git Bash 或 WSL 中执行；涉及 YAML 或脚本文件时，请按页面给出的文件名和内容手动创建同名文件。
 
 版本信息在 2026-05-29 查询：
 
@@ -373,8 +372,9 @@ troubleshooting/
 
 创建 `troubleshooting/k8s/01-pending-pod.yaml`：
 
-```bash linenums="0"
-cat > troubleshooting/k8s/01-pending-pod.yaml <<'YAML'
+将下面内容写入 `troubleshooting/k8s/01-pending-pod.yaml`：
+
+```yaml title="troubleshooting/k8s/01-pending-pod.yaml"
 apiVersion: v1
 kind: Pod
 metadata:
@@ -397,7 +397,6 @@ spec:
         limits:
           cpu: 50m
           memory: 32Mi
-YAML
 ```
 
 关键点：`nodeSelector` 要求节点必须带有指定 label。kind 节点默认没有这个 label，所以 Pod 会停留在 `Pending`，Event 中会出现 `FailedScheduling`。
@@ -406,8 +405,9 @@ YAML
 
 创建 `troubleshooting/k8s/02-broken-service.yaml`：
 
-```bash linenums="0"
-cat > troubleshooting/k8s/02-broken-service.yaml <<'YAML'
+将下面内容写入 `troubleshooting/k8s/02-broken-service.yaml`：
+
+```yaml title="troubleshooting/k8s/02-broken-service.yaml"
 apiVersion: v1
 kind: Service
 metadata:
@@ -425,7 +425,6 @@ spec:
     - name: http
       port: 18080
       targetPort: http
-YAML
 ```
 
 关键点：Service selector 选不中任何 Pod 时，Service 仍然能创建，DNS 也能解析，但 EndpointSlice 没有后端地址。
@@ -434,8 +433,9 @@ YAML
 
 创建 `troubleshooting/k8s/03-pvc-missing-storageclass.yaml`：
 
-```bash linenums="0"
-cat > troubleshooting/k8s/03-pvc-missing-storageclass.yaml <<'YAML'
+将下面内容写入 `troubleshooting/k8s/03-pvc-missing-storageclass.yaml`：
+
+```yaml title="troubleshooting/k8s/03-pvc-missing-storageclass.yaml"
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
@@ -490,7 +490,6 @@ spec:
     - name: data
       persistentVolumeClaim:
         claimName: todo-trouble-data
-YAML
 ```
 
 关键点：Pod 使用了无法绑定的 PVC，所以 Pod 也会等待 volume 就绪。排障时要同时看 Pod Event 和 PVC Event。
@@ -499,8 +498,9 @@ YAML
 
 创建 `troubleshooting/k8s/04-dns-broken.yaml`：
 
-```bash linenums="0"
-cat > troubleshooting/k8s/04-dns-broken.yaml <<'YAML'
+将下面内容写入 `troubleshooting/k8s/04-dns-broken.yaml`：
+
+```yaml title="troubleshooting/k8s/04-dns-broken.yaml"
 apiVersion: v1
 kind: Pod
 metadata:
@@ -542,7 +542,6 @@ spec:
         limits:
           cpu: 100m
           memory: 128Mi
-YAML
 ```
 
 关键点：很多生产 DNS 故障并不是 CoreDNS 挂了，而是 Pod 级 `dnsPolicy`/`dnsConfig` 错误、NetworkPolicy 出站阻断，或节点级 DNS 配置异常。本实验用错误 `dnsConfig` 稳定复现单个 Pod 的 DNS 失败。
@@ -551,8 +550,9 @@ YAML
 
 创建 `troubleshooting/k8s/05-oom-demo.yaml`：
 
-```bash linenums="0"
-cat > troubleshooting/k8s/05-oom-demo.yaml <<'YAML'
+将下面内容写入 `troubleshooting/k8s/05-oom-demo.yaml`：
+
+```yaml title="troubleshooting/k8s/05-oom-demo.yaml"
 apiVersion: v1
 kind: Pod
 metadata:
@@ -591,7 +591,6 @@ spec:
         limits:
           cpu: 200m
           memory: 64Mi
-YAML
 ```
 
 关键点：容器尝试分配约 `160Mi` 内存，但 limit 只有 `64Mi`，kubelet 会记录 `OOMKilled`。如果你的镜像仓库访问受限，可以把该镜像提前拉取到本地并 `kind load docker-image` 到集群。
@@ -600,8 +599,9 @@ YAML
 
 创建 `troubleshooting/k8s/99-cleanup.sh`：
 
-```bash linenums="0"
-cat > troubleshooting/k8s/99-cleanup.sh <<'BASH'
+将下面内容写入 `troubleshooting/k8s/99-cleanup.sh`：
+
+```bash title="troubleshooting/k8s/99-cleanup.sh"
 #!/usr/bin/env bash
 set -euo pipefail
 
@@ -614,8 +614,11 @@ kubectl -n todo-dev delete networkpolicy allow-dns-egress --ignore-not-found
 kubectl -n todo-dev delete pod todo-oom-demo --ignore-not-found
 
 echo "troubleshooting resources cleaned"
-BASH
+```
 
+继续执行：
+
+```bash linenums="0"
 chmod +x troubleshooting/k8s/99-cleanup.sh
 ```
 
@@ -1323,74 +1326,13 @@ kubectl -n todo-dev get pod,svc,pvc,networkpolicy | grep -E 'todo-(pending|broke
 
 5. **存储排障必须保护数据**。PVC、PV、StorageClass 故障常常涉及真实数据。生产中不能为了让 Pod 启动就随意删除 PVC 或重建数据库卷。处理前要确认备份、快照、恢复点、访问模式和绑定关系；删除资源前至少做一次影响确认，并让业务负责人知道可能的数据影响。
 
-## 8. 本章小项目
-
-### 8.1 项目产出
-
-完成本篇后，Todo Platform 新增以下能力：
-
-- `troubleshooting/k8s/01-pending-pod.yaml`：调度失败演练。
-- `troubleshooting/k8s/02-broken-service.yaml`：Service endpoints 为空演练。
-- `troubleshooting/k8s/03-pvc-missing-storageclass.yaml`：PVC 绑定失败演练。
-- `troubleshooting/k8s/04-dns-broken.yaml`：DNS 配置错误演练。
-- `troubleshooting/k8s/05-oom-demo.yaml`：OOMKilled 演练。
-- `troubleshooting/k8s/99-cleanup.sh`：故障资源清理脚本。
-- 一套 Todo Platform Kubernetes 生产排障 runbook。
-
-图 33-2 是本章小项目交付关系：
-
-```mermaid
-flowchart TD
-    Faults["故障注入 YAML"] --> Cluster["todo-dev namespace"]
-    Cluster --> Events["Kubernetes Events"]
-    Cluster --> Logs["kubectl logs / stern / Loki"]
-    Cluster --> Metrics["kubectl top / Prometheus"]
-    Cluster --> Trace["Tempo Trace"]
-    Events --> Runbook["排障 Runbook"]
-    Logs --> Runbook
-    Metrics --> Runbook
-    Trace --> Runbook
-    Runbook --> Recovery["argocd app sync 恢复"]
-```
-
-建议把每次演练按下面模板写成事故复盘记录。模板不追求长，而是要求证据完整、责任清晰：
-
-```markdown linenums="0"
-## 事故复盘：<标题>
-
-- 时间线：<告警时间、确认时间、止血时间、恢复时间>
-- 影响范围：<namespace、服务、接口、用户比例、持续时间>
-- 用户症状：<502、超时、登录失败、延迟升高等>
-- 检测信号：<告警、Event、日志、指标、Trace 链接>
-- 根因：<直接原因和触发条件>
-- 止血动作：<执行命令、执行人、回滚方式>
-- 永久修复：<代码、YAML、容量、流程或监控修复>
-- 预防措施：<测试、告警、准入、runbook 更新>
-- 负责人和截止时间：<owner / due date>
-```
-
-### 8.2 能力验收标准
-
-| 能力 | 验收标准 |
-|---|---|
-| 调度排障 | 能通过 Event 解释 Pod Pending 原因 |
-| 镜像排障 | 能定位 ImagePullBackOff 的镜像名、tag 或权限问题 |
-| 启动排障 | 能使用 `--previous` 日志定位 CrashLoopBackOff |
-| 资源排障 | 能识别 OOMKilled、exit code 137 和资源 limit 关系 |
-| 服务排障 | 能通过 EndpointSlice 判断 Service selector 是否正确 |
-| DNS 排障 | 能区分 CoreDNS 故障、Pod DNS 配置错误和 NetworkPolicy 阻断 |
-| 存储排障 | 能通过 PVC Event 定位 StorageClass 问题 |
-| 工具链 | 能用 k9s、stern、`kubectl debug` 辅助定位 |
-| GitOps 恢复 | 能用 Argo CD 把临时故障注入恢复为 Git 期望状态 |
-| 复盘能力 | 能写出症状、影响范围、根因、修复、预防措施 |
-
-## 9. 练习题与面试题
+## 8. 练习题与面试题
 
 本章练习题和面试题已拆分到独立页面，完成正文学习后再进入题库练习与复盘。
 
 [查看本章练习题与面试题](../../questions/stage-05-production-engineering/33-k8s-troubleshooting.md)
 
-## 10. 本章总结
+## 9. 本章总结
 
 本篇把第 29-32 篇的交付和可观测性能力整合成真实排障流程。知识上，你理解了 Pod 状态、事件、日志、指标、Trace、Service、EndpointSlice、DNS、NetworkPolicy、PVC 和 StorageClass 在排障中的位置。
 
@@ -1398,7 +1340,7 @@ flowchart TD
 
 能力价值上，你已经从“会部署 Kubernetes 应用”推进到“能在应用出问题时定位、修复、验证和复盘”。这正是企业级云原生工程师和平台工程师的分水岭。
 
-## 11. 下一章衔接
+## 10. 下一章衔接
 
 阶段五到这里完成了 CI/CD、GitOps、监控、日志、Trace 和生产排障闭环。下一篇第 34 篇会进入阶段六：Kubernetes API 扩展机制。
 

@@ -39,7 +39,7 @@
 
 **展开解释**：envtest 可以证明 Reconciler 逻辑大体正确，但不能证明 manager Pod 能启动、Webhook Service 有 endpoints、cert-manager 能注入 CA、镜像能拉取、RBAC 权限足够。kind 集成测试用本地真实集群把这些环节串起来。
 
-**深入追问**：kind 测试应该放在每次提交吗？小项目可以放在 PR；大型项目通常把快速单元测试放在每次提交，把 kind 集成测试放在 PR、夜间构建或发布候选阶段。
+**深入追问**：kind 测试应该放在每次提交吗？完整集成测试可以放在 PR；大型项目通常把快速单元测试放在每次提交，把 kind 集成测试放在 PR、夜间构建或发布候选阶段。
 
 ### 面试题 3：Helm 发布 Operator 时，CRD 应该怎么处理？
 

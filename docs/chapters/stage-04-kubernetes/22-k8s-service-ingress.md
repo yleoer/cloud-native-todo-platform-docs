@@ -60,20 +60,11 @@
 
 这也是 Gateway API 相比传统 Ingress 更强调的方向：把“基础设施入口”和“业务路由规则”拆开，让平台团队和应用团队各管各的边界。
 
-### 2.3 课程项目关联
+### 2.3 Todo 平台模拟案例
 
-阶段四主线正在逐步把 Todo Platform 迁移到 Kubernetes：
+> Todo API 已在集群内运行，但用户需要从集群外访问它。你需要配置 Service、Ingress 和 Gateway API 对比实验，验证域名、路径、TLS 和后端转发是否按预期工作。
 
-```text linenums="0"
-第 20 篇：kind 集群和 smoke Service
-第 21 篇：Todo API Deployment + ClusterIP Service
-第 22 篇：Traefik Ingress + HTTPS + Gateway API 对比
-第 23 篇：ConfigMap / Secret 配置迁移
-第 24 篇：PostgreSQL PVC 持久化
-```
-
-本篇会继续复用 `deployments/k8s-base/` 目录，在其中加入入口层相关 YAML。后续 Helm 和 Kustomize 章节会把这些 YAML 改造成可参数化、多环境可复用的发布资产。
-
+这个案例强调入口层排障：访问失败时，要能区分 Service selector、Endpoint、Ingress 规则、网关监听和应用响应问题。
 ## 3. 核心概念
 
 ### 3.1 Service：稳定入口和服务发现
@@ -265,6 +256,8 @@ HTTPRoute：这个应用的哪些 Host/Path 转发到哪个 Service
 
 ## 5. 手把手实验
 
+预计耗时：90-120 分钟（动手操作约 70 分钟）。
+
 ### 5.1 实验目标
 
 在第 21 篇 Todo API Deployment 和 ClusterIP Service 的基础上，部署 Traefik 入口控制器，创建本地 TLS Secret，通过 Ingress 和 Gateway API 两种方式用 HTTPS 访问 Todo API，并能排查入口层常见故障。
@@ -334,12 +327,13 @@ deployments/k8s-base/tls/
 
 ### 5.4 完整代码或配置
 
-以下命令按 bash / WSL2 Ubuntu 编写。Windows PowerShell 用户建议在 WSL2 中执行；如果必须使用 PowerShell，请手动创建同名文件并复制 YAML 内容，或把 heredoc 改写成 PowerShell here-string。
+以下命令按 bash / WSL2 Ubuntu 编写。需要创建 YAML 或配置文件时，请按页面给出的文件名手动创建同名文件，并复制对应内容。
 
 创建 NodePort 对比 Service：
 
-```bash linenums="0"
-cat > deployments/k8s-base/todo-api-nodeport.yaml <<'YAML'
+将下面内容写入 `deployments/k8s-base/todo-api-nodeport.yaml`：
+
+```yaml title="deployments/k8s-base/todo-api-nodeport.yaml"
 apiVersion: v1
 kind: Service
 metadata:
@@ -358,13 +352,13 @@ spec:
       port: 80
       targetPort: http
       nodePort: 30082 # ← 默认 NodePort 范围 30000-32767，手工指定要避免冲突
-YAML
 ```
 
 创建 LoadBalancer 对比 Service：
 
-```bash linenums="0"
-cat > deployments/k8s-base/todo-api-loadbalancer.yaml <<'YAML'
+将下面内容写入 `deployments/k8s-base/todo-api-loadbalancer.yaml`：
+
+```yaml title="deployments/k8s-base/todo-api-loadbalancer.yaml"
 apiVersion: v1
 kind: Service
 metadata:
@@ -382,7 +376,6 @@ spec:
     - name: http
       port: 80
       targetPort: http
-YAML
 ```
 
 安装 Gateway API CRDs。Traefik 3.6 的 Gateway Provider 与 Gateway API `v1.4.0` 对齐，本篇固定这个版本：
@@ -395,8 +388,9 @@ kubectl apply --server-side -f https://github.com/kubernetes-sigs/gateway-api/re
 
 创建 Traefik Controller。这里不用 Helm，是为了让你看清 Controller 需要哪些 RBAC、监听端口和 provider 开关；后续交付章节会再讨论入口层如何逐步纳入 Helm Chart 或环境 overlay 管理：
 
-```bash linenums="0"
-cat > deployments/k8s-base/traefik-controller.yaml <<'YAML'
+将下面内容写入 `deployments/k8s-base/traefik-controller.yaml`：
+
+```yaml title="deployments/k8s-base/traefik-controller.yaml"
 # 结构概览：
 # 1. Namespace / ServiceAccount：隔离入口控制器运行身份
 # 2. ClusterRole / Binding：允许 Traefik 读取 Namespace、Ingress、Gateway、Service、EndpointSlice、Secret
@@ -541,13 +535,13 @@ spec:
     - name: dashboard
       port: 8080
       targetPort: dashboard
-YAML
 ```
 
 生成本地 TLS 证书。证书包含 `todo.localhost` 和 `todo-gateway.localhost` 两个 SAN：
 
-```bash linenums="0"
-cat > deployments/k8s-base/tls/openssl-todo-localhost.cnf <<'EOF'
+将下面内容写入 `deployments/k8s-base/tls/openssl-todo-localhost.cnf`：
+
+```text title="deployments/k8s-base/tls/openssl-todo-localhost.cnf"
 [req]
 default_bits = 2048
 prompt = no
@@ -564,8 +558,11 @@ subjectAltName = @alt_names
 [alt_names]
 DNS.1 = todo.localhost
 DNS.2 = todo-gateway.localhost
-EOF
+```
 
+继续执行：
+
+```bash linenums="0"
 openssl req -x509 -nodes -days 30 -newkey rsa:2048 \
   -keyout deployments/k8s-base/tls/todo.localhost.key \
   -out deployments/k8s-base/tls/todo.localhost.crt \
@@ -579,8 +576,9 @@ kubectl -n todo-workloads create secret tls todo-api-local-tls \
 
 创建 Ingress：
 
-```bash linenums="0"
-cat > deployments/k8s-base/todo-api-ingress.yaml <<'YAML'
+将下面内容写入 `deployments/k8s-base/todo-api-ingress.yaml`：
+
+```yaml title="deployments/k8s-base/todo-api-ingress.yaml"
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -608,13 +606,13 @@ spec:
                 name: todo-api
                 port:
                   number: 80
-YAML
 ```
 
 创建 Gateway API 的平台入口资源。`GatewayClass` 是集群级资源，通常由平台团队维护；`Gateway` 声明本 Namespace 可用的 HTTPS 入口：
 
-```bash linenums="0"
-cat > deployments/k8s-base/traefik-gateway-platform.yaml <<'YAML'
+将下面内容写入 `deployments/k8s-base/traefik-gateway-platform.yaml`：
+
+```yaml title="deployments/k8s-base/traefik-gateway-platform.yaml"
 apiVersion: gateway.networking.k8s.io/v1
 kind: GatewayClass
 metadata:
@@ -641,13 +639,13 @@ spec:
       allowedRoutes:
         namespaces:
           from: Same # ← 本章只允许同 Namespace 的 HTTPRoute 绑定
-YAML
 ```
 
 创建应用团队提交的 `HTTPRoute`。它只描述 Todo API 的 Host、Path 和后端 Service，不再负责创建集群级入口类别：
 
-```bash linenums="0"
-cat > deployments/k8s-base/todo-api-httproute.yaml <<'YAML'
+将下面内容写入 `deployments/k8s-base/todo-api-httproute.yaml`：
+
+```yaml title="deployments/k8s-base/todo-api-httproute.yaml"
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
@@ -667,7 +665,6 @@ spec:
       backendRefs:
         - name: todo-api
           port: 80
-YAML
 ```
 
 ### 5.5 执行命令
@@ -846,8 +843,6 @@ kubectl delete --ignore-not-found -f https://github.com/kubernetes-sigs/gateway-
 
 注意：删除 Gateway API CRDs 会影响整个集群中所有 Gateway、HTTPRoute、ReferenceGrant 等对象。共享集群里不要随便删除 CRDs。
 
-预计耗时：90-120 分钟（动手操作约 70 分钟）。
-
 ## 6. 常见错误与排障
 
 ### 错误 1：创建了 Ingress，但访问一直 404
@@ -973,42 +968,13 @@ kubectl delete --ignore-not-found -f https://github.com/kubernetes-sigs/gateway-
 
 5. **Ingress NGINX 存量要做迁移盘点。** 社区 Ingress NGINX 已进入退役路径，旧集群不会立即失效，但安全修复和长期维护风险很高。迁移时不要只替换镜像；要盘点 annotations、rewrite、auth、snippet、TLS、灰度、监控和日志行为，再迁移到 Gateway API 或受支持的 Ingress Controller。
 
-## 8. 本章小项目
-
-本章小项目是 **Todo API Kubernetes HTTPS Entry Pack**。
-
-项目产出：
-
-- `deployments/k8s-base/todo-api-nodeport.yaml`
-- `deployments/k8s-base/todo-api-loadbalancer.yaml`
-- `deployments/k8s-base/traefik-controller.yaml`
-- `deployments/k8s-base/todo-api-tls.local.yaml`（本地生成，不提交公开仓库）
-- `deployments/k8s-base/todo-api-ingress.yaml`
-- `deployments/k8s-base/traefik-gateway-platform.yaml`
-- `deployments/k8s-base/todo-api-httproute.yaml`
-- `deployments/k8s-base/tls/`（本地证书和私钥，不提交公开仓库）
-
-主线验收：
-
-- Traefik Deployment Ready。
-- Todo API Ingress 能通过 `https://todo.localhost:18443/readyz` 返回 `200`。
-- Todo API HTTPRoute 能通过 `https://todo-gateway.localhost:18443/readyz` 返回 `200`。
-- 能解释为什么 LoadBalancer 在 kind 中是 `<pending>`。
-- 能通过 EndpointSlice 判断入口 502 是不是后端 Service 问题。
-
-进阶验收：
-
-- 能说清 Ingress 和 Gateway API 的职责差异。
-- 能说明 TLS Secret 为什么必须和 Ingress/Gateway 在同一 Namespace。
-- 能写出一份 Ingress NGINX 到 Traefik / Gateway API 的迁移检查清单。
-
-## 9. 练习题与面试题
+## 8. 练习题与面试题
 
 本章练习题和面试题已拆分到独立页面，完成正文学习后再进入题库练习与复盘。
 
 [查看本章练习题与面试题](../../questions/stage-04-kubernetes/22-k8s-service-ingress.md)
 
-## 10. 本章总结
+## 9. 本章总结
 
 本篇把 Todo API 从“只能通过 ClusterIP 和 port-forward 调试”推进到“具备入口层 HTTPS 访问”。你理解了 Service 的稳定入口、ClusterIP / NodePort / LoadBalancer 的边界、Ingress 和 Ingress Controller 的关系、TLS 终止、Traefik 的控制器职责，以及 Gateway API 如何把平台入口和应用路由拆开。
 
@@ -1016,6 +982,6 @@ kubectl delete --ignore-not-found -f https://github.com/kubernetes-sigs/gateway-
 
 能力价值上，你现在能从客户端请求一路排查到 Controller、Ingress/Gateway、Service、EndpointSlice 和 Pod，这是 Kubernetes 应用交付中非常关键的中高级排障能力。
 
-## 11. 下一章衔接
+## 10. 下一章衔接
 
 第 23 篇会继续在本篇入口层之上，把 Todo API 的环境变量、JWT Secret、管理员用户哈希等配置从 YAML 硬编码迁移到 ConfigMap 和 Secret 管理。到那时，入口层负责“请求如何进来”，配置管理负责“应用以什么参数运行”，两者合起来才更接近真实团队的 Kubernetes 交付方式。

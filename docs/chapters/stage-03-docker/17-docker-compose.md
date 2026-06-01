@@ -78,28 +78,11 @@ Compose 不是把命令变短这么简单。它把“本地环境应该长什么
 
 本篇不会把 Compose 当作生产部署方案。生产阶段会进入 Kubernetes、Helm、Kustomize、GitOps 和 CI/CD。但 Compose 是进入这些内容前非常重要的一层：它让你先把服务依赖、配置注入、启动顺序和本地入口代理梳理清楚。
 
-### 2.3 课程项目关联
+### 2.3 Todo 平台模拟案例
 
-本篇会把前两篇的成果串起来：
+> Todo 平台本地开发需要一条命令启动 API、PostgreSQL、Redis 和入口代理。你需要用 Docker Compose 描述服务依赖、网络、端口、环境变量、健康检查和数据卷。
 
-```text linenums="0"
-第 15 篇：手动 docker run
-  -> 理解网络、端口、数据卷、环境变量
-
-第 16 篇：Dockerfile 构建镜像
-  -> 得到 todo-api:v0.1.0
-
-第 17 篇：Docker Compose 本地编排
-  -> 一条命令启动 API + PostgreSQL + Redis + Traefik
-```
-
-本篇产出的 `deployments/docker-compose/compose.yaml` 会被后续章节反复引用：
-
-- 第 18 篇会基于这个环境观察容器进程、文件系统和网络隔离。
-- 第 19 篇会把本篇对“镜像、容器、运行时”的理解迁移到 OCI、containerd、runc 和 CRI。
-- 第 20 篇以后进入 Kubernetes，本篇的 `api`、`postgres`、`redis`、`traefik` 会分别演进为 Deployment、StatefulSet、Service、Ingress、Secret 和 PVC 等资源。
-- 第 29 篇 CI/CD 会把本篇手动启动和验证流程自动化。
-
+这个案例用于训练本地编排思维：开发环境应该可重复启动、可检查状态、可清理数据，并能清楚表达服务之间的依赖关系。
 ## 3. 核心概念
 
 ### 3.1 Compose 文件是什么
@@ -378,6 +361,8 @@ labels:
 本地实验为了降低访问门槛，使用 `PathPrefix(`/`)`，这样 `http://127.0.0.1:18080/readyz` 和 API 路径都能直接进入 Todo API。真实团队通常会使用 `Host(`todo.localhost`)` 或正式域名作为路由规则，并配合 TLS、认证、限流、访问日志和更严格的路由边界。
 
 ## 5. 手把手实验
+
+预计耗时：120 分钟（动手操作约 80 分钟，排障和记录约 40 分钟）。
 
 ### 5.1 实验目标
 
@@ -945,7 +930,6 @@ docker compose --env-file .env restart api
 docker compose --env-file .env up -d --force-recreate
 ```
 
-预计耗时：120 分钟（动手操作约 80 分钟，排障和记录约 40 分钟）。
 
 ## 6. 常见错误与排障
 
@@ -1165,105 +1149,13 @@ docker compose --env-file .env up -d --force-recreate
 
 5. **健康检查不是业务 SLA。** 本篇用 `pg_isready`、`redis-cli ping` 和 `config-check` 处理本地启动顺序，但生产环境还需要真实的 readiness、liveness、指标、日志、追踪和告警。`depends_on` 只能帮助本地环境按顺序启动，不能保证运行期间依赖永远可用。
 
-## 8. 本章小项目
-
-本章小项目：**为 Cloud Native Todo Platform 交付一套可复现的 Docker Compose 本地环境**。
-
-### 8.1 项目产出
-
-完成后，你应该拥有：
-
-- `deployments/docker-compose/compose.yaml`
-- `deployments/docker-compose/.env.example`
-- `deployments/docker-compose/README.md`
-- 本地未提交的 `deployments/docker-compose/.env`
-- 可运行的服务：`postgres`、`redis`、`migrate`、`api`、`traefik`
-- 一份启动、验证、排障和清理记录
-
-### 8.2 验收标准
-
-最小验收：
-
-- `docker compose --env-file .env config --services` 输出 5 个服务。
-- `docker compose --env-file .env up -d` 能启动完整环境。
-- `docker compose --env-file .env ps -a` 显示 `migrate` 成功退出，状态为 `Exited (0)`。
-- `curl -i http://127.0.0.1:18080/readyz` 返回 `200 OK`。
-- 登录接口能返回 JWT。
-- 带 Bearer Token 创建 Todo 成功。
-- `docker compose --env-file .env down` 后数据卷仍然存在。
-
-进阶验收：
-
-- `compose.yaml` 中 API 使用 `postgres:5432` 和 `redis:6379`。
-- PostgreSQL 和 Redis 都有命名数据卷。
-- PostgreSQL、Redis、API 至少有基础健康检查或明确启动依赖。
-- API 不直接暴露宿主机端口，请求通过 Traefik 进入。
-- `.env` 未被提交，`.env.example` 可安全提交。
-- `deployments/docker-compose/README.md` 说明启动、日志、停止和清空数据。
-
-### 8.3 建议记录模板
-
-在 `docs/docker/chapter-17-compose-record.md` 中记录：
-
-```markdown linenums="0"
-# 第 17 篇 Docker Compose 本地编排记录
-
-## 基础信息
-
-- 操作系统：
-- Docker 版本：
-- Docker Compose 版本：
-- Todo API 镜像：
-- Compose 项目名：
-
-## 文件产出
-
-- compose.yaml：
-- .env.example：
-- README.md：
-- .env 是否已忽略：
-
-## 启动结果
-
-    粘贴 docker compose ps 输出
-
-## 验证结果
-
-- /healthz：
-- /readyz：
-- 登录接口：
-- 创建 Todo：
-- PostgreSQL 表：
-- Redis ping：
-- Traefik Dashboard：
-
-## 排障记录
-
-1. 问题：
-   - 现象：
-   - 定位命令：
-   - 根因：
-   - 修复方式：
-
-2. 问题：
-   - 现象：
-   - 定位命令：
-   - 根因：
-   - 修复方式：
-
-## 清理方式
-
-- 保留数据停止：
-- 清空数据重置：
-```
-
-## 9. 练习题与面试题
+## 8. 练习题与面试题
 
 本章练习题和面试题已拆分到独立页面，完成正文学习后再进入题库练习与复盘。
 
 [查看本章练习题与面试题](../../questions/stage-03-docker/17-docker-compose.md)
 
-## 10. 本章总结
+## 9. 本章总结
 
 本篇把第 15 篇的手工 Docker 命令和第 16 篇的 `todo-api:v0.1.0` 镜像整合成了一套可复现的 Docker Compose 本地环境。你编写了 `compose.yaml`、`.env.example` 和本地 README，用一条命令启动 PostgreSQL、Redis、迁移任务、API 和 Traefik。
 
@@ -1271,7 +1163,7 @@ docker compose --env-file .env up -d --force-recreate
 
 本篇的关键收获不是“少敲命令”，而是把本地开发环境变成工程资产。只要 Compose 文件可信，团队就能围绕同一份环境排查问题、编写文档、接入 CI，并平滑过渡到 Kubernetes。
 
-## 11. 下一章衔接
+## 10. 下一章衔接
 
 第 18 篇会进入容器运行原理。我们会基于本篇启动的容器观察 namespace、cgroups、UnionFS、容器进程、挂载点和网络隔离。到那时你会看到：Compose 负责把服务编排起来，但每个容器的底层仍然依赖 Linux 内核能力和 OCI 运行时。
 

@@ -53,48 +53,11 @@ Prometheus 与 Grafana 的价值不是让页面变好看，而是把系统行为
 
 出问题时，团队通常先看四张图：请求量是否变化、错误率是否升高、延迟是否变慢、资源是否打满。指标回答“系统发生了什么”；第 32 篇的日志和链路追踪会继续回答“为什么发生、慢在哪里”。
 
-### 2.3 课程项目关联
+### 2.3 Todo 平台模拟案例
 
-本篇承接前面几篇产物：
+> Todo API 需要被监控。你需要添加 `/metrics` 指标、Prometheus 采集配置、Grafana Dashboard 和基础告警规则，用请求量、错误率、延迟和实例状态观察服务健康度。
 
-```text linenums="0"
-第 14 篇：Todo API v5 已具备生产风格配置、认证和结构化日志
-第 21 篇：Todo API 已部署为 Kubernetes Deployment / Service
-第 27 篇：Todo Platform Helm Chart 提供稳定标签和 Service 端口名
-第 28 篇：Kustomize overlay 管理 dev/test/prod 环境差异
-第 30 篇：Argo CD 管理 todo-dev 与 todo-prod 两套环境
-```
-
-本篇会新增两类产物：
-
-```text linenums="0"
-api/internal/metrics/                  # Go 服务指标埋点
-observability/
-├── grafana/
-│   └── todo-api-dashboard-configmap.yaml
-└── prometheus/
-    ├── kube-prometheus-stack-values.yaml
-    ├── todo-allow-prometheus-networkpolicy.yaml
-    ├── todo-servicemonitor.yaml
-    └── todo-prometheus-rules.yaml
-```
-
-图 31-1 展示本篇产物在 Todo Platform 中的位置：
-
-```mermaid
-flowchart LR
-    User["用户请求"] --> Svc["todo-platform Service"]
-    Svc --> Pod["Todo API Pod<br/>/healthz /readyz /metrics"]
-    Pod --> Metrics["Prometheus metrics<br/>Counter / Gauge / Histogram"]
-    SM["ServiceMonitor"] --> Prom["Prometheus"]
-    Metrics --> Prom
-    Rules["PrometheusRule<br/>recording rules / alerts"] --> Prom
-    Prom --> Grafana["Grafana Dashboard<br/>QPS / Error / Latency / Resources"]
-    Prom --> AM["Alertmanager<br/>P95 > 500ms"]
-```
-
-本篇产物会被第 32 篇复用：当 Grafana 图表显示某个时间段 P95 延迟升高时，第 32 篇会用 Loki 日志和 OpenTelemetry Trace 继续定位是哪条请求链路、哪个下游调用或哪段代码变慢。
-
+这个案例关注可观测性闭环：指标不是为了好看，而是为了在故障发生前发现趋势，在故障发生时缩小排查范围。
 ## 3. 核心概念
 
 ### 3.1 可观测性三大支柱
@@ -313,17 +276,17 @@ Alerting rules 则基于 PromQL 判断是否触发告警。生产环境里不要
 
 ## 5. 手把手实验
 
+预计耗时：90 分钟（动手操作约 65 分钟）。
+
 ### 5.1 实验目标
 
 在第 30 篇的 `todo-gitops` kind 集群和 `todo-dev` 环境基础上，为 Todo API 暴露 Prometheus 指标，安装 kube-prometheus-stack，配置 ServiceMonitor、PrometheusRule 和 Grafana dashboard，并验证 QPS、错误率、P95/P99 延迟、CPU/内存面板有数据。
-
-预计耗时：90 分钟（动手操作约 65 分钟）。
 
 ### 5.2 实验环境
 
 本篇命令默认在 **Cloud Native Todo Platform 应用仓库根目录** 执行，也就是包含 `api/`、`deployments/`、`observability/` 的仓库根目录。
 
-本篇创建文件的命令使用 Bash here-doc。Linux、macOS 和 WSL 可以直接执行；Windows 用户建议在 WSL 或 Git Bash 中执行文件创建命令，`kubectl`、`helm`、`docker` 和浏览器访问步骤在 PowerShell 中同样适用。
+本篇需要创建多个 Go、YAML 和 Grafana 配置文件。请按页面给出的文件名手动创建同名文件，并复制对应内容；`kubectl`、`helm`、`docker` 和浏览器访问步骤在 PowerShell 中同样适用。
 
 表 31-1 是本篇实验版本。版本信息在 2026-05-29 查询：Prometheus 上游最新为 `v3.12.0`，Grafana 上游最新为 `v13.0.1+security-01`；本实验锁定 `kube-prometheus-stack` chart `86.0.1`，实际组件版本以该 chart 的默认 values 和依赖为准，避免把上游最新版本和 Helm Chart 内置版本混用。
 
@@ -423,8 +386,9 @@ go mod tidy
 
 创建 `api/internal/metrics/http.go`：
 
-```bash linenums="0"
-cat > api/internal/metrics/http.go <<'GO'
+将下面内容写入 `api/internal/metrics/http.go`：
+
+```go title="api/internal/metrics/http.go"
 package metrics
 
 import (
@@ -501,15 +465,15 @@ func HTTPMetrics() gin.HandlerFunc {
 		RequestDurationSeconds.WithLabelValues(c.Request.Method, route, status).Observe(time.Since(start).Seconds())
 	}
 }
-GO
 ```
 
 这里刻意使用 `route` 而不是原始 URL path。`/api/v2/todos/1`、`/api/v2/todos/2` 在 Gin 中都会归一成 `/api/v2/todos/:id`，避免每个 ID 产生一条新的时间序列。生产环境绝对不要把 `user_id`、`request_id`、订单号这类高基数字段放进 label。
 
 创建测试 `api/internal/metrics/http_test.go`：
 
-```bash linenums="0"
-cat > api/internal/metrics/http_test.go <<'GO'
+将下面内容写入 `api/internal/metrics/http_test.go`：
+
+```go title="api/internal/metrics/http_test.go"
 package metrics
 
 import (
@@ -550,7 +514,6 @@ func TestHTTPMetrics(t *testing.T) {
 		t.Fatalf("metrics output does not contain duration histogram:\n%s", body)
 	}
 }
-GO
 ```
 
 #### 5.4.3 把指标接入 Gin Router
@@ -601,8 +564,9 @@ go test ./api/internal/metrics ./api/internal/handler/gin
 
 创建 `observability/prometheus/kube-prometheus-stack-values.yaml`：
 
-```bash linenums="0"
-cat > observability/prometheus/kube-prometheus-stack-values.yaml <<'YAML'
+将下面内容写入 `observability/prometheus/kube-prometheus-stack-values.yaml`：
+
+```yaml title="observability/prometheus/kube-prometheus-stack-values.yaml"
 grafana:
   enabled: true
   adminPassword: "admin"
@@ -651,7 +615,6 @@ kube-state-metrics:
 
 prometheus-node-exporter:
   enabled: true
-YAML
 ```
 
 `adminPassword: "admin"` 只适合本地实验。生产环境应使用外部 Secret、SSO、OIDC 或企业身份系统，并限制 Grafana 管理员权限。
@@ -662,8 +625,9 @@ YAML
 
 创建 `observability/prometheus/todo-servicemonitor.yaml`：
 
-```bash linenums="0"
-cat > observability/prometheus/todo-servicemonitor.yaml <<'YAML'
+将下面内容写入 `observability/prometheus/todo-servicemonitor.yaml`：
+
+```yaml title="observability/prometheus/todo-servicemonitor.yaml"
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
@@ -685,7 +649,6 @@ spec:
       path: /metrics
       interval: 15s
       scrapeTimeout: 5s
-YAML
 ```
 
 这里选择的是 `todo-dev` namespace 中带有 `app.kubernetes.io/name=todo-platform` 和 `app.kubernetes.io/instance=todo-platform` 的 Service。第 27 篇 Helm Chart 已经为 Service 写入这两个稳定 label，Service 端口名是 `http`，所以 ServiceMonitor 不需要关心 Service 实际端口是 80 还是 18080。
@@ -703,8 +666,9 @@ kubectl -n todo-dev get svc todo-platform -o jsonpath='{.spec.ports[*].name}{"\n
 
 创建 `observability/prometheus/todo-prometheus-rules.yaml`：
 
-```bash linenums="0"
-cat > observability/prometheus/todo-prometheus-rules.yaml <<'YAML'
+将下面内容写入 `observability/prometheus/todo-prometheus-rules.yaml`：
+
+```yaml title="observability/prometheus/todo-prometheus-rules.yaml"
 apiVersion: monitoring.coreos.com/v1
 kind: PrometheusRule
 metadata:
@@ -756,7 +720,6 @@ spec:
             summary: "Todo API P95 latency is above 500ms"
             description: "Todo API P95 latency is {{ $value }}s for more than 2 minutes."
             runbook_url: "https://example.com/runbooks/todo-api-high-latency"
-YAML
 ```
 
 `clamp_min(..., 1)` 用于避免请求量为 0 时分母过小导致查询结果异常。生产环境里错误率通常会结合最小流量门槛，例如“过去 5 分钟请求数超过 100 且错误率超过 5%”才告警。
@@ -765,8 +728,9 @@ YAML
 
 创建 `observability/grafana/todo-api-dashboard-configmap.yaml`：
 
-```bash linenums="0"
-cat > observability/grafana/todo-api-dashboard-configmap.yaml <<'YAML'
+将下面内容写入 `observability/grafana/todo-api-dashboard-configmap.yaml`：
+
+```yaml title="observability/grafana/todo-api-dashboard-configmap.yaml"
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -950,7 +914,6 @@ data:
         }
       ]
     }
-YAML
 ```
 
 这个 dashboard 使用固定的 `todo-dev` namespace，是为了让新手第一次打开就能看到数据。生产环境建议增加 Grafana 变量，让团队能在 namespace、service、pod 之间切换。
@@ -963,8 +926,9 @@ YAML
 
 创建 `observability/prometheus/todo-allow-prometheus-networkpolicy.yaml`：
 
-```bash linenums="0"
-cat > observability/prometheus/todo-allow-prometheus-networkpolicy.yaml <<'YAML'
+将下面内容写入 `observability/prometheus/todo-allow-prometheus-networkpolicy.yaml`：
+
+```yaml title="observability/prometheus/todo-allow-prometheus-networkpolicy.yaml"
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -988,7 +952,6 @@ spec:
       ports:
         - protocol: TCP
           port: http
-YAML
 ```
 
 这条策略不会删除第 27 篇已有的同 namespace 访问规则。Kubernetes NetworkPolicy 的 ingress 规则是叠加生效的：已有策略允许 `todo-dev` 内部访问，本篇新增策略允许 `monitoring` namespace 访问。生产环境可以进一步加上 `podSelector`，只允许 Prometheus Pod 抓取，而不是放行整个 `monitoring` namespace。
@@ -1593,55 +1556,13 @@ argocd app sync todo-platform-dev --timeout 300
 
 5. **为增长预留存储和查询策略**。本地实验 retention 只有 6 小时，生产环境常见保留 15-30 天甚至更长。单机 Prometheus 容量有限，数据量上来后应考虑 remote write、Thanos、Cortex、Mimir 或 VictoriaMetrics 等长期存储方案。复杂 dashboard 查询要用 recording rules 降低实时查询成本。
 
-## 8. 本章小项目
-
-### 8.1 项目产出
-
-完成本篇后，Todo Platform 新增以下能力：
-
-- `api/internal/metrics/http.go`：Go HTTP 指标埋点，暴露 Counter、Gauge、Histogram。
-- `api/internal/metrics/http_test.go`：验证指标中间件和 `/metrics` 输出。
-- 更新后的 `api/internal/handler/gin/handler.go`：新增 `/metrics` 路由和指标中间件。
-- `observability/prometheus/kube-prometheus-stack-values.yaml`：本地监控栈安装配置。
-- `observability/prometheus/todo-servicemonitor.yaml`：让 Prometheus 抓取 Todo API。
-- `observability/prometheus/todo-prometheus-rules.yaml`：QPS、错误率、P50/P95/P99 recording rules 和 P95 延迟告警。
-- `observability/prometheus/todo-allow-prometheus-networkpolicy.yaml`：允许 monitoring namespace 中的 Prometheus 抓取 Todo API。
-- `observability/grafana/todo-api-dashboard-configmap.yaml`：Todo API dashboard 自动导入配置。
-
-图 31-2 是本章小项目交付关系：
-
-```mermaid
-flowchart TD
-    Code["Go Metrics Middleware"] --> Image["todo-api:v0.1.1-metrics"]
-    Image --> Dev["todo-dev Deployment"]
-    Values["kube-prometheus-stack values"] --> Stack["Prometheus / Grafana / Alertmanager"]
-    Netpol["Allow Prometheus NetworkPolicy"] --> Dev
-    SM["ServiceMonitor"] --> Stack
-    Rules["PrometheusRule"] --> Stack
-    Dashboard["Grafana Dashboard ConfigMap"] --> Stack
-    Dev --> Stack
-```
-
-### 8.2 能力验收标准
-
-| 能力 | 验收标准 |
-|---|---|
-| 指标埋点 | `/metrics` 输出 `todo_api_http_requests_total` 和 `todo_api_http_request_duration_seconds_bucket` |
-| Kubernetes 抓取 | Prometheus Targets 中 Todo API 为 `up` |
-| PromQL 查询 | 能写出 QPS、错误率、P95/P99、CPU、内存查询 |
-| Recording rules | `todo_api:p95_latency_seconds5m` 能查询到数据 |
-| 告警规则 | Prometheus Rules 中存在 `TodoApiHighP95Latency` |
-| Grafana 面板 | `Todo API Overview` 显示 QPS、错误率、延迟和资源曲线 |
-| 排障能力 | 能定位 Target 缺失、PromQL 空数据、Dashboard 无数据和告警不触发 |
-| 生产意识 | 能解释 label 基数、SLO、Histogram bucket、告警噪声和监控系统安全风险 |
-
-## 9. 练习题与面试题
+## 8. 练习题与面试题
 
 本章练习题和面试题已拆分到独立页面，完成正文学习后再进入题库练习与复盘。
 
 [查看本章练习题与面试题](../../questions/stage-05-production-engineering/31-prometheus-grafana.md)
 
-## 10. 本章总结
+## 9. 本章总结
 
 本篇把 Todo Platform 从“能被部署”推进到“能被观测”。知识上，你理解了可观测性三大支柱、RED/USE 指标体系、Prometheus 拉取模型、ServiceMonitor、PrometheusRule、Counter/Gauge/Histogram、PromQL 和 Grafana dashboard。
 
@@ -1649,7 +1570,7 @@ flowchart TD
 
 能力价值上，这一章是 SRE 和平台工程的关键分界线：只会部署应用，还不足以支撑生产；能用指标判断系统是否满足 SLO、能把异常转化为可排查信号，才开始具备中高级云原生工程能力。
 
-## 11. 下一章衔接
+## 10. 下一章衔接
 
 本篇指标能回答“系统什么时候变慢、错误率是否升高、影响范围多大”。但指标通常不能直接告诉你“是哪一次请求慢、哪条 SQL 慢、哪个下游调用慢、错误栈是什么”。
 

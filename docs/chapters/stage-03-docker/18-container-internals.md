@@ -79,18 +79,11 @@ Docker CLI / Compose
 
 本篇会用实验把这些抽象概念落到可观察的文件、进程和命令输出上。
 
-### 2.3 课程项目关联
+### 2.3 Todo 平台模拟案例
 
-第 17 篇已经启动了 Todo Platform 本地环境。本篇会基于这个环境观察 `api` 容器的宿主机 PID、namespace、cgroup 和挂载信息。也就是说：
+> Todo API 容器已经能够运行，但团队需要理解它为什么像一个隔离环境。你需要观察容器的 PID、namespace、cgroup、rootfs、挂载点和网络视图。
 
-```text linenums="0"
-第 17 篇：Compose 编排出 api / postgres / redis / traefik
-第 18 篇：拆开 api 容器，观察它为什么像一个隔离环境
-第 19 篇：继续往下，看 Docker 如何通过 containerd / runc / CRI 启动容器
-```
-
-完成本篇后，你不仅知道 Todo API 容器能跑，还能解释它是如何被 Linux 内核隔离、限制和挂载出来的。
-
+这个案例把容器从“黑盒命令”拆成 Linux 内核机制：定位容器问题时，要能说清隔离、限制和文件系统从哪里来。
 ## 3. 核心概念
 
 ### 3.1 容器与虚拟机的本质区别
@@ -389,6 +382,8 @@ uid=0(root) gid=0(root)
 
 ## 5. 手把手实验
 
+预计耗时：150 分钟（基础观察约 45 分钟，手动模拟约 75 分钟，排障和记录约 30 分钟）。
+
 ### 5.1 实验目标
 
 在 Linux / WSL2 Ubuntu / Linux 虚拟机中创建 `~/container-lab`，观察真实容器的 PID、namespace、cgroup 和挂载信息，并用 `unshare`、`chroot`、cgroup v2、OverlayFS 和 `nsenter` 手动模拟一个简化容器。
@@ -498,8 +493,9 @@ pwd
 
 创建内存实验脚本：
 
-```bash linenums="0"
-cat > "$LAB/allocate-memory.py" <<'PY'
+将下面内容写入 `$LAB/allocate-memory.py`：
+
+```python title="$LAB/allocate-memory.py"
 import time
 
 chunks = []
@@ -508,15 +504,15 @@ for i in range(128):
     chunks.append(bytearray(1024 * 1024))
     print(f"allocated {i + 1} MiB", flush=True)
     time.sleep(0.05)
-PY
 ```
 
 这个脚本最多分配 128 次，每次 1 MiB，总计 128 MiB。后面的 cgroup 实验会把内存限制设为 64 MiB，因此它通常会在接近或略超过 64 MiB 时被内核终止。
 
 创建简化容器脚本：
 
-```bash linenums="0"
-cat > "$LAB/mini-container.sh" <<'EOF'
+将下面内容写入 `$LAB/mini-container.sh`：
+
+```bash title="$LAB/mini-container.sh"
 #!/usr/bin/env bash
 set -euo pipefail
 
@@ -577,8 +573,11 @@ ps -o pid,ppid,comm
 echo "[cgroup]"
 cat /proc/1/cgroup
 '
-EOF
+```
 
+继续执行：
+
+```bash linenums="0"
 chmod +x "$LAB/mini-container.sh"
 ```
 
@@ -1101,8 +1100,6 @@ fi
 findmnt | grep container-lab || echo "no container-lab mounts"
 ```
 
-预计耗时：150 分钟（基础观察约 45 分钟，手动模拟约 75 分钟，排障和记录约 30 分钟）。
-
 ## 6. 常见错误与排障
 
 ### 错误 1：`unshare` 报 `Operation not permitted`
@@ -1256,82 +1253,13 @@ findmnt | grep container-lab || echo "no container-lab mounts"
 
 5. **容器 PID 1 要正确处理信号。** 容器主进程是 PID 1 时，信号和子进程回收行为会影响优雅退出。Go 服务要正确处理 SIGTERM，必要时使用合适的 init 进程或确保应用能回收子进程，避免发布、扩缩容和节点排空时出现脏退出。
 
-## 8. 本章小项目
-
-本章小项目：**完成 Todo Platform 容器运行原理观察记录**。
-
-### 8.1 项目产出
-
-完成后，你应该得到：
-
-- `~/container-lab/mini-container.sh`
-- 从 `registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23` 导出的 `rootfs/`
-- OverlayFS 模拟目录：`image-layers/`、`upper/`、`work/`、`merged/`
-- 一份 `docs/docker/chapter-18-runtime-internals-record.md` 记录
-
-记录模板：
-
-```markdown linenums="0"
-# Chapter 18 Runtime Internals Record
-
-## 环境信息
-
-- OS：
-- Docker 版本：
-- cgroup 类型：
-- 是否支持 OverlayFS：
-
-## Todo API 容器观察
-
-- 容器 ID：
-- 宿主机 PID：
-- namespace 输出摘要：
-- cgroup 输出摘要：
-- 挂载输出摘要：
-
-## 手动实验结果
-
-- UTS namespace：
-- PID namespace：
-- Network namespace：
-- Mount namespace：
-- chroot：
-- cgroup v2：
-- OverlayFS：
-- mini-container.sh：
-
-## 排障记录
-
-- 问题：
-- 现象：
-- 根因：
-- 修复：
-```
-
-### 8.2 验收标准
-
-最小验收：
-
-- 能通过 `docker inspect` 找到容器宿主机 PID。
-- 能查看 `/proc/<pid>/ns` 和 `/proc/<pid>/cgroup`。
-- 能用 `unshare --uts` 验证 hostname 隔离。
-- 能用 `unshare --pid --mount-proc` 验证 PID 隔离。
-- 能用 Docker `--memory`、`--cpus` 观察资源限制配置。
-
-进阶验收：
-
-- 能导出 Alpine rootfs 并 `chroot` 进入。
-- 能完成 OverlayFS lower / upper / merged 实验。
-- 能运行 `mini-container.sh`。
-- 能解释 `mini-container.sh` 不是完整容器运行时，还缺少 OCI spec、`pivot_root`、User namespace 映射、capabilities、seccomp、网络配置和生命周期管理等能力。
-
-## 9. 练习题与面试题
+## 8. 练习题与面试题
 
 本章练习题和面试题已拆分到独立页面，完成正文学习后再进入题库练习与复盘。
 
 [查看本章练习题与面试题](../../questions/stage-03-docker/18-container-internals.md)
 
-## 10. 本章总结
+## 9. 本章总结
 
 本篇把容器从“Docker 命令”拆回到 Linux 内核机制：namespace 负责隔离视图，cgroups 负责限制和统计资源，rootfs 与 OverlayFS 提供容器看到的文件系统，容器主进程本质上仍然是宿主机上的普通进程。
 
@@ -1339,7 +1267,7 @@ findmnt | grep container-lab || echo "no container-lab mounts"
 
 能力价值上，你已经能解释 OOMKilled、CPU throttling、容器内 PID 1、容器可写层丢失、privileged 风险和镜像分层等真实工作问题，为后续学习 containerd、runc、CRI 和 Kubernetes 运行时打下基础。
 
-## 11. 下一章衔接
+## 10. 下一章衔接
 
 回顾阶段三前四篇的递进：Ch15 手工运行容器，Ch16 构建镜像，Ch17 编排多服务，本篇拆解底层机制。第 19 篇会继续向下拆解 OCI 运行时规范。
 

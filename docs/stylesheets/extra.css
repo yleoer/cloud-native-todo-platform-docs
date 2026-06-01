@@ -107,6 +107,11 @@ code, pre {
   font-size: inherit;
 }
 
+.md-typeset .highlight pre:has(> code > span:only-child) .md-code__nav {
+  top: 50%;
+  transform: translateY(-50%);
+}
+
 .md-typeset .highlighttable .linenos pre,
 .md-typeset .highlighttable .code pre,
 .md-typeset .highlighttable .code pre > code {

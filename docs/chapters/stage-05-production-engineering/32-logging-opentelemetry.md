@@ -54,51 +54,11 @@
 
 事故发生时，排障动作应该像接力一样顺滑：告警指向 Grafana 指标面板，指标面板定位时间窗口，日志按 `request_id` 找到错误上下文，Trace 显示哪段 Span 耗时最高，最后由代码、配置或依赖负责人处理。
 
-### 2.3 课程项目关联
+### 2.3 Todo 平台模拟案例
 
-本篇承接前面几篇产物：
+> Todo API 的一次请求可能经过入口、服务、数据库和缓存。你需要输出结构化日志，接入 Loki、Tempo、Alloy 和 OpenTelemetry，用 request_id 或 trace_id 串起一次请求的日志和链路。
 
-```text linenums="0"
-第 14 篇：Todo API 已输出 JSON 结构化日志和 request_id
-第 30 篇：Argo CD 管理 todo-dev 环境
-第 31 篇：Prometheus / Grafana 已提供指标、告警和 Grafana 入口
-```
-
-本篇新增的产物会放在 `observability/` 下：
-
-```text linenums="0"
-observability/
-├── alloy/
-│   └── alloy-values.yaml
-├── grafana/
-│   ├── todo-logs-dashboard-configmap.yaml
-│   └── todo-observability-datasources.yaml
-├── loki/
-│   └── loki-values.yaml
-├── otel/
-│   └── todo-otel-env-patch.yaml
-└── tempo/
-    └── tempo-values.yaml
-```
-
-图 32-1 展示本篇的可观测链路：
-
-```mermaid
-flowchart LR
-    Client["客户端请求<br/>X-Request-ID"] --> API["Todo API<br/>Gin + OTel"]
-    API --> Stdout["JSON stdout logs<br/>request_id / trace_id"]
-    API --> OTLP["OTLP Trace<br/>gRPC 4317"]
-    Stdout --> Alloy["Grafana Alloy<br/>采集 Pod 日志"]
-    OTLP --> Alloy
-    Alloy --> Loki["Loki<br/>日志存储与 LogQL"]
-    Alloy --> Tempo["Tempo<br/>Trace 存储"]
-    Loki --> Grafana["Grafana Explore"]
-    Tempo --> Grafana
-    Grafana --> Jump["日志 trace_id<br/>跳转 Trace 瀑布图"]
-```
-
-本篇完成后，第 33 篇 Kubernetes 生产排障会复用这些能力：当 Pod `CrashLoopBackOff`、Service 502、OOMKilled 或 DNS 故障发生时，我们会同时查看事件、日志、指标和 Trace，而不是只靠单一命令猜原因。
-
+这个案例强调日志和 Trace 的定位价值：当接口变慢或失败时，要能从用户请求一路追到具体组件和错误上下文。
 ## 3. 核心概念
 
 ### 3.1 结构化日志
@@ -286,11 +246,11 @@ Loki / Tempo 更偏云原生和标签查询，适合与 Prometheus/Grafana 协�
 
 ## 5. 手把手实验
 
+预计耗时：100 分钟（动手操作约 75 分钟）。
+
 ### 5.1 实验目标
 
 在第 31 篇 `monitoring` namespace 和 Grafana 基础上，为 Todo API 接入 OpenTelemetry Trace，将结构化日志采集到 Loki，将 Trace 保存到 Tempo，并在 Grafana 中通过 `request_id` 查询日志、通过 `trace_id` 跳转到 Trace。
-
-预计耗时：100 分钟（动手操作约 75 分钟）。
 
 ### 5.2 实验环境
 
@@ -399,8 +359,9 @@ go mod tidy
 
 创建 `api/internal/observability/tracing.go`：
 
-```bash linenums="0"
-cat > api/internal/observability/tracing.go <<'GO'
+将下面内容写入 `api/internal/observability/tracing.go`：
+
+```go title="api/internal/observability/tracing.go"
 package observability
 
 import (
@@ -465,7 +426,6 @@ func SetupTracing(ctx context.Context, cfg TracingConfig) (func(context.Context)
 
 	return provider.Shutdown, nil
 }
-GO
 ```
 
 本地实验采样率设置为 100%，方便每次请求都能看到 Trace。生产环境应按流量和成本调整采样策略，例如 1%-10% 概率采样、错误请求全采样或基于尾采样策略保留慢请求。
@@ -656,8 +616,9 @@ import (
 
 创建 `observability/loki/loki-values.yaml`：
 
-```bash linenums="0"
-cat > observability/loki/loki-values.yaml <<'YAML'
+将下面内容写入 `observability/loki/loki-values.yaml`：
+
+```yaml title="observability/loki/loki-values.yaml"
 deploymentMode: SingleBinary
 
 loki:
@@ -704,7 +665,6 @@ chunksCache:
   enabled: false
 resultsCache:
   enabled: false
-YAML
 ```
 
 这里的 `commonConfig` 和 `schemaConfig` 是 Loki Helm chart 的 values 键名；chart 渲染后会生成 Loki 运行时配置里的 `common` 和 `schema_config`。这份配置只服务本地 kind 实验：单副本、文件系统、无持久化、关闭缓存。`gateway` 在单节点 kind 上改成 `Recreate`，是为了避免默认滚动更新在资源紧张时同时拉起新旧 Pod 失败。生产环境应使用对象存储、持久化、明确保留周期、多副本和容量规划。
@@ -713,8 +673,9 @@ YAML
 
 创建 `observability/tempo/tempo-values.yaml`：
 
-```bash linenums="0"
-cat > observability/tempo/tempo-values.yaml <<'YAML'
+将下面内容写入 `observability/tempo/tempo-values.yaml`：
+
+```yaml title="observability/tempo/tempo-values.yaml"
 tempo:
   reportingEnabled: false
   retention: 6h
@@ -735,7 +696,6 @@ tempo:
 
 service:
   type: ClusterIP
-YAML
 ```
 
 Tempo 单体 chart `1.24.4` 中，`reportingEnabled`、`retention` 和 `receivers` 都位于 `tempo` 键下。Tempo 默认更适合按 Trace ID 查询。本篇不做复杂 TraceQL 检索，只演示从 Loki 日志中的 `trace_id` 跳转到 Tempo 查看瀑布图。
@@ -746,8 +706,9 @@ Tempo 单体 chart `1.24.4` 中，`reportingEnabled`、`retention` 和 `receiver
 
 创建 `observability/alloy/alloy-values.yaml`：
 
-```bash linenums="0"
-cat > observability/alloy/alloy-values.yaml <<'YAML'
+将下面内容写入 `observability/alloy/alloy-values.yaml`：
+
+```yaml title="observability/alloy/alloy-values.yaml"
 controller:
   type: daemonset
 
@@ -867,7 +828,6 @@ alloy:
           }
         }
       }
-YAML
 ```
 
 Alloy 的日志流水线只把 `level` 提升为 Loki label，`request_id` 和 `trace_id` 仍留在日志内容里，查询时通过 `| json` 解析。这样能避免高基数字段扩大 Loki 索引。
@@ -876,8 +836,9 @@ Alloy 的日志流水线只把 `level` 提升为 Loki label，`request_id` 和 `
 
 第 31 篇的 Grafana sidecar 已启用 datasource 自动发现。创建 `observability/grafana/todo-observability-datasources.yaml`：
 
-```bash linenums="0"
-cat > observability/grafana/todo-observability-datasources.yaml <<'YAML'
+将下面内容写入 `observability/grafana/todo-observability-datasources.yaml`：
+
+```yaml title="observability/grafana/todo-observability-datasources.yaml"
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -917,7 +878,6 @@ data:
               - app
           serviceMap:
             datasourceUid: prometheus
-YAML
 ```
 
 `$${__value.raw}` 是 Grafana provisioning 中常见写法，用于避免 `$` 被当成环境变量提前替换。`$$` 最终会转义成单个 `$`，也就是把 `${__value.raw}` 交给 Grafana derived field，让它把日志里匹配到的 Trace ID 传给 Tempo。
@@ -926,8 +886,9 @@ YAML
 
 创建 `observability/grafana/todo-logs-dashboard-configmap.yaml`：
 
-```bash linenums="0"
-cat > observability/grafana/todo-logs-dashboard-configmap.yaml <<'YAML'
+将下面内容写入 `observability/grafana/todo-logs-dashboard-configmap.yaml`：
+
+```yaml title="observability/grafana/todo-logs-dashboard-configmap.yaml"
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -989,7 +950,6 @@ data:
         }
       ]
     }
-YAML
 ```
 
 Dashboard 只是入口。真正的排障仍建议在 Grafana Explore 中按时间窗口、`request_id`、`trace_id` 和 Trace 跳转逐步定位。
@@ -998,8 +958,9 @@ Dashboard 只是入口。真正的排障仍建议在 Grafana Explore 中按时�
 
 创建 `observability/otel/todo-otel-env-patch.yaml`，作为修改 dev overlay 时的参考片段：
 
-```bash linenums="0"
-cat > observability/otel/todo-otel-env-patch.yaml <<'YAML'
+将下面内容写入 `observability/otel/todo-otel-env-patch.yaml`：
+
+```yaml title="observability/otel/todo-otel-env-patch.yaml"
 # Add these literals to deployments/gitops/envs/dev/kustomization.yaml
 configMapGenerator:
   - name: todo-platform-env
@@ -1007,7 +968,6 @@ configMapGenerator:
     literals:
       - TODO_OTEL_SERVICE_NAME=todo-api
       - TODO_OTEL_EXPORTER_OTLP_ENDPOINT=alloy.observability.svc.cluster.local:4317
-YAML
 ```
 
 随后手工打开 `deployments/gitops/envs/dev/kustomization.yaml`，在已有 `configMapGenerator` 的 `literals` 中追加：
@@ -1609,59 +1569,13 @@ argocd app sync todo-platform-dev --timeout 300
 
 5. **可观测系统也要高可用和限流**。Loki、Tempo、Alloy、Grafana 在生产中需要 requests/limits、持久化、对象存储、租户隔离、保留策略、限流、备份和访问控制。Loki 要明确 retention，例如按合规和成本设置 7-30 天，并根据 namespace、租户或业务等级差异化。如果生产集群采用默认拒绝出站流量，还要允许业务 namespace 访问 Alloy 或 OpenTelemetry Collector 的 OTLP gRPC/HTTP 端口。应用侧 OTLP exporter 要有批处理、超时和优雅关闭；Pod 终止时如果没有调用 `Shutdown`，最后几秒的 Trace 可能丢失。
 
-## 8. 本章小项目
-
-### 8.1 项目产出
-
-完成本篇后，Todo Platform 新增以下能力：
-
-- `api/internal/observability/tracing.go`：OpenTelemetry Trace 初始化。
-- 更新后的 `api/internal/handler/gin/middleware.go`：日志包含 `trace_id` 和 `span_id`。
-- 更新后的 `api/internal/handler/gin/handler.go`：Gin 自动生成 HTTP server span，并为创建 Todo 增加 `todo.create` 业务 Span。
-- 更新后的 `api/cmd/todo-api/main.go`：通过 `TODO_OTEL_EXPORTER_OTLP_ENDPOINT` 启用 Trace 导出。
-- `observability/loki/loki-values.yaml`：本地 Loki 安装配置。
-- `observability/tempo/tempo-values.yaml`：本地 Tempo 安装配置。
-- `observability/alloy/alloy-values.yaml`：日志采集和 OTLP Trace 转发配置。
-- `observability/grafana/todo-observability-datasources.yaml`：Grafana Loki/Tempo 数据源和 derived field。
-- `observability/grafana/todo-logs-dashboard-configmap.yaml`：日志 dashboard。
-- `observability/otel/todo-otel-env-patch.yaml`：GitOps overlay 中 OTel 环境变量参考。
-
-图 32-2 是本章小项目交付关系：
-
-```mermaid
-flowchart TD
-    Code["Todo API OTel code"] --> Image["todo-api:v0.1.2-observability"]
-    Image --> Dev["todo-dev Deployment"]
-    Dev --> Logs["stdout JSON logs"]
-    Dev --> Trace["OTLP traces"]
-    Logs --> Alloy["Grafana Alloy"]
-    Trace --> Alloy
-    Alloy --> Loki["Loki"]
-    Alloy --> Tempo["Tempo"]
-    Loki --> Grafana["Grafana Explore"]
-    Tempo --> Grafana
-```
-
-### 8.2 能力验收标准
-
-| 能力 | 验收标准 |
-|---|---|
-| 结构化日志 | Todo API 日志包含 `request_id`、`trace_id`、`span_id` |
-| 日志采集 | Loki 能查询 `{namespace="todo-dev", app="todo-platform"}` |
-| LogQL 查询 | 能用 `| json | request_id="..."` 找到单次请求 |
-| Trace 采集 | Tempo 能按 Trace ID 返回 HTTP server Span 和 `todo.create` 业务 Span |
-| Grafana 数据源 | Loki 和 Tempo 数据源可用 |
-| 关联跳转 | Loki 日志中的 TraceID 能跳转到 Tempo |
-| 排障能力 | 能定位日志为空、Trace 缺失、derived field 失效、高基数 label |
-| 生产意识 | 能说明日志脱敏、采样、保留、成本和访问控制风险 |
-
-## 9. 练习题与面试题
+## 8. 练习题与面试题
 
 本章练习题和面试题已拆分到独立页面，完成正文学习后再进入题库练习与复盘。
 
 [查看本章练习题与面试题](../../questions/stage-05-production-engineering/32-logging-opentelemetry.md)
 
-## 10. 本章总结
+## 9. 本章总结
 
 本篇把 Todo Platform 的可观测性从指标扩展到日志和 Trace。知识上，你理解了结构化日志、Loki、LogQL、Promtail 与 Alloy 的演进关系、OpenTelemetry Trace/Span/Context Propagation、Tempo 与 Jaeger 的定位，以及 ELK/EFK 与 Loki/Tempo 的取舍。
 
@@ -1669,7 +1583,7 @@ flowchart TD
 
 能力价值上，这一章让你具备了中高级云原生排障的关键能力：当指标报警出现时，你不再只看 Pod 状态或猜测代码问题，而是能通过日志和 Trace 还原一次请求的上下文、路径和耗时分布。
 
-## 11. 下一章衔接
+## 10. 下一章衔接
 
 第 31 篇提供指标，第 32 篇提供日志和 Trace。下一篇第 33 篇会把这些工具放到真实故障场景中：Pod `Pending`、`CrashLoopBackOff`、`ImagePullBackOff`、OOMKilled、Service 不通、DNS 异常、PVC 挂载失败。
 

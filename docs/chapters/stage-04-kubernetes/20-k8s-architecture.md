@@ -65,20 +65,11 @@ Kubernetes 的价值在于：团队把“我要运行什么”描述成期望状
 - 平台工程师维护集群基线、kubeconfig 分发、镜像仓库、准入策略、Ingress Controller 和多环境模板。
 - 安全工程师审查 kubeconfig 权限、Namespace 隔离、镜像来源、RBAC 和生产操作审计。
 
-### 2.3 课程项目关联
+### 2.3 Todo 平台模拟案例
 
-阶段三已经完成 Todo Platform 的容器化交付包：
+> Todo 平台准备进入 Kubernetes，但第一步不是直接迁移全部服务，而是先创建 kind 集群并部署一个 smoke 应用。你需要理解 API Server、Node、kubelet、kubeconfig 和 `kubectl` 如何协同工作。
 
-```text linenums="0"
-todo-api:v0.1.0
-deployments/docker-compose/compose.yaml
-runtime-lab/
-```
-
-本篇不会马上把完整 Todo API、PostgreSQL、Redis 全部迁进 Kubernetes。我们先搭建本地集群，部署一个最小 smoke 应用，学会控制面、节点、kubeconfig 和 `kubectl` 基本操作。第 21 篇会正式把 `todo-api:v0.1.0` 变成 Deployment，并继续加入探针、资源限制、滚动更新和回滚。
-
-阶段四一共 9 篇，会沿着一条从“能部署”到“能交付”的路线推进：第 20 篇搭集群，第 21-24 篇完成工作负载、入口、配置和 PostgreSQL 持久化，第 25-26 篇把网络隔离和安全基线补齐，第 27-28 篇再用 Helm 与 Kustomize 收束成可安装、可升级、可多环境发布的交付物。读完这一阶段，你应该能把 Todo Platform 作为一个完整的 Kubernetes 作品集展示出来。
-
+这个案例用于建立 Kubernetes 最小控制链路：声明资源、提交 API、调度到节点、观察状态和定位基础连接问题。
 ## 3. 核心概念
 
 ### 3.1 Kubernetes 是什么
@@ -238,6 +229,8 @@ Kubernetes 排障不能只看对象列表。一个 Pod 的完整线索通常来�
 
 ## 5. 手把手实验
 
+预计耗时：75 分钟（动手操作约 50 分钟）。
+
 ### 5.1 实验目标
 
 创建一个本地 kind 集群，部署 `todo-k8s-smoke` 测试应用，验证 `kubectl`、kubeconfig、Pod、Service、日志和端口转发，并把 `todo-api:v0.1.0` 镜像导入 kind 节点。
@@ -297,14 +290,14 @@ k8s-lab
 
 创建 kind 集群配置：
 
-```bash linenums="0"
-cat > k8s-lab/kind-config.yaml <<'YAML'
+将下面内容写入 `k8s-lab/kind-config.yaml`：
+
+```yaml title="k8s-lab/kind-config.yaml"
 kind: Cluster
 apiVersion: kind.x-k8s.io/v1alpha4
 nodes:
   - role: control-plane
     image: registry.cn-guangzhou.aliyuncs.com/yleoer/node:v1.35.0@sha256:452d707d4862f52530247495d180205e029056831160e22870e37e3f6c1ac31f # ← kind v0.31.0 默认节点镜像
-YAML
 ```
 
 !!! note "为什么先固定节点镜像"
@@ -312,8 +305,9 @@ YAML
 
 创建 Namespace、Pod 和 Service：
 
-```bash linenums="0"
-cat > k8s-lab/manifests/smoke.yaml <<'YAML'
+将下面内容写入 `k8s-lab/manifests/smoke.yaml`：
+
+```yaml title="k8s-lab/manifests/smoke.yaml"
 apiVersion: v1
 kind: Namespace
 metadata:
@@ -358,13 +352,13 @@ spec:
     - name: http
       port: 80 # ← Service 端口
       targetPort: http # ← 转发到 Pod 中名为 http 的 containerPort
-YAML
 ```
 
 创建观察记录模板：
 
-```bash linenums="0"
-cat > k8s-lab/notes/chapter-20-k8s-cluster-record.md <<'MD'
+将下面内容写入 `k8s-lab/notes/chapter-20-k8s-cluster-record.md`：
+
+```markdown title="k8s-lab/notes/chapter-20-k8s-cluster-record.md"
 # Chapter 20 Kubernetes Cluster Record
 
 ## 基础信息
@@ -399,7 +393,6 @@ cat > k8s-lab/notes/chapter-20-k8s-cluster-record.md <<'MD'
 - 遇到的问题：
 - 根因：
 - 修复方式：
-MD
 ```
 
 ### 5.5 执行命令
@@ -579,7 +572,6 @@ docker ps --filter "name=${KIND_CLUSTER}"
 rm -rf k8s-lab
 ```
 
-预计耗时：75 分钟（动手操作约 50 分钟）。
 
 ## 6. 常见错误与排障
 
@@ -750,40 +742,13 @@ rm -rf k8s-lab
 
 7. **裸 Pod 只适合学习和临时诊断。** 本篇直接创建 Pod，是为了让你看清最小调度单元和 Service 选择器。生产应用通常交给 Deployment、StatefulSet、DaemonSet 或 Job 管理；它们负责副本数、重建、滚动更新、回滚和生命周期策略。第 21 篇会把 `todo-api:v0.1.0` 迁移到 Deployment。
 
-## 8. 本章小项目
-
-本章小项目是 **Todo Kubernetes 本地集群启动包**。
-
-项目产出：
-
-- `k8s-lab/kind-config.yaml`
-- `k8s-lab/manifests/smoke.yaml`
-- `k8s-lab/notes/chapter-20-k8s-cluster-record.md`
-- 一个名为 `todo-k8s` 的 kind 集群
-- 已导入 kind 节点的 `todo-api:v0.1.0` 镜像
-
-主线验收：
-
-- `kubectl cluster-info --context kind-todo-k8s` 正常。
-- `kubectl get nodes` 显示节点 `Ready`。
-- `kubectl -n todo-k8s-lab get pod todo-k8s-smoke` 显示 `Running`。
-- `kubectl -n todo-k8s-lab exec todo-k8s-smoke -- cat /etc/os-release` 能输出 Alpine 系统信息。
-- `curl -i http://127.0.0.1:18081` 返回 `hello from kubernetes`。
-- `docker exec "$NODE" crictl images | grep todo-api` 能找到 `todo-api:v0.1.0`。
-
-进阶验收：
-
-- 能解释控制面和 Node 组件的职责。
-- 能说明 `kubectl apply` 后对象如何进入 etcd、被调度、再由 kubelet 创建容器。
-- 能说明为什么 kind 不是生产集群。
-
-## 9. 练习题与面试题
+## 8. 练习题与面试题
 
 本章练习题和面试题已拆分到独立页面，完成正文学习后再进入题库练习与复盘。
 
 [查看本章练习题与面试题](../../questions/stage-04-kubernetes/20-k8s-architecture.md)
 
-## 10. 本章总结
+## 9. 本章总结
 
 本章建立了 Kubernetes 的第一层全局视角：控制面通过 API Server、etcd、Scheduler 和 Controller Manager 保存并调谐期望状态；节点通过 kubelet、containerd、kube-proxy 和网络插件真正运行 Pod。你学习了声明式 API、kubeconfig、context、Pod、Service 和 Namespace 的基本概念。
 
@@ -791,6 +756,6 @@ rm -rf k8s-lab
 
 能力价值上，你已经能搭建本地 Kubernetes 实验集群，能解释 `kubectl apply` 后发生了什么，也能用基础命令判断问题在 kubeconfig、API 对象、Pod、Service 还是镜像层。
 
-## 11. 下一章衔接
+## 10. 下一章衔接
 
 第 21 篇会把第 16 篇构建并在本篇导入 kind 的 `todo-api:v0.1.0` 正式部署成 Kubernetes Deployment。你会继续学习 Pod 生命周期、ReplicaSet、滚动更新、回滚、探针和资源限制，理解为什么生产环境不直接管理裸 Pod；第 22 篇会继续展开 Service 的 NodePort、LoadBalancer、Ingress 等对外访问方式。如果跳过本篇，后续遇到 context、Namespace、Service、Pod 状态和 `kubectl describe` 时会很容易迷路。

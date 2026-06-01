@@ -76,20 +76,11 @@ Docker CLI / kubectl
 - 安全工程师关注 OCI 镜像来源、digest 固定、运行时 socket 权限、seccomp、AppArmor / SELinux、rootless 和沙箱运行时。
 - 架构师需要在技术评审中解释为什么 Kubernetes 通过 CRI 调运行时，而不是把 Docker 当成固定依赖。
 
-### 2.3 课程项目关联
+### 2.3 Todo 平台模拟案例
 
-第 16 篇产出了 `todo-api:v0.1.0` 镜像，第 17 篇用 Docker Compose 在开发机上运行它，第 18 篇解释了这个容器的 Linux 底层机制。本篇会把它放到 Kubernetes 运行时视角下观察：
+> Todo API 镜像需要放到 Kubernetes 运行时视角下观察。你需要进入 kind 节点，使用 `crictl`、`ctr` 和可选 `nerdctl` 查看镜像、容器、Pod 沙箱和运行时对象。
 
-```text linenums="0"
-第 16 篇：构建 todo-api:v0.1.0 镜像
-第 17 篇：用 Docker Compose 运行 Todo Platform
-第 18 篇：拆开容器进程、namespace、cgroup 和 rootfs
-第 19 篇：进入 kind 节点，用 CRI 和 containerd 观察运行时对象
-第 20 篇：正式学习 Kubernetes 架构、API Server、kubelet 和 kubectl
-```
-
-本篇不会完整部署 Todo Platform 到 Kubernetes，那是第 20 篇以后的主线。本篇先用一个轻量 `runtime-probe` Pod 打通观察链路，并提供把 `todo-api:v0.1.0` 镜像导入 kind 节点的进阶步骤。
-
+这个案例帮助你区分 Docker 命令体验、OCI 镜像规范、containerd 运行时和 CRI 接口各自负责的边界。
 ## 3. 核心概念
 
 ### 3.1 OCI：容器生态的共同语言
@@ -457,6 +448,8 @@ ctr -n k8s.io content ls / snapshots ls
 
 ## 5. 手把手实验
 
+预计耗时：120 分钟（动手操作约 80 分钟，记录和复盘约 40 分钟）。
+
 ### 5.1 实验目标
 
 本实验会创建一个 kind 集群，部署 `runtime-probe` Pod，然后分别用 `kubectl`、`crictl`、`ctr` 和可选 `nerdctl` 观察它，最后把第 16 篇的 `todo-api:v0.1.0` 镜像导入 kind 节点 containerd。
@@ -538,8 +531,9 @@ runtime-lab
 
 创建 `runtime-probe` Pod：
 
-```bash linenums="0"
-cat > runtime-lab/k8s/runtime-probe.yaml <<'YAML'
+将下面内容写入 `runtime-lab/k8s/runtime-probe.yaml`：
+
+```yaml title="runtime-lab/k8s/runtime-probe.yaml"
 apiVersion: v1
 kind: Namespace
 metadata:
@@ -583,7 +577,6 @@ spec:
         limits:
           cpu: "100m"
           memory: "64Mi"
-YAML
 ```
 
 关键字段说明：
@@ -596,8 +589,9 @@ YAML
 
 创建观察记录模板：
 
-```bash linenums="0"
-cat > runtime-lab/notes/runtime-observation.md <<'MD'
+将下面内容写入 `runtime-lab/notes/runtime-observation.md`：
+
+```markdown title="runtime-lab/notes/runtime-observation.md"
 # 第 19 篇运行时观察记录
 
 ## 1. 集群与节点
@@ -638,7 +632,6 @@ cat > runtime-lab/notes/runtime-observation.md <<'MD'
 ## 6. 结论
 
 用 5-8 句话说明 Docker、containerd、runc、CRI、kubelet 的关系。
-MD
 ```
 
 ### 5.5 执行命令
@@ -1023,7 +1016,6 @@ docker ps --filter "name=${KIND_CLUSTER}"
 kind get clusters
 ```
 
-预计耗时：120 分钟（动手操作约 80 分钟，记录和复盘约 40 分钟）。
 
 ## 6. 常见错误与排障
 
@@ -1212,50 +1204,13 @@ kind get clusters
 
 5. **运行时排障要结合可观测性和垃圾回收策略。** containerd 管理镜像层、快照、日志和 task。如果节点磁盘被镜像层或容器日志打满，Pod 可能出现 Evicted、ImageGCFailed 或启动失败。生产环境要监控节点磁盘、imagefs、container filesystem、runtime 错误日志，并设置合理的镜像清理、日志轮转和节点维护流程。
 
-## 8. 本章小项目
-
-### 8.1 项目目标
-
-完成一个“Todo 运行时观察报告”。你需要创建 kind 集群，部署 `runtime-probe` Pod，用 `kubectl`、`crictl`、`ctr` 观察同一个容器，并把 `todo-api:v0.1.0` 镜像导入 kind 节点。
-
-### 8.2 项目交付物
-
-项目完成后应保留：
-
-- `runtime-lab/k8s/runtime-probe.yaml`
-- `runtime-lab/notes/runtime-observation.md`
-- `kubectl get pod -n todo-runtime -o wide` 结果
-- `crictl pods`、`crictl ps`、`crictl images` 关键结果
-- `ctr -n k8s.io containers ls`、`tasks ls` 关键结果
-- Docker / crictl / ctr / nerdctl 命令对比表
-
-### 8.3 最小验收标准
-
-- kind 集群能创建成功。
-- `runtime-probe` Pod 处于 `Running`。
-- 能进入 kind 节点执行 `crictl version`。
-- 能用 `crictl pods` 找到 PodSandbox。
-- 能用 `crictl ps` 找到业务容器。
-- 能用 `ctr -n k8s.io tasks ls` 找到同一个容器的 task。
-- 能解释宿主机 `docker ps` 与节点内 `crictl ps` 输出不同的原因。
-
-### 8.4 进阶验收标准
-
-- 能导入 `todo-api:v0.1.0` 到 kind 节点。
-- 能在 `crictl images` 中找到 Todo API 镜像。
-- 能在 `ctr -n k8s.io images ls` 中找到 Todo API 镜像。
-- 能从 `ctr containers info` 中找到 OCI spec 相关字段。
-- 能记录 task PID，并说明它是节点上的普通 Linux 进程。
-- 能完成可选 `nerdctl` 对照实验，或说明本机为什么不适合运行它。
-- 能写出 5-8 句话总结 Docker、containerd、runc、CRI 和 kubelet 的关系。
-
-## 9. 练习题与面试题
+## 8. 练习题与面试题
 
 本章练习题和面试题已拆分到独立页面，完成正文学习后再进入题库练习与复盘。
 
 [查看本章练习题与面试题](../../questions/stage-03-docker/19-oci-containerd-cri.md)
 
-## 10. 本章总结
+## 9. 本章总结
 
 本章把阶段三 Docker 学习收束到容器运行时生态。你已经看到：Docker 是开发体验入口，containerd 是主流运行时守护进程，runc 是 OCI 低层执行器，CRI 是 kubelet 与运行时之间的标准接口。
 
@@ -1263,7 +1218,7 @@ kind get clusters
 
 项目成果上，你完成了 `runtime-lab`，并能把第 16 篇的 `todo-api:v0.1.0` 镜像导入 kind 节点 containerd。这为第 20 篇正式进入 Kubernetes 架构打好了运行时基础。
 
-## 11. 下一章衔接
+## 10. 下一章衔接
 
 第 20 篇开始进入阶段四 Kubernetes 应用交付。你会系统学习 Kubernetes 架构、API Server、etcd、Scheduler、Controller Manager、kubelet、kube-proxy、container runtime、kind 集群和 kubectl 基础操作。
 

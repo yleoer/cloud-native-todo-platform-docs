@@ -32,7 +32,7 @@
 - 第 17 篇：理解 Todo API 的环境变量、`/healthz`、`/readyz` 和 `config-check`。
 - 第 20 篇：本地 kind 集群 `todo-k8s` 可用，并理解 Namespace、Pod、Service 和 `kubectl describe`。
 
-本篇命令以 Linux / macOS / WSL2 Bash 为主。Windows 用户建议在 WSL2 Ubuntu 中完成实验；本章大量使用 `cat <<'YAML'` heredoc 生成文件，不能直接粘贴到 PowerShell 中执行。如果坚持使用 PowerShell，请手动创建文件并复制 YAML 内容，或改写为 PowerShell here-string。
+本篇命令以 Linux / macOS / WSL2 Bash 为主。Windows 用户建议在 WSL2 Ubuntu 中完成实验；涉及 YAML 的步骤请按页面给出的文件名和内容手动创建同名文件。
 
 第 17 篇的 Compose 环境同时运行 PostgreSQL、Redis、迁移任务、API 和 Traefik。Kubernetes 阶段会逐步拆解这些能力：本篇聚焦工作负载；第 22 篇处理入口流量；第 23 篇迁移 ConfigMap / Secret；第 24 篇再迁移 PostgreSQL 与持久化存储。
 
@@ -63,19 +63,11 @@
 - 安全工程师关注镜像来源、Secret 注入、非 root、最小权限和运行时边界。
 - 测试工程师在隔离 Namespace 中反复创建、更新、回滚同一套 YAML。
 
-### 2.3 课程项目关联
+### 2.3 Todo 平台模拟案例
 
-阶段三到阶段四的主线正在从“容器化交付物”变成“集群工作负载”：
+> Todo API 需要作为 Kubernetes 工作负载运行。你需要编写 Deployment、Service、探针、资源限制、滚动更新和 HPA 配置，并观察 Pod 从创建到就绪的完整状态变化。
 
-```text linenums="0"
-第 16 篇：todo-api:v0.1.0 镜像
-第 17 篇：Docker Compose 本地多服务编排
-第 20 篇：kind 集群 + 镜像导入
-第 21 篇：Deployment + Probe + Resource + HPA
-```
-
-本篇会在应用仓库中创建 `deployments/k8s-base/`，这是后续第 22-24 篇继续叠加 Service、Ingress、ConfigMap、Secret 和 PVC 的基础目录。
-
+这个案例关注“应用如何在集群里稳定运行”：副本、健康检查、资源约束和发布过程都要能被 YAML 明确表达。
 ## 3. 核心概念
 
 ### 3.1 Pod 生命周期与容器状态
@@ -242,6 +234,8 @@ flowchart LR
 
 ## 5. 手把手实验
 
+预计耗时：90-120 分钟（动手操作约 75 分钟）。
+
 ### 5.1 实验目标
 
 把 `todo-api:v0.1.0` 部署到第 20 篇创建的 kind 集群中，完成：
@@ -342,15 +336,15 @@ deployments/k8s-base
 
 创建 Namespace：
 
-```bash linenums="0"
-cat > deployments/k8s-base/namespace.yaml <<'YAML'
+将下面内容写入 `deployments/k8s-base/namespace.yaml`：
+
+```yaml title="deployments/k8s-base/namespace.yaml"
 apiVersion: v1
 kind: Namespace
 metadata:
   name: todo-workloads # ← 本篇工作负载实验的独立命名空间
   labels:
     app.kubernetes.io/part-of: todo-platform
-YAML
 ```
 
 先应用 Namespace，后续 Secret 需要写入这个 Namespace：
@@ -397,8 +391,9 @@ kubectl -n todo-workloads create secret generic todo-api-auth \
 
 创建 Deployment：
 
-```bash linenums="0"
-cat > deployments/k8s-base/todo-api-deployment.yaml <<'YAML'
+将下面内容写入 `deployments/k8s-base/todo-api-deployment.yaml`：
+
+```yaml title="deployments/k8s-base/todo-api-deployment.yaml"
 # 结构概览：
 # 1. metadata/labels：统一应用标签，供 Service、HPA、查询命令使用
 # 2. strategy：滚动更新策略
@@ -482,13 +477,13 @@ spec:
             capabilities:
               drop:
                 - ALL
-YAML
 ```
 
 创建 Service：
 
-```bash linenums="0"
-cat > deployments/k8s-base/todo-api-service.yaml <<'YAML'
+将下面内容写入 `deployments/k8s-base/todo-api-service.yaml`：
+
+```yaml title="deployments/k8s-base/todo-api-service.yaml"
 apiVersion: v1
 kind: Service
 metadata:
@@ -506,13 +501,13 @@ spec:
     - name: http
       port: 80 # ← Service 端口
       targetPort: http # ← 转发到容器命名端口 http
-YAML
 ```
 
 创建 HPA：
 
-```bash linenums="0"
-cat > deployments/k8s-base/todo-api-hpa.yaml <<'YAML'
+将下面内容写入 `deployments/k8s-base/todo-api-hpa.yaml`：
+
+```yaml title="deployments/k8s-base/todo-api-hpa.yaml"
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
@@ -538,13 +533,13 @@ spec:
   behavior:
     scaleDown:
       stabilizationWindowSeconds: 60 # ← 实验用短窗口；生产通常建议 300s 或更长
-YAML
 ```
 
 创建 Job、CronJob、DaemonSet 示例：
 
-```bash linenums="0"
-cat > deployments/k8s-base/workload-extras.yaml <<'YAML'
+将下面内容写入 `deployments/k8s-base/workload-extras.yaml`：
+
+```yaml title="deployments/k8s-base/workload-extras.yaml"
 # 结构概览：
 # 1. Job：一次性运行 todo-api config-check
 # 2. CronJob：定时配置检查示例，默认 suspend
@@ -648,13 +643,13 @@ spec:
             limits:
               cpu: 50m
               memory: 64Mi
-YAML
 ```
 
 写入本地 README：
 
-```bash linenums="0"
-cat > deployments/k8s-base/README.md <<'MD'
+将下面内容写入 `deployments/k8s-base/README.md`：
+
+```markdown title="deployments/k8s-base/README.md"
 # Todo API Kubernetes Base
 
 ## Apply
@@ -681,7 +676,6 @@ cat > deployments/k8s-base/README.md <<'MD'
     kubectl delete namespace todo-workloads --ignore-not-found
 
 `todo-api-secret.local.yaml` is generated for local labs and should not be committed to public repositories.
-MD
 ```
 
 ### 5.5 执行命令
@@ -927,7 +921,6 @@ kubectl -n todo-workloads delete pod hpa-load --ignore-not-found
 kubectl delete -f components.yaml --ignore-not-found
 ```
 
-预计耗时：90-120 分钟（动手操作约 75 分钟）。
 
 ## 6. 常见错误与排障
 
@@ -1113,42 +1106,13 @@ kubectl delete -f components.yaml --ignore-not-found
 
 8. **DaemonSet 常常拥有更高风险。** 日志采集、网络、监控 agent 可能需要宿主机路径、网络或特权能力。生产 DaemonSet 必须经过安全审查，并限制节点选择范围。
 
-## 8. 本章小项目
-
-本章小项目是 **Todo API Kubernetes Workload Pack**。
-
-项目产出：
-
-- `deployments/k8s-base/namespace.yaml`
-- `deployments/k8s-base/todo-api-secret.local.yaml`（本地生成，不提交公开仓库）
-- `deployments/k8s-base/todo-api-deployment.yaml`
-- `deployments/k8s-base/todo-api-service.yaml`
-- `deployments/k8s-base/todo-api-hpa.yaml`
-- `deployments/k8s-base/workload-extras.yaml`
-- `deployments/k8s-base/README.md`
-
-主线验收：
-
-- `todo-api` Deployment 至少 2 个 Ready 副本。
-- `/healthz` 和 `/readyz` 通过 Service port-forward 返回 `200 OK`。
-- `kubectl rollout history deployment/todo-api` 能看到至少 2 个 revision。
-- 坏镜像发布后能通过 `kubectl rollout undo` 恢复。
-- HPA 对象存在，且 Deployment 中配置了 CPU request。
-- Job、CronJob、DaemonSet 示例能创建并观察到对应 Pod。
-
-进阶验收：
-
-- 能解释为什么本篇不用裸 Pod 承载 Todo API。
-- 能说清 readinessProbe 和 livenessProbe 配错会导致什么生产事故。
-- 能根据 Events 判断问题在镜像、Secret、Probe、资源还是 HPA 指标链路。
-
-## 9. 练习题与面试题
+## 8. 练习题与面试题
 
 本章练习题和面试题已拆分到独立页面，完成正文学习后再进入题库练习与复盘。
 
 [查看本章练习题与面试题](../../questions/stage-04-kubernetes/21-k8s-workloads.md)
 
-## 10. 本章总结
+## 9. 本章总结
 
 本篇把 Todo API 从“已导入 kind 节点的容器镜像”推进到“由 Kubernetes 工作负载控制器管理的服务”。你编写了 Deployment、Service、HPA、Job、CronJob 和 DaemonSet YAML，理解了 Pod 生命周期、ReplicaSet、滚动更新、回滚、探针、资源限制和 HPA 指标链路。
 
@@ -1156,6 +1120,6 @@ kubectl delete -f components.yaml --ignore-not-found
 
 能力价值上，你现在不只是会“apply 一个 YAML”，而是能判断发布是否健康、服务是否接流量、为什么 HPA 不工作、以及失败发布应该如何回滚。
 
-## 11. 下一章衔接
+## 10. 下一章衔接
 
 第 22 篇会在本篇 Deployment 和 ClusterIP Service 的基础上，继续学习 Service 类型、Traefik Ingress、HTTPS 和 Gateway API 对比。到那时，Todo API 不再只靠 `kubectl port-forward` 临时访问，而会通过更接近真实团队的入口流量模型暴露出来。

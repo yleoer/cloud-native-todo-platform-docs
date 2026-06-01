@@ -53,50 +53,11 @@ GitOps 的目标不是把所有人工动作都消灭，而是让集群的期望�
 
 出问题时也更容易定位：如果 Git 期望状态错了，修 Git；如果 Git 正确但集群不同步，查 Argo CD；如果 Argo CD 已同步但应用不健康，查 Kubernetes 资源和应用日志。
 
-### 2.3 课程项目关联
+### 2.3 Todo 平台模拟案例
 
-本篇承接前面几篇产物：
+> Todo 平台希望由 Git 中的期望状态驱动集群变更。你需要用 Argo CD 管理 dev 和 prod 环境，处理应用目录、同步策略、健康状态、回滚和 Secret 边界。
 
-```text linenums="0"
-第 27 篇：Todo Platform Helm 4 Chart
-第 28 篇：Kustomize dev/test/prod overlay
-第 29 篇：GitHub Actions 构建镜像并验证部署
-```
-
-第 28 篇的 overlay 里使用了本地 `.secrets/todo-api-auth.env`。这适合本地实验和 CI 临时渲染，但不适合 Argo CD：Argo CD 在集群内从 Git 拉取仓库，不能读取你电脑上的 `.secrets/` 文件，也不应该从 Git 拉取明文生产密钥。
-
-所以本篇会新增 GitOps 专用目录：
-
-```text linenums="0"
-deployments/gitops/
-├── argocd/
-│   ├── todo-platform-project.yaml
-│   ├── todo-platform-dev-application.yaml
-│   └── todo-platform-applicationset.yaml
-└── envs/
-    ├── dev/
-    │   ├── kustomization.yaml
-    │   └── namespace.yaml
-    └── prod/
-        ├── kustomization.yaml
-        ├── namespace.yaml
-        └── patch-deployment-resources.yaml
-```
-
-图 30-1 展示第 29 篇到第 30 篇的职责变化：
-
-```mermaid
-flowchart LR
-    Dev["开发者提交代码"] --> CI["GitHub Actions<br/>测试 / 构建镜像 / 推送 GHCR"]
-    CI --> GitOps["更新 GitOps 目录<br/>镜像 tag / digest / 环境配置"]
-    GitOps --> Argo["Argo CD<br/>持续监听 Git"]
-    Argo --> K8s["Kubernetes 集群<br/>同步期望状态"]
-    K8s --> Drift["漂移检测<br/>OutOfSync / SelfHeal"]
-    Drift --> Argo
-```
-
-本篇产物会被第 31 篇 Prometheus / Grafana 复用：Argo CD 管理的 dev/prod 环境会成为后续监控、日志、Tracing 和生产排障的基础运行环境。
-
+这个案例强调 GitOps 的核心约束：集群状态应该能回到 Git 中解释，敏感信息和环境差异不能靠个人电脑上的临时文件维持。
 ## 3. 核心概念
 
 ### 3.1 GitOps：Git 是唯一事实来源
@@ -379,11 +340,11 @@ Argo CD：同步 Deployment，但不管理 Secret 明文
 
 ## 5. 手把手实验
 
+预计耗时：90 分钟（动手操作约 60 分钟）。
+
 ### 5.1 实验目标
 
 在一个持续运行的 kind 集群中安装 Argo CD v3.4.3，创建 Todo Platform 的 GitOps dev/prod 目录，使用 Argo CD Application 管理 dev 环境，再使用 ApplicationSet 管理 dev/prod 两套环境，并演示自动同步、漂移修复和 Git 回滚。
-
-预计耗时：90 分钟（动手操作约 60 分钟）。
 
 ### 5.2 实验环境
 
@@ -466,8 +427,9 @@ echo "$GITOPS_REVISION"
 
 创建 dev Namespace：
 
-```bash linenums="0"
-cat > deployments/gitops/envs/dev/namespace.yaml <<'YAML'
+将下面内容写入 `deployments/gitops/envs/dev/namespace.yaml`：
+
+```yaml title="deployments/gitops/envs/dev/namespace.yaml"
 apiVersion: v1
 kind: Namespace
 metadata:
@@ -476,13 +438,13 @@ metadata:
     pod-security.kubernetes.io/enforce: restricted
     pod-security.kubernetes.io/enforce-version: latest
     app.kubernetes.io/managed-by: argocd
-YAML
 ```
 
 创建 dev GitOps overlay。它直接复用第 28 篇的 `deployments/kustomize/base`，但不使用 `secretGenerator`，因为 Secret 由集群内预创建：
 
-```bash linenums="0"
-cat > deployments/gitops/envs/dev/kustomization.yaml <<'YAML'
+将下面内容写入 `deployments/gitops/envs/dev/kustomization.yaml`：
+
+```yaml title="deployments/gitops/envs/dev/kustomization.yaml"
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 namespace: todo-dev
@@ -545,7 +507,6 @@ patches:
       - op: replace
         path: /subjects/0/namespace
         value: todo-dev
-YAML
 ```
 
 dev 使用 `TODO_LOG_LEVEL=debug`，是为了让本地排障能看到更多请求与配置细节；prod 会改为 `info`，减少日志量并降低敏感信息暴露概率。本篇仍沿用第 28 篇的内存 Repository 约定：不设置 `TODO_DATABASE_DSN` 时，Todo API 不连接 PostgreSQL。
@@ -554,8 +515,9 @@ dev 使用 `TODO_LOG_LEVEL=debug`，是为了让本地排障能看到更多请�
 
 创建 prod Namespace：
 
-```bash linenums="0"
-cat > deployments/gitops/envs/prod/namespace.yaml <<'YAML'
+将下面内容写入 `deployments/gitops/envs/prod/namespace.yaml`：
+
+```yaml title="deployments/gitops/envs/prod/namespace.yaml"
 apiVersion: v1
 kind: Namespace
 metadata:
@@ -564,13 +526,13 @@ metadata:
     pod-security.kubernetes.io/enforce: restricted
     pod-security.kubernetes.io/enforce-version: latest
     app.kubernetes.io/managed-by: argocd
-YAML
 ```
 
 创建 prod 资源 patch：
 
-```bash linenums="0"
-cat > deployments/gitops/envs/prod/patch-deployment-resources.yaml <<'YAML'
+将下面内容写入 `deployments/gitops/envs/prod/patch-deployment-resources.yaml`：
+
+```yaml title="deployments/gitops/envs/prod/patch-deployment-resources.yaml"
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -587,13 +549,13 @@ spec:
             limits:
               cpu: "1"
               memory: 512Mi
-YAML
 ```
 
 创建 prod GitOps overlay。生产示例使用 3 个副本、更保守的日志级别和更高资源配置：
 
-```bash linenums="0"
-cat > deployments/gitops/envs/prod/kustomization.yaml <<'YAML'
+将下面内容写入 `deployments/gitops/envs/prod/kustomization.yaml`：
+
+```yaml title="deployments/gitops/envs/prod/kustomization.yaml"
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 namespace: todo-prod
@@ -657,15 +619,17 @@ patches:
       - op: replace
         path: /subjects/0/namespace
         value: todo-prod
-YAML
 ```
 
 prod 使用 `TODO_LOG_LEVEL=info` 和 3 个副本，体现生产环境更关注稳定性、日志成本和容量冗余。本篇为了聚焦 GitOps 发布链路，prod 示例仍不接入 PostgreSQL；后续如果把数据库主链路纳入 GitOps，需要同步引入 StatefulSet/Secret/备份恢复策略。
 
 创建 AppProject。这里不用默认 `default` project，而是把 Todo Platform 限定在本章需要的仓库、Namespace 和资源类型内：
 
-```bash linenums="0"
-cat > deployments/gitops/argocd/todo-platform-project.yaml <<YAML
+将下面内容写入 `deployments/gitops/argocd/todo-platform-project.yaml`：
+
+把 `<REPO_URL>` 替换为上一步 `echo "$REPO_URL"` 的输出。
+
+```yaml title="deployments/gitops/argocd/todo-platform-project.yaml"
 apiVersion: argoproj.io/v1alpha1
 kind: AppProject
 metadata:
@@ -674,7 +638,7 @@ metadata:
 spec:
   description: Todo Platform GitOps project
   sourceRepos:
-    - ${REPO_URL}
+    - <REPO_URL>
   destinations:
     - server: https://kubernetes.default.svc
       namespace: todo-dev
@@ -700,15 +664,17 @@ spec:
       kind: Role
     - group: "rbac.authorization.k8s.io"
       kind: RoleBinding
-YAML
 ```
 
 这份白名单覆盖第 28 篇 base 从 Helm Chart 渲染出的主链路对象。后续如果你把 Ingress、Job、CronJob 或 ExternalSecret 也纳入 GitOps，需要同步扩展 AppProject 白名单，否则 Argo CD 会拒绝同步。
 
 创建 dev Application。这里开启自动同步、自动 prune 和 self-heal，便于演示 GitOps 控制循环：
 
-```bash linenums="0"
-cat > deployments/gitops/argocd/todo-platform-dev-application.yaml <<YAML
+将下面内容写入 `deployments/gitops/argocd/todo-platform-dev-application.yaml`：
+
+把 `<REPO_URL>` 替换为上一步 `echo "$REPO_URL"` 的输出，把 `<GITOPS_REVISION>` 替换为 `echo "$GITOPS_REVISION"` 的输出。
+
+```yaml title="deployments/gitops/argocd/todo-platform-dev-application.yaml"
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -720,8 +686,8 @@ metadata:
 spec:
   project: todo-platform
   source:
-    repoURL: ${REPO_URL}
-    targetRevision: ${GITOPS_REVISION}
+    repoURL: <REPO_URL>
+    targetRevision: <GITOPS_REVISION>
     path: deployments/gitops/envs/dev
   destination:
     server: https://kubernetes.default.svc
@@ -735,13 +701,15 @@ spec:
       - PruneLast=true
       - ApplyOutOfSyncOnly=true
   revisionHistoryLimit: 10
-YAML
 ```
 
 创建 ApplicationSet。它用 list generator 生成 dev/prod 两个 Application。多环境模板默认不启用自动同步，尤其避免把 prod 复制成 dev 的 auto-sync 策略；本篇前面已经用单独的 dev Application 演示过自动同步和漂移修复：
 
-```bash linenums="0"
-cat > deployments/gitops/argocd/todo-platform-applicationset.yaml <<YAML
+将下面内容写入 `deployments/gitops/argocd/todo-platform-applicationset.yaml`：
+
+把 `<REPO_URL>` 替换为上一步 `echo "$REPO_URL"` 的输出，把 `<GITOPS_REVISION>` 替换为 `echo "$GITOPS_REVISION"` 的输出。
+
+```yaml title="deployments/gitops/argocd/todo-platform-applicationset.yaml"
 apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
 metadata:
@@ -768,8 +736,8 @@ spec:
     spec:
       project: todo-platform
       source:
-        repoURL: ${REPO_URL}
-        targetRevision: ${GITOPS_REVISION}
+        repoURL: <REPO_URL>
+        targetRevision: <GITOPS_REVISION>
         path: "{{.path}}"
       destination:
         server: https://kubernetes.default.svc
@@ -780,7 +748,6 @@ spec:
           - PruneLast=true
           - ApplyOutOfSyncOnly=true
       revisionHistoryLimit: 10
-YAML
 ```
 
 注意：本篇同时保留 `namespace.yaml`、`CreateNamespace=true` 和预创建 Namespace。`namespace.yaml` 用来让 GitOps 管理 Namespace 标签与安全基线；`CreateNamespace=true` 是防止目标 Namespace 不存在的兜底；实验里提前创建 Namespace 是为了先放入不进入 Git 的运行时 Secret。
@@ -1425,66 +1392,13 @@ git push origin HEAD
 - [Argo CD ApplicationSet Introduction](https://argo-cd.readthedocs.io/en/stable/operator-manual/applicationset/)
 - [Argo CD v3.4.3 Release](https://github.com/argoproj/argo-cd/releases/tag/v3.4.3)
 
-## 8. 本章小项目
-
-### 8.1 项目产出
-
-本章完成后，Todo Platform 应用仓库新增：
-
-- `deployments/gitops/envs/dev/kustomization.yaml`：GitOps dev 环境期望状态。
-- `deployments/gitops/envs/dev/namespace.yaml`：dev Namespace 与 Pod Security 标签。
-- `deployments/gitops/envs/prod/kustomization.yaml`：GitOps prod 环境期望状态。
-- `deployments/gitops/envs/prod/namespace.yaml`：prod Namespace 与 Pod Security 标签。
-- `deployments/gitops/envs/prod/patch-deployment-resources.yaml`：prod 资源请求和限制。
-- `deployments/gitops/argocd/todo-platform-project.yaml`：Argo CD 项目权限边界。
-- `deployments/gitops/argocd/todo-platform-dev-application.yaml`：单环境 Application。
-- `deployments/gitops/argocd/todo-platform-applicationset.yaml`：dev/prod 多环境 ApplicationSet。
-
-图 30-4 本章小项目产出关系：
-
-```mermaid
-flowchart TD
-    Base["第 28 篇 Kustomize base"] --> Dev["GitOps dev overlay"]
-    Base --> Prod["GitOps prod overlay"]
-    Dev --> App["todo-platform-dev Application"]
-    Dev --> AppSet["todo-platform-envs ApplicationSet"]
-    Prod --> AppSet
-    Project["todo-platform AppProject"] --> App
-    Project --> AppSet
-    App --> Cluster["todo-dev Namespace"]
-    AppSet --> Cluster
-    AppSet --> ProdNs["todo-prod Namespace"]
-```
-
-### 8.2 能力验收标准
-
-基础验收：
-
-- 能安装 Argo CD v3.4.3，并看到 `argocd-server`、`argocd-repo-server`、`argocd-application-controller` 正常运行。
-- 能写出 `AppProject`，限制 Todo Platform 只能部署到 `todo-dev` 和 `todo-prod`。
-- 能写出 `Application`，指向 `deployments/gitops/envs/dev`。
-- 能解释为什么 GitOps overlay 不再使用第 28 篇的 `.secrets/`。
-
-进阶验收：
-
-- `todo-platform-dev` 能自动同步到 `Synced` 和 `Healthy`。
-- 手工修改 dev Deployment 副本数后，Argo CD 能自动修复漂移。
-- Git 修改 `TODO_RELEASE` 后，Argo CD 能自动同步新 ConfigMap 并滚动更新。
-- 能通过 Git revert 完成回滚，并解释为什么不优先使用集群内手工回滚。
-- ApplicationSet 能生成 `todo-platform-dev` 和 `todo-platform-prod` 两个 Application。
-
-作品集验收：
-
-- 能展示 GitOps 目录结构截图、Argo CD Application 页面截图、同步历史和一次漂移修复证据。
-- 能讲清楚第 29 篇 CI 与第 30 篇 GitOps 的边界：CI 产出制品并更新 Git，Argo CD 从 Git 同步集群。
-
-## 9. 练习题与面试题
+## 8. 练习题与面试题
 
 本章练习题和面试题已拆分到独立页面，完成正文学习后再进入题库练习与复盘。
 
 [查看本章练习题与面试题](../../questions/stage-05-production-engineering/30-gitops-argocd.md)
 
-## 10. 本章总结
+## 9. 本章总结
 
 本篇把 Todo Platform 从“CI 构建并验证”推进到“GitOps 声明式发布”。你学习了 GitOps 的事实来源模型、Argo CD Application / AppProject / ApplicationSet 的结构、同步状态与健康状态的区别、自动同步、prune、selfHeal、漂移检测和 Git 回滚。
 
@@ -1492,7 +1406,7 @@ flowchart TD
 
 能力价值上，你现在能把第 29 篇的 CI/CD 和本篇 GitOps 组合成企业常见交付链路：CI 负责验证和制品，Git 负责承载期望状态，Argo CD 负责持续同步和漂移治理。这是后续监控、日志、Tracing 和生产排障的运行基础。
 
-## 11. 下一章衔接
+## 10. 下一章衔接
 
 第 31 篇会进入 Prometheus 与 Grafana 监控。本篇已经让 Todo Platform 的 dev/prod 环境由 Argo CD 持续管理；下一篇会回答另一个生产问题：**应用已经能自动发布到集群后，如何知道它是否健康、是否变慢、是否错误率升高、是否需要告警？**
 

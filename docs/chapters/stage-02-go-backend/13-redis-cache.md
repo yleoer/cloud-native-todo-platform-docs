@@ -36,7 +36,7 @@
 - 能用 Redis 计数器和 Lua（Redis 内置脚本语言）脚本实现固定窗口限流。
 - 能用 Redis List 实现简单异步统计刷新任务。
 
-本篇结束时，你至少应该能成功执行：
+你至少应该能成功执行：
 
 ```bash linenums="0"
 cd ~/workspace/cloud-native-todo-platform
@@ -74,32 +74,11 @@ PostgreSQL 是权威数据源，但它不是所有问题的唯一答案：
 
 Redis 的核心价值不是“快”，而是把短期状态、热点读取、计数和轻量协调从主数据库里分离出来。
 
-### 2.3 课程项目关联
+### 2.3 Todo 平台模拟案例
 
-本篇会新增或修改：
+> Todo 平台在高频访问下需要缓存和限流能力。你需要接入 Redis，实现热点读取缓存、请求计数、限流中间件和本地降级处理。
 
-```text linenums="0"
-cloud-native-todo-platform/
-├── docker-compose.yml
-└── api/
-    ├── cmd/
-    │   └── todo-api/
-    │       └── main.go
-    └── internal/
-        ├── cache/
-        │   └── redis.go
-        ├── middleware/
-        │   └── ratelimit.go
-        ├── ratelimit/
-        │   └── redis_limiter.go
-        ├── repository/
-        │   └── cached.go
-        └── tasks/
-            └── redis_queue.go
-```
-
-第 12 篇的 PostgreSQL Repository 仍然是事实数据源。本篇新增的 `CachedRepository` 是包装层：读列表时先查 Redis，未命中再查真实 Repository；写操作成功后删除相关缓存并投递统计刷新任务。
-
+这个案例关注缓存不是“加一层 Redis”这么简单：键设计、过期时间、错误降级和限流策略都会影响接口稳定性。
 ## 3. 核心概念
 
 ### 3.1 Redis 是什么
@@ -286,6 +265,8 @@ Redis 限流中间件有两种故障策略：
 这类任务适合用 Redis List 教学。更可靠的业务任务应考虑 Redis Streams、Kafka、RabbitMQ 或云厂商消息队列，并设计重试、死信和幂等键。
 
 ## 5. 手把手实验
+
+预计耗时：25 分钟阅读，80 分钟动手实验。
 
 ### 5.1 实验目标
 
@@ -1238,8 +1219,6 @@ docker compose down -v
 
 `-v` 会删除 PostgreSQL 和 Redis 数据卷。确认不需要保留实验数据再执行。
 
-预计耗时：25 分钟阅读，80 分钟动手实验。
-
 ## 6. 常见错误与排障
 
 ### 错误 1：Redis 认证失败
@@ -1336,37 +1315,13 @@ docker compose down -v
 
 5. **Redis 要有容量和安全边界**。生产 Redis 不应裸露公网，要配置访问控制、TLS、内存上限、淘汰策略、慢命令监控和备份。缓存 Redis、锁 Redis、队列 Redis 最好按风险和容量隔离。
 
-## 8. 本章小项目
-
-本章小项目是 **Todo API v4 Redis 加速与异步处理**。项目目标是在 PostgreSQL 持久化基础上，为 Todo API 增加缓存、接口限流和异步统计刷新能力，同时说明 Redis 的一致性和可靠性边界。
-
-交付物包括：
-
-- 更新后的 `docker-compose.yml`
-- `api/internal/cache/redis.go`
-- `api/internal/repository/cached.go`
-- `api/internal/ratelimit/redis_limiter.go`
-- `api/internal/middleware/ratelimit.go`
-- `api/internal/tasks/redis_queue.go`
-- 更新后的 `api/cmd/todo-api/main.go`
-
-能力验收标准：
-
-- 能启动 Redis 8.2 并用 `redis-cli` 连接。
-- 能解释 Redis 和 PostgreSQL 的职责差异。
-- 能说明 Cache-Aside 的读写流程。
-- 能验证 Todo 列表缓存 Key 和 TTL。
-- 能触发并解释 `429 Too Many Requests`。
-- 能说明 Redis 分布式锁为什么需要 token、过期时间和 Lua 释放。
-- 能说明 Redis List 队列的可靠性边界。
-
-## 9. 练习题与面试题
+## 8. 练习题与面试题
 
 本章练习题和面试题已拆分到独立页面，完成正文学习后再进入题库练习与复盘。
 
 [查看本章练习题与面试题](../../questions/stage-02-go-backend/13-redis-cache.md)
 
-## 10. 本章总结
+## 9. 本章总结
 
 本篇把 Todo API 从“有数据库持久化”继续推进到“具备缓存、限流和异步处理能力”。你使用 Docker Compose 启动 Redis 8.2，学习了 String、List 等常用数据结构，理解了分布式锁的正确边界，用 `go-redis` 初始化客户端，并在 API 中按配置启用 Redis。
 
@@ -1374,7 +1329,7 @@ docker compose down -v
 
 能力价值上，你已经能说明 Redis 能解决什么，也能说清它不能解决什么。后续进入第 14 篇生产化时，Redis 的地址、密码、TTL、限流阈值、日志和故障策略都会进入配置分层和运维边界。
 
-## 11. 下一章衔接
+## 10. 下一章衔接
 
 第 14 篇会把 Todo API 继续推向生产化：JWT 鉴权、审计日志、配置分层、结构化日志、健康检查强化和 pprof 性能分析都会围绕当前 API、PostgreSQL 和 Redis 组合展开。
 

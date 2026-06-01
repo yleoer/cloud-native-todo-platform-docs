@@ -34,7 +34,7 @@
 - 第 14 篇：理解 JSON Web Token（JWT）Secret、`serve`、`migrate`、`hash-password` 等运维命令。
 - 第 16 篇：本地已经构建 `todo-api:v0.1.0` 镜像。
 
-本篇命令以 Linux / macOS / WSL2 Bash 为主。Windows 用户建议在 WSL2 Ubuntu 中完成实验；如果使用 PowerShell，请手动创建 YAML 文件，或把 heredoc 改写为 PowerShell here-string。
+本篇命令以 Linux / macOS / WSL2 Bash 为主。Windows 用户建议在 WSL2 Ubuntu 中完成实验；需要创建 YAML 文件时，请按页面给出的文件名手动创建同名文件，并复制对应内容。
 
 !!! warning "本篇数据库密码只用于本地教学"
     文中的 `todo_password`、DSN 和 Secret 文件只用于本地 kind 实验。真实环境必须使用随机密码、受控 Secret 管理、最小权限 Role-Based Access Control（RBAC，基于角色的访问控制）、审计和轮换流程。
@@ -67,21 +67,11 @@
 
 开发环境可以用 kind 的本地存储完成学习闭环；生产环境则要更谨慎地选择托管数据库、数据库 Operator 或成熟的自建方案。
 
-### 2.3 课程项目关联
+### 2.3 Todo 平台模拟案例
 
-阶段四正在把 Todo Platform 从“一个 Kubernetes API 服务”推进到“具备真实后端依赖的集群应用”：
+> Todo 平台需要在 Kubernetes 中保存数据库数据。你需要为 PostgreSQL 配置 Service、StatefulSet、PVC、Secret 和初始化脚本，并验证 Pod 重建后数据仍然存在。
 
-```text linenums="0"
-第 20 篇：kind 集群和基础对象
-第 21 篇：Todo API Deployment + Probe + HPA
-第 22 篇：Service + Ingress + Gateway API
-第 23 篇：ConfigMap + Secret 配置迁移
-第 24 篇：PostgreSQL + PVC 持久化
-第 25 篇：Kubernetes 网络、域名解析、容器网络接口（Container Network Interface，CNI）和网络策略
-```
-
-本篇产出的 PostgreSQL Service、StatefulSet、PVC 和数据库 Secret 会被后续章节继续使用：第 25 篇会从 Domain Name System（DNS，域名系统）和网络路径解释 API 如何访问 `todo-postgres`；第 27 篇会把这些 YAML 模板化到 Helm；第 28 篇会用 Kustomize 管理不同环境的存储差异。
-
+这个案例用于理解有状态服务的基本要求：身份、存储、访问地址、凭据和备份恢复都不能只按无状态应用处理。
 ## 3. 核心概念
 
 ### 3.1 Volume 是什么
@@ -252,6 +242,8 @@ Kubernetes 中更清晰的做法是：
 
 ## 5. 手把手实验
 
+预计耗时：90 分钟（动手操作约 60 分钟）。
+
 ### 5.1 实验目标
 
 本实验要完成：在 `todo-workloads` Namespace 中部署 PostgreSQL 18 StatefulSet，使用 PVC 持久化数据，执行 Todo API 迁移，把 Todo API 切换到 PostgreSQL，并验证删除 PostgreSQL Pod 后 Todo 数据仍然存在。
@@ -366,8 +358,9 @@ grep -F 'deployments/k8s-base/*.local.yaml' .gitignore || \
 
 创建 PostgreSQL ConfigMap。这里保存非敏感配置：数据库名、数据目录和服务地址。
 
-```bash linenums="0"
-cat > deployments/k8s-base/todo-postgres-configmap.yaml <<'YAML'
+将下面内容写入 `deployments/k8s-base/todo-postgres-configmap.yaml`：
+
+```yaml title="deployments/k8s-base/todo-postgres-configmap.yaml"
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -382,7 +375,6 @@ data:
   TODO_DATABASE_HOST: "todo-postgres.todo-workloads.svc.cluster.local" # ← API 访问数据库的服务 DNS
   TODO_DATABASE_PORT: "5432" # ← PostgreSQL 默认端口
   TODO_DATABASE_NAME: "todo_platform" # ← 给排障和文档阅读使用，应用真正读取 DSN
-YAML
 ```
 
 生成 PostgreSQL 本地实验 Secret。用户名和密码属于敏感信息，所以放在 Secret 中：
@@ -406,8 +398,9 @@ kubectl -n todo-workloads create secret generic todo-api-database \
 
 创建 PostgreSQL Service。一个 Headless Service 提供 StatefulSet 稳定身份，一个普通 ClusterIP Service 给 Todo API 访问：
 
-```bash linenums="0"
-cat > deployments/k8s-base/todo-postgres-service.yaml <<'YAML'
+将下面内容写入 `deployments/k8s-base/todo-postgres-service.yaml`：
+
+```yaml title="deployments/k8s-base/todo-postgres-service.yaml"
 apiVersion: v1
 kind: Service
 metadata:
@@ -441,13 +434,13 @@ spec:
     - name: postgres
       port: 5432
       targetPort: postgres
-YAML
 ```
 
 创建 PostgreSQL StatefulSet。`volumeClaimTemplates` 会为 `todo-postgres-0` 自动创建 PVC：
 
-```bash linenums="0"
-cat > deployments/k8s-base/todo-postgres-statefulset.yaml <<'YAML'
+将下面内容写入 `deployments/k8s-base/todo-postgres-statefulset.yaml`：
+
+```yaml title="deployments/k8s-base/todo-postgres-statefulset.yaml"
 # 结构概览：
 # 1. serviceName：绑定 Headless Service，提供稳定网络身份
 # 2. template：PostgreSQL Pod 模板，包含镜像、环境变量、探针和挂载点
@@ -525,13 +518,13 @@ spec:
         resources:
           requests:
             storage: 1Gi # ← 本地实验 1Gi 足够；生产按容量规划设置
-YAML
 ```
 
 创建迁移 Job。它复用 Todo API 镜像，但只执行 `migrate` 命令：
 
-```bash linenums="0"
-cat > deployments/k8s-base/todo-api-migrate-job.yaml <<'YAML'
+将下面内容写入 `deployments/k8s-base/todo-api-migrate-job.yaml`：
+
+```yaml title="deployments/k8s-base/todo-api-migrate-job.yaml"
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -559,13 +552,13 @@ spec:
           envFrom:
             - secretRef:
                 name: todo-api-database # ← 提供 TODO_DATABASE_DSN
-YAML
 ```
 
 更新 Todo API Deployment，让它额外读取数据库 DSN Secret。下面保留第 23 篇的 ConfigMap / Secret 写法，只新增 `todo-api-database`：
 
-```bash linenums="0"
-cat > deployments/k8s-base/todo-api-deployment.yaml <<'YAML'
+将下面内容写入 `deployments/k8s-base/todo-api-deployment.yaml`：
+
+```yaml title="deployments/k8s-base/todo-api-deployment.yaml"
 # 结构概览：
 # 1. envFrom：从 ConfigMap / Secret 注入运行配置、认证配置和数据库 DSN
 # 2. probes：继续使用 /healthz 和 /readyz
@@ -644,7 +637,6 @@ spec:
         - name: runtime-config
           configMap:
             name: todo-api-config-file
-YAML
 ```
 
 ### 5.5 执行命令
@@ -952,8 +944,6 @@ kubectl -n todo-workloads delete pvc postgres-data-todo-postgres-0 --ignore-not-
 
 如果删除了数据库 Secret，但还想继续运行 Todo API，请把 Deployment 恢复到第 23 篇的不带 `todo-api-database` Secret 写法，或重新执行第 23 篇的 Deployment 配置。
 
-预计耗时：90 分钟（动手操作约 60 分钟）。
-
 ## 6. 常见错误与排障
 
 ### 错误 1：PVC 一直是 `Pending`
@@ -1078,46 +1068,13 @@ kubectl -n todo-workloads delete pvc postgres-data-todo-postgres-0 --ignore-not-
 
 5. **Secret、网络和运维入口要最小暴露。** 数据库密码应使用受控 Secret 管理和轮换流程；PostgreSQL Service 默认只暴露集群内访问，不应直接开放到公网。生产中还应配合 NetworkPolicy、审计日志、Transport Layer Security（TLS，传输层安全）、备份加密和最小权限 ServiceAccount。
 
-## 8. 本章小项目
-
-本章小项目是：**Todo Platform Kubernetes PostgreSQL PVC 持久化方案**。
-
-### 8.1 项目产出
-
-- `deployments/k8s-base/todo-postgres-configmap.yaml`：PostgreSQL 非敏感配置。
-- `deployments/k8s-base/todo-postgres-secret.local.yaml`：本地实验数据库账号密码，不提交公开仓库。
-- `deployments/k8s-base/todo-api-database-secret.local.yaml`：Todo API 数据库 DSN，不提交公开仓库。
-- `deployments/k8s-base/todo-postgres-service.yaml`：Headless Service 和 ClusterIP Service。
-- `deployments/k8s-base/todo-postgres-statefulset.yaml`：PostgreSQL 18 StatefulSet 和 PVC 模板。
-- `deployments/k8s-base/todo-api-migrate-job.yaml`：数据库迁移 Job。
-- `deployments/k8s-base/todo-api-deployment.yaml`：切换到 PostgreSQL 的 Todo API Deployment。
-
-### 8.2 验收标准
-
-基础验收：
-
-- `kubectl -n todo-workloads get pvc postgres-data-todo-postgres-0` 显示 `Bound`。
-- `kubectl -n todo-workloads get pod todo-postgres-0` 显示 `Running`。
-- `kubectl -n todo-workloads logs job/todo-api-migrate` 显示迁移成功。
-- `psql -c "\dt"` 能看到 `todos`、`todo_events`、`schema_migrations`。
-- Todo API Pod 中能看到 `TODO_DATABASE_DSN`。
-- `curl http://127.0.0.1:18082/readyz` 返回 `200 OK`。
-
-进阶验收：
-
-- 通过 API 创建 Todo 后，PostgreSQL 中能查到对应记录。
-- 删除 `todo-postgres-0` Pod 后，StatefulSet 自动重建同名 Pod。
-- 重建后查询 `todos` 表，原有 Todo 仍然存在。
-- 能解释为什么删除 PVC 与删除 Pod 的影响完全不同。
-- 能说明本篇方案为什么不是生产高可用 PostgreSQL。
-
-## 9. 练习题与面试题
+## 8. 练习题与面试题
 
 本章练习题和面试题已拆分到独立页面，完成正文学习后再进入题库练习与复盘。
 
 [查看本章练习题与面试题](../../questions/stage-04-kubernetes/24-k8s-storage.md)
 
-## 10. 本章总结
+## 9. 本章总结
 
 本篇把 Todo Platform 从“API 可以在 Kubernetes 中运行”推进到“核心业务数据可以通过 PostgreSQL 持久化”。你学习了 Volume、PV、PVC、StorageClass 和 StatefulSet 的职责边界，理解了 PVC 动态供给、StatefulSet 稳定身份、PostgreSQL 数据目录和迁移 Job 的运行链路。
 
@@ -1125,7 +1082,7 @@ kubectl -n todo-workloads delete pvc postgres-data-todo-postgres-0 --ignore-not-
 
 能力价值上，你已经能处理 Kubernetes 中最常见的有状态服务入门任务：申请持久存储、部署单实例数据库、执行迁移、切换应用配置、验证数据保留，并能区分“教学可用”和“生产可用”的边界。
 
-## 11. 下一章衔接
+## 10. 下一章衔接
 
 第 25 篇会进入 Kubernetes 网络原理，解释 Pod、Service、DNS、CNI、kube-proxy 和 NetworkPolicy 如何共同完成集群通信。本篇的 `todo-api -> todo-postgres` 访问链路会成为下一章的真实案例：如果 DNS 解析失败、Service 没有 Endpoints 或网络策略拦截，Todo API 就无法连接数据库。
 

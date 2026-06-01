@@ -45,27 +45,11 @@
 
 本章实验会模拟这条协作线。你会创建一个最终交付分支，补齐最终 YAML、GitHub Actions 工作流、Argo CD Application、验证脚本和作品集文档。然后通过一次故障注入证明这不是“截图项目”：当镜像标签错误导致 Pod 无法启动时，你能按证据链定位到 Deployment、Events、`TodoApp.status.conditions`、Operator 指标和 Git 变更，再通过 GitOps 修复。
 
-### 2.3 课程项目关联
+### 2.3 Todo 平台模拟案例
 
-本章继续使用前面所有阶段积累的目录，尤其是：
+> Todo 平台需要整理成一个可展示的综合案例：应用团队提交 `TodoApp` YAML，平台完成部署、服务暴露、状态回写、监控指标和故障演练。你需要把架构说明、部署手册、排障记录和面试讲解稿整理成完整作品集。
 
-- `api/`：第 9-14 篇积累的 Todo API 服务。
-- `deployments/`：第 15-28 篇积累的 Docker、Kubernetes、Helm 和 Kustomize 交付文件。
-- `.github/workflows/`：第 29 篇积累的 CI/CD 流水线。
-- `observability/`：第 31-32 篇积累的 Prometheus、Grafana、Loki 和 OpenTelemetry 配置。
-- `operator/kubebuilder/` 与 `operator/helm/todo-operator/`：第 38-41 篇积累的 Todo Operator。
-
-本章把项目版本线推进到 `v5.0-final-delivery`。其中第 41 篇的 `v4.7-operator-production` 是 Operator 自身的生产基线，本篇的 `v5.0-final-delivery` 是整个 Cloud Native Todo Platform 的综合交付基线。
-
-需要提前说明一个边界：第 35 篇定义过 `TodoApp`、`TodoDatabase`、`TodoCache` 三个 CRD，第 38-41 篇实际完成的是 `TodoApp` 对 Deployment、Service、status、Events 和 metrics 的自动化管理。也就是说，当前课程主线已经具备“应用交付 Operator”的可执行能力，但还没有实现数据库和缓存的独立 Controller。
-
-因此本章实验采用“两条路径”：
-
-- **路径 A：最小可执行闭环**。只依赖第 41 篇已有 Operator，使用 `deployments/final/todoapp-local-smoke.yaml` 创建 `TodoApp`，验证 Deployment、Service、Ready condition、RBAC、metrics 和故障演练。这条路径是本章必须跑通的主路径。
-- **路径 B：完整作品集增强路径**。使用 `deployments/final/todoapp-full.yaml` 表达 `TodoApp`、`TodoDatabase`、`TodoCache` 的最终平台契约，并接入 Argo CD、Prometheus、Loki、Trace 和作品集证据。只有当你已经安装第 35 篇三个 CRD，或已经继续实现 DB/Cache Controller 时，才把它作为完整可执行路径。
-
-这样安排不是降低目标，而是让课程边界更真实：企业项目经常会先交付一个可运行的最小闭环，再把尚未自动化的能力写成明确的 API 契约和路线图。面试或评审时，能诚实讲清“已经实现什么、还计划实现什么”，比把未完成能力说成已完成更专业。
-
+这个案例关注表达能力：除了让系统跑通，还要能解释设计取舍、验证证据、故障处理和生产边界。
 ## 3. 核心概念
 
 ### 3.1 最终交付契约
@@ -277,11 +261,11 @@ flowchart TD
 
 ## 5. 手把手实验
 
+预计耗时：90 分钟（动手操作约 60 分钟）。
+
 ### 5.1 步骤 1：实验目标
 
 本次实验目标是：在项目仓库中整理最终交付入口和作品集材料，先用一条 `kubectl apply -f deployments/final/todoapp-local-smoke.yaml` 跑通当前 Operator 的最小闭环，再用 `deployments/final/todoapp-full.yaml` 整理完整平台契约和作品集证据。
-
-预计耗时：90 分钟（动手操作约 60 分钟）。
 
 ### 5.2 步骤 2：实验环境
 
@@ -1451,44 +1435,13 @@ argocd app delete todo-platform-final
 
 5. **作品集要脱敏。** 面试或公开分享时，不要暴露真实域名、Token、Secret、客户名称、内部镜像仓库地址和生产告警截图。可以保留结构、流程、字段和排障方法，把敏感值替换为示例值。专业的脱敏比炫耀真实生产截图更能体现工程素养。
 
-## 8. 本章小项目
-
-本章小项目是完成 Cloud Native Todo Platform 最终交付包。你需要在项目仓库中交付：
-
-- `deployments/final/todoapp-local-smoke.yaml`：最小可执行交付入口，必须能在第 41 篇 Operator 上跑通。
-- `deployments/final/todoapp-full.yaml`：完整作品集交付入口，表达 TodoApp、TodoDatabase 和 TodoCache 平台契约。
-- `deployments/gitops/applications/todo-platform-final.yaml`：Argo CD Application 示例。
-- `.github/workflows/final-integration.yml`：最终集成 CI。
-- `scripts/final-verify.sh`：最终验收脚本。
-- `docs/portfolio/architecture.md`：项目总架构说明。
-- `docs/portfolio/deploy-runbook.md`：部署和回滚手册。
-- `docs/portfolio/troubleshooting.md`：故障演练与复盘。
-- `docs/portfolio/interview-talk-track.md`：面试讲解稿。
-- `docs/portfolio/evidence/`：最终验证证据和截图目录。
-
-验收标准：
-
-| 验收项 | 判断方式 |
-|---|---|
-| 最小一条 YAML 可执行 | `kubectl apply -f deployments/final/todoapp-local-smoke.yaml` 成功 |
-| Operator 自动调谐 | `TodoApp` 创建后生成同名 Deployment 和 Service |
-| 业务状态 Ready | Deployment rollout 成功，`TodoApp.status.conditions` 为 Ready |
-| 完整契约可说明 | 能解释 `todoapp-full.yaml` 中 DB/Cache 当前是 API 契约还是已调谐资源 |
-| GitOps 可接入 | Argo CD Application 能指向 `deployments/final` 并只 include `todoapp-full.yaml` |
-| CI 覆盖核心路径 | Go、Helm、YAML、docs 至少有对应验证步骤 |
-| 故障可复现 | 错误镜像演练能产生可解释的 `ImagePullBackOff` 证据 |
-| 证据可归档 | `docs/portfolio/evidence/` 包含对象状态、Events、metrics 样例和截图占位 |
-| 面试可表达 | 3 分钟讲解稿能讲清业务目标、架构、取舍和故障经验 |
-
-项目完成后，版本线可以标记为 `v5.0-final-delivery`。
-
-## 9. 练习题与面试题
+## 8. 练习题与面试题
 
 本章练习题和面试题已拆分到独立页面，完成正文学习后再进入题库练习与复盘。
 
 [查看本章练习题与面试题](../../questions/stage-06-platform-operator/42-final-integration-career.md)
 
-## 10. 本章总结
+## 9. 本章总结
 
 本篇完成了 Cloud Native Todo Platform 的最终集成。知识上，你把 Go API、Docker、Kubernetes、Helm、Kustomize、CI/CD、GitOps、可观测性、CRD、Controller 和 Operator 放进同一张交付图里，理解了从代码提交到运行中 Pod 的完整状态链路。
 
@@ -1496,7 +1449,7 @@ argocd app delete todo-platform-final
 
 能力上，你已经具备把一个学习项目转换成职业作品集的基本方法：用工程证据证明技术能力，用故障复盘证明生产意识，用清晰表达证明你理解架构取舍。至此，这套课程的主线从“会写一个服务”推进到了“能交付一个可治理的平台能力”。
 
-## 11. 课程收官与后续学习路线
+## 10. 课程收官与后续学习路线
 
 这是 Cloud Native Todo Platform 主线课程的最后一篇。后续不再进入新的正文章节，但你的学习可以沿六条路线继续深入：
 

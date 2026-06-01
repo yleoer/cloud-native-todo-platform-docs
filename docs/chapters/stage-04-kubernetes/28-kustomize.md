@@ -35,13 +35,7 @@
 - 第 27 篇：已经创建 `deployments/helm/todo-platform/` Helm Chart。
 - 第 16 篇：本地已有 `todo-api:v0.1.0` 镜像，必要时能加载到 kind 集群。
 
-本篇命令以 Linux / macOS / Windows Subsystem for Linux 2（WSL2，Windows 的 Linux 子系统）中的 Bash 为主。Windows PowerShell 用户可以把 `cat <<'YAML'` 改成 here-string：
-
-```powershell linenums="0"
-@'
-key: value
-'@ | Set-Content -Encoding utf8 deployments/kustomize/base/example.yaml
-```
+本篇命令以 Linux / macOS / Windows Subsystem for Linux 2（WSL2，Windows 的 Linux 子系统）中的 Bash 为主。需要创建文件时，请按页面给出的文件名和内容手动写入。
 
 本机验证基线：
 
@@ -88,40 +82,11 @@ Kustomize 解决的是“在不改 base 的前提下，对同一组 Kubernetes Y
 
 这能把职责边界变清楚：Chart 定义“应用应该有哪些对象”，overlay 定义“这个环境怎样运行这些对象”。
 
-### 2.3 课程项目关联
+### 2.3 Todo 平台模拟案例
 
-阶段四到这里已经形成一条完整交付链：
+> Todo 平台需要维护 dev、test、prod 三套环境差异。你需要用 Kustomize base 和 overlays 管理镜像标签、副本数、资源规格、命名空间和配置引用。
 
-```text linenums="0"
-第 20 篇：kind 集群和 kubectl 基础
-第 21 篇：Todo API Deployment / Service / 探针
-第 22 篇：入口层和域名访问
-第 23 篇：ConfigMap / Secret 配置管理
-第 24 篇：PostgreSQL 持久化
-第 25 篇：NetworkPolicy 网络隔离
-第 26 篇：RBAC、非 root、Pod Security 基线
-第 27 篇：Helm 4 Chart 和 release 生命周期
-第 28 篇：Kustomize dev / test / prod overlay
-```
-
-本篇会产出 `deployments/kustomize/` 目录。为了避免破坏第 20-27 篇资源，实验会使用三个独立 Namespace：`todo-dev`、`todo-test`、`todo-prod`。
-
-图 28-1 展示本篇和前后章节的关系：
-
-```mermaid
-flowchart LR
-    Ch23["第 23 篇<br/>dev/test/prod 配置"] --> Ch28["第 28 篇<br/>Kustomize overlay"]
-    Ch26["第 26 篇<br/>安全基线"] --> Ch28
-    Ch27["第 27 篇<br/>Helm Chart"] --> Base["Helm render<br/>Kustomize base"]
-    Base --> Ch28
-    Ch28 --> Dev["todo-dev<br/>小副本 / debug"]
-    Ch28 --> Test["todo-test<br/>测试配置"]
-    Ch28 --> Prod["todo-prod<br/>资源限制 / Restricted"]
-    Ch28 --> Ch29["第 29 篇<br/>CI/CD 自动化交付"]
-```
-
-下一阶段会进入 CI/CD。第 29 篇会把本篇的 `kubectl kustomize`、server-side dry-run 和部署验证放进流水线，让 Git 变更自动触发构建、检查和交付。
-
+这个案例关注多环境配置治理：公共部分要集中维护，环境差异要清晰可审查，最终渲染结果要能被命令验证。
 ## 3. 核心概念
 
 ### 3.1 base 与 overlay
@@ -374,6 +339,8 @@ git diff
 
 ## 5. 手把手实验
 
+预计耗时：15 分钟阅读，45-60 分钟动手操作。
+
 ### 5.1 实验目标
 
 基于第 27 篇 Helm Chart 生成 Kustomize base，并创建 dev、test、prod 三套 overlay；每套 overlay 能独立渲染、服务端 dry-run、部署到不同 Namespace，并能访问 Todo API 健康检查接口。
@@ -448,8 +415,9 @@ mkdir -p deployments/kustomize/overlays/prod/.secrets
 
 创建 Helm 渲染 base 使用的 values。这里关闭 Helm Secret 模板，改由 Kustomize overlay 的 `secretGenerator` 生成 Secret：
 
-```bash linenums="0"
-cat > deployments/kustomize/base/values-kustomize-base.yaml <<'YAML'
+将下面内容写入 `deployments/kustomize/base/values-kustomize-base.yaml`：
+
+```yaml title="deployments/kustomize/base/values-kustomize-base.yaml"
 auth:
   create: false # ← Secret 交给 Kustomize overlay 生成，base 不保存敏感数据。
   existingSecret: todo-api-auth
@@ -459,7 +427,6 @@ config:
 
 cache:
   enabled: false
-YAML
 ```
 
 更新 Helm 本地依赖，并把 Chart 渲染为 Kustomize base。第 27 篇已经生成过 `Chart.lock`；如果你跳过了第 27 篇的依赖更新步骤，下面第一行会先补齐锁文件。`--skip-tests` 用来跳过 Helm test Pod，避免把测试 hook 当成常驻资源应用到集群：
@@ -481,13 +448,13 @@ helm template todo-platform deployments/helm/todo-platform \
 
 创建 base 的 `kustomization.yaml`：
 
-```bash linenums="0"
-cat > deployments/kustomize/base/kustomization.yaml <<'YAML'
+将下面内容写入 `deployments/kustomize/base/kustomization.yaml`：
+
+```yaml title="deployments/kustomize/base/kustomization.yaml"
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
   - todo-platform-rendered.yaml
-YAML
 ```
 
 创建本地实验 Secret 输入文件。`hash-password` 子命令来自第 14 篇，并在第 16 篇镜像构建实验中验证过。`.secrets/` 只服务本地实验，不要把真实生产密钥放入 GitOps 仓库：
@@ -495,21 +462,29 @@ YAML
 ```bash linenums="0"
 HASH=$(docker run --rm todo-api:v0.1.0 hash-password "change-me-123")
 test -n "$HASH"
+```
 
-cat > deployments/kustomize/overlays/dev/.secrets/todo-api-auth.env <<EOF
+将下面内容写入 `deployments/kustomize/overlays/dev/.secrets/todo-api-auth.env`：
+
+把 `<PASSWORD_HASH>` 替换为上一条命令输出的完整哈希值。
+
+```text title="deployments/kustomize/overlays/dev/.secrets/todo-api-auth.env"
 TODO_JWT_SECRET=dev-0123456789abcdef0123456789abcdef
-TODO_AUTH_USERS=admin=${HASH}
-EOF
+TODO_AUTH_USERS=admin=<PASSWORD_HASH>
+```
 
-cat > deployments/kustomize/overlays/test/.secrets/todo-api-auth.env <<EOF
+将下面内容写入 `deployments/kustomize/overlays/test/.secrets/todo-api-auth.env`：
+
+```text title="deployments/kustomize/overlays/test/.secrets/todo-api-auth.env"
 TODO_JWT_SECRET=test-0123456789abcdef0123456789abcde
-TODO_AUTH_USERS=admin=${HASH}
-EOF
+TODO_AUTH_USERS=admin=<PASSWORD_HASH>
+```
 
-cat > deployments/kustomize/overlays/prod/.secrets/todo-api-auth.env <<EOF
+将下面内容写入 `deployments/kustomize/overlays/prod/.secrets/todo-api-auth.env`：
+
+```text title="deployments/kustomize/overlays/prod/.secrets/todo-api-auth.env"
 TODO_JWT_SECRET=prod-0123456789abcdef0123456789abcde
-TODO_AUTH_USERS=admin=${HASH}
-EOF
+TODO_AUTH_USERS=admin=<PASSWORD_HASH>
 ```
 
 如果 `docker run` 提示 `Unable to find image 'todo-api:v0.1.0'`，请先回到第 16 篇重新构建镜像；如果提示 `unknown command "hash-password"`，说明镜像不是本课程要求的 Todo API 版本，需要重新构建并加载到 kind 集群。
@@ -521,7 +496,7 @@ $HASH = docker run --rm todo-api:v0.1.0 hash-password "change-me-123"
 if (-not $HASH) { throw "hash-password failed" }
 ```
 
-再用 here-string 创建三个 `.env` 文件。
+同样把 `<PASSWORD_HASH>` 替换为 `$HASH` 的输出后，再创建三个 `.env` 文件。
 
 确认 `.secrets/` 不会被提交。当前仓库应已有对应规则；如果第一条命令没有输出，请按第 6 节“Secret env 文件缺失或被误提交”的修复方式补充 `.gitignore`：
 
@@ -534,8 +509,9 @@ git status --short --ignored deployments/kustomize/overlays/dev/.secrets/todo-ap
 
 创建 dev Namespace：
 
-```bash linenums="0"
-cat > deployments/kustomize/overlays/dev/namespace.yaml <<'YAML'
+将下面内容写入 `deployments/kustomize/overlays/dev/namespace.yaml`：
+
+```yaml title="deployments/kustomize/overlays/dev/namespace.yaml"
 apiVersion: v1
 kind: Namespace
 metadata:
@@ -543,13 +519,13 @@ metadata:
   labels:
     pod-security.kubernetes.io/enforce: restricted
     pod-security.kubernetes.io/enforce-version: latest
-YAML
 ```
 
 创建 dev overlay。dev 使用 1 个副本、debug 日志和本地域名：
 
-```bash linenums="0"
-cat > deployments/kustomize/overlays/dev/kustomization.yaml <<'YAML'
+将下面内容写入 `deployments/kustomize/overlays/dev/kustomization.yaml`：
+
+```yaml title="deployments/kustomize/overlays/dev/kustomization.yaml"
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 namespace: todo-dev
@@ -616,15 +592,15 @@ patches:
       - op: replace
         path: /subjects/0/namespace
         value: todo-dev
-YAML
 ```
 
 dev overlay 不额外创建 `patch-deployment-resources.yaml`，它沿用 Helm base 中的默认资源请求和限制。这样 dev 的差异集中在 Namespace、副本数和调试配置上。
 
 创建 test Namespace：
 
-```bash linenums="0"
-cat > deployments/kustomize/overlays/test/namespace.yaml <<'YAML'
+将下面内容写入 `deployments/kustomize/overlays/test/namespace.yaml`：
+
+```yaml title="deployments/kustomize/overlays/test/namespace.yaml"
 apiVersion: v1
 kind: Namespace
 metadata:
@@ -632,13 +608,13 @@ metadata:
   labels:
     pod-security.kubernetes.io/enforce: restricted
     pod-security.kubernetes.io/enforce-version: latest
-YAML
 ```
 
 创建 test 资源补丁。test 环境使用中等资源规格：
 
-```bash linenums="0"
-cat > deployments/kustomize/overlays/test/patch-deployment-resources.yaml <<'YAML'
+将下面内容写入 `deployments/kustomize/overlays/test/patch-deployment-resources.yaml`：
+
+```yaml title="deployments/kustomize/overlays/test/patch-deployment-resources.yaml"
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -655,13 +631,13 @@ spec:
             limits:
               cpu: 750m
               memory: 384Mi
-YAML
 ```
 
 创建 test overlay：
 
-```bash linenums="0"
-cat > deployments/kustomize/overlays/test/kustomization.yaml <<'YAML'
+将下面内容写入 `deployments/kustomize/overlays/test/kustomization.yaml`：
+
+```yaml title="deployments/kustomize/overlays/test/kustomization.yaml"
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 namespace: todo-test
@@ -729,13 +705,13 @@ patches:
       - op: replace
         path: /subjects/0/namespace
         value: todo-test
-YAML
 ```
 
 创建 prod Namespace。prod 同时启用 enforce、audit、warn 三类 PSA 标签，方便提前发现不符合 Restricted 的 Pod：
 
-```bash linenums="0"
-cat > deployments/kustomize/overlays/prod/namespace.yaml <<'YAML'
+将下面内容写入 `deployments/kustomize/overlays/prod/namespace.yaml`：
+
+```yaml title="deployments/kustomize/overlays/prod/namespace.yaml"
 apiVersion: v1
 kind: Namespace
 metadata:
@@ -747,13 +723,13 @@ metadata:
     pod-security.kubernetes.io/audit-version: latest
     pod-security.kubernetes.io/warn: restricted
     pod-security.kubernetes.io/warn-version: latest
-YAML
 ```
 
 创建 prod 资源补丁。prod 环境使用更高资源规格：
 
-```bash linenums="0"
-cat > deployments/kustomize/overlays/prod/patch-deployment-resources.yaml <<'YAML'
+将下面内容写入 `deployments/kustomize/overlays/prod/patch-deployment-resources.yaml`：
+
+```yaml title="deployments/kustomize/overlays/prod/patch-deployment-resources.yaml"
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -770,13 +746,13 @@ spec:
             limits:
               cpu: "1"
               memory: 512Mi
-YAML
 ```
 
 创建 prod overlay：
 
-```bash linenums="0"
-cat > deployments/kustomize/overlays/prod/kustomization.yaml <<'YAML'
+将下面内容写入 `deployments/kustomize/overlays/prod/kustomization.yaml`：
+
+```yaml title="deployments/kustomize/overlays/prod/kustomization.yaml"
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 namespace: todo-prod
@@ -844,7 +820,6 @@ patches:
       - op: replace
         path: /subjects/0/namespace
         value: todo-prod
-YAML
 ```
 
 ### 5.5 执行命令
@@ -1117,8 +1092,6 @@ kubectl delete namespace todo-dev todo-test todo-prod --ignore-not-found
 rm -rf deployments/kustomize
 ```
 
-预计耗时：15 分钟阅读，45-60 分钟动手操作。
-
 ## 6. 常见错误与排障
 
 ### 错误 1：overlay 找不到 base
@@ -1301,52 +1274,18 @@ rm -rf deployments/kustomize
 
 5. **Helm 与 Kustomize 的职责边界要稳定。** 如果某个差异是应用安装者经常调整的参数，优先放 Helm values；如果它是环境层策略，例如 Namespace 标签、环境域名、资源等级、GitOps 补丁，适合放 Kustomize overlay。边界频繁摆动会让团队不知道该改 Chart 还是改 overlay。
 
-## 8. 本章小项目
-
-本章小项目：**为 Todo Platform 建立 dev、test、prod 三套 Kustomize overlay，并完成渲染、dry-run、部署和验证。**
-
-### 8.1 项目产出
-
-完成后，你应该得到：
-
-- `deployments/kustomize/base/kustomization.yaml`
-- `deployments/kustomize/base/todo-platform-rendered.yaml`
-- `deployments/kustomize/base/values-kustomize-base.yaml`
-- `deployments/kustomize/overlays/dev/kustomization.yaml`
-- `deployments/kustomize/overlays/dev/namespace.yaml`
-- `deployments/kustomize/overlays/test/kustomization.yaml`
-- `deployments/kustomize/overlays/test/namespace.yaml`
-- `deployments/kustomize/overlays/test/patch-deployment-resources.yaml`
-- `deployments/kustomize/overlays/prod/kustomization.yaml`
-- `deployments/kustomize/overlays/prod/namespace.yaml`
-- `deployments/kustomize/overlays/prod/patch-deployment-resources.yaml`
-- 三套本地 `.secrets/todo-api-auth.env`，但这些文件不应提交。
-
-### 8.2 能力验收标准
-
-- 能解释 base 与 overlay 的职责边界。
-- 能从 Helm Chart 生成不含明文 Secret 的 Kustomize base。
-- 能用 `kubectl kustomize` 渲染 dev、test、prod 三套 YAML。
-- 能用 `configMapGenerator` 生成环境配置，并看到 ConfigMap hash 后缀。
-- 能用 `secretGenerator` 生成 Secret，并确认 Deployment 引用被改写。
-- 能用 `replicas` 分别设置 dev=1、test=2、prod=3。
-- 能用 `patches` 修正 RoleBinding subject Namespace 和 Role `resourceNames`。
-- 能用 `kubectl apply --dry-run=server -k` 通过 API Server 校验。
-- 能部署三套环境，并访问至少一套环境的 `/healthz` 和 `/readyz`。
-- 能说明 Kustomize 与 Helm 各自适合解决的问题。
-
-## 9. 练习题与面试题
+## 8. 练习题与面试题
 
 本章练习题和面试题已拆分到独立页面，完成正文学习后再进入题库练习与复盘。
 
 [查看本章练习题与面试题](../../questions/stage-04-kubernetes/28-kustomize.md)
 
-## 10. 本章总结
+## 9. 本章总结
 
 本篇完成了阶段四的最后一块拼图：用 Kustomize 把 Todo Platform 的 dev、test、prod 环境差异整理成可审查、可渲染、可部署的 overlay。你已经掌握 base / overlay、generator、patch、images、replicas 和 Namespace transformer 的关键用法。
 
 更重要的是，你现在能解释 Helm 与 Kustomize 的边界：Helm 负责把应用打包成稳定发布单元，Kustomize 负责把同一组 YAML 按环境叠加成最终交付形态。阶段四的 Todo Platform 已经具备 Kubernetes 工作负载、入口、配置、存储、网络、安全、Helm 和 Kustomize 的完整应用交付骨架。
 
-## 11. 下一章衔接
+## 10. 下一章衔接
 
 第 29 篇会进入 CI/CD 自动化交付。我们会把前面手工执行的检查串起来：代码测试、镜像构建、Helm / Kustomize 渲染、server-side dry-run、推送镜像和部署到 Kubernetes。到那时，本篇的 `deployments/kustomize/overlays/dev`、`test`、`prod` 会成为流水线和 GitOps 的天然输入。

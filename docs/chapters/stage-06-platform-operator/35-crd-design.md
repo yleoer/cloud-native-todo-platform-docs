@@ -48,18 +48,11 @@ CRD 的价值不只是“能存一份自定义 YAML”。它还要提供 schema�
 
 SRE 负责通过 `kubectl get`、`kubectl describe`、`status.conditions`、Events、日志和指标判断平台状态。好的 CRD 会让 SRE 快速回答：“这个应用期望是什么？平台已经观察到什么？失败原因是什么？状态是否追上最新 generation？”
 
-### 2.3 课程项目关联
+### 2.3 Todo 平台模拟案例
 
-本篇承接第 34 篇的 `operator/api-model/` 草案，并输出阶段六第一批真实 Kubernetes API：
+> Todo 平台的 API 草案需要变成真实 CRD。你需要定义 `TodoApp`、`TodoDatabase` 和 `TodoCache` 的字段、校验、打印列、状态结构和示例资源。
 
-- `TodoApp`：描述 Todo API 应用本身，包括镜像、副本、服务端口、Ingress、资源规格和可观测性。
-- `TodoDatabase`：描述 Todo Platform 需要的 PostgreSQL 数据库能力，包括版本、存储、Secret 和备份策略。
-- `TodoCache`：描述 Todo Platform 需要的 Redis 缓存能力，包括版本、内存规格、副本和持久化。
-
-本篇只安装 CRD 和创建 CR 实例，不会创建 Deployment、PostgreSQL 或 Redis。第 36 篇会分析 Controller 应该如何 watch 这些资源；第 37-38 篇会让 Controller 根据 CR 自动创建底层资源并回写 status。
-
-项目版本线进入阶段六子版本 `v4.1-crd-design`，它隶属于计划文档中的 `v4.0-operator` 总版本线。
-
+这个案例关注 API 设计的长期成本：字段命名、默认值、校验规则和状态表达一旦发布，就会影响使用者和控制器实现。
 ## 3. 核心概念
 
 ### 3.1 CRD 是 Kubernetes API 类型定义
@@ -284,6 +277,8 @@ CRD 版本升级最容易踩坑的地方是把“修改 YAML 文件”误以为�
 
 ## 5. 手把手实验
 
+预计耗时：90 分钟（动手操作约 65 分钟）。
+
 ### 5.1 实验目标
 
 本篇实验会完成四件事：
@@ -292,8 +287,6 @@ CRD 版本升级最容易踩坑的地方是把“修改 YAML 文件”误以为�
 2. 使用 `kubectl explain`、`api-resources` 和 `get` 验证 CRD 已注册。
 3. 创建三个自定义资源实例，并验证 OpenAPI schema 校验生效。
 4. 使用 status subresource 模拟 Controller 回写状态。
-
-预计耗时：90 分钟（动手操作约 65 分钟）。
 
 ### 5.2 实验环境
 
@@ -368,14 +361,15 @@ operator/
 
 ### 5.4 完整代码或配置
 
-下面的文件创建命令使用 Bash heredoc，适用于 Linux、macOS、Git Bash 和 WSL。Windows 用户如果直接使用 PowerShell，建议用编辑器创建同名文件并复制对应 YAML 内容；PowerShell 不支持 `cat <<'YAML'` 这种 heredoc 语法，直接执行会出现 `Missing file specification after redirection operator` 一类错误。长 YAML 以文件内容为准，不要把 shell 创建方式当成 Kubernetes 语法本身。
+下面的配置文件都以文件内容形式给出。请用编辑器创建同名文件并复制对应内容；长 YAML 以文件内容为准，不要把 shell 创建方式当成 Kubernetes 语法本身。
 
 #### 5.4.1 TodoApp CRD
 
 创建 `operator/crds/base/todoapps.platform.todo.example.com.yaml`：
 
-```bash linenums="0"
-cat > operator/crds/base/todoapps.platform.todo.example.com.yaml <<'YAML'
+将下面内容写入 `operator/crds/base/todoapps.platform.todo.example.com.yaml`：
+
+```yaml title="operator/crds/base/todoapps.platform.todo.example.com.yaml"
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
@@ -546,7 +540,6 @@ spec:
                       lastTransitionTime:
                         type: string
                         format: date-time
-YAML
 ```
 
 关键字段说明：
@@ -562,8 +555,9 @@ YAML
 
 创建 `operator/crds/base/tododatabases.platform.todo.example.com.yaml`：
 
-```bash linenums="0"
-cat > operator/crds/base/tododatabases.platform.todo.example.com.yaml <<'YAML'
+将下面内容写入 `operator/crds/base/tododatabases.platform.todo.example.com.yaml`：
+
+```yaml title="operator/crds/base/tododatabases.platform.todo.example.com.yaml"
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
@@ -710,7 +704,6 @@ spec:
                       lastTransitionTime:
                         type: string
                         format: date-time
-YAML
 ```
 
 关键字段说明：
@@ -724,8 +717,9 @@ YAML
 
 创建 `operator/crds/base/todocaches.platform.todo.example.com.yaml`：
 
-```bash linenums="0"
-cat > operator/crds/base/todocaches.platform.todo.example.com.yaml <<'YAML'
+将下面内容写入 `operator/crds/base/todocaches.platform.todo.example.com.yaml`：
+
+```yaml title="operator/crds/base/todocaches.platform.todo.example.com.yaml"
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
@@ -859,7 +853,6 @@ spec:
                       lastTransitionTime:
                         type: string
                         format: date-time
-YAML
 ```
 
 关键字段说明：
@@ -873,8 +866,9 @@ YAML
 
 创建 `operator/samples/todoapp.yaml`：
 
-```bash linenums="0"
-cat > operator/samples/todoapp.yaml <<'YAML'
+将下面内容写入 `operator/samples/todoapp.yaml`：
+
+```yaml title="operator/samples/todoapp.yaml"
 apiVersion: platform.todo.example.com/v1alpha1
 kind: TodoApp
 metadata:
@@ -896,13 +890,13 @@ spec:
     tracing: true
   rollout:
     strategy: RollingUpdate
-YAML
 ```
 
 创建 `operator/samples/tododatabase.yaml`：
 
-```bash linenums="0"
-cat > operator/samples/tododatabase.yaml <<'YAML'
+将下面内容写入 `operator/samples/tododatabase.yaml`：
+
+```yaml title="operator/samples/tododatabase.yaml"
 apiVersion: platform.todo.example.com/v1alpha1
 kind: TodoDatabase
 metadata:
@@ -918,13 +912,13 @@ spec:
     enabled: true
     schedule: "0 2 * * *"
     retentionDays: 7
-YAML
 ```
 
 创建 `operator/samples/todocache.yaml`：
 
-```bash linenums="0"
-cat > operator/samples/todocache.yaml <<'YAML'
+将下面内容写入 `operator/samples/todocache.yaml`：
+
+```yaml title="operator/samples/todocache.yaml"
 apiVersion: platform.todo.example.com/v1alpha1
 kind: TodoCache
 metadata:
@@ -937,7 +931,6 @@ spec:
   replicas: 1
   persistence:
     enabled: false
-YAML
 ```
 
 这些样例都是“期望状态”。它们不会自动创建真实 PostgreSQL、Redis 或 Todo API Deployment。第 37-38 篇的 Controller 会让这些声明真正产生底层资源。
@@ -946,8 +939,9 @@ YAML
 
 创建 `operator/crds/versions/todoapps-versioning-notes.md`，这份文件只记录版本演进思路，不是可以直接 apply 的 CRD：
 
-```bash linenums="0"
-cat > operator/crds/versions/todoapps-versioning-notes.md <<'EOF'
+将下面内容写入 `operator/crds/versions/todoapps-versioning-notes.md`：
+
+```markdown title="operator/crds/versions/todoapps-versioning-notes.md"
 # TodoApp v1beta1 versioning notes
 
 This is a design note, not an applyable CRD manifest.
@@ -974,7 +968,6 @@ versions:
     served: true
     storage: true
 ~~~
-EOF
 ```
 
 这里故意不生成 `todoapps-v1beta1-preview.yaml`，因为读者很容易把“演示用 CRD”误 apply 到集群里。真实升级不能用 `x-kubernetes-preserve-unknown-fields` 偷懒放开校验；应该为每个版本定义完整 schema，并在需要时实现 conversion webhook。
@@ -1520,60 +1513,13 @@ Remove-Item -Recurse -Force operator/crds,operator/samples
 - [Versions in CustomResourceDefinitions](https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definition-versioning/)
 - [Kubernetes CEL Validation](https://kubernetes.io/docs/reference/using-api/cel)
 
-## 8. 本章小项目
-
-### 8.1 项目产出
-
-本章完成 Todo Platform 的 CRD 层 API 设计，产出：
-
-- `operator/crds/base/todoapps.platform.todo.example.com.yaml`
-- `operator/crds/base/tododatabases.platform.todo.example.com.yaml`
-- `operator/crds/base/todocaches.platform.todo.example.com.yaml`
-- `operator/samples/todoapp.yaml`
-- `operator/samples/tododatabase.yaml`
-- `operator/samples/todocache.yaml`
-- `operator/crds/versions/todoapps-versioning-notes.md`
-
-图 35-2 展示本章产物和后续章节的关系：
-
-```mermaid
-flowchart TD
-    CRDs["Ch35 CRDs"] --> CRs["TodoApp / TodoDatabase / TodoCache CRs"]
-    CRs --> Watch["Ch36 Watch and Reconcile design"]
-    Watch --> Handwritten["Ch37 Handwritten Controller"]
-    Handwritten --> Kubebuilder["Ch38 Kubebuilder Operator"]
-    CRDs --> Schema["OpenAPI schema validation"]
-    CRDs --> Status["status subresource"]
-    CRDs --> Columns["kubectl get printer columns"]
-```
-
-### 8.2 设计决策小结
-
-本章没有把所有字段塞进一个大 `TodoApp`，而是拆成 `TodoApp`、`TodoDatabase`、`TodoCache` 三个 CRD。这样数据库和缓存可以拥有独立生命周期、独立权限和独立 status，后续 Controller 也能分别表达应用、数据库、缓存的调谐结果。
-
-`resources.profile` 和 `memoryProfile` 使用 `small`、`medium`、`large` 这类枚举，而不是直接暴露 CPU、memory 和 Redis 内存值，是为了让平台保留资源映射权。业务方声明规格意图，Controller 再把规格映射成具体 requests、limits 或底层参数。
-
-数据库和缓存的 `version` 使用正则而不是枚举，是为了避免 CRD 因每个 patch 版本都频繁变更；枚举适合稳定且短小的业务选项，版本号更适合用 pattern 限制主版本范围，再由 Controller 或 admission 策略做更细的可用性判断。
-
-### 8.3 能力验收标准
-
-| 能力 | 验收标准 |
-|---|---|
-| CRD 结构 | 能解释 `group`、`names`、`scope`、`versions`、`schema` 的作用 |
-| schema 校验 | 非法 `replicas`、数据库版本、缓存规格会被 server-side dry-run 拒绝 |
-| CEL 校验 | `ingress.enabled=true` 且缺少 `ingress.host` 会被 server-side dry-run 拒绝 |
-| kubectl 操作 | 能 `get`、`describe`、`explain`、`edit`、`delete` 三个自定义资源 |
-| status subresource | 能通过 `--subresource=status` 回写 status，并理解主资源写入会忽略 status |
-| printer columns | `kubectl get todoapp,tododatabase,todocache` 能展示关键列 |
-| 版本演进 | 能说明 `served`、`storage`、`deprecated` 和 storage version 迁移风险 |
-
-## 9. 练习题与面试题
+## 8. 练习题与面试题
 
 本章练习题和面试题已拆分到独立页面，完成正文学习后再进入题库练习与复盘。
 
 [查看本章练习题与面试题](../../questions/stage-06-platform-operator/35-crd-design.md)
 
-## 10. 本章总结
+## 9. 本章总结
 
 本篇把第 34 篇的 API 模型草案变成了真正的 Kubernetes API。你编写并安装了 `TodoApp`、`TodoDatabase`、`TodoCache` 三个 CRD，定义了 OpenAPI schema、status subresource 和 additional printer columns，并用 `kubectl explain`、server-side dry-run、自定义资源创建和 status patch 验证了它们。
 
@@ -1583,7 +1529,7 @@ flowchart TD
 
 还要提前记住一个阶段六边界：第 38-41 篇主线会优先实现 `TodoApp` Controller，把应用交付到 Deployment 和 Service；`TodoDatabase` 与 `TodoCache` 已经作为平台 API 契约定义好，但对应 Controller 会作为作品集扩展方向保留。这样设计是为了先把一个可运行、可测试、可发布的 Operator 主链路做扎实。
 
-## 11. 下一章衔接
+## 10. 下一章衔接
 
 下一篇第 36 篇会进入 Controller 机制：Informer 与 Workqueue。我们会围绕本篇的三个 CRD 继续追问：
 

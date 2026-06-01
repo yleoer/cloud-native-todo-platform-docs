@@ -37,10 +37,11 @@ Go 工程化的目标不是把目录拆得很复杂，而是让“入口、配�
 
 如果线上出现 Todo 创建失败，开发会先根据结构化日志里的 `component`、`operation`、`error` 字段定位代码路径；测试会补充失败用例；平台工程师会确认配置和启动命令是否正确。工程化让这些角色能围绕同一套项目结构协作，而不是靠口头约定猜测。
 
-### 2.3 课程项目关联
+### 2.3 Todo 平台模拟案例
 
-本章会把 `Cloud Native Todo Platform` 从命令行练习推进到后端服务工程骨架阶段。产出包括 `cmd/todo-api` 启动入口、`internal/config` 配置包、`internal/logger` 日志包、`internal/todo` 领域服务和测试。第 9 篇会在这个骨架上加入 `net/http` 路由和 Handler，第 12 篇会把内存仓储替换为 PostgreSQL，第 15 篇以后会直接复用启动入口构建 Docker 镜像并部署到 Kubernetes。
+> Todo 平台的命令行练习需要演进为后端服务工程骨架。你需要建立 `cmd/todo-api` 启动入口、`internal/config` 配置包、`internal/logger` 日志包、`internal/todo` 领域服务和对应测试。
 
+这个案例关注工程组织能力：目录结构要服务于依赖边界、可测试性和后续维护，而不是为了复杂而复杂。
 ## 3. 核心概念
 
 ### 3.1 Go 项目目录结构
@@ -199,6 +200,8 @@ flowchart TB
 覆盖率高不代表测试质量一定高。如果测试只执行代码却不校验结果，覆盖率数字也会很好看。Benchmark 也不是越快越好，它必须和真实业务路径匹配。本章要求你把覆盖率和 Benchmark 当作辅助信号：覆盖率帮助发现缺测区域，Benchmark 帮助发现性能变化，但最终仍要看测试是否覆盖关键业务规则。
 
 ## 5. 手把手实验
+
+预计耗时：90-120 分钟（动手操作约 60 分钟）。
 
 ### 5.1 实验目标
 
@@ -965,8 +968,6 @@ todo api skeleton checked; future listener addr :8080
 
 不要删除本章新增的 `cmd/todo-api`、`internal/config`、`internal/logger` 和 `internal/app`。`internal/todo` 如果来自第 7 篇，请保留并按本章内容更新，它会被后续章节继续使用。
 
-预计耗时：90-120 分钟（动手操作约 60 分钟）。
-
 ## 6. 常见错误与排障
 
 ### 错误 1：import path 和 go.mod 不一致
@@ -1090,42 +1091,16 @@ todo api skeleton checked; future listener addr :8080
 
 5. **Benchmark 要和真实瓶颈关联**：Benchmark 适合比较同一段逻辑在不同实现下的性能变化，但不能凭一个微基准就决定整体架构。后续接入数据库和 Redis 后，真正的瓶颈可能来自 I/O、连接池、锁竞争或网络延迟。本章 Benchmark 的价值是建立测量习惯，而不是提前做复杂优化。
 
-## 8. 本章小项目
-
-本章小项目是：**Todo API 工程骨架 + 首个单元测试**。
-
-### 项目产出
-
-- `cmd/todo-api/main.go`：Todo API 进程启动入口。
-- `internal/config`：配置加载包，支持环境变量和默认值。
-- `internal/logger`：基于 `log/slog` 的 JSON 格式结构化日志。
-- `internal/app`：应用依赖组装层。
-- `internal/todo`：Todo 领域模型、仓储接口、内存仓储和服务层。
-- `internal/todo/service_test.go`：表驱动单元测试、fake 仓储和 Benchmark。
-- `test/integration/app_test.go`：应用组装集成测试。
-
-### 验收标准
-
-完成后应能观察到以下结果：
-
-- 执行 `go test ./...`，所有包通过测试。
-- 执行 `go vet ./...`，没有静态检查报错。
-- 执行 `go test ./... -cover`，能看到 `internal/todo` 的覆盖率。
-- 执行 `go test ./... -coverprofile coverage.out` 和 `go tool cover -func coverage.out`，能看到函数级覆盖率。
-- 执行 `go test ./internal/todo -bench BenchmarkServiceStats -benchmem`，能看到 Benchmark 指标。
-- 执行 `go run ./cmd/todo-api`，终端输出 JSON 日志和启动提示。
-- 代码中没有真实密码、真实 IP、个人绝对路径或硬编码生产配置。
-
-## 9. 练习题与面试题
+## 8. 练习题与面试题
 
 本章练习题和面试题已拆分到独立页面，完成正文学习后再进入题库练习与复盘。
 
 [查看本章练习题与面试题](../../questions/stage-02-go-backend/08-go-engineering-testing.md)
 
-## 10. 本章总结
+## 9. 本章总结
 
-本章把 Todo 项目从“能运行的小程序”推进到“可持续演进的后端工程骨架”。你学习了 Go 项目目录边界、配置加载、结构化日志、错误包装、仓储接口、服务层、表驱动测试、集成测试、覆盖率和 Benchmark。小项目产出了 `cmd/todo-api`、`internal/config`、`internal/logger`、`internal/app` 和 `internal/todo`，并通过 `go test ./...` 验证。学完本章后，你已经能承担真实团队中“搭建 Go 服务骨架、拆分业务包、补齐基础测试、建立本地验证命令”的工作任务。
+本章把 Todo 项目从“能运行的小程序”推进到“可持续演进的后端工程骨架”。你学习了 Go 项目目录边界、配置加载、结构化日志、错误包装、仓储接口、服务层、表驱动测试、集成测试、覆盖率和 Benchmark。本章产出了 `cmd/todo-api`、`internal/config`、`internal/logger`、`internal/app` 和 `internal/todo`，并通过 `go test ./...` 验证。学完本章后，你已经能承担真实团队中“搭建 Go 服务骨架、拆分业务包、补齐基础测试、建立本地验证命令”的工作任务。
 
-## 11. 下一章衔接
+## 10. 下一章衔接
 
 下一章会在本章的工程骨架上加入 `net/http` 标准库 HTTP 服务。`cmd/todo-api` 会从“启动后打印日志”演进为真正监听端口的 API 进程，`internal/todo.Service` 会被 Handler 调用，配置、日志和测试命令也会继续复用。如果跳过本章直接写 HTTP，很容易把路由、业务规则、配置和日志全部塞进 `main.go`，后续接入 Gin、数据库和容器化时会很难维护。

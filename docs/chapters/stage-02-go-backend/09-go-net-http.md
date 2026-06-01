@@ -46,7 +46,7 @@
 - 能设置 `ReadHeaderTimeout`、`ReadTimeout`、`WriteTimeout` 和优雅关闭。
 - 能使用 `curl` 和 `go test ./...` 验证 API 行为。
 
-本篇结束时，你至少应该能成功执行：
+你至少应该能成功执行：
 
 ```bash linenums="0"
 cd ~/workspace/cloud-native-todo-platform
@@ -92,30 +92,11 @@ curl -s http://127.0.0.1:18080/api/v1/todos
 
 本篇的 `Todo API v1` 会刻意保持标准库实现，让每一个 HTTP 细节都能被看见：请求如何进入、参数如何解析、错误如何映射、响应如何返回、中间件如何串起来。
 
-### 2.3 课程项目关联
+### 2.3 Todo 平台模拟案例
 
-本篇会新增 `api/` 目录，把 Todo 平台从 CLI 项目推进到 API 服务：
+> Todo 平台需要从命令行能力变成 HTTP API。你需要使用标准库 `net/http` 暴露健康检查、待办事项增删改查、JSON 编解码、错误响应和优雅关闭。
 
-```text linenums="0"
-cloud-native-todo-platform/
-├── api/
-│   ├── cmd/todo-api/
-│   └── internal/
-│       ├── handler/http/
-│       ├── model/
-│       ├── repository/
-│       └── service/
-├── cmd/todo-cli/
-├── internal/todo/
-└── go.mod
-```
-
-`api/internal/handler/http` 是本篇的标准库 Handler 版本。第 10 篇会用 Gin 重构同一组 Todo API，让你对比“标准库手写”和“框架封装”的差异。第 11 篇会把 HTTP 请求并发、超时和 `context` 继续讲深。第 12 篇会把内存存储替换为 PostgreSQL。
-
-这里没有直接复用第 7 篇的 `internal/todo`，是因为 CLI 和 API 是两个不同入口：CLI 关注命令行参数和终端输出，API 关注 HTTP 契约、状态码和 JSON 响应。两者的业务模型、Repository 思路和错误处理习惯是一致的，但 API 需要单独形成后续 Gin、数据库和 Kubernetes 部署都能复用的目录边界。
-
-第 8 篇创建过根目录下的 `cmd/todo-api`、`internal/app`、`internal/config` 和 `internal/logger`，那一版的重点是让你先理解“入口、配置、日志、业务、测试”这些工程化边界。从本篇开始，课程把后端服务主线收拢到 `api/` 目录：`api/cmd/todo-api` 会成为真正监听端口的服务入口，`api/internal/...` 会承接后续 Handler、Service、Repository、数据库、Redis 和生产化配置。也就是说，第 8 篇的物理目录不再继续扩展，但它建立的工程化概念会在 `api/` 结构里延续。
-
+这个案例要求你理解 HTTP 服务的最小生产骨架：路由、请求上下文、响应格式、超时控制和退出流程都必须明确。
 ## 3. 核心概念
 
 ### 3.1 Handler 与 HandlerFunc
@@ -333,6 +314,8 @@ server := &http.Server{
 这些超时能减少慢请求、慢 Header 和连接占用带来的风险。进程收到 `SIGTERM` 时，应调用 `server.Shutdown(ctx)`，让服务停止接收新请求，并等待正在处理的请求完成。这会直接支撑后续 Kubernetes 滚动更新。
 
 ## 5. 手把手实验
+
+预计耗时：90 分钟（动手操作约 60 分钟）。
 
 ### 5.1 实验目标
 
@@ -1489,8 +1472,6 @@ ss -lntp | grep 18080
 
 本篇使用内存存储，不会产生数据库、JSON 数据文件或 YAML 资源。Kubernetes YAML 会在后续部署阶段出现；本篇只聚焦 Go HTTP 服务本身。
 
-预计耗时：90 分钟（动手操作约 60 分钟）。
-
 ## 6. 常见错误与排障
 
 ### 错误 1：`address already in use`
@@ -1643,52 +1624,13 @@ ss -lntp | grep 18080
 6. **中间件要理解能力边界。**
    本篇的 panic recover 可以防止普通 Handler panic 直接终止进程，但如果响应已经写出一部分，再尝试改写成 `500` JSON 就不一定可靠。`ResponseWriter` 包装也不是完全透明的，涉及流式响应、WebSocket 或 HTTP/2 特性时，需要确认包装器是否保留底层接口能力。
 
-## 8. 本章小项目
-
-本章小项目：**Todo API v1（net/http 标准库版）**。
-
-交付物：
-
-- `api/cmd/todo-api/main.go`
-- `api/internal/model/todo.go`
-- `api/internal/repository/memory.go`
-- `api/internal/service/todo_service.go`
-- `api/internal/handler/http/response.go`
-- `api/internal/handler/http/middleware.go`
-- `api/internal/handler/http/handler.go`
-- `api/internal/handler/http/handler_test.go`
-- `bin/todo-api` 构建产物（本地生成，不提交）
-
-验收命令：
-
-```bash linenums="0"
-cd ~/workspace/cloud-native-todo-platform
-go fmt ./api/...
-go test ./api/...
-go build -o bin/todo-api ./api/cmd/todo-api
-TODO_API_ADDR=127.0.0.1:18080 ./bin/todo-api config-check
-./bin/todo-api routes
-```
-
-能力验收标准：
-
-| 能力项 | 验收方式 |
-|---|---|
-| Handler/ServeMux | 能解释 `NewRouter` 如何注册 Method + Path 路由 |
-| 请求解析 | 能从 Path、Query、Header、Body 中读取参数 |
-| JSON API | 能返回稳定 `data/error` 响应结构 |
-| 错误映射 | 能解释业务错误如何变成 HTTP 状态码 |
-| 中间件 | 能解释 request ID、访问日志、panic recover 的执行顺序 |
-| 生产基础 | 能说明超时、请求体限制和优雅关闭的作用 |
-| 验证能力 | `go test ./api/...`、`go build`、`curl` CRUD 均通过 |
-
-## 9. 练习题与面试题
+## 8. 练习题与面试题
 
 本章练习题和面试题已拆分到独立页面，完成正文学习后再进入题库练习与复盘。
 
 [查看本章练习题与面试题](../../questions/stage-02-go-backend/09-go-net-http.md)
 
-## 10. 本章总结
+## 9. 本章总结
 
 本篇完成了 Todo 平台从 Go 业务代码到 HTTP API 的关键升级。你学习了 `http.Handler`、`HandlerFunc`、`ServeMux`、`Request`、`ResponseWriter`、JSON 编解码、中间件、健康检查、HTTP 超时和优雅关闭。
 
@@ -1696,7 +1638,7 @@ TODO_API_ADDR=127.0.0.1:18080 ./bin/todo-api config-check
 
 能力价值上，你不只是会调用框架，而是理解 Go HTTP 服务的底层模型。这会让你在第 10 篇学习 Gin 时知道框架到底帮你省掉了什么，也能在排查生产问题时回到标准库模型定位问题。
 
-## 11. 下一章衔接
+## 10. 下一章衔接
 
 下一篇进入 **Go Web API 开发：Gin 框架**。
 

@@ -37,7 +37,7 @@
 - 能编写并发单元测试，并用 `go test -race` 验证无数据竞争。
 - 能编写一个简单的 API 并发压测命令，观察成功率、耗时和吞吐。
 
-本篇结束时，你至少应该能成功执行：
+你至少应该能成功执行：
 
 ```bash linenums="0"
 cd ~/workspace/cloud-native-todo-platform
@@ -75,24 +75,11 @@ TODO_API_ADDR=127.0.0.1:18080 ./bin/todo-api
 
 并发代码要能被别人读懂。比起“为了快开很多 goroutine”，更重要的是明确：任务从哪里来、并发数怎么控制、取消信号怎么传递、结果怎么汇总、共享状态由谁保护。
 
-### 2.3 课程项目关联
+### 2.3 Todo 平台模拟案例
 
-本篇会新增：
+> Todo 平台需要统计任务状态，并提供一个轻量压测命令对运行中的 API 发起并发请求。你需要使用 goroutine、channel、context 和同步原语控制并发、取消和结果汇总。
 
-```text linenums="0"
-cloud-native-todo-platform/
-├── api/
-│   ├── cmd/
-│   │   └── todo-load/
-│   │       └── main.go
-│   └── internal/
-│       └── service/
-│           ├── stats_service.go
-│           └── stats_service_test.go
-```
-
-`stats_service.go` 会复用第 10 篇的 Todo Service，只依赖一个小接口读取 Todo 列表。`todo-load` 是一个轻量压测命令，用来对运行中的 Todo API 发起并发请求。第 12 篇接入 PostgreSQL 后，这个并发统计和压测命令可以继续用来验证数据库访问是否稳定。
-
+这个案例用于判断并发代码是否真的可靠：请求可以并行，但超时、取消、错误聚合和资源释放必须可控。
 ## 3. 核心概念
 
 ### 3.1 goroutine
@@ -244,6 +231,8 @@ return s.latest
 这个边界很清楚：worker 不共享写全局变量，Service 对外共享的只有最新快照。
 
 ## 5. 手把手实验
+
+预计耗时：15 分钟阅读，45 分钟动手实验。
 
 ### 5.1 实验目标
 
@@ -815,8 +804,6 @@ requests must be positive
 rm -f bin/todo-load
 ```
 
-预计耗时：15 分钟阅读，45 分钟动手实验。
-
 ## 6. 常见错误与排障
 
 ### 错误 1：`go test -race` 报 data race
@@ -941,32 +928,13 @@ rm -f bin/todo-load
 
 5. **context 不是万能取消器**。context 只是一种信号传递机制；下游代码必须主动监听它。数据库查询、HTTP 请求、channel 发送接收、循环任务都要显式使用带 context 的 API 或 `select` 分支。
 
-## 8. 本章小项目
-
-本章小项目是 **并发 Todo 统计任务执行器 + API 并发压测命令**。项目目标是在 Todo API v2 的基础上补齐并发处理能力：用 worker pool 统计 Todo 状态，用 `context` 支持取消，用 `sync.RWMutex` 保护最新快照，用 `go test -race` 验证无数据竞争，并用 `todo-load` 对 API 发起并发请求。
-
-交付物包括：
-
-- `api/internal/service/stats_service.go`
-- `api/internal/service/stats_service_test.go`
-- `api/cmd/todo-load/main.go`
-- `bin/todo-load` 构建产物
-
-能力验收标准：
-
-- 能执行 `go test -race ./api/...` 且全部通过。
-- 能解释 worker pool 的任务分发和结果汇总流程。
-- 能说明 `ctx.Done()` 在 producer 和 worker 中分别解决什么问题。
-- 能运行 `todo-load` 并解释 `requests`、`concurrency`、`ok`、`failed`、`rps` 的含义。
-- 能指出代码中哪些共享状态由 `sync.RWMutex` 保护。
-
-## 9. 练习题与面试题
+## 8. 练习题与面试题
 
 本章练习题和面试题已拆分到独立页面，完成正文学习后再进入题库练习与复盘。
 
 [查看本章练习题与面试题](../../questions/stage-02-go-backend/11-go-concurrency.md)
 
-## 10. 本章总结
+## 9. 本章总结
 
 本篇你把 Go 并发能力放进了 Todo API 的真实后端场景：理解了 HTTP Server 的并发请求模型，使用 worker pool、channel、context、WaitGroup 和 RWMutex 实现并发统计任务，并用 `go test -race` 验证无数据竞争。你还编写了 `todo-load` 命令，能用固定请求数和并发数对 API 做基础压测。
 
@@ -974,6 +942,6 @@ rm -f bin/todo-load
 
 能力价值上，你已经能开始判断并发代码是否可控、是否会泄漏、是否有竞态、是否能在真实服务里长期运行。进入第 12 篇后，这些能力会直接迁移到 PostgreSQL 连接池、查询超时、事务边界和并发请求排障中。
 
-## 11. 下一章衔接
+## 10. 下一章衔接
 
 第 12 篇会把 Todo API 的内存存储替换为 PostgreSQL。数据库访问同样会面对并发请求、连接池、事务和超时问题；如果不理解本篇的 context、worker pool 和竞态检测，后续很容易把数据库并发问题误判为“SQL 慢”或“框架问题”。
