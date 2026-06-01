@@ -70,7 +70,7 @@ Todo Operator（篇 34-42）
 
 ---
 
-### 第 1 篇：课程导学与开发环境准备 [A]
+### 第 1 篇：课程导学与开发环境准备
 
 **大篇学习目标**
 
@@ -95,7 +95,7 @@ Todo Operator（篇 34-42）
 
 ---
 
-### 第 2 篇：Linux 文件系统与命令基础 [A]
+### 第 2 篇：Linux 文件系统与命令基础
 
 **大篇学习目标**
 
@@ -119,7 +119,7 @@ Todo Operator（篇 34-42）
 
 ---
 
-### 第 3 篇：Linux 进程、服务与软件管理 [A]
+### 第 3 篇：Linux 进程、服务与软件管理
 
 **大篇学习目标**
 
@@ -143,7 +143,7 @@ Todo Operator（篇 34-42）
 
 ---
 
-### 第 4 篇：Linux 网络基础与排障 [A]
+### 第 4 篇：Linux 网络基础与排障
 
 **大篇学习目标**
 
@@ -168,7 +168,7 @@ Todo Operator（篇 34-42）
 
 ---
 
-### 第 5 篇：Git 基础与团队协作 [A]
+### 第 5 篇：Git 基础与团队协作
 
 **大篇学习目标**
 
@@ -191,7 +191,7 @@ Todo Operator（篇 34-42）
 
 ---
 
-### 第 6 篇：Shell 脚本与自动化基础 [A]
+### 第 6 篇：Shell 脚本与自动化基础
 
 **大篇学习目标**
 
@@ -222,7 +222,7 @@ Todo Operator（篇 34-42）
 
 ---
 
-### 第 7 篇：Go 语言基础 [C]
+### 第 7 篇：Go 语言基础
 
 **大篇学习目标**
 
@@ -246,7 +246,7 @@ Todo Operator（篇 34-42）
 
 ---
 
-### 第 8 篇：Go 工程化与测试 [C]
+### 第 8 篇：Go 工程化与测试
 
 **大篇学习目标**
 
@@ -270,7 +270,7 @@ Todo Operator（篇 34-42）
 
 ---
 
-### 第 9 篇：Go net/http 标准库与 HTTP 服务 [C]
+### 第 9 篇：Go net/http 标准库与 HTTP 服务
 
 **大篇学习目标**
 
@@ -293,7 +293,7 @@ Todo Operator（篇 34-42）
 
 ---
 
-### 第 10 篇：Go Web API 开发——Gin 框架 [C]
+### 第 10 篇：Go Web API 开发——Gin 框架
 
 **大篇学习目标**
 
@@ -317,7 +317,7 @@ Todo Operator（篇 34-42）
 
 ---
 
-### 第 11 篇：Go 并发编程 [C]
+### 第 11 篇：Go 并发编程
 
 **大篇学习目标**
 
@@ -342,7 +342,7 @@ Todo Operator（篇 34-42）
 
 ---
 
-### 第 12 篇：数据库与持久化开发 [C]
+### 第 12 篇：数据库与持久化开发
 
 **大篇学习目标**
 
@@ -366,7 +366,7 @@ Todo Operator（篇 34-42）
 
 ---
 
-### 第 13 篇：Redis、缓存与异步任务 [C]
+### 第 13 篇：Redis、缓存与异步任务
 
 **大篇学习目标**
 
@@ -390,7 +390,7 @@ Todo Operator（篇 34-42）
 
 ---
 
-### 第 14 篇：Go 后端生产化能力 [C]
+### 第 14 篇：Go 后端生产化能力
 
 **大篇学习目标**
 
@@ -438,7 +438,7 @@ Todo Operator（篇 34-42）
 
 ---
 
-### 第 15 篇：Docker 基础 [A]
+### 第 15 篇：Docker 基础
 
 **大篇学习目标**
 
@@ -462,7 +462,7 @@ Todo Operator（篇 34-42）
 
 ---
 
-### 第 16 篇：Dockerfile 与镜像构建 [C]
+### 第 16 篇：Dockerfile 与镜像构建
 
 **大篇学习目标**
 
@@ -487,7 +487,7 @@ Todo Operator（篇 34-42）
 
 ---
 
-### 第 17 篇：Docker Compose 本地编排 [C]
+### 第 17 篇：Docker Compose 本地编排
 
 **大篇学习目标**
 
@@ -511,7 +511,7 @@ Todo Operator（篇 34-42）
 
 ---
 
-### 第 18 篇：容器运行原理 [B]
+### 第 18 篇：容器运行原理
 
 **大篇学习目标**
 
@@ -535,7 +535,7 @@ Todo Operator（篇 34-42）
 
 ---
 
-### 第 19 篇：OCI、containerd、runc 与 CRI [B]
+### 第 19 篇：OCI、containerd、runc 与 CRI
 
 **大篇学习目标**
 
@@ -581,7 +581,7 @@ Todo Operator（篇 34-42）
 
 ---
 
-### 第 20 篇：Kubernetes 架构与集群搭建 [A]
+### 第 20 篇：Kubernetes 架构与集群搭建
 
 **大篇学习目标**
 
@@ -605,7 +605,7 @@ Todo Operator（篇 34-42）
 
 ---
 
-### 第 21 篇：Kubernetes 核心工作负载 [C]
+### 第 21 篇：Kubernetes 核心工作负载
 
 **大篇学习目标**
 
@@ -629,7 +629,7 @@ Todo Operator（篇 34-42）
 
 ---
 
-### 第 22 篇：Service、Ingress 与流量入口 [C]
+### 第 22 篇：Service、Ingress 与流量入口
 
 **大篇学习目标**
 
@@ -654,7 +654,7 @@ Todo Operator（篇 34-42）
 
 ---
 
-### 第 23 篇：ConfigMap、Secret 与配置管理 [C]
+### 第 23 篇：ConfigMap、Secret 与配置管理
 
 **大篇学习目标**
 
@@ -678,7 +678,7 @@ Todo Operator（篇 34-42）
 
 ---
 
-### 第 24 篇：Kubernetes 存储 [C]
+### 第 24 篇：Kubernetes 存储
 
 **大篇学习目标**
 
@@ -702,7 +702,7 @@ Todo Operator（篇 34-42）
 
 ---
 
-### 第 25 篇：Kubernetes 网络原理 [B]
+### 第 25 篇：Kubernetes 网络原理
 
 **大篇学习目标**
 
@@ -727,7 +727,7 @@ Todo Operator（篇 34-42）
 
 ---
 
-### 第 26 篇：Kubernetes 安全 [C]
+### 第 26 篇：Kubernetes 安全
 
 **大篇学习目标**
 
@@ -752,7 +752,7 @@ Todo Operator（篇 34-42）
 
 ---
 
-### 第 27 篇：Helm 4 包管理 [C]
+### 第 27 篇：Helm 4 包管理
 
 **大篇学习目标**
 
@@ -776,7 +776,7 @@ Todo Operator（篇 34-42）
 
 ---
 
-### 第 28 篇：Kustomize 多环境配置管理 [C]
+### 第 28 篇：Kustomize 多环境配置管理
 
 **大篇学习目标**
 
@@ -823,7 +823,7 @@ Todo Operator（篇 34-42）
 
 ---
 
-### 第 29 篇：CI/CD 自动化交付 [C]
+### 第 29 篇：CI/CD 自动化交付
 
 **大篇学习目标**
 
@@ -847,7 +847,7 @@ Todo Operator（篇 34-42）
 
 ---
 
-### 第 30 篇：GitOps 与 Argo CD [C]
+### 第 30 篇：GitOps 与 Argo CD
 
 **大篇学习目标**
 
@@ -871,7 +871,7 @@ Todo Operator（篇 34-42）
 
 ---
 
-### 第 31 篇：Prometheus 与 Grafana 监控 [C]
+### 第 31 篇：Prometheus 与 Grafana 监控
 
 **大篇学习目标**
 
@@ -895,7 +895,7 @@ Todo Operator（篇 34-42）
 
 ---
 
-### 第 32 篇：日志与 OpenTelemetry 链路追踪 [C]
+### 第 32 篇：日志与 OpenTelemetry 链路追踪
 
 **大篇学习目标**
 
@@ -920,7 +920,7 @@ Todo Operator（篇 34-42）
 
 ---
 
-### 第 33 篇：Kubernetes 生产排障 [C]
+### 第 33 篇：Kubernetes 生产排障
 
 **大篇学习目标**
 
@@ -952,7 +952,7 @@ Todo Platform 故障注入与恢复演练：模拟 OOMKilled、DNS 中断、PVC 
 
 ---
 
-### 第 34 篇：Kubernetes API 扩展机制 [B]
+### 第 34 篇：Kubernetes API 扩展机制
 
 **大篇学习目标**
 
@@ -976,7 +976,7 @@ Todo Platform 故障注入与恢复演练：模拟 OOMKilled、DNS 中断、PVC 
 
 ---
 
-### 第 35 篇：CRD 设计与实践 [C]
+### 第 35 篇：CRD 设计与实践
 
 **大篇学习目标**
 
@@ -1000,7 +1000,7 @@ Todo Platform 故障注入与恢复演练：模拟 OOMKilled、DNS 中断、PVC 
 
 ---
 
-### 第 36 篇：Controller 机制——Informer 与 Workqueue [B]
+### 第 36 篇：Controller 机制——Informer 与 Workqueue
 
 **大篇学习目标**
 
@@ -1025,7 +1025,7 @@ Todo Platform 故障注入与恢复演练：模拟 OOMKilled、DNS 中断、PVC 
 
 ---
 
-### 第 37 篇：手写简化版 Controller [C]
+### 第 37 篇：手写简化版 Controller
 
 **大篇学习目标**
 
@@ -1048,7 +1048,7 @@ Todo Platform 故障注入与恢复演练：模拟 OOMKilled、DNS 中断、PVC 
 
 ---
 
-### 第 38 篇：Kubebuilder 入门 [C]
+### 第 38 篇：Kubebuilder 入门
 
 **大篇学习目标**
 
@@ -1072,7 +1072,7 @@ Todo Platform 故障注入与恢复演练：模拟 OOMKilled、DNS 中断、PVC 
 
 ---
 
-### 第 39 篇：Operator 高级机制 [C]
+### 第 39 篇：Operator 高级机制
 
 **大篇学习目标**
 
@@ -1098,7 +1098,7 @@ Todo Platform 故障注入与恢复演练：模拟 OOMKilled、DNS 中断、PVC 
 
 ---
 
-### 第 40 篇：Operator 测试、发布与升级 [C]
+### 第 40 篇：Operator 测试、发布与升级
 
 **大篇学习目标**
 
@@ -1122,7 +1122,7 @@ Todo Platform 故障注入与恢复演练：模拟 OOMKilled、DNS 中断、PVC 
 
 ---
 
-### 第 41 篇：Operator 生产实践 [C]
+### 第 41 篇：Operator 生产实践
 
 **大篇学习目标**
 
@@ -1163,7 +1163,7 @@ Todo Platform 故障注入与恢复演练：模拟 OOMKilled、DNS 中断、PVC 
 
 ---
 
-### 第 42 篇：综合集成与职业能力验收 [C]
+### 第 42 篇：综合集成与能力验收
 
 **大篇学习目标**
 

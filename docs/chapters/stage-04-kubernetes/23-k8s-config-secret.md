@@ -1,4 +1,4 @@
-# 第 23 篇：ConfigMap、Secret 与配置管理 [C]
+# 第 23 篇：ConfigMap、Secret 与配置管理
 
 第 22 篇已经让 Todo API 具备了集群入口：Service 提供稳定访问，Traefik Ingress 和 Gateway API 负责把 HTTPS 流量转发到后端。现在还剩一个真实交付里绕不开的问题：应用到底以什么配置运行，敏感信息应该放在哪里，dev / test / prod 环境如何保持差异又不互相污染。
 

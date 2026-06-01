@@ -1,4 +1,4 @@
-# 第 24 篇：Kubernetes 存储 [C]
+# 第 24 篇：Kubernetes 存储
 
 第 23 篇已经把 Todo API 的运行参数和敏感信息从 Deployment 中拆到了 ConfigMap 与 Secret。现在 Todo API 仍然有一个明显短板：它虽然可以在 Kubernetes 中被访问，但默认还在使用内存 Repository。Pod 重建后，内存里的 Todo 会消失；副本数增加后，每个 Pod 也会看到不同的数据。
 

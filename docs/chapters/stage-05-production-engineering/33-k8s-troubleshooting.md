@@ -1,4 +1,4 @@
-# 第 33 篇：Kubernetes 生产排障 [C]
+# 第 33 篇：Kubernetes 生产排障
 
 ## 1. 本章学习目标
 

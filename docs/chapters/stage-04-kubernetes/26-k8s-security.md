@@ -1,4 +1,4 @@
-# 第 26 篇：Kubernetes 安全 [C]
+# 第 26 篇：Kubernetes 安全
 
 第 25 篇把 Todo Platform 的网络链路拆开了：Pod IP 从哪里来，Service 如何转发，DNS 如何解析，NetworkPolicy 如何拦住未授权流量。网络隔离解决的是“谁能连谁”。到了安全章节，我们继续往里收紧：**谁能调用 Kubernetes API、容器以什么身份运行、Namespace 能否拒绝不安全 Pod、Secret 和镜像凭据如何避免扩散**。
 

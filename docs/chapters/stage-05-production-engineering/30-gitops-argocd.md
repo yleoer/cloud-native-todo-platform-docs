@@ -1,4 +1,4 @@
-# 第 30 篇：GitOps 与 Argo CD [C]
+# 第 30 篇：GitOps 与 Argo CD
 
 第 29 篇已经把 Todo Platform 的测试、镜像构建、镜像推送和临时 kind 部署验证放进 GitHub Actions。那条流水线证明了一件事：每次变更都能自动生成可信制品，并验证 Kubernetes 交付物能启动。
 

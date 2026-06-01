@@ -1,4 +1,4 @@
-# 第 29 篇：CI/CD 自动化交付 [C]
+# 第 29 篇：CI/CD 自动化交付
 
 第 28 篇已经把 Todo Platform 的 Kubernetes 交付物整理成 Helm Chart 和 Kustomize overlay。到这里，手工命令已经足够完整：你能测试 Go 代码、构建 Docker 镜像、渲染 Helm、验证 Kustomize，并把资源部署到 kind 集群。
 

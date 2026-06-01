@@ -193,7 +193,7 @@ Tempo Trace 瀑布图截图
 ## 7. 出版前 Checklist
 
 - 第 29-33 篇均通过 `mkdocs build --strict`。
-- 第 29-33 篇标题均带 `[C]`，且 12 节结构完整。
+- 第 29-33 篇标题和 12 节结构完整。
 - 版本表中的 Kubernetes v1.35.0 说明与课程蓝图 1.36.x 的差异。
 - Helm chart 版本、Go module 版本和公共镜像 tag 均已验证。
 - GitHub Actions workflow 在应用仓库真实跑通。

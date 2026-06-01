@@ -1,4 +1,4 @@
-﻿# 第 28 篇：Kustomize 多环境配置管理 [C]
+# 第 28 篇：Kustomize 多环境配置管理
 
 第 27 篇把 Todo API 主链路整理成了 Helm 4 Chart。到了阶段四收官篇，我们不再继续复制三套 YAML，也不把每个环境差异都塞进 Helm values，而是学习用 Kustomize 的 base / overlay 模型管理 dev、test、prod 三套环境。
 

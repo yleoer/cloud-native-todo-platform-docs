@@ -1,4 +1,4 @@
-﻿# 第 31 篇：Prometheus 与 Grafana 监控 [C]
+# 第 31 篇：Prometheus 与 Grafana 监控
 
 第 30 篇已经让 Todo Platform 进入 GitOps 发布模型：Git 保存期望状态，Argo CD 负责把 dev/prod 环境同步到 Kubernetes。那解决的是“部署状态”问题：什么版本应该运行、是否同步、是否健康。
 

@@ -1,4 +1,4 @@
-# 第 22 篇：Service、Ingress 与流量入口 [C]
+# 第 22 篇：Service、Ingress 与流量入口
 
 第 21 篇已经把 `todo-api:v0.1.0` 部署成 Deployment，并通过 ClusterIP Service 和 `kubectl port-forward` 完成了本地访问。本篇继续向真实交付靠近：让 Todo API 拥有稳定的集群内 DNS，理解 ClusterIP、NodePort、LoadBalancer 的边界，安装 Traefik 作为 Ingress Controller，配置自签名 TLS，通过 HTTPS 访问 Todo API，并用 Gateway API 写出同一条入口规则。
 

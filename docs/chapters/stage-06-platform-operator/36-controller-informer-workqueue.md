@@ -1,4 +1,4 @@
-# 第 36 篇：Controller 机制：Informer 与 Workqueue [B]
+# 第 36 篇：Controller 机制：Informer 与 Workqueue
 
 第 35 篇已经把 `TodoApp`、`TodoDatabase`、`TodoCache` 三个纸面 API 变成了真实 CRD。API server 现在能识别、校验和保存这些对象，但它仍然不会自动创建 Deployment、Service、数据库或缓存。原因很简单：**CRD 定义 API，Controller 执行调谐。**
 

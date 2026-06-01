@@ -1,4 +1,4 @@
-# 第 11 篇：Go 并发编程 [C]
+# 第 11 篇：Go 并发编程
 
 第 10 篇已经把 Todo API v2 重构为 Gin 框架版本。到这里，服务已经能处理 HTTP 请求、返回 JSON、生成 OpenAPI 文档，也有中间件负责 request ID、日志、panic 恢复、请求超时和请求体大小限制。
 

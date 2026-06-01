@@ -1,4 +1,4 @@
-# 第 16 篇：Dockerfile 与镜像构建 [C]
+# 第 16 篇：Dockerfile 与镜像构建
 
 第 15 篇已经让 Todo API、PostgreSQL 和 Redis 通过 Docker CLI 跑在同一个 Docker 网络里。但 Todo API 仍然依赖 `registry.cn-guangzhou.aliyuncs.com/yleoer/golang:1.26-bookworm + 源码挂载 + go run`。这种方式适合学习容器运行参数，不适合交付给测试、CI/CD、预发环境或 Kubernetes。
 
