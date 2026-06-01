@@ -1,4 +1,4 @@
-# 第 14 篇：Go 后端生产化能力 [C]
+# 第 14 篇：Go 后端生产化能力
 
 第 13 篇已经把 Todo API v4 接入 Redis，让服务具备缓存、限流和简单异步任务能力。到这里，Todo Platform 已经有了业务 API、PostgreSQL、Redis 和后台 worker，但它还不像一个可以交给团队长期运行的后端服务：谁能访问接口、日志能否追踪一次请求、配置是否能区分 dev/test/prod、线上出问题时能否快速确认健康状态和 goroutine 情况，这些都还需要补齐。
 

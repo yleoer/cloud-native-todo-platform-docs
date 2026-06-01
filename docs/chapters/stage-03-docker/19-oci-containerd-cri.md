@@ -1,4 +1,4 @@
-# 第 19 篇：OCI、containerd、runc 与 CRI [B]
+# 第 19 篇：OCI、containerd、runc 与 CRI
 
 第 18 篇把容器拆成了 namespace、cgroup、rootfs 和 OverlayFS。本篇继续往下追问：当你执行 `docker run`，或者 Kubernetes 创建一个 Pod 时，谁负责拉镜像，谁负责管理镜像层，谁负责调用 Linux 内核能力，谁又负责把 Kubernetes 的 Pod 语义翻译成容器运行时命令？
 

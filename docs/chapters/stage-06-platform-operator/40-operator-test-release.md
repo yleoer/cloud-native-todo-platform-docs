@@ -1,4 +1,4 @@
-# 第 40 篇：Operator 测试、发布与升级 [C]
+# 第 40 篇：Operator 测试、发布与升级
 
 第 39 篇已经把 Todo Operator 推进到具备生产雏形的阶段：它有 OwnerReference、Finalizer、Admission Webhook、Conditions、Events 和清晰的删除路径。到这里，一个新的问题出现了：这些能力怎么证明没有坏？更进一步，怎么把 Operator 作为一个可发布、可升级、可回滚的控制面组件交付出去？
 

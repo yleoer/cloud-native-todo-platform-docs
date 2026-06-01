@@ -1,4 +1,4 @@
-# 第 20 篇：Kubernetes 架构与集群搭建 [A]
+# 第 20 篇：Kubernetes 架构与集群搭建
 
 第 19 篇已经把 Docker、containerd、runc 和 CRI 的关系拆开了。本篇开始进入阶段四 Kubernetes 应用交付：你仍然会用 Docker 承载 kind 节点，但 Pod 容器会由节点内部的 kubelet 通过 CRI 调 containerd 管理。也就是说，操作入口从 `docker run` 变成 `kubectl apply`，底层仍然接续阶段三学过的运行时链路。
 

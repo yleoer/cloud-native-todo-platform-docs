@@ -1,4 +1,4 @@
-# 第 10 篇：Go Web API 开发——Gin 框架 [C]
+# 第 10 篇：Go Web API 开发——Gin 框架
 
 第 9 篇已经用 `net/http` 标准库实现了 Todo API v1。你已经看过 HTTP 请求怎样进入 `http.Server`，`ServeMux` 怎样分发路由，Handler 怎样解析 JSON，ResponseWriter 怎样写状态码和响应体。
 

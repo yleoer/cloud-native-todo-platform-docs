@@ -1,4 +1,4 @@
-# 第 17 篇：Docker Compose 本地编排 [C]
+# 第 17 篇：Docker Compose 本地编排
 
 第 15 篇中，我们手动执行 `docker network create`、`docker volume create` 和多条 `docker run` 命令，把 PostgreSQL、Redis 和 Todo API 连在一起。第 16 篇中，我们把 Todo API 构建成了可发布的 `todo-api:v0.1.0` 镜像。
 

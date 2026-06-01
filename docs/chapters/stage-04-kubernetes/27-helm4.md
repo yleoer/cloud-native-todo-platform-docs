@@ -1,4 +1,4 @@
-# 第 27 篇：Helm 4 包管理 [C]
+# 第 27 篇：Helm 4 包管理
 
 第 20-26 篇把 Todo Platform 在 Kubernetes 中逐步拼起来：工作负载、Service、配置、存储、网络和安全基线都已经出现。到了这一篇，我们先把 Todo API 主链路收束成一个可版本化、可安装、可升级、可回滚的 Helm Chart。第 24 篇的 PostgreSQL StatefulSet 不是被丢弃，而是暂时留在主线 YAML 中：本篇先让 Chart 模板和 release 生命周期足够聚焦，后续多环境和生产工程章节再把数据库、入口和更复杂的环境差异逐步并入完整平台交付。
 

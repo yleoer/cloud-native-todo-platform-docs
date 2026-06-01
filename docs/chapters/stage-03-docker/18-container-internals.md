@@ -1,4 +1,4 @@
-# 第 18 篇：容器运行原理 [B]
+# 第 18 篇：容器运行原理
 
 第 15 篇我们用 `docker run` 手动启动容器，第 16 篇把 Todo API 构建成镜像，第 17 篇用 Docker Compose 启动了 API、PostgreSQL、Redis 和 Traefik。到这里，你已经会“使用容器”。本篇开始回答更底层的问题：**容器到底是什么？**
 

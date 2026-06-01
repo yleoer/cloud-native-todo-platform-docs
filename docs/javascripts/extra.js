@@ -5,6 +5,83 @@ const topNavState = {
   initialized: false
 };
 
+const terminalPromptLanguages = [
+  'bash',
+  'sh',
+  'shell',
+  'console',
+  'powershell',
+  'ps1'
+];
+
+const terminalPromptDefaultTitles = [
+  'bash',
+  'sh',
+  'shell',
+  'console',
+  'powershell',
+  'ps1'
+];
+
+const terminalRootCommandPattern = /^(apt|apt-get|yum|dnf|zypper|pacman|apk|systemctl|journalctl|useradd|usermod|groupadd|groupmod|passwd|chown|chmod|mount|umount|modprobe|sysctl|iptables|nft|firewall-cmd)\b|^(mkdir|rm|cp|mv|tee)\s+\/(boot|etc|opt|root|usr|var)\b/;
+
+function getHighlightLanguage(block) {
+  const languageClass = Array.from(block.classList).find(className => className.startsWith('language-'));
+  return languageClass ? languageClass.slice('language-'.length).toLowerCase() : '';
+}
+
+function getHighlightTitle(block) {
+  const title = block.querySelector('.filename .filename, .filename');
+  return title ? title.textContent.trim().toLowerCase() : '';
+}
+
+function shouldShowTerminalPrompt(block) {
+  const language = getHighlightLanguage(block);
+  if (!terminalPromptLanguages.includes(language)) {
+    return false;
+  }
+
+  const title = getHighlightTitle(block);
+  return !title || terminalPromptDefaultTitles.includes(title);
+}
+
+function getTerminalPromptForLine(line) {
+  const text = line.textContent.trim();
+  if (!text) {
+    return '';
+  }
+
+  if (text.startsWith('sudo ')) {
+    return '$';
+  }
+
+  return terminalRootCommandPattern.test(text) ? '#' : '$';
+}
+
+function setupTerminalPrompts() {
+  document.querySelectorAll('.highlight').forEach(block => {
+    if (!shouldShowTerminalPrompt(block)) {
+      block.classList.remove('terminal-prompt');
+      return;
+    }
+
+    const code = block.querySelector('.code code, pre code');
+    if (!code) {
+      return;
+    }
+
+    const lines = code.querySelectorAll(':scope > span[id^="__span-"]');
+    if (!lines.length) {
+      return;
+    }
+
+    block.classList.add('terminal-prompt');
+    lines.forEach(line => {
+      line.dataset.prompt = getTerminalPromptForLine(line);
+    });
+  });
+}
+
 function updateTopNavCollapse() {
   const shouldCollapse = window.scrollY > 96 && !topNavState.hoverOpen;
   document.body.classList.toggle('top-nav-collapsed', shouldCollapse);
@@ -71,9 +148,11 @@ function setupTopNavAutoExpand() {
 }
 
 document.addEventListener('DOMContentLoaded', setupTopNavAutoExpand);
+document.addEventListener('DOMContentLoaded', setupTerminalPrompts);
 
 if (typeof document$ !== 'undefined') {
   document$.subscribe(setupTopNavAutoExpand);
+  document$.subscribe(setupTerminalPrompts);
 }
 
 // 平滑滚动

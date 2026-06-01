@@ -1,4 +1,4 @@
-# 第 21 篇：Kubernetes 核心工作负载 [C]
+# 第 21 篇：Kubernetes 核心工作负载
 
 第 20 篇已经创建了本地 kind 集群，并把 `todo-api:v0.1.0` 镜像导入到节点。现在我们从“能创建 Pod”进入“能运行业务服务”：用 Deployment 管理 Todo API，用 Probe 表达健康状态，用 Resource Request / Limit 给调度器和 HPA 提供依据，再用滚动更新和回滚处理发布风险。
 
