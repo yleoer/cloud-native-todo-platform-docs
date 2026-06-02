@@ -502,7 +502,7 @@ command -v nerdctl && nerdctl version || echo "nerdctl not installed; optional s
 | `kubectl version --client` | 输出客户端版本 | 回到第 1 篇安装 kubectl |
 | `kind version` | 输出 kind 版本 | 回到第 1 篇安装 kind |
 | `command -v tree` | 输出命令路径 | 安装 `tree`，或用 `find` 替代目录展示 |
-| `nerdctl version` | 可选输出版本 | 不影响主线实验，只跳过 5.5.8 |
+| `nerdctl version` | 可选输出版本 | 不影响主线实验，只跳过 5.4.8 |
 
 ### 5.3 文件目录结构
 
@@ -527,7 +527,9 @@ runtime-lab
 └── notes
 ```
 
-### 5.4 完整代码或配置
+### 5.4 执行命令
+
+先按下面内容创建或更新实验文件；保存完成后，再继续执行后续命令。
 
 创建 `runtime-probe` Pod：
 
@@ -634,9 +636,7 @@ spec:
 用 5-8 句话说明 Docker、containerd、runc、CRI、kubelet 的关系。
 ```
 
-### 5.5 执行命令
-
-#### 5.5.1 创建 kind 集群
+#### 5.4.1 创建 kind 集群
 
 设置实验变量：
 
@@ -669,7 +669,7 @@ kubectl cluster-info --context "kind-$KIND_CLUSTER"
 kubectl get nodes -o wide
 ```
 
-#### 5.5.2 部署 runtime-probe Pod
+#### 5.4.2 部署 runtime-probe Pod
 
 应用 YAML：
 
@@ -693,12 +693,12 @@ kubectl -n todo-runtime logs runtime-probe --tail=5
 
 这一步回答的是 Kubernetes 层问题：Pod 是否被调度、镜像是否拉取成功、容器是否 Ready。
 
-#### 5.5.3 找到 kind 节点容器
+#### 5.4.3 找到 kind 节点容器
 
 kind 的节点本身是一个 Docker 容器。找到它：
 
 ```bash linenums="0"
-echo "KIND_CLUSTER=${KIND_CLUSTER:?not set, run section 5.5.1 first}"
+echo "KIND_CLUSTER=${KIND_CLUSTER:?not set, run section 5.4.1 first}"
 NODE="$(docker ps --filter "name=${KIND_CLUSTER}-control-plane" --format '{{.Names}}' | head -n 1)"
 echo "$NODE"
 ```
@@ -727,7 +727,7 @@ docker exec "$NODE" ctr plugins ls | grep -E 'cri|snapshot' || true
 
 本篇不手动执行 `runc run`，原因是手写 OCI bundle、网络、挂载和 cgroup 配置会把实验重点从“理解 Kubernetes 运行时链路”转移到“手工组装低层容器”。你只需要通过 `runc --version` 确认底层执行器存在，再通过后面的 `ctr -n k8s.io containers info "$CONTAINER_ID"` 观察运行时生成的 OCI spec 关键字段即可。真正手工运行 runc 更适合放到专门的运行时源码或安全沙箱课程中。
 
-#### 5.5.4 用 crictl 观察 CRI 层
+#### 5.4.4 用 crictl 观察 CRI 层
 
 查看 PodSandbox：
 
@@ -773,7 +773,7 @@ docker exec "$NODE" crictl exec "$CONTAINER_ID" ps -o pid,ppid,comm
 
 这一步回答的是 CRI 层问题：kubelet 交给运行时的 PodSandbox 和业务容器是否存在，容器进程是否已经运行。
 
-#### 5.5.5 用 ctr 观察 containerd 层
+#### 5.4.5 用 ctr 观察 containerd 层
 
 查看 containerd namespace：
 
@@ -814,7 +814,7 @@ docker exec "$NODE" ctr -n k8s.io snapshots ls | head -n 20
 
 这一步回答的是 containerd 层问题：镜像是否在 containerd 中，容器元数据是否存在，task 是否已经由 shim/runc 启动。
 
-#### 5.5.6 对比 Docker 视角
+#### 5.4.6 对比 Docker 视角
 
 宿主机 Docker 能看到 kind 节点容器：
 
@@ -837,7 +837,7 @@ docker exec "$NODE" crictl ps --pod "$POD_ID"
 
 这个对比非常关键：kind 是“Docker 承载 Kubernetes 节点”，不是“宿主机 Docker 直接运行 Pod 容器”。
 
-#### 5.5.7 导入 Todo API 镜像到 kind 节点
+#### 5.4.7 导入 Todo API 镜像到 kind 节点
 
 如果你已经完成第 16 篇，先确认本地有 `todo-api:v0.1.0`：
 
@@ -865,7 +865,7 @@ docker exec "$NODE" ctr -n k8s.io images ls | grep todo-api
 
 如果你还没有构建 Todo API 镜像，可以跳过本节，不影响本篇主线。第 20 篇以后会正式把 Todo API 部署到 Kubernetes。
 
-#### 5.5.8 可选：用 nerdctl 对照 Docker 风格命令
+#### 5.4.8 可选：用 nerdctl 对照 Docker 风格命令
 
 本篇主线用 `crictl` 和 `ctr` 观察 kind 节点内部的 Kubernetes 运行时。`nerdctl` 是 containerd 的 Docker 兼容风格 CLI，适合帮助你把熟悉的 Docker 命令迁移到 containerd 语境中，但它不是 Kubernetes 节点排障的首选入口。
 
@@ -894,7 +894,7 @@ fi
 
 如果这里失败，不代表 Kubernetes 运行时有问题。很多开发机没有配置本机 containerd 的 CNI、rootless 或权限。本篇主线以 kind 节点内置的 `crictl` 和 `ctr` 为准。
 
-#### 5.5.9 填写观察记录
+#### 5.4.9 填写观察记录
 
 打开记录模板，把关键结果填进去：
 
@@ -910,7 +910,7 @@ cat runtime-lab/notes/runtime-observation.md
 - `ctr -n k8s.io tasks ls` 中的 task PID。
 - `crictl images` 或 `ctr -n k8s.io images ls` 中的 `todo-api:v0.1.0` 结果。
 
-### 5.6 预期输出
+### 5.5 预期输出
 
 `kubectl get pod` 应看到 Pod 运行：
 
@@ -947,7 +947,7 @@ IMAGE               TAG       IMAGE ID        SIZE
 todo-api            v0.1.0    sha256:...      ...
 ```
 
-### 5.7 验证方法
+### 5.6 验证方法
 
 基础验证：
 
@@ -989,7 +989,7 @@ docker exec "$NODE" crictl images | grep -E 'alpine|todo-api'
 - 能把本地 Docker 镜像加载进 kind 节点 containerd。
 - 能说清楚 `crictl` 和 `ctr` 分别适合排查哪一层。
 
-### 5.8 清理步骤
+### 5.7 清理步骤
 
 删除实验 Pod 和命名空间：
 

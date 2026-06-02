@@ -410,7 +410,17 @@ cloud-native-todo-platform/
 - `.env.example` 可以提交，`.env` 不应该提交。
 - `.github/workflows/scripts-check.yml` 是可选 CI 文件，如果暂时不用 GitHub Actions，可以先不提交。
 
-### 5.4 完整代码和配置
+### 5.4 执行命令
+
+从项目根目录开始：
+
+```bash linenums="0"
+pwd
+git status --short --branch
+mkdir -p scripts .github/workflows
+```
+
+先按下面内容创建或更新实验文件；保存完成后，再继续执行后续命令。
 
 `.env.example`：
 
@@ -1046,15 +1056,6 @@ jobs:
 | `bash -n` | 只检查 Bash 语法，不执行脚本 |
 | `shellcheck` | 发现未引用变量、危险写法等常见问题 |
 
-### 5.5 执行命令
-
-从项目根目录开始：
-
-```bash linenums="0"
-pwd
-git status --short --branch
-mkdir -p scripts .github/workflows
-```
 
 创建 `.env.example`，并确保本地运行时目录和 `.env` 不进入 Git：
 
@@ -1065,7 +1066,7 @@ grep -qxF '.todo-platform/' .gitignore || printf '%s\n' '.todo-platform/' >> .gi
 grep -qxF '.env' .gitignore || printf '%s\n' '.env' >> .gitignore
 ```
 
-把 5.4 中的 `dev.sh`、`check.sh`、`clean.sh` 保存到 `scripts/` 目录；如果使用 GitHub Actions，把 `scripts-check.yml` 保存到 `.github/workflows/`。
+把上面的 `dev.sh`、`check.sh`、`clean.sh` 保存到 `scripts/` 目录；如果使用 GitHub Actions，把 `scripts-check.yml` 保存到 `.github/workflows/`。
 
 授予执行权限：
 
@@ -1140,7 +1141,7 @@ git add .github/workflows/scripts-check.yml
 git commit -m "chore: add shell automation scripts"
 ```
 
-### 5.6 预期输出
+### 5.5 预期输出
 
 `./scripts/dev.sh` 输出类似：
 
@@ -1195,7 +1196,7 @@ git commit -m "chore: add shell automation scripts"
 [clean] clean completed
 ```
 
-### 5.7 验证方法
+### 5.6 验证方法
 
 从项目根目录执行：
 
@@ -1223,7 +1224,7 @@ curl -fsS http://127.0.0.1:18080/healthz
 - `curl /healthz` 返回 JSON。
 - `./scripts/clean.sh --all` 能停止进程并清理 `.todo-platform/`。
 
-### 5.8 清理步骤
+### 5.7 清理步骤
 
 只清理运行时文件：
 

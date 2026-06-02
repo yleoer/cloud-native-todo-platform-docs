@@ -341,9 +341,11 @@ cloud-native-todo-platform/
         └── tempo-values.yaml
 ```
 
-### 5.4 完整代码或配置
+### 5.4 执行命令
 
-#### 5.4.1 增加 OpenTelemetry 依赖
+先按下面内容创建或更新实验文件；保存完成后，再继续执行后续命令。
+
+#### 增加 OpenTelemetry 依赖
 
 ```bash linenums="0"
 go get go.opentelemetry.io/otel@v1.44.0
@@ -355,7 +357,7 @@ go mod tidy
 
 `go.opentelemetry.io/otel` 提供 API，`go.opentelemetry.io/otel/sdk` 负责采样和导出，`otlptracegrpc` 通过 OTLP gRPC 发送 Trace，`otelgin` 为 Gin 路由自动创建 HTTP server span。
 
-#### 5.4.2 创建 tracing 初始化代码
+#### 创建 tracing 初始化代码
 
 创建 `api/internal/observability/tracing.go`：
 
@@ -430,7 +432,7 @@ func SetupTracing(ctx context.Context, cfg TracingConfig) (func(context.Context)
 
 本地实验采样率设置为 100%，方便每次请求都能看到 Trace。生产环境应按流量和成本调整采样策略，例如 1%-10% 概率采样、错误请求全采样或基于尾采样策略保留慢请求。
 
-#### 5.4.3 让日志包含 trace 字段
+#### 让日志包含 trace 字段
 
 更新 `api/internal/handler/gin/middleware.go`，在 import 中增加 OTel trace 包：
 
@@ -498,7 +500,7 @@ logger.Info("audit event", attrs...)
 
 这样 Loki 中的日志仍然可以按 `request_id` 查询，同时 Grafana 可以从日志中提取 `trace_id` 跳转到 Tempo。
 
-#### 5.4.4 为 Gin 注册 OTel 中间件
+#### 为 Gin 注册 OTel 中间件
 
 更新 `api/internal/handler/gin/handler.go`，在已有 import 中新增 `otelgin`：
 
@@ -554,7 +556,7 @@ todo, err := h.service.Create(ctx, input.Title)
 
 如果你的 `createTodo` 里原来是 `h.service.Create(c.Request.Context(), input.Title)`，只替换这一处调用即可，不要把请求标题、JWT 或用户隐私字段写入 Span attribute。这样 Tempo 中会看到 `POST /api/v2/todos` 下面挂着 `todo.create`，更容易理解“请求入口”和“业务处理”之间的耗时关系。
 
-#### 5.4.5 在 main.go 中启用 Trace 导出
+#### 在 main.go 中启用 Trace 导出
 
 更新 `api/cmd/todo-api/main.go` import，新增 observability 包：
 
@@ -612,7 +614,7 @@ import (
 
 `TODO_OTEL_EXPORTER_OTLP_ENDPOINT` 为空时，`SetupTracing` 返回空 shutdown 函数，应用可以正常本地运行。部署到 Kubernetes 后，我们会把它设置为 Alloy 的 OTLP gRPC Service 地址。
 
-#### 5.4.6 创建 Loki values
+#### 创建 Loki values
 
 创建 `observability/loki/loki-values.yaml`：
 
@@ -669,7 +671,7 @@ resultsCache:
 
 这里的 `commonConfig` 和 `schemaConfig` 是 Loki Helm chart 的 values 键名；chart 渲染后会生成 Loki 运行时配置里的 `common` 和 `schema_config`。这份配置只服务本地 kind 实验：单副本、文件系统、无持久化、关闭缓存。`gateway` 在单节点 kind 上改成 `Recreate`，是为了避免默认滚动更新在资源紧张时同时拉起新旧 Pod 失败。生产环境应使用对象存储、持久化、明确保留周期、多副本和容量规划。
 
-#### 5.4.7 创建 Tempo values
+#### 创建 Tempo values
 
 创建 `observability/tempo/tempo-values.yaml`：
 
@@ -700,7 +702,7 @@ service:
 
 Tempo 单体 chart `1.24.4` 中，`reportingEnabled`、`retention` 和 `receivers` 都位于 `tempo` 键下。Tempo 默认更适合按 Trace ID 查询。本篇不做复杂 TraceQL 检索，只演示从 Loki 日志中的 `trace_id` 跳转到 Tempo 查看瀑布图。
 
-#### 5.4.8 创建 Alloy values
+#### 创建 Alloy values
 
 这份 River 配置有两条数据流。日志流是 `discovery.kubernetes -> discovery.relabel -> loki.source.kubernetes -> loki.process -> loki.write`；Trace 流是 `otelcol.receiver.otlp -> otelcol.processor.batch -> otelcol.exporter.otlp`。`loki.source.kubernetes` 接收前面 discovery/relabel 生成的 `targets`，再通过 Kubernetes API tail Pod 日志。
 
@@ -832,7 +834,7 @@ alloy:
 
 Alloy 的日志流水线只把 `level` 提升为 Loki label，`request_id` 和 `trace_id` 仍留在日志内容里，查询时通过 `| json` 解析。这样能避免高基数字段扩大 Loki 索引。
 
-#### 5.4.9 创建 Grafana 数据源
+#### 创建 Grafana 数据源
 
 第 31 篇的 Grafana sidecar 已启用 datasource 自动发现。创建 `observability/grafana/todo-observability-datasources.yaml`：
 
@@ -882,7 +884,7 @@ data:
 
 `$${__value.raw}` 是 Grafana provisioning 中常见写法，用于避免 `$` 被当成环境变量提前替换。`$$` 最终会转义成单个 `$`，也就是把 `${__value.raw}` 交给 Grafana derived field，让它把日志里匹配到的 Trace ID 传给 Tempo。
 
-#### 5.4.10 创建日志 dashboard
+#### 创建日志 dashboard
 
 创建 `observability/grafana/todo-logs-dashboard-configmap.yaml`：
 
@@ -954,7 +956,7 @@ data:
 
 Dashboard 只是入口。真正的排障仍建议在 Grafana Explore 中按时间窗口、`request_id`、`trace_id` 和 Trace 跳转逐步定位。
 
-#### 5.4.11 创建 GitOps 环境变量 patch
+#### 创建 GitOps 环境变量 patch
 
 创建 `observability/otel/todo-otel-env-patch.yaml`，作为修改 dev overlay 时的参考片段：
 
@@ -979,9 +981,8 @@ configMapGenerator:
 
 不要新建第二个同名 `configMapGenerator` 放进 dev overlay；上面的 `todo-otel-env-patch.yaml` 只是给你保存变更意图，实际应合并进第 30-31 篇已经存在的 dev overlay。
 
-### 5.5 执行命令
 
-#### 5.5.1 本地验证 OpenTelemetry 代码
+#### 5.4.1 本地验证 OpenTelemetry 代码
 
 ```bash linenums="0"
 go test ./api/internal/observability ./api/internal/handler/gin ./api/cmd/todo-api
@@ -1005,7 +1006,7 @@ curl -i -H "X-Request-ID: local-otel-check" http://127.0.0.1:18080/healthz
 
 判断标准：服务日志仍是 JSON，包含 `request_id`。此时没有 `trace_id` 也可以接受，因为本地未设置 OTLP endpoint。
 
-#### 5.5.2 安装 Loki、Tempo 和 Alloy
+#### 5.4.2 安装 Loki、Tempo 和 Alloy
 
 添加 Grafana Helm 仓库：
 
@@ -1091,7 +1092,7 @@ kubectl -n observability get svc -l app.kubernetes.io/instance=loki
 
 如果没有 `loki-gateway`，以第二条命令看到的实际 gateway Service 为准，替换 Alloy `loki.write` 和 Grafana Loki datasource 中的 URL。
 
-#### 5.5.3 应用 Grafana 数据源和 Dashboard
+#### 5.4.3 应用 Grafana 数据源和 Dashboard
 
 ```bash linenums="0"
 kubectl apply --server-side --dry-run=server -f observability/grafana/todo-observability-datasources.yaml
@@ -1113,7 +1114,7 @@ kubectl -n monitoring logs deployment/monitoring-grafana -c grafana-sc-dashboard
 kubectl -n monitoring get deployment monitoring-grafana -o jsonpath='{.spec.template.spec.containers[0].image}{"\n"}'
 ```
 
-#### 5.5.4 构建镜像并同步 dev 环境
+#### 5.4.4 构建镜像并同步 dev 环境
 
 构建新镜像并加载到 kind：
 
@@ -1152,7 +1153,7 @@ kubectl -n todo-dev rollout status deployment/todo-platform --timeout=180s
 
 如果第 30 篇 Application 跟踪的是 `main`，仍然不要直接推送 `main`。按团队流程合并 PR，或仅在本地学习环境临时修改 `targetRevision`。
 
-#### 5.5.5 生成带 request_id 的请求
+#### 5.4.5 生成带 request_id 的请求
 
 打开 Todo API port-forward：
 
@@ -1187,7 +1188,7 @@ curl -s \
 echo "${REQ_ID}"
 ```
 
-#### 5.5.6 查询 Loki 日志
+#### 5.4.6 查询 Loki 日志
 
 打开 Loki 端口：
 
@@ -1235,7 +1236,7 @@ echo "${TRACE_ID}"
 {namespace="todo-dev", app="todo-platform"} | json | request_id="todo-create-..."
 ```
 
-#### 5.5.7 查询 Tempo Trace
+#### 5.4.7 查询 Tempo Trace
 
 打开 Tempo 端口：
 
@@ -1258,7 +1259,7 @@ curl -s "http://127.0.0.1:3200/api/traces/${TRACE_ID}" \
 
 在 Grafana 中也可以打开 `Explore -> Tempo`，粘贴 Trace ID 查看瀑布图。
 
-#### 5.5.8 在 Grafana 中完成跳转
+#### 5.4.8 在 Grafana 中完成跳转
 
 打开 Grafana：
 
@@ -1280,7 +1281,7 @@ http://127.0.0.1:3000
 
 展开日志行，确认能看到 `trace_id`。如果 derived field 生效，Grafana 会把 Trace ID 渲染成可点击链接，点击后跳到 Tempo Trace 视图。
 
-### 5.6 预期输出
+### 5.5 预期输出
 
 Go 测试输出类似：
 
@@ -1345,7 +1346,7 @@ Explore -> Loki: 查询 request_id 能看到日志
 Dashboard: Todo Logs and Traces 有日志量和日志列表
 ```
 
-### 5.7 验证方法
+### 5.6 验证方法
 
 **第一层：应用日志含关联字段**
 
@@ -1419,7 +1420,7 @@ kubectl -n monitoring logs deployment/monitoring-grafana -c grafana-sc-dashboard
 
 判断标准：日志详情中有 `trace_id`，TraceID 链接能跳转到 Tempo，并显示 HTTP server Span；创建 Todo 的请求还能看到 `todo.create` 业务 Span。
 
-### 5.8 清理步骤
+### 5.7 清理步骤
 
 只删除本篇 Grafana 配置：
 

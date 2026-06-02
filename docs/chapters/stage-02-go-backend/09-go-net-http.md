@@ -385,7 +385,9 @@ cloud-native-todo-platform/
 └── ...
 ```
 
-### 5.4 完整代码
+### 5.4 执行命令
+
+先按下面内容创建或更新实验文件；保存完成后，再继续执行后续命令。
 
 确认 `go.mod`：
 
@@ -1317,7 +1319,6 @@ func request(t *testing.T, server *httptest.Server, method, path, body string) (
 }
 ```
 
-### 5.5 执行命令
 
 确认已经保存以上 8 个 Go 源文件，再继续执行下面的命令。
 
@@ -1374,7 +1375,7 @@ curl -s -X DELETE -i http://127.0.0.1:18080/api/v1/todos/1
 
 停止服务时，在服务终端按 `Ctrl+C`。程序会执行 `server.Shutdown`，日志中能看到停止过程。
 
-### 5.6 预期输出
+### 5.5 预期输出
 
 `go test ./api/...` 应类似：
 
@@ -1420,7 +1421,7 @@ Date: Wed, 27 May 2026 10:00:00 GMT
 {"time":"2026-05-27T10:00:00Z","level":"INFO","msg":"todo api stopped"}
 ```
 
-### 5.7 验证方法
+### 5.6 验证方法
 
 验证格式、测试和构建：
 
@@ -1454,7 +1455,7 @@ curl -s -o /tmp/notfound.out -w '%{http_code}\n' http://127.0.0.1:18080/api/v1/t
 - 错误 JSON 返回 `400` 和 `bad_json`。
 - 服务停止时没有 panic。
 
-### 5.8 清理步骤
+### 5.7 清理步骤
 
 删除构建产物：
 

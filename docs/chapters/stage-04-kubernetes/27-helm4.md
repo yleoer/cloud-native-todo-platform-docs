@@ -460,7 +460,9 @@ deployments/helm/**/charts/*.tgz
 deployments/helm/packages/
 ```
 
-### 5.4 完整 Chart 配置
+### 5.4 执行命令
+
+先按下面内容创建或更新实验文件；保存完成后，再继续执行后续命令。
 
 先创建本地 subchart。它只生成一个 ConfigMap，用来演示 Chart 依赖和 alias，不参与 Todo API 主链路：
 
@@ -1194,7 +1196,6 @@ auth:
   authUsers: "admin=<PASSWORD_HASH>"
 ```
 
-### 5.5 执行命令
 
 先更新 Chart 依赖。由于依赖来自本地 `file://../todo-cache`，这一步不需要访问公网：
 
@@ -1355,7 +1356,7 @@ helm install todo-platform-oci oci://ghcr.io/<github-user>/charts/todo-platform@
   --create-namespace
 ```
 
-### 5.6 预期输出
+### 5.5 预期输出
 
 依赖更新成功：
 
@@ -1427,7 +1428,7 @@ REVISION  STATUS      DESCRIPTION
 Successfully packaged chart and saved it to: deployments/helm/packages/todo-platform-0.1.0.tgz
 ```
 
-### 5.7 验证方法
+### 5.6 验证方法
 
 第一层：确认 Chart 静态检查通过。
 
@@ -1484,7 +1485,7 @@ curl -fsS http://127.0.0.1:18084/healthz
 
 判断标准：返回 `ok` 或应用健康检查的成功响应。
 
-### 5.8 清理步骤
+### 5.7 清理步骤
 
 卸载 Helm release：
 

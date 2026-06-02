@@ -428,7 +428,9 @@ cloud-native-todo-platform/
 └── go.mod
 ```
 
-### 5.4 完整代码
+### 5.4 执行命令
+
+先按下面内容创建或更新实验文件；保存完成后，再继续执行后续命令。
 
 如果仓库还没有 `go.mod`，先初始化 module：
 
@@ -812,7 +814,6 @@ Examples:
 }
 ```
 
-### 5.5 执行命令
 
 格式化 Go 代码：
 
@@ -868,7 +869,7 @@ go build -o bin/todo-cli ./cmd/todo-cli
 ./bin/todo-cli add "构建后的 CLI 可运行" list
 ```
 
-### 5.6 预期输出
+### 5.5 预期输出
 
 `go list ./...` 应包含：
 
@@ -906,7 +907,7 @@ todo-cli memory mode. Type help or exit.
 >
 ```
 
-### 5.7 验证方法
+### 5.6 验证方法
 
 验证代码格式。执行前先确认文件已经保存；`go fmt` 会直接格式化目标 package：
 
@@ -938,7 +939,7 @@ go build -o bin/todo-cli ./cmd/todo-cli
 - `done 1` 后列表中能看到 `[x]`。
 - `delete 1` 后列表显示 `no todos`。
 
-### 5.8 清理步骤
+### 5.7 清理步骤
 
 如果只是删除构建产物：
 

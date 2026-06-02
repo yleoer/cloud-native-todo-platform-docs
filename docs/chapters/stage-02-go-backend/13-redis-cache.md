@@ -342,7 +342,9 @@ cloud-native-todo-platform/
             └── redis_queue.go
 ```
 
-### 5.4 完整代码
+### 5.4 执行命令
+
+先按下面内容创建或更新实验文件；保存完成后，再继续执行后续命令。
 
 覆盖 `docker-compose.yml`，在第 12 篇 PostgreSQL 基础上增加 Redis：
 
@@ -1026,7 +1028,6 @@ func durationFromEnv(name string, fallback time.Duration) time.Duration {
 - 设置 `TODO_DATABASE_DSN`：使用 PostgreSQL Repository。
 - 设置 `TODO_REDIS_ADDR`：在当前 Repository 外面增加 Redis 缓存、限流和异步任务。
 
-### 5.5 执行命令
 
 拉取 Redis 依赖并整理依赖：
 
@@ -1137,7 +1138,7 @@ docker compose exec redis redis-cli -a todo_redis_password LLEN todo:tasks
 
 如果 API 日志出现 `stats refreshed`，说明 worker 已经消费了任务。
 
-### 5.6 预期输出
+### 5.5 预期输出
 
 API 启动日志中应出现：
 
@@ -1169,7 +1170,7 @@ Retry-After: 60
 {"error":{"code":"rate_limited","message":"too many requests"}}
 ```
 
-### 5.7 验证方法
+### 5.6 验证方法
 
 验证 Redis 服务：
 
@@ -1203,7 +1204,7 @@ docker compose exec redis redis-cli -a todo_redis_password INFO stats
 
 关注 `keyspace_hits` 和 `keyspace_misses`。它们是 Redis 全局指标，不能替代应用级缓存命中日志，但适合初步观察。
 
-### 5.8 清理步骤
+### 5.7 清理步骤
 
 停止 API 后，停止依赖容器但保留数据卷：
 

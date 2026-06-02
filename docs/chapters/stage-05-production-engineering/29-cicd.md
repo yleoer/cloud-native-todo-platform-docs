@@ -367,7 +367,9 @@ mkdir -p .github/workflows .github/ci
     └── todo-platform-ci-cd.yml
 ```
 
-### 5.4 完整代码或配置
+### 5.4 执行命令
+
+先按下面内容创建或更新实验文件；保存完成后，再继续执行后续命令。
 
 创建 CI 专用 Helm values。它只用于模板渲染和本地 kind 验证，不包含真实生产 Secret：
 
@@ -716,7 +718,6 @@ jobs:
 
 这里故意使用 Kustomize `images` 字段生成临时 overlay，而不是使用旧资料里常见的 `kubectl set image --local`。`--local` 标志已经从新版本 `kubectl set image` 中移除，继续使用会让 CI 在部署验证阶段失败。
 
-### 5.5 执行命令
 
 先在本地做 YAML 语法检查，避免提交明显错误：
 
@@ -754,7 +755,7 @@ PR 合并到 `main` 后，`push` 事件会触发完整链路：
 validate -> build-image -> deploy-kind
 ```
 
-### 5.6 预期输出
+### 5.5 预期输出
 
 PR 阶段的 Actions 页面应看到：
 
@@ -794,7 +795,7 @@ deployment.apps/todo-platform successfully rolled out
 ok
 ```
 
-### 5.7 验证方法
+### 5.6 验证方法
 
 第一层：确认 PR 门禁生效。
 
@@ -845,7 +846,7 @@ grep -n "packages: write" .github/workflows/todo-platform-ci-cd.yml
 
 判断标准：只有 `build-image` job 拥有 `packages: write`，没有使用全局 `write-all`。
 
-### 5.8 清理步骤
+### 5.7 清理步骤
 
 本篇在 GitHub Actions runner 中创建的 kind 集群会随 runner 销毁。你通常不需要手工清理远端 runner。
 

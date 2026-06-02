@@ -351,9 +351,10 @@ operator/
         └── todoapp.yaml
 ```
 
-### 5.4 完整代码或配置
+### 5.4 执行命令
 
-本节按文件名给出完整内容。请用编辑器创建同名文件，并复制对应内容。
+先按下面内容创建或更新实验文件；保存完成后，再继续执行后续命令。
+
 
 本节会创建 7 个文件：
 
@@ -367,7 +368,7 @@ operator/
 | `operator/handwritten/manifests/deployment.yaml` | Controller Deployment |
 | `operator/handwritten/samples/todoapp.yaml` | 用于触发 Reconcile 的样例 CR |
 
-#### 5.4.1 go.mod
+#### go.mod
 
 创建 `operator/handwritten/go.mod`：
 
@@ -391,7 +392,7 @@ require (
 - client-go 版本号使用 `v0.xx.y`，不是 `v1.xx.y`，这是 Kubernetes Go 模块的长期约定。
 - `go.sum` 会在后面的 `go mod tidy` 中生成；构建 Docker 镜像前必须先完成本地编译检查。
 
-#### 5.4.2 main.go
+#### main.go
 
 创建 `operator/handwritten/main.go`：
 
@@ -490,7 +491,7 @@ func defaultKubeconfig() string {
 - `buildConfig` 先尝试 in-cluster config，再回退到本地 kubeconfig，因此同一份代码既能在本地运行，也能部署到集群。
 - `WaitForCacheSync` 是 worker 启动前的安全边界。
 
-#### 5.4.3 controller.go
+#### controller.go
 
 创建 `operator/handwritten/controller.go`：
 
@@ -816,7 +817,7 @@ func int64Value(value any) (int64, bool) {
 - `statusObserved` 会在写入前逐字段比较当前 status，避免无变化 patch；`lastTransitionTime` 只在 condition 状态转换时刷新。
 - 本篇不写 `Available=True`，因为还没有真实创建 Deployment；这是有意为之。
 
-#### 5.4.4 Dockerfile
+#### Dockerfile
 
 创建 `operator/handwritten/Dockerfile`：
 
@@ -839,7 +840,7 @@ USER 65532:65532
 ENTRYPOINT ["/todo-handwritten-controller"]
 ```
 
-#### 5.4.5 RBAC
+#### RBAC
 
 创建 `operator/handwritten/manifests/rbac.yaml`：
 
@@ -892,7 +893,7 @@ roleRef:
 
 这份 RBAC 只允许读取 `todoapps` 和写 `todoapps/status`，不会授予 Deployment、Service、Secret 等权限。第 38 篇开始创建子资源后，再扩展 RBAC。
 
-#### 5.4.6 Controller Deployment
+#### Controller Deployment
 
 创建 `operator/handwritten/manifests/deployment.yaml`：
 
@@ -946,7 +947,7 @@ spec:
           type: RuntimeDefault
 ```
 
-#### 5.4.7 样例 TodoApp
+#### 样例 TodoApp
 
 创建 `operator/handwritten/samples/todoapp.yaml`：
 
@@ -975,9 +976,8 @@ spec:
     strategy: RollingUpdate
 ```
 
-### 5.5 执行命令
 
-#### 5.5.1 准备命名空间和 CRD
+#### 5.4.1 准备命名空间和 CRD
 
 ```bash linenums="0"
 ls operator/crds/base/todoapps.platform.todo.example.com.yaml
@@ -988,7 +988,7 @@ kubectl wait --for=condition=Established crd/todoapps.platform.todo.example.com 
 
 如果你还没有第 35 篇生成的 `operator/crds/base`，请先回到第 35 篇完成 CRD 文件创建。Controller 必须在 CRD 安装后才能 Watch `TodoApp`。这里对整个 `operator/crds/base` 执行 apply 会同时安装 `TodoDatabase` 和 `TodoCache` CRD，不会影响本篇实验。
 
-#### 5.5.2 本地编译检查
+#### 5.4.2 本地编译检查
 
 ```bash linenums="0"
 cd operator/handwritten
@@ -1008,7 +1008,7 @@ cd ../..
 go env -w GOPROXY=https://proxy.golang.org,direct
 ```
 
-#### 5.5.3 本地运行 Controller
+#### 5.4.3 本地运行 Controller
 
 开一个终端运行：
 
@@ -1028,9 +1028,9 @@ kubectl -n todo-dev get todoapp todo-platform -o jsonpath='{.status.conditions[*
 
 本地运行方式最适合调试，因为日志直接显示在终端里。`go run . --namespace=todo-dev` 会持续 Watch API server，不会像一次性命令那样自动退出；看到 status 回写后，可以按 `Ctrl+C` 停止 Controller。本地运行会使用当前 kubeconfig 访问集群，只适合开发调试；生产 Controller 应部署在集群内，并使用受限的 ServiceAccount。
 
-#### 5.5.4 构建镜像并加载到 kind
+#### 5.4.4 构建镜像并加载到 kind
 
-请先完成 5.5.2 节的 `go mod tidy`，确保 `operator/handwritten/go.sum` 已生成，否则 Dockerfile 中的 `COPY go.mod go.sum ./` 会找不到 `go.sum`。
+请先完成 5.4.2 节的 `go mod tidy`，确保 `operator/handwritten/go.sum` 已生成，否则 Dockerfile 中的 `COPY go.mod go.sum ./` 会找不到 `go.sum`。
 
 ```bash linenums="0"
 docker build -t todo-handwritten-controller:v0.1.0 operator/handwritten
@@ -1039,7 +1039,7 @@ kind load docker-image todo-handwritten-controller:v0.1.0 --name todo-gitops
 
 如果你的 kind 集群名称不是 `todo-gitops`，把 `--name todo-gitops` 改成 `kind get clusters` 输出的集群名。
 
-#### 5.5.5 部署到集群
+#### 5.4.5 部署到集群
 
 ```bash linenums="0"
 kubectl apply -f operator/handwritten/manifests/rbac.yaml
@@ -1048,7 +1048,7 @@ kubectl -n todo-dev rollout status deployment/todo-handwritten-controller --time
 kubectl -n todo-dev logs deployment/todo-handwritten-controller --tail=50
 ```
 
-#### 5.5.6 端到端验证 status 自动回写
+#### 5.4.6 端到端验证 status 自动回写
 
 先重新应用样例 CR：
 
@@ -1075,7 +1075,7 @@ kubectl -n todo-dev get todoapp todo-platform `
 
 如果 `generation` 和 `observed` 相等，说明 Controller 已经观察到最新 spec 并回写 status。
 
-### 5.6 预期输出
+### 5.5 预期输出
 
 本地或集群日志应包含类似内容：
 
@@ -1104,7 +1104,7 @@ Reconciled WorkloadNotCreated
 
 **`Available=False` 是预期结果**，因为本篇还没有创建真正的 Deployment。真正工作负载会在第 38 篇由 Kubebuilder Controller 创建。
 
-### 5.7 验证方法
+### 5.6 验证方法
 
 **第一层：代码可编译**
 
@@ -1165,7 +1165,7 @@ kubectl auth can-i create deployments \
 
 判断标准：前两条输出 `yes`，第三条输出 `no`。这说明本篇 Controller 只能 Watch `TodoApp` 和写 status，不能创建 Deployment。
 
-### 5.8 清理步骤
+### 5.7 清理步骤
 
 如果准备继续第 38 篇，可以保留 CRD 和样例 CR，只删除本篇手写 Controller：
 
@@ -1188,7 +1188,7 @@ kubectl -n todo-dev delete todoapp todo-platform --ignore-not-found
 
 ### 错误 1：CRD 未安装，Informer 无法 List
 
-对应实验环节：5.5.1。
+对应实验环节：5.4.1。
 
 - **现象**：
 
@@ -1218,7 +1218,7 @@ kubectl -n todo-dev delete todoapp todo-platform --ignore-not-found
 
 ### 错误 2：RBAC 缺少 todoapps/status 权限
 
-对应实验环节：5.4.5、5.5.5、5.7 第五层。
+对应实验环节：5.4.5、5.6 第五层。
 
 - **现象**：
 
@@ -1275,7 +1275,7 @@ kubectl -n todo-dev delete todoapp todo-platform --ignore-not-found
 
 ### 错误 4：镜像加载到错误 kind 集群
 
-对应实验环节：5.5.4、5.5.5。
+对应实验环节：5.4.4、5.4.5。
 
 - **现象**：
 
@@ -1307,7 +1307,7 @@ kubectl -n todo-dev delete todoapp todo-platform --ignore-not-found
 
 ### 错误 5：status patch 触发重复 Reconcile
 
-对应实验环节：5.4.3、5.5.6。
+对应实验环节：5.4.3、5.4.6。
 
 - **现象**：没有修改 `spec`，日志里仍然反复出现同一个对象的 `enqueue` 和 `reconciled`。
 

@@ -496,9 +496,11 @@ operator/
     └── todoapp-api-map.md
 ```
 
-### 5.4 完整代码或配置
+### 5.4 执行命令
 
-#### 5.4.1 创建 TodoApp 自定义资源草案
+先按下面内容创建或更新实验文件；保存完成后，再继续执行后续命令。
+
+#### 创建 TodoApp 自定义资源草案
 
 创建 `operator/api-model/todoapp-example.yaml`：
 
@@ -564,7 +566,7 @@ spec:
 
 关键点：这个 YAML 现在还不能 apply，因为 API server 还不认识 `TodoApp`。它是第 35 篇 CRD 的输入设计。
 
-#### 5.4.2 创建 TodoApp status 草案
+#### 创建 TodoApp status 草案
 
 创建 `operator/api-model/todoapp-status-example.yaml`：
 
@@ -634,7 +636,7 @@ status:
 
 关键点：真实用户不应该手写这份 status。它展示的是 Controller 未来应该回写什么。
 
-#### 5.4.3 创建 API 映射说明
+#### 创建 API 映射说明
 
 创建 `operator/api-model/todoapp-api-map.md`：
 
@@ -718,9 +720,8 @@ PowerShell：
 
 其中 `resources.profile: small` 是平台 API 的有意抽象。用户只选择 `small`、`medium`、`large` 这样的业务规格，未来 Controller 再把它映射为具体的 `resources.requests` 和 `resources.limits`。这样既能降低业务方理解成本，也能让平台团队统一管理资源配额策略。
 
-### 5.5 执行命令
 
-#### 5.5.1 探查 API groups 与 versions
+#### 5.4.1 探查 API groups 与 versions
 
 查看集群支持的 API versions：
 
@@ -759,7 +760,7 @@ deployments   deploy   apps/v1   true   Deployment
 customresourcedefinitions   crd,crds   apiextensions.k8s.io/v1   false   CustomResourceDefinition
 ```
 
-#### 5.5.2 查看 GVK 与 GVR
+#### 5.4.2 查看 GVK 与 GVR
 
 从内置 Deployment 对象读取 GVK：
 
@@ -799,7 +800,7 @@ kubectl api-resources --api-group=apps | Select-String '^deployments'
 deployments   deploy   apps/v1   true   Deployment
 ```
 
-#### 5.5.3 直接访问 API discovery
+#### 5.4.3 直接访问 API discovery
 
 查看 core API：
 
@@ -816,7 +817,7 @@ kubectl get --raw /apis/apps/v1 \
 
 预期能看到 `deployments` 是 namespaced resource，kind 是 `Deployment`，并支持 `get`、`list`、`watch`、`create`、`update`、`patch`、`delete` 等 verbs。
 
-#### 5.5.4 查看 spec 与 status
+#### 5.4.4 查看 spec 与 status
 
 查看 Deployment 的期望副本和实际副本：
 
@@ -864,7 +865,7 @@ kubectl get --raw "/apis/apps/v1/namespaces/todo-dev/deployments/$OBSERVE_DEPLOY
 
 把这个观察迁移到 `TodoApp` 上，就是本章 API 设计的核心问题：用户在 `spec` 里应该写哪些期望，Controller 又应该在 `status` 里回写哪些观察结果？后面的模型检查会围绕这条边界展开。
 
-#### 5.5.5 使用 kubectl explain 理解 schema
+#### 5.4.5 使用 kubectl explain 理解 schema
 
 查看 Deployment 字段说明：
 
@@ -876,7 +877,7 @@ kubectl explain deployment.status.conditions
 
 这一步很重要。未来第 35 篇安装 CRD 后，`kubectl explain todoapp.spec` 也应该能显示我们定义的 OpenAPI schema。
 
-#### 5.5.6 验证 TodoApp 还不能 apply
+#### 5.4.6 验证 TodoApp 还不能 apply
 
 先确认 API server 还不认识 `TodoApp`：
 
@@ -909,7 +910,7 @@ ensure CRDs are installed first
 
 如果你已经提前安装过第 35 篇的 CRD，或者集群里已有同名 `todoapps.platform.todo.example.com`，这条命令可能不会报 `no matches for kind`。这种情况下请只观察 discovery 变化，或者换一个临时 group 名称做对比；不要为了本篇验证去删除团队共享集群中的 CRD。
 
-#### 5.5.7 检查 TodoApp 模型边界
+#### 5.4.7 检查 TodoApp 模型边界
 
 查看我们设计的 `spec`：
 
@@ -947,7 +948,7 @@ cat operator/api-model/todoapp-api-map.md
 - `status` 中只出现系统观察结果，例如 readyReplicas、url、components、conditions。
 - 未来 Controller 可以根据 `spec` 创建资源，并根据实际资源状态回写 `status`。
 
-### 5.6 预期输出
+### 5.5 预期输出
 
 完成实验后，你应该得到以下关键结果：
 
@@ -967,7 +968,7 @@ operator/api-model/todoapp-status-example.yaml
 operator/api-model/todoapp-api-map.md
 ```
 
-### 5.7 验证方法
+### 5.6 验证方法
 
 **第一层：能发现 API 资源**
 
@@ -1036,7 +1037,7 @@ Test-Path operator/api-model/todoapp-api-map.md
 
 判断标准：三个文件存在，且字段边界能支撑第 35 篇 CRD 设计。
 
-### 5.8 清理步骤
+### 5.7 清理步骤
 
 本篇没有向集群创建资源。建议保留 `operator/api-model/`，因为第 35 篇会继续使用。
 
@@ -1093,7 +1094,7 @@ kubectl -n todo-dev delete deployment api-shape-demo --ignore-not-found
 - **修复**：YAML 中使用 `kind: Deployment`；RBAC、API path、GVR 里才使用 `deployments`。
 - **预防**：记住一句话：YAML 看 GVK，URL/RBAC 看 GVR。
 
-### 错误 2：CRD 未安装就 apply 自定义资源（对应 5.5.6 节）
+### 错误 2：CRD 未安装就 apply 自定义资源（对应 5.4.6 节）
 
 - **现象**：
 
@@ -1112,7 +1113,7 @@ kubectl -n todo-dev delete deployment api-shape-demo --ignore-not-found
 - **修复**：第 35 篇先安装 `todoapps.platform.todo.example.com` CRD，再 apply `TodoApp` 实例。
 - **预防**：GitOps 或 Helm 发布 CRD 时，先应用 CRD，再应用 CR 实例。
 
-### 错误 3：已经安装 CRD，导致本篇 dry-run 不再报错（对应 5.5.6 节）
+### 错误 3：已经安装 CRD，导致本篇 dry-run 不再报错（对应 5.4.6 节）
 
 - **现象**：执行 `kubectl apply --dry-run=server -f operator/api-model/todoapp-example.yaml` 时没有出现 `no matches for kind`。
 - **原因**：集群中已经存在 `todoapps.platform.todo.example.com` CRD，API server 已经认识 `TodoApp`。
@@ -1126,7 +1127,7 @@ kubectl -n todo-dev delete deployment api-shape-demo --ignore-not-found
 - **修复**：如果是个人临时集群，可以在确认无业务数据后清理测试 CRD；如果是共享集群，不要删除，改为观察“安装 CRD 后 discovery 会出现 TodoApp”的现象。
 - **预防**：每篇实验前确认当前集群状态，尤其是 CRD、namespace 和测试对象是否来自前一轮实验。
 
-### 错误 4：把运行结果写进 spec（对应 3.6 与 5.5.7 节）
+### 错误 4：把运行结果写进 spec（对应 3.6 与 5.4.7 节）
 
 - **现象**：`spec` 中出现 `readyReplicas`、`urlReady`、`lastError`、`observedGeneration` 这类运行结果。
 - **原因**：没有区分用户期望和系统观察值。
@@ -1168,7 +1169,7 @@ kubectl -n todo-dev delete deployment api-shape-demo --ignore-not-found
 - **修复**：使用 Conditions 表达状态，包含 `type`、`status`、`reason`、`message`、`lastTransitionTime`。
 - **预防**：把第 33 篇的排障视角前置到 API 设计阶段。
 
-### 错误 7：在 PowerShell 中直接执行 Bash 脚本片段（对应 5.4 节）
+### 错误 7：在 PowerShell 中直接执行 Bash 脚本片段（对应执行命令）
 
 - **现象**：把 Bash 脚本片段直接粘贴到 PowerShell 后报语法错误。
 - **原因**：Bash 与 PowerShell 的重定向、变量和多行文本语法不同。

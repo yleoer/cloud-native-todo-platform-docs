@@ -430,7 +430,32 @@ cloud-native-todo-platform/
 
 `network-debug-report.txt` 是实验过程中生成的排障报告，不一定需要提交到 Git。
 
-### 5.4 完整代码和配置
+### 5.4 执行命令
+
+先确认你在课程仓库根目录：
+
+```bash linenums="0"
+pwd
+ls
+```
+
+预期能看到 `README.md`、`docs/` 等文件或目录。
+
+如果仓库还没有 Go module，先初始化：
+
+```bash linenums="0"
+test -f go.mod || go mod init github.com/your-name/cloud-native-todo-platform
+```
+
+请把 `your-name` 替换为你的 GitHub 用户名或组织名；如果只是本地实验，保留这个示例模块名也不影响本篇编译。
+
+创建目录：
+
+```bash linenums="0"
+mkdir -p api/cmd/todo-network-demo bin scripts
+```
+
+先按下面内容创建或更新实验文件；保存完成后，再继续执行后续命令。
 
 Go HTTP 服务 `api/cmd/todo-network-demo/main.go`：
 
@@ -731,32 +756,8 @@ network-clean:
 
 `network-run` 会在前台运行服务并阻塞当前终端，适合单独调试。三终端抓包实验中，直接执行 `./bin/todo-network-demo` 更容易看清每个终端的角色。
 
-### 5.5 执行命令
 
-先确认你在课程仓库根目录：
-
-```bash linenums="0"
-pwd
-ls
-```
-
-预期能看到 `README.md`、`docs/` 等文件或目录。
-
-如果仓库还没有 Go module，先初始化：
-
-```bash linenums="0"
-test -f go.mod || go mod init github.com/your-name/cloud-native-todo-platform
-```
-
-请把 `your-name` 替换为你的 GitHub 用户名或组织名；如果只是本地实验，保留这个示例模块名也不影响本篇编译。
-
-创建目录：
-
-```bash linenums="0"
-mkdir -p api/cmd/todo-network-demo bin scripts
-```
-
-将 5.4 中的 Go 代码、检查脚本和 Makefile 分别保存到对应文件，然后赋予脚本执行权限：
+确认上面的 Go 代码、检查脚本和 Makefile 已分别保存到对应文件后，赋予脚本执行权限：
 
 ```bash linenums="0"
 chmod +x scripts/check-network-demo.sh
@@ -861,7 +862,7 @@ sudo tcpdump -i any -nn 'tcp port 18080' -c 6
 make -f Makefile.network network-report
 ```
 
-### 5.6 预期输出
+### 5.5 预期输出
 
 健康检查预期类似：
 
@@ -935,7 +936,7 @@ IP 127.0.0.1.18080 > 127.0.0.1.54321: Flags [S.], seq ...
 Network demo check completed.
 ```
 
-### 5.7 验证方法
+### 5.6 验证方法
 
 验证前请确认服务正在另一个终端中运行：
 
@@ -970,7 +971,7 @@ test -f network-debug-report.txt
 - 检查脚本输出 `Network demo check completed.`。
 - `network-debug-report.txt` 包含 listen、healthz、dns 等排障信息。
 
-### 5.8 清理步骤
+### 5.7 清理步骤
 
 停止服务：
 

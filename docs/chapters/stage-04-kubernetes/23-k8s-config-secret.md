@@ -332,7 +332,9 @@ git status --short
 
 如果 `git status --short` 中已经出现 `todo-api-secret.local.yaml`，不要提交它。真实 Secret 一旦进入 Git 历史，即使后续删除文件，也应该按泄露处理并轮换密钥。
 
-### 5.4 完整代码或配置
+### 5.4 应用配置
+
+先按下面内容创建或更新实验文件；保存完成后，再继续执行后续命令。
 
 创建非敏感配置 `deployments/k8s-base/todo-api-configmap.yaml`：
 
@@ -555,7 +557,6 @@ data:
 
 这三份文件暂时只是教学示例，本篇主线只应用根目录下的 `todo-api-configmap.yaml`。由于它们的对象名和 Namespace 都相同，直接 `kubectl apply -f environments/test/todo-api-configmap.yaml` 会覆盖当前 `todo-api-config`。第 28 篇会用 Kustomize 把这些差异整理成更标准的 overlay；如果你现在就想隔离验证，建议为 dev / test / prod 使用不同 Namespace。
 
-### 5.5 应用配置
 
 以下命令均在项目根目录执行，也就是包含 `deployments/` 目录的 `cloud-native-todo-platform/` 仓库根目录。
 
@@ -598,7 +599,7 @@ kubectl -n todo-workloads describe deployment todo-api
 
 你应该能在输出中看到 `Environment Variables from` 类似信息，说明 Deployment 已经从 ConfigMap 和 Secret 注入环境变量。
 
-### 5.6 验证配置生效
+### 5.5 验证配置生效
 
 获取一个 Todo API Pod 名称：
 
@@ -666,7 +667,7 @@ curl -s http://127.0.0.1:18082/readyz
 
 验证完成后，在运行 `port-forward` 的终端按 `Ctrl+C` 终止端口转发。
 
-### 5.7 验证 ConfigMap 文件更新
+### 5.6 验证 ConfigMap 文件更新
 
 修改 `todo-api-config-file`：
 
@@ -691,7 +692,7 @@ config version: chapter-23-updated
 
 说明 ConfigMap 作为卷挂载时，文件内容已经更新。
 
-### 5.8 验证环境变量不会热更新
+### 5.7 验证环境变量不会热更新
 
 修改 `todo-api-config` 中的 `TODO_RELEASE`：
 
@@ -742,7 +743,7 @@ kubectl -n todo-workloads exec "$POD" -- printenv TODO_RELEASE
 chapter-23-env-updated
 ```
 
-### 5.9 查看 Secret 但避免泄露
+### 5.8 查看 Secret 但避免泄露
 
 查看 Secret 元信息：
 
@@ -794,7 +795,7 @@ kubectl auth can-i list secrets -n todo-workloads
 
 如果普通应用开发账号能随意 `list secrets`，生产环境就需要重新审查 RBAC。
 
-### 5.10 了解其他 Secret 类型
+### 5.9 了解其他 Secret 类型
 
 第 22 篇已经用过 TLS Secret：
 
@@ -824,7 +825,7 @@ spec:
 
 本篇不会真的接入私有仓库，第 29 篇 CI/CD 和镜像仓库章节会继续展开。
 
-### 5.11 验证方法
+### 5.10 验证方法
 
 完成实验后，可以用下面这组命令集中确认结果：
 
@@ -849,7 +850,7 @@ kubectl auth can-i get secrets -n todo-workloads
 - Pod 内 `TODO_RELEASE` 在 rollout restart 后更新为 `chapter-23-env-updated`。
 - `/healthz` 和 `/readyz` 通过 Service port-forward 返回成功。
 
-### 5.12 清理步骤
+### 5.11 清理步骤
 
 如果继续学习第 24 篇，建议保留 `todo-workloads`、Todo API Deployment、Service、Ingress 和本篇 ConfigMap / Secret。第 24 篇会继续在这个 Namespace 中加入 PostgreSQL 和 PVC。
 

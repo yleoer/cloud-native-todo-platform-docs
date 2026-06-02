@@ -286,7 +286,9 @@ k8s-lab
 └── notes
 ```
 
-### 5.4 完整代码或配置
+### 5.4 执行命令
+
+先按下面内容创建或更新实验文件；保存完成后，再继续执行后续命令。
 
 创建 kind 集群配置：
 
@@ -395,7 +397,6 @@ spec:
 - 修复方式：
 ```
 
-### 5.5 执行命令
 
 设置变量：
 
@@ -480,7 +481,7 @@ echo "$NODE"
 docker exec "$NODE" crictl images | grep todo-api
 ```
 
-### 5.6 预期输出
+### 5.5 预期输出
 
 创建集群成功后能看到类似输出：
 
@@ -521,7 +522,7 @@ Content-Type: text/plain
 hello from kubernetes
 ```
 
-### 5.7 验证方法
+### 5.6 验证方法
 
 执行以下命令：
 
@@ -545,7 +546,7 @@ docker exec "$NODE" crictl images | grep todo-api
 - 通过 `port-forward` 访问 `http://127.0.0.1:18081` 能看到 `hello from kubernetes`。
 - kind 节点内能看到 `todo-api:v0.1.0` 镜像。
 
-### 5.8 清理步骤
+### 5.7 清理步骤
 
 删除实验应用：
 

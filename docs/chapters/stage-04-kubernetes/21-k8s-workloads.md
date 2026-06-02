@@ -332,7 +332,9 @@ deployments/k8s-base
 
 `todo-api-secret.local.yaml` 是本地实验生成文件，包含本地密码哈希，不应提交到公开仓库。如果你的应用仓库还没有忽略它，可以把 `deployments/k8s-base/*.local.yaml` 加入 `.gitignore`；真实项目应使用 Secret 管理系统、Sealed Secrets、External Secrets 或 GitOps 平台的受控密钥能力。
 
-### 5.4 完整代码或配置
+### 5.4 执行命令
+
+先按下面内容创建或更新实验文件；保存完成后，再继续执行后续命令。
 
 创建 Namespace：
 
@@ -678,7 +680,6 @@ spec:
 `todo-api-secret.local.yaml` is generated for local labs and should not be committed to public repositories.
 ```
 
-### 5.5 执行命令
 
 先部署 Namespace、Secret、Deployment 和 Service：
 
@@ -826,7 +827,7 @@ kubectl -n todo-workloads logs -l app.kubernetes.io/name=node-heartbeat --tail=2
 
 单节点 kind 集群中，DaemonSet 通常只会创建 1 个 Pod，这是正常现象。多节点集群才会看到每个匹配节点各运行一个 DaemonSet Pod。
 
-### 5.6 预期输出
+### 5.5 预期输出
 
 Deployment 发布成功时：
 
@@ -877,7 +878,7 @@ todo-api   Deployment/todo-api   <unknown>/60%   2         5         2
 
 metrics-server 可用并完成一轮采集后，`TARGETS` 会显示类似 `3%/60%` 的数值。刚安装完 metrics-server 时短暂显示 `<unknown>` 是常见现象，先等待 30 到 60 秒再复查。
 
-### 5.7 验证方法
+### 5.6 验证方法
 
 执行以下命令：
 
@@ -900,7 +901,7 @@ curl -i http://127.0.0.1:18082/readyz
 - 模拟坏镜像后能通过 `kubectl rollout undo` 回滚成功。
 - HPA 对象存在；如果 metrics-server 可用，`TARGETS` 不再是 `<unknown>`。
 
-### 5.8 清理步骤
+### 5.7 清理步骤
 
 如果你还要继续第 22 篇，可以保留 `todo-workloads` Namespace。若要清理本篇所有资源：
 

@@ -290,7 +290,9 @@ cloud-native-todo-platform/
             └── stats_service_test.go
 ```
 
-### 5.4 完整代码
+### 5.4 执行命令
+
+先按下面内容创建或更新实验文件；保存完成后，再继续执行后续命令。
 
 创建 `api/internal/service/stats_service.go`：
 
@@ -695,7 +697,6 @@ func doRequest(ctx context.Context, client *http.Client, url string) error {
 
 这个压测命令不是替代专业工具。它的价值是让你亲手看见：固定请求数、固定并发数、固定超时下，服务的成功数、失败数和吞吐如何变化。
 
-### 5.5 执行命令
 
 格式化代码：
 
@@ -739,7 +740,7 @@ TODO_API_ADDR=127.0.0.1:18080 ./bin/todo-api
 ./bin/todo-load -addr http://127.0.0.1:18080 -path /api/v2/todos -requests 50 -concurrency 5
 ```
 
-### 5.6 预期输出
+### 5.5 预期输出
 
 `go test -race ./api/...` 通过时，输出类似：
 
@@ -766,7 +767,7 @@ requests=50 concurrency=5 ok=50 failed=0 elapsed=42ms rps=1190.48
 
 验收时不能只看 `todo-load` 进程是否退出，还必须确认输出里的 `failed=0`。如果 `failed > 0`，上面的实现会返回非 0 退出码，便于脚本和 CI 正确判断压测失败。
 
-### 5.7 验证方法
+### 5.6 验证方法
 
 验证并发统计服务无竞态：
 
@@ -794,7 +795,7 @@ go build -o bin/todo-load ./api/cmd/todo-load
 requests must be positive
 ```
 
-### 5.8 清理步骤
+### 5.7 清理步骤
 
 如果 Todo API 仍在运行，先在服务终端按 `Ctrl+C` 停止。
 

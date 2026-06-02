@@ -438,7 +438,9 @@ cloud-native-todo-platform/
 deployments/docker-compose/.env
 ```
 
-### 5.4 完整代码或配置
+### 5.4 执行命令
+
+先按下面内容创建或更新实验文件；保存完成后，再继续执行后续命令。
 
 先创建 Compose 配置目录。Linux / macOS / WSL2：
 
@@ -648,7 +650,6 @@ Windows 用户请参考主文档中的 PowerShell 命令。
 
 上面这个 README 是项目交付物的一部分，真实团队中它比单独把命令写在课程里更有用。新人只需要进入目录，按 README 启动，就能得到与其他成员一致的本地环境。
 
-### 5.5 执行命令
 
 以下命令请从应用仓库根目录开始执行。
 
@@ -778,7 +779,7 @@ http://127.0.0.1:18090/dashboard/
 
 Dashboard 只是本地调试入口，生产环境不能使用 `--api.insecure=true`。
 
-### 5.6 预期输出
+### 5.5 预期输出
 
 `docker compose --env-file .env config --services` 应输出：
 
@@ -841,9 +842,9 @@ Content-Type: application/json
 ...
 ```
 
-### 5.7 验证方法
+### 5.6 验证方法
 
-#### 5.7.1 最小验证
+#### 5.6.1 最小验证
 
 完成本篇最小验收，需要全部通过：
 
@@ -866,7 +867,7 @@ docker compose --env-file .env logs migrate
 - Redis 返回 `PONG`。
 - 迁移日志没有错误。
 
-#### 5.7.2 进阶验证
+#### 5.6.2 进阶验证
 
 完成进阶验收，建议继续执行：
 
@@ -892,7 +893,7 @@ docker compose --env-file .env config | Select-String "postgres:5432|redis:6379"
 
 如果能看到迁移后的表、数据卷、网络、API 正常日志，并且配置中确实使用 `postgres:5432` 和 `redis:6379`，说明你已经掌握了本地 Compose 多服务编排的核心链路。
 
-### 5.8 清理步骤
+### 5.7 清理步骤
 
 日常停止环境但保留数据：
 

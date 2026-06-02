@@ -489,7 +489,143 @@ pwd
 
 使用单独目录是为了把 rootfs、OverlayFS 目录和脚本限制在一个可清理范围内，降低误操作风险。
 
-### 5.4 完整代码或配置
+### 5.4 执行命令
+
+建议按下面的路线执行。先完成必做项，再根据你的 Linux 环境能力选择进阶项：
+
+| 路线 | 实验 | 适合情况 |
+|---|---|---|
+| 必做 | 观察真实容器、UTS/PID namespace、rootfs、Docker 资源限制 | 所有 Linux / WSL2 Ubuntu 学习者 |
+| 进阶 | 手动 cgroup v2、OverlayFS、`mini-container.sh`、`nsenter` | 有 sudo 权限、内核和文件系统支持较完整 |
+| 可跳过 | `cgcreate` cgroup v1 对照 | 只有老实验机或需要理解历史工具时再做 |
+
+#### 5.4.1 观察 Todo API 容器
+
+如果你已经完成第 17 篇，请先进入 Cloud Native Todo Platform 应用仓库根目录，也就是包含 `deployments/docker-compose/compose.yaml` 的目录。然后进入 Compose 目录启动本地环境：
+
+```bash linenums="0"
+test -f deployments/docker-compose/compose.yaml
+cd deployments/docker-compose
+test -f .env
+docker compose --env-file .env up -d
+docker compose --env-file .env ps
+```
+
+获取 API 容器 ID 和宿主机 PID：
+
+```bash linenums="0"
+TODO_API_CONTAINER="$(docker compose --env-file .env ps -q api)"
+TODO_API_PID="$(docker inspect "$TODO_API_CONTAINER" --format '{{.State.Pid}}')"
+echo "$TODO_API_CONTAINER"
+echo "$TODO_API_PID"
+ps -o pid,ppid,comm -p "$TODO_API_PID"
+```
+
+查看 namespace、cgroup 和挂载：
+
+```bash linenums="0"
+sudo ls -l /proc/"$TODO_API_PID"/ns
+cat /proc/"$TODO_API_PID"/cgroup
+docker inspect "$TODO_API_CONTAINER" --format '{{json .Mounts}}'
+docker inspect "$TODO_API_CONTAINER" --format 'Memory={{.HostConfig.Memory}} NanoCpus={{.HostConfig.NanoCpus}}'
+```
+
+如果你没有应用仓库，也可以启动独立 demo 容器：
+
+```bash linenums="0"
+docker run -d --name internals-demo registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23 sleep 1d
+HOST_PID="$(docker inspect internals-demo --format '{{.State.Pid}}')"
+echo "$HOST_PID"
+sudo ls -l /proc/"$HOST_PID"/ns
+cat /proc/"$HOST_PID"/cgroup
+docker exec internals-demo ps -o pid,ppid,comm
+ps -o pid,ppid,comm -p "$HOST_PID"
+```
+
+清理 demo 容器：
+
+```bash linenums="0"
+docker rm -f internals-demo
+```
+
+#### 5.4.2 使用 UTS namespace 隔离主机名
+
+查看当前主机名：
+
+```bash linenums="0"
+hostname
+```
+
+进入新的 UTS namespace：
+
+```bash linenums="0"
+sudo unshare --uts --fork bash
+```
+
+在新 shell 中执行：
+
+```bash linenums="0"
+hostname todo-uts
+hostname
+exit
+```
+
+回到原 shell 后验证：
+
+```bash linenums="0"
+hostname
+```
+
+预期现象：新 namespace 中 hostname 可以修改，退出后宿主机 hostname 不变。
+
+#### 5.4.3 使用 PID namespace 隔离进程编号
+
+进入新的 PID namespace，并挂载新的 `/proc`：
+
+```bash linenums="0"
+sudo unshare --pid --fork --mount-proc bash
+```
+
+在新 shell 中执行：
+
+```bash linenums="0"
+echo "inside pid namespace"
+ps -ef
+echo "my pid is $$"
+exit
+```
+
+预期现象：新 shell 在 namespace 中通常是 PID 1，`ps -ef` 只能看到 namespace 内进程。
+
+#### 5.4.4 使用 Network namespace 隔离网络
+
+进入新的 Network namespace：
+
+```bash linenums="0"
+sudo unshare --net --fork bash
+```
+
+在新 shell 中执行：
+
+```bash linenums="0"
+ip addr
+ip route
+ip link set lo up
+ping -c 1 127.0.0.1
+exit
+```
+
+预期现象：你可能只看到 `lo` 回环网卡，没有默认路由。Docker 会在类似基础上创建 veth pair、bridge、NAT 和 DNS。
+
+#### 5.4.5 使用 Mount namespace 隔离挂载点
+
+准备目录：
+
+```bash linenums="0"
+mkdir -p "$LAB/mnt"
+```
+
+先按下面内容创建或更新实验文件；保存完成后，再继续执行后续命令。
 
 创建内存实验脚本：
 
@@ -592,141 +728,6 @@ chmod +x "$LAB/mini-container.sh"
 - `trap cleanup EXIT` 保证退出时卸载 rootfs 内的 `/proc`。
 - namespace 由启动命令中的 `unshare` 创建，脚本本身只负责 rootfs、cgroup 和 chroot。
 
-### 5.5 执行命令
-
-建议按下面的路线执行。先完成必做项，再根据你的 Linux 环境能力选择进阶项：
-
-| 路线 | 实验 | 适合情况 |
-|---|---|---|
-| 必做 | 观察真实容器、UTS/PID namespace、rootfs、Docker 资源限制 | 所有 Linux / WSL2 Ubuntu 学习者 |
-| 进阶 | 手动 cgroup v2、OverlayFS、`mini-container.sh`、`nsenter` | 有 sudo 权限、内核和文件系统支持较完整 |
-| 可跳过 | `cgcreate` cgroup v1 对照 | 只有老实验机或需要理解历史工具时再做 |
-
-#### 5.5.1 观察 Todo API 容器
-
-如果你已经完成第 17 篇，请先进入 Cloud Native Todo Platform 应用仓库根目录，也就是包含 `deployments/docker-compose/compose.yaml` 的目录。然后进入 Compose 目录启动本地环境：
-
-```bash linenums="0"
-test -f deployments/docker-compose/compose.yaml
-cd deployments/docker-compose
-test -f .env
-docker compose --env-file .env up -d
-docker compose --env-file .env ps
-```
-
-获取 API 容器 ID 和宿主机 PID：
-
-```bash linenums="0"
-TODO_API_CONTAINER="$(docker compose --env-file .env ps -q api)"
-TODO_API_PID="$(docker inspect "$TODO_API_CONTAINER" --format '{{.State.Pid}}')"
-echo "$TODO_API_CONTAINER"
-echo "$TODO_API_PID"
-ps -o pid,ppid,comm -p "$TODO_API_PID"
-```
-
-查看 namespace、cgroup 和挂载：
-
-```bash linenums="0"
-sudo ls -l /proc/"$TODO_API_PID"/ns
-cat /proc/"$TODO_API_PID"/cgroup
-docker inspect "$TODO_API_CONTAINER" --format '{{json .Mounts}}'
-docker inspect "$TODO_API_CONTAINER" --format 'Memory={{.HostConfig.Memory}} NanoCpus={{.HostConfig.NanoCpus}}'
-```
-
-如果你没有应用仓库，也可以启动独立 demo 容器：
-
-```bash linenums="0"
-docker run -d --name internals-demo registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23 sleep 1d
-HOST_PID="$(docker inspect internals-demo --format '{{.State.Pid}}')"
-echo "$HOST_PID"
-sudo ls -l /proc/"$HOST_PID"/ns
-cat /proc/"$HOST_PID"/cgroup
-docker exec internals-demo ps -o pid,ppid,comm
-ps -o pid,ppid,comm -p "$HOST_PID"
-```
-
-清理 demo 容器：
-
-```bash linenums="0"
-docker rm -f internals-demo
-```
-
-#### 5.5.2 使用 UTS namespace 隔离主机名
-
-查看当前主机名：
-
-```bash linenums="0"
-hostname
-```
-
-进入新的 UTS namespace：
-
-```bash linenums="0"
-sudo unshare --uts --fork bash
-```
-
-在新 shell 中执行：
-
-```bash linenums="0"
-hostname todo-uts
-hostname
-exit
-```
-
-回到原 shell 后验证：
-
-```bash linenums="0"
-hostname
-```
-
-预期现象：新 namespace 中 hostname 可以修改，退出后宿主机 hostname 不变。
-
-#### 5.5.3 使用 PID namespace 隔离进程编号
-
-进入新的 PID namespace，并挂载新的 `/proc`：
-
-```bash linenums="0"
-sudo unshare --pid --fork --mount-proc bash
-```
-
-在新 shell 中执行：
-
-```bash linenums="0"
-echo "inside pid namespace"
-ps -ef
-echo "my pid is $$"
-exit
-```
-
-预期现象：新 shell 在 namespace 中通常是 PID 1，`ps -ef` 只能看到 namespace 内进程。
-
-#### 5.5.4 使用 Network namespace 隔离网络
-
-进入新的 Network namespace：
-
-```bash linenums="0"
-sudo unshare --net --fork bash
-```
-
-在新 shell 中执行：
-
-```bash linenums="0"
-ip addr
-ip route
-ip link set lo up
-ping -c 1 127.0.0.1
-exit
-```
-
-预期现象：你可能只看到 `lo` 回环网卡，没有默认路由。Docker 会在类似基础上创建 veth pair、bridge、NAT 和 DNS。
-
-#### 5.5.5 使用 Mount namespace 隔离挂载点
-
-准备目录：
-
-```bash linenums="0"
-mkdir -p "$LAB/mnt"
-```
 
 进入新的 Mount namespace：
 
@@ -757,7 +758,7 @@ ls -la "$LAB/mnt"
 sudo umount "$LAB/mnt" 2>/dev/null || true
 ```
 
-#### 5.5.6 导出 Alpine rootfs 并使用 chroot
+#### 5.4.6 导出 Alpine rootfs 并使用 chroot
 
 导出 rootfs：
 
@@ -795,7 +796,7 @@ exit
 
 注意：`chroot` 不是容器。它没有自动隔离 PID、网络、主机名、cgroup，只是切换根文件系统视图。
 
-#### 5.5.7 使用 cgroup v2 限制资源
+#### 5.4.7 使用 cgroup v2 限制资源
 
 先确认 cgroup v2：
 
@@ -804,7 +805,7 @@ stat -fc %T /sys/fs/cgroup
 test -f /sys/fs/cgroup/cgroup.controllers && cat /sys/fs/cgroup/cgroup.controllers || true
 ```
 
-如果不是 `cgroup2fs`，或者当前系统不允许手动写 `/sys/fs/cgroup`，跳到 5.5.8 使用 Docker 替代实验。即使系统是 cgroup v2，具体 controller 也可能没有委派给当前环境，下面会先检查文件是否存在。
+如果不是 `cgroup2fs`，或者当前系统不允许手动写 `/sys/fs/cgroup`，跳到 5.4.8 使用 Docker 替代实验。即使系统是 cgroup v2，具体 controller 也可能没有委派给当前环境，下面会先检查文件是否存在。
 
 创建实验 cgroup：
 
@@ -844,7 +845,7 @@ sudo cgexec -g memory,cpu:todo-lab-v1 python3 "$LAB/allocate-memory.py"
 
 如果这些命令不可用，不影响本篇主线。现代生产环境通常由 Docker、containerd、systemd 或 Kubernetes 管理 cgroup。
 
-#### 5.5.8 使用 Docker 对照资源限制
+#### 5.4.8 使用 Docker 对照资源限制
 
 Docker 参数能观察同样思想：
 
@@ -862,7 +863,7 @@ docker rm -f limit-demo
 
 这里的 `--memory` 和 `--cpus` 会被运行时转成 cgroup 资源限制。
 
-#### 5.5.9 使用 OverlayFS 模拟镜像层
+#### 5.4.9 使用 OverlayFS 模拟镜像层
 
 准备模拟目录：
 
@@ -915,7 +916,7 @@ cat "$LAB/upper/app.txt"
 sudo umount "$LAB/merged"
 ```
 
-#### 5.5.10 手动启动简化容器
+#### 5.4.10 手动启动简化容器
 
 确保 rootfs 和脚本存在：
 
@@ -941,7 +942,7 @@ sudo env LAB="$LAB" INSIDE_MINI_NS=1 \
 - `ps` 只看到简化容器内进程。
 - `/proc/1/cgroup` 能看到 cgroup 信息。
 
-#### 5.5.11 使用 nsenter 进入容器 namespace
+#### 5.4.11 使用 nsenter 进入容器 namespace
 
 启动 demo 容器：
 
@@ -969,7 +970,7 @@ docker rm -f nsenter-demo
 
 `nsenter` 是强工具。生产环境使用必须受权限控制和审计，因为它可以从宿主机进入目标进程所在 namespace。
 
-### 5.6 预期输出
+### 5.5 预期输出
 
 查看容器 namespace 时应看到类似：
 
@@ -1021,7 +1022,7 @@ PID   PPID  COMMAND
 ...
 ```
 
-### 5.7 验证方法
+### 5.6 验证方法
 
 最小验证：
 
@@ -1054,7 +1055,7 @@ sudo env LAB="$LAB" INSIDE_MINI_NS=1 \
 - 能解释 OverlayFS lower / upper / merged 三层含义。
 - 能运行 `mini-container.sh` 并说明它组合了哪些机制。
 
-### 5.8 清理步骤
+### 5.7 清理步骤
 
 回到实验目录：
 
