@@ -312,7 +312,9 @@ cloud-native-todo-platform/
 
 `go.sum` 只有在引入第三方依赖后才会出现。本章代码全部来自标准库，因此没有 `go.sum` 也不影响实验。下面代码中的 import path 使用 `cloud-native-todo-platform`。如果你的 `go.mod` module 名称不同，请用 `go list -m` 查看当前 module，并把代码中的 import path 替换为你的实际 module 名。
 
-### 5.5 完整代码
+### 5.5 执行命令
+
+先按下面内容创建或更新实验文件；保存完成后，再继续执行后续命令。
 
 创建 `internal/config/config.go`：
 
@@ -839,7 +841,6 @@ func TestAppCreatesTodo(t *testing.T) {
 }
 ```
 
-### 5.6 执行命令
 
 以下命令均在项目根目录执行，也就是 `go.mod` 所在目录。
 
@@ -929,7 +930,7 @@ todo api skeleton checked; future listener addr :8080
 
 当前阶段还没有启动 HTTP Server，所以程序完成健康检查和日志输出后会立即退出。第 9 篇加入 `net/http` 后，进程才会持续监听端口。
 
-### 5.7 验证方法
+### 5.6 验证方法
 
 当你看到以下结果时，说明本章实验成功：
 
@@ -942,7 +943,7 @@ todo api skeleton checked; future listener addr :8080
 - Benchmark 输出包含 `ns/op`、`B/op` 和 `allocs/op`。
 - `go run ./cmd/todo-api` 输出 JSON 格式结构化日志和 `todo api skeleton checked`。
 
-### 5.8 清理步骤
+### 5.7 清理步骤
 
 本章没有启动后台服务，也没有创建外部资源。若你设置了环境变量，可以按需清理。
 

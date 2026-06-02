@@ -334,7 +334,9 @@ cloud-native-todo-platform/
 
 第 9 篇已经创建过 `model`、`repository` 和 `service`。本篇为了保证教程可独立复制执行，会把这些文件再次完整列出。你可以直接覆盖同名文件。
 
-### 5.4 完整代码
+### 5.4 执行命令
+
+先按下面内容创建或更新实验文件；保存完成后，再继续执行后续命令。
 
 先用 `go get` 加入 Gin 依赖。这样不会覆盖第 9 篇或后续章节已经写入 `go.mod` 的其他依赖：
 
@@ -1470,7 +1472,6 @@ func loadConfig() config {
 }
 ```
 
-### 5.5 执行命令
 
 先拉取 Gin 依赖并整理 `go.sum`：
 
@@ -1550,7 +1551,7 @@ curl -s http://127.0.0.1:18080/openapi.yaml | head
 {"time":"...","level":"INFO","msg":"todo api stopped"}
 ```
 
-### 5.6 预期输出
+### 5.5 预期输出
 
 测试通过时，你会看到类似输出：
 
@@ -1583,7 +1584,7 @@ info:
   version: 2.0.0
 ```
 
-### 5.7 验证方法
+### 5.6 验证方法
 
 验证格式、测试、构建和文档生成：
 
@@ -1615,7 +1616,7 @@ curl -i -s -X POST http://127.0.0.1:18080/api/v2/todos -H 'Content-Type: text/pl
 {"error":{"code":"unsupported_media_type","message":"Content-Type must be application/json"}}
 ```
 
-### 5.8 清理步骤
+### 5.7 清理步骤
 
 如果服务还在运行，先按 `Ctrl+C` 停止。
 

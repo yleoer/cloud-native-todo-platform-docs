@@ -394,7 +394,22 @@ cloud-native-todo-platform/
 find . -maxdepth 3 -print
 ```
 
-### 5.4 完整代码和配置
+### 5.4 执行命令
+
+先在临时仓库中练习危险操作，避免破坏课程项目历史。
+
+创建临时仓库：
+
+```bash linenums="0"
+rm -rf /tmp/git-collaboration-lab /tmp/git-collaboration-remote.git
+mkdir -p /tmp/git-collaboration-lab
+cd /tmp/git-collaboration-lab
+git init -b main
+git config user.name "Course Learner"
+git config user.email "learner@example.com"
+```
+
+先按下面内容创建或更新实验文件；保存完成后，再继续执行后续命令。
 
 `.gitattributes`：
 
@@ -569,20 +584,6 @@ test(api): cover todo validation
 
 占位符说明：`.gitmessage` 和 PR/MR 模板中的 `<type>`、`<summary>`、`Refs #`、`Closes #` 都需要在真实提交或 PR/MR 中替换成具体内容。模板的作用是提醒你补齐背景、变更、验证和风险，不是让占位符原样进入团队历史。
 
-### 5.5 执行命令
-
-先在临时仓库中练习危险操作，避免破坏课程项目历史。
-
-创建临时仓库：
-
-```bash linenums="0"
-rm -rf /tmp/git-collaboration-lab /tmp/git-collaboration-remote.git
-mkdir -p /tmp/git-collaboration-lab
-cd /tmp/git-collaboration-lab
-git init -b main
-git config user.name "Course Learner"
-git config user.email "learner@example.com"
-```
 
 创建初始提交：
 
@@ -680,13 +681,13 @@ git switch -c docs/issue-5-git-workflow
 
 `git config --local pull.ff only` 只影响当前课程项目。
 
-创建目录并写入 5.4 中的文件：
+创建目录并写入实验文件：
 
 ```bash linenums="0"
 mkdir -p .github docs/contributing
 ```
 
-把 5.4 中的 `.gitattributes`、`.gitignore`、`.gitmessage`、`.github/pull_request_template.md` 和 `docs/contributing/git-workflow.md` 保存到对应路径。
+把上面的 `.gitattributes`、`.gitignore`、`.gitmessage`、`.github/pull_request_template.md` 和 `docs/contributing/git-workflow.md` 保存到对应路径。
 
 让 Git 使用提交模板：
 
@@ -774,7 +775,7 @@ git pull --ff-only origin main
 git branch -d docs/issue-5-git-workflow
 ```
 
-### 5.6 预期输出
+### 5.5 预期输出
 
 初始化临时仓库后，分支状态类似：
 
@@ -827,7 +828,7 @@ stash@{0}: On main: wip: temporary workflow note
 ## docs/issue-5-git-workflow
 ```
 
-### 5.7 验证方法
+### 5.6 验证方法
 
 在临时仓库中验证：
 
@@ -867,7 +868,7 @@ git config --show-origin --get pull.ff
 - 有远程平台时，能看到对应 PR/MR，且描述包含 Summary、Verification 和 Risk。
 - 无远程平台时，至少完成本地裸仓库推送，并在学习笔记中写清 PR/MR 标题、Summary、Verification 和 Risk。
 
-### 5.8 清理步骤
+### 5.7 清理步骤
 
 临时练习仓库可以删除：
 

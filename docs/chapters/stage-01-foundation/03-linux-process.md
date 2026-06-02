@@ -36,20 +36,6 @@ Go 服务运行在 Linux 之上，无论它将来是在虚拟机、Docker 容器
 - 能使用 `ss`、`free`、`df`、`du` 定位端口监听、内存紧张和磁盘空间问题。
 - 能将 `todo-process-demo` 作为 systemd 服务运行，并用检查脚本完成验收。
 
-你至少应该能独立完成下面这组任务：
-
-```bash linenums="0"
-systemctl status todo-process-demo --no-pager
-journalctl -u todo-process-demo -n 30 --no-pager
-PID="$(systemctl show -p MainPID --value todo-process-demo)"
-ps -p "$PID" -o pid,ppid,user,stat,%cpu,%mem,etime,cmd
-sudo ss -lntp | grep 18080
-curl -fsS http://127.0.0.1:18080/healthz
-sudo systemctl restart todo-process-demo
-```
-
-这些命令是 Linux 服务器、容器宿主机、CI Runner 和 Kubernetes Node 排障时经常会用到的基础工具箱。
-
 ## 2. 本章工作场景与真实案例
 
 ### 2.1 技术痛点
@@ -353,17 +339,6 @@ systemd 管理单机服务，Kubernetes 管理集群应用。它们不是同一�
 cd ~/workspace/cloud-native-todo-platform
 ```
 
-推荐环境：
-
-| 项目 | 要求 |
-|---|---|
-| 操作系统 | Ubuntu 24.04 LTS |
-| Go | Go 1.26.x，能在当前 Ubuntu 终端中执行 `go version` |
-| systemd | PID 1 为 `systemd` |
-| 权限 | 当前用户可以使用 `sudo` |
-| 必需命令 | `go`、`systemctl`、`journalctl`、`ps`、`top`、`ss`、`curl`、`free`、`df` |
-| 可选命令 | `htop`、`lsof`、`pstree` |
-
 确认 systemd 可用：
 
 ```bash linenums="0"
@@ -388,31 +363,10 @@ go version
 预期输出类似：
 
 ```text linenums="0"
-go version go1.26.2 linux/amd64
+go version go1.26.3 linux/amd64
 ```
 
 注意：systemd 启动的是 Ubuntu 环境里的二进制文件，Go 编译和服务安装都应在同一台 Ubuntu 24.04 机器上完成。不要在容器、精简环境或没有 systemd 的临时 shell 中做本篇实验。
-
-安装排障工具：
-
-=== "Ubuntu / Debian"
-
-    ```bash linenums="0"
-    sudo apt update
-    sudo apt install -y procps curl htop lsof psmisc
-    ```
-
-=== "Rocky / Alma / Fedora"
-
-    ```bash linenums="0"
-    sudo dnf install -y procps-ng curl htop lsof psmisc
-    ```
-
-=== "遗留 CentOS 7"
-
-    ```bash linenums="0"
-    sudo yum install -y procps-ng curl htop lsof psmisc
-    ```
 
 ### 5.3 文件目录结构
 
@@ -446,7 +400,32 @@ cloud-native-todo-platform/
 
 这些路径承接第 2 篇的目录设计：程序放 `/opt`，配置放 `/etc`，数据放 `/var/lib`，日志放 `/var/log`，运行时状态放 `/run`。
 
-### 5.4 完整代码和配置
+### 5.4 执行命令
+
+先确认你在课程仓库根目录：
+
+```bash linenums="0"
+pwd
+ls
+```
+
+预期能看到 `README.md`、`docs/` 等文件或目录。
+
+如果仓库还没有 Go module，先初始化：
+
+```bash linenums="0"
+test -f go.mod || go mod init github.com/your-name/cloud-native-todo-platform
+```
+
+请把 `your-name` 替换为你的 GitHub 用户名或组织名；如果只是本地实验，保留这个示例模块名也不影响本篇编译。
+
+创建实验目录：
+
+```bash linenums="0"
+mkdir -p api/cmd/todo-process-demo bin deployments/systemd scripts
+```
+
+先按下面内容创建或更新实验文件；保存完成后，再继续执行后续命令。
 
 Go HTTP 服务 `api/cmd/todo-process-demo/main.go`：
 
@@ -839,32 +818,8 @@ main() {
 main "$@"
 ```
 
-### 5.5 执行命令
 
-先确认你在课程仓库根目录：
-
-```bash linenums="0"
-pwd
-ls
-```
-
-预期能看到 `README.md`、`docs/` 等文件或目录。
-
-如果仓库还没有 Go module，先初始化：
-
-```bash linenums="0"
-test -f go.mod || go mod init github.com/your-name/cloud-native-todo-platform
-```
-
-请把 `your-name` 替换为你的 GitHub 用户名或组织名；如果只是本地实验，保留这个示例模块名也不影响本篇编译。
-
-创建实验目录：
-
-```bash linenums="0"
-mkdir -p api/cmd/todo-process-demo bin deployments/systemd scripts
-```
-
-将 5.4 中的 Go 代码保存为 `api/cmd/todo-process-demo/main.go`，再格式化并编译：
+确认上面的 Go 代码已经保存为 `api/cmd/todo-process-demo/main.go` 后，格式化并编译：
 
 ```bash linenums="0"
 gofmt -w api/cmd/todo-process-demo/main.go
@@ -921,7 +876,7 @@ sudo chmod 640 /etc/todo-platform/process-demo.env
 
 配置文件内容需要原样保存，不要把文件里的 `$VARIABLE` 误写成当前终端变量的展开结果。
 
-将 5.4 中的 unit 内容保存为 `deployments/systemd/todo-process-demo.service`，再安装到 systemd：
+确认上面的 unit 内容已经保存为 `deployments/systemd/todo-process-demo.service` 后，安装到 systemd：
 
 ```bash linenums="0"
 sudo cp deployments/systemd/todo-process-demo.service /etc/systemd/system/todo-process-demo.service
@@ -974,7 +929,7 @@ df -h
 
 `/work?ms=1000` 使用忙循环制造短暂 CPU 占用，只用于教学观察；真实生产代码不要用忙循环模拟等待，应该使用正常业务逻辑、定时器或队列任务。
 
-将 5.4 中的检查脚本保存为 `scripts/check-process-service.sh`，再赋予执行权限：
+确认上面的检查脚本已经保存为 `scripts/check-process-service.sh` 后，赋予执行权限：
 
 ```bash linenums="0"
 chmod +x scripts/check-process-service.sh
@@ -997,7 +952,7 @@ systemctl status todo-process-demo --no-pager
 sudo systemctl start todo-process-demo
 ```
 
-### 5.6 预期输出
+### 5.5 预期输出
 
 健康检查输出类似：
 
@@ -1039,7 +994,7 @@ LISTEN 0 4096 127.0.0.1:18080 0.0.0.0:* users:(("todo-process-demo",pid=12345,fd
 Process service check completed.
 ```
 
-### 5.7 验证方法
+### 5.6 验证方法
 
 集中执行下面命令：
 
@@ -1068,7 +1023,7 @@ sudo ss -lntp | grep 18080
 - `ss` 能看到 `127.0.0.1:18080` 正在监听。
 - 检查脚本输出 `Process service check completed.`。
 
-### 5.8 清理步骤
+### 5.7 清理步骤
 
 如果你只是临时停止服务：
 

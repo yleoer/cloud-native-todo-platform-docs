@@ -490,7 +490,9 @@ cloud-native-todo-platform/
 
 为什么不是把 Dockerfile 放在根目录？因为本课程项目主线把 API 服务相关交付物收敛到 `api/` 下，后续 Kubernetes、Helm 和 CI/CD 会继续围绕 `api/Dockerfile` 构建镜像。但 `.dockerignore` 必须放在构建上下文根目录，也就是项目根目录。
 
-### 5.4 完整代码或配置
+### 5.4 执行命令
+
+先按下面内容创建或更新实验文件；保存完成后，再继续执行后续命令。
 
 在项目根目录创建 `.dockerignore`：
 
@@ -626,7 +628,6 @@ CMD ["serve"]
 - `ENTRYPOINT` 固定二进制，`CMD` 默认执行 `serve`，方便覆盖为 `config-check`、`migrate`、`openapi`。
 - `org.opencontainers.image.source` 中的 `<your-org>` 是占位符，练习时替换成自己的组织、用户名或企业仓库地址。
 
-### 5.5 执行命令
 
 正式构建前先设置版本变量：
 
@@ -1031,7 +1032,7 @@ docker push ghcr.io/<your-org>/todo-api:v0.1.0
 
 这里的 `<your-org>` 必须替换成你的 GitHub 组织或用户名。不要把真实 Token 写入教程、脚本或 Git 仓库。
 
-### 5.6 预期输出
+### 5.5 预期输出
 
 镜像列表应能看到两个标签：
 
@@ -1079,9 +1080,9 @@ The push refers to repository [localhost:5000/todo-api]
 v0.1.0: digest: sha256:... size: ...
 ```
 
-### 5.7 验证方法
+### 5.6 验证方法
 
-#### 5.7.1 最小验证
+#### 5.6.1 最小验证
 
 验证 Dockerfile 和 `.dockerignore` 已创建：
 
@@ -1144,7 +1145,7 @@ docker image rm localhost:5000/todo-api:v0.1.0
 docker pull localhost:5000/todo-api:v0.1.0
 ```
 
-#### 5.7.2 进阶验证
+#### 5.6.2 进阶验证
 
 进阶验证用于证明你不仅能构建镜像，还能分析镜像质量。已安装工具时记录以下信息：
 
@@ -1155,7 +1156,7 @@ docker pull localhost:5000/todo-api:v0.1.0
 - `trivy` 或 Docker Scout 扫描结果。
 - 本地 registry 推送成功的 digest。
 
-### 5.8 清理步骤
+### 5.7 清理步骤
 
 停止并删除实验容器。连续验证多阶段时，先确认这些容器不是前序阶段仍需保留的数据库或缓存环境：
 

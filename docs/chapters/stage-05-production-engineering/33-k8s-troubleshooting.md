@@ -366,9 +366,11 @@ troubleshooting/
     └── 99-cleanup.sh
 ```
 
-### 5.4 完整代码或配置
+### 5.4 执行命令
 
-#### 5.4.1 创建 Pending 故障 Pod
+先按下面内容创建或更新实验文件；保存完成后，再继续执行后续命令。
+
+#### 创建 Pending 故障 Pod
 
 创建 `troubleshooting/k8s/01-pending-pod.yaml`：
 
@@ -401,7 +403,7 @@ spec:
 
 关键点：`nodeSelector` 要求节点必须带有指定 label。kind 节点默认没有这个 label，所以 Pod 会停留在 `Pending`，Event 中会出现 `FailedScheduling`。
 
-#### 5.4.2 创建 Service selector 错误
+#### 创建 Service selector 错误
 
 创建 `troubleshooting/k8s/02-broken-service.yaml`：
 
@@ -429,7 +431,7 @@ spec:
 
 关键点：Service selector 选不中任何 Pod 时，Service 仍然能创建，DNS 也能解析，但 EndpointSlice 没有后端地址。
 
-#### 5.4.3 创建 PVC 绑定失败
+#### 创建 PVC 绑定失败
 
 创建 `troubleshooting/k8s/03-pvc-missing-storageclass.yaml`：
 
@@ -494,7 +496,7 @@ spec:
 
 关键点：Pod 使用了无法绑定的 PVC，所以 Pod 也会等待 volume 就绪。排障时要同时看 Pod Event 和 PVC Event。
 
-#### 5.4.4 创建 DNS 配置故障
+#### 创建 DNS 配置故障
 
 创建 `troubleshooting/k8s/04-dns-broken.yaml`：
 
@@ -546,7 +548,7 @@ spec:
 
 关键点：很多生产 DNS 故障并不是 CoreDNS 挂了，而是 Pod 级 `dnsPolicy`/`dnsConfig` 错误、NetworkPolicy 出站阻断，或节点级 DNS 配置异常。本实验用错误 `dnsConfig` 稳定复现单个 Pod 的 DNS 失败。
 
-#### 5.4.5 创建 OOMKilled 演练 Pod
+#### 创建 OOMKilled 演练 Pod
 
 创建 `troubleshooting/k8s/05-oom-demo.yaml`：
 
@@ -595,7 +597,7 @@ spec:
 
 关键点：容器尝试分配约 `160Mi` 内存，但 limit 只有 `64Mi`，kubelet 会记录 `OOMKilled`。如果你的镜像仓库访问受限，可以把该镜像提前拉取到本地并 `kind load docker-image` 到集群。
 
-#### 5.4.6 创建清理脚本
+#### 创建清理脚本
 
 创建 `troubleshooting/k8s/99-cleanup.sh`：
 
@@ -622,11 +624,10 @@ echo "troubleshooting resources cleaned"
 chmod +x troubleshooting/k8s/99-cleanup.sh
 ```
 
-### 5.5 执行命令
 
 每个演练都先确认故障确实生效，再进入排查。生产排障也一样：不要只凭告警标题下结论，先用状态、Event、日志或指标确认当前症状。
 
-#### 5.5.1 建立健康基线
+#### 5.4.1 建立健康基线
 
 先确认 Todo Platform 当前是健康的：
 
@@ -660,7 +661,7 @@ HTTP/1.1 200 OK
 
 如果第 31-32 篇的监控组件还在，可以同时打开 Grafana，观察 `Todo API QPS`、错误率、日志和 Trace。基线健康时再注入故障，排障对比才清晰。
 
-#### 5.5.2 演练一：Pod Pending
+#### 5.4.2 演练一：Pod Pending
 
 注入故障：
 
@@ -693,7 +694,7 @@ kubectl -n todo-dev delete pod todo-pending-demo
 
 生产中的永久修复通常不是删除 Pod，而是修正 `nodeSelector`、node affinity、资源请求、污点容忍或节点容量。
 
-#### 5.5.3 演练二：ImagePullBackOff
+#### 5.4.3 演练二：ImagePullBackOff
 
 这个演练会短暂修改 GitOps 管理的 Todo Deployment。它用于学习镜像拉取排障，修复后会用 Argo CD 恢复。
 
@@ -744,7 +745,7 @@ kubectl -n todo-dev rollout status deployment/todo-platform --timeout=180s
 
 止血后仍要回到第 30 篇的 GitOps 流程，完成 `argocd app sync`，确保集群状态和 Git 期望状态一致。
 
-#### 5.5.4 演练三：CrashLoopBackOff
+#### 5.4.4 演练三：CrashLoopBackOff
 
 注入故障，让 Todo API 进程收到错误子命令后退出：
 
@@ -791,7 +792,7 @@ kubectl -n todo-dev rollout status deployment/todo-platform --timeout=180s
 
 如果 Argo CD 自动 self-heal 很快，这个故障可能被自动恢复。这在生产中是好事，说明 GitOps 控制器正在把集群拉回期望状态。
 
-#### 5.5.5 演练四：OOMKilled 与资源瓶颈
+#### 5.4.5 演练四：OOMKilled 与资源瓶颈
 
 注入故障：
 
@@ -837,7 +838,7 @@ kubectl -n todo-dev delete pod todo-oom-demo
 
 本演练使用 `restartPolicy: Always`，所以 OOM 后 Pod 会被 kubelet 反复重启。生产中的一次性 Job 可能使用 `Never` 或 `OnFailure`，此时 OOM 后的重试和告警方式要结合 Job 的 backoff 策略一起判断。
 
-#### 5.5.6 演练五：Service endpoints 为空
+#### 5.4.6 演练五：Service endpoints 为空
 
 注入故障：
 
@@ -890,7 +891,7 @@ kubectl -n todo-dev run todo-curl-once \
   --command -- curl -i --max-time 5 http://todo-broken-service:18080/healthz
 ```
 
-#### 5.5.7 演练六：DNS 配置错误
+#### 5.4.7 演练六：DNS 配置错误
 
 注入故障：
 
@@ -965,7 +966,7 @@ spec:
           port: 53
 ```
 
-#### 5.5.8 演练七：PVC 绑定失败
+#### 5.4.8 演练七：PVC 绑定失败
 
 注入故障：
 
@@ -1006,7 +1007,7 @@ kubectl get storageclass
 
 然后重新创建使用真实 StorageClass 的 PVC。PVC 的 `storageClassName` 通常不适合在已创建后直接修改，生产中要谨慎处理数据迁移和备份。
 
-#### 5.5.9 使用 stern 聚合日志
+#### 5.4.9 使用 stern 聚合日志
 
 创建一个请求 ID：
 
@@ -1029,7 +1030,7 @@ stern -n todo-dev 'todo-platform|todo-.*demo' --since 10m --tail 50
 
 `stern` 更适合现场追日志，Loki 更适合跨时间窗口检索和保留。
 
-#### 5.5.10 使用 kubectl debug 调试 distroless 容器
+#### 5.4.10 使用 kubectl debug 调试 distroless 容器
 
 第 16 篇之后 Todo API 镜像通常是 distroless 风格，容器里没有 shell。不要为了排障把生产镜像改成带 shell 的大镜像，可以用临时容器：
 
@@ -1057,7 +1058,7 @@ exit
 
 如果无法拉取 `nicolaka/netshoot`，可以换成企业内部允许的调试镜像。生产集群应限制谁可以创建 ephemeral containers，因为它等价于进入业务 Pod 的网络和进程排障上下文。
 
-#### 5.5.11 使用 k9s 快速定位
+#### 5.4.11 使用 k9s 快速定位
 
 启动：
 
@@ -1080,7 +1081,7 @@ k9s -n todo-dev
 
 k9s 是提速工具，不是唯一入口。正式复盘中仍要把关键 `kubectl` 命令和输出记录下来，方便团队复现。
 
-### 5.6 预期输出
+### 5.5 预期输出
 
 完成全部故障演练后，你应该能看到以下典型输出：
 
@@ -1106,7 +1107,7 @@ todo-platform   ClusterIP   10.96.x.x       18080/TCP
 HTTP/1.1 200 OK
 ```
 
-### 5.7 验证方法
+### 5.6 验证方法
 
 **第一层：GitOps 应用恢复健康**
 
@@ -1162,7 +1163,7 @@ kubectl -n observability get pods
 
 判断标准：应用日志持续输出；Grafana、Loki、Tempo、Alloy 仍然运行。Grafana 中 Todo API QPS、错误率和日志面板能看到新数据。
 
-### 5.8 清理步骤
+### 5.7 清理步骤
 
 清理本篇创建的故障资源：
 

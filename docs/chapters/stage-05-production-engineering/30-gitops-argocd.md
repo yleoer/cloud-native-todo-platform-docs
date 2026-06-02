@@ -408,7 +408,9 @@ mkdir -p deployments/gitops/envs/prod
 
 这些文件是应用仓库产物，不是本教材仓库产物。教材仓库只保存教程正文。
 
-### 5.4 完整代码或配置
+### 5.4 执行命令
+
+先按下面内容创建或更新实验文件；保存完成后，再继续执行后续命令。
 
 先准备仓库地址。下面命令会把 SSH 形式的 GitHub 地址转换成 Argo CD 更容易访问的 HTTPS 地址：
 
@@ -752,7 +754,6 @@ spec:
 
 注意：本篇同时保留 `namespace.yaml`、`CreateNamespace=true` 和预创建 Namespace。`namespace.yaml` 用来让 GitOps 管理 Namespace 标签与安全基线；`CreateNamespace=true` 是防止目标 Namespace 不存在的兜底；实验里提前创建 Namespace 是为了先放入不进入 Git 的运行时 Secret。
 
-### 5.5 执行命令
 
 先本地验证 GitOps overlay 能渲染。下面命令不访问集群，只检查 Kustomize 路径和 YAML 结构：
 
@@ -1035,7 +1036,7 @@ argocd app wait todo-platform-prod --sync --health --timeout 300
 
 ApplicationSet 创建的新 Application 首次同步时，Argo CD 会对比 Git 中的期望状态和集群里已经存在的对象。对象内容一致时通常不会重建业务资源，而是在同步过程中补齐 Argo CD 需要的 tracking metadata，把现有对象纳入新 Application 管理。
 
-### 5.6 预期输出
+### 5.5 预期输出
 
 Argo CD 组件启动完成后应看到：
 
@@ -1088,7 +1089,7 @@ todo-platform-dev    Synced        Healthy
 todo-platform-prod   Synced        Healthy
 ```
 
-### 5.7 验证方法
+### 5.6 验证方法
 
 第一层：确认 Argo CD 控制面正常。
 
@@ -1146,7 +1147,7 @@ kubectl -n argocd get applications -l app.kubernetes.io/part-of=todo-platform
 
 判断标准：存在 `todo-platform-dev` 和 `todo-platform-prod` 两个 Application。
 
-### 5.8 清理步骤
+### 5.7 清理步骤
 
 先停止本地 port-forward：
 

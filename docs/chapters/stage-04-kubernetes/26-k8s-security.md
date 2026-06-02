@@ -371,7 +371,9 @@ grep -F 'deployments/k8s-security/*.local.yaml' .gitignore || \
   printf '\ndeployments/k8s-security/*.local.yaml\n' >> .gitignore
 ```
 
-### 5.4 完整代码或配置
+### 5.4 执行命令
+
+先按下面内容创建或更新实验文件；保存完成后，再继续执行后续命令。
 
 创建启用 Restricted Pod Security 的 Namespace：
 
@@ -691,7 +693,6 @@ imagePullSecrets:
 
 本篇模拟服务使用公开 Alpine 镜像，不需要实际应用这个私有仓库密钥。
 
-### 5.5 执行命令
 
 先做服务端 dry-run，确认 API Server、RBAC 和 Pod Security Admission 都能接受安全 Manifest：
 
@@ -809,7 +810,7 @@ kubectl -n todo-workloads patch deployment todo-api \
   --dry-run=server -o yaml
 ```
 
-### 5.6 预期输出
+### 5.5 预期输出
 
 应用安全 Namespace：
 
@@ -875,7 +876,7 @@ capabilities.drop=ALL
 false
 ```
 
-### 5.7 验证方法
+### 5.6 验证方法
 
 第一层：确认 Namespace 已启用 Restricted Pod Security。
 
@@ -921,7 +922,7 @@ kubectl -n todo-security-lab exec todo-security-client -- \
 
 判断标准：输出 `Todo API security baseline OK`。
 
-### 5.8 清理步骤
+### 5.7 清理步骤
 
 删除实验 Namespace：
 

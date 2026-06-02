@@ -419,7 +419,9 @@ cloud-native-todo-platform/
 
 `docker-compose.yml` 来自第 12、13 篇，本篇不会使用它启动服务。我们先手动执行 Docker 命令，第 17 篇再把这些参数整理成新版 Compose 文件。
 
-### 5.4 完整运行配置
+### 5.4 执行命令
+
+先按下面内容创建或更新实验文件；保存完成后，再继续执行后续命令。
 
 本篇会创建以下 Docker 资源：
 
@@ -449,7 +451,6 @@ Todo API 容器会使用这些关键环境变量：
 
 这里的 Secret 和密码都是本地教学值。真实环境不应把 Secret 写进命令历史、镜像层或公开仓库。
 
-### 5.5 执行命令
 
 下面命令会为了本地教学直接写入数据库密码、Redis 密码和 JWT Secret。真实项目应通过 Secret 管理系统、CI/CD Secret 或受控环境变量注入，不要把它们留在公开命令历史、镜像层或仓库中。
 
@@ -855,7 +856,7 @@ go version
 exit
 ```
 
-### 5.6 预期输出
+### 5.5 预期输出
 
 `docker ps` 应能看到三个容器：
 
@@ -897,7 +898,7 @@ API 日志中应能看到请求日志和 Redis 启用信息，输出类似：
 {"level":"INFO","msg":"http request","method":"POST","path":"/api/v2/todos","status":201,"user":"admin"}
 ```
 
-### 5.7 验证方法
+### 5.6 验证方法
 
 验证 Docker 资源存在：
 
@@ -939,7 +940,7 @@ docker run --rm --network todo-net registry.cn-guangzhou.aliyuncs.com/yleoer/alp
 docker run --rm --network todo-net registry.cn-guangzhou.aliyuncs.com/yleoer/alpine:3.23 nslookup todo-redis
 ```
 
-### 5.8 清理步骤
+### 5.7 清理步骤
 
 只停止和删除容器，保留数据卷。注意：这会删除 `todo-api`、`todo-postgres`、`todo-redis` 三个容器；连续验证多阶段时，先确认这些容器不是前序阶段仍需保留的运行环境。
 

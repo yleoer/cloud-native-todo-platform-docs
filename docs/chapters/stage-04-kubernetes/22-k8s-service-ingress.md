@@ -325,7 +325,9 @@ deployments/k8s-base/*.local.yaml
 deployments/k8s-base/tls/
 ```
 
-### 5.4 完整代码或配置
+### 5.4 执行命令
+
+先按下面内容创建或更新实验文件；保存完成后，再继续执行后续命令。
 
 以下命令按 bash / WSL2 Ubuntu 编写。需要创建 YAML 或配置文件时，请按页面给出的文件名手动创建同名文件，并复制对应内容。
 
@@ -667,7 +669,6 @@ spec:
           port: 80
 ```
 
-### 5.5 执行命令
 
 确认第 21 篇服务可用。后续 Ingress 和 Gateway API 都依赖 Ready 端点；如果 Pod 不是 Running/Ready，或者 EndpointSlice 输出为空，请先回到第 21 篇排查内存模式、Probe 和 ClusterIP Service：
 
@@ -743,7 +744,7 @@ curl -s http://127.0.0.1:18091/api/http/routers | head
 [{"entryPoints":["websecure"],"service":"todo-workloads-todo-api-80",...}]
 ```
 
-### 5.6 预期输出
+### 5.5 预期输出
 
 Service 对比输出类似：
 
@@ -781,7 +782,7 @@ content-type: application/json
 
 如果你的 Todo API 返回格式略有不同，但 HTTP 状态码是 `200`，说明入口链路成功。
 
-### 5.7 验证方法
+### 5.6 验证方法
 
 执行以下检查：
 
@@ -815,7 +816,7 @@ kubectl -n todo-workloads describe ingress todo-api
 kubectl -n traefik logs deployment/traefik --tail=120
 ```
 
-### 5.8 清理步骤
+### 5.7 清理步骤
 
 如果要继续第 23 篇，可以保留 `todo-workloads`、Todo API Deployment 和 Service，只清理入口对比资源：
 

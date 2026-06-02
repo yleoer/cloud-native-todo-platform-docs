@@ -383,11 +383,12 @@ operator/
     └── controller-design.md
 ```
 
-### 5.4 完整代码或配置
+### 5.4 执行命令
 
-#### 5.4.1 go.mod
+先按下面内容创建或更新实验文件；保存完成后，再继续执行后续命令。
 
-本节按文件名给出完整内容。请用编辑器创建同名文件，并复制对应内容。
+#### go.mod
+
 
 创建 `operator/controller-lab/go.mod`：
 
@@ -401,7 +402,7 @@ go 1.26
 
 PowerShell 可以使用编辑器创建同名文件，内容保持一致。
 
-#### 5.4.2 最小 Informer-Workqueue 模拟程序
+#### 最小 Informer-Workqueue 模拟程序
 
 创建 `operator/controller-lab/main.go`：
 
@@ -737,7 +738,7 @@ func main() {
 
 为保持输出可读，本程序用 `queue: skip stale retry` 跳过成功后残留的延迟重试，这是教学模拟中的简化。真实生产代码应直接使用 client-go workqueue 或 controller-runtime 队列，并以官方实现的去重、限速和重试语义为准。
 
-#### 5.4.3 Controller 需求分析文档
+#### Controller 需求分析文档
 
 创建 `operator/controller-lab/controller-design.md`：
 
@@ -792,7 +793,6 @@ func main() {
 - TodoCache reference -> TodoApp key
 ```
 
-### 5.5 执行命令
 
 进入实验目录：
 
@@ -821,7 +821,7 @@ Get-Content controller-design.md
 
 为什么要先做模拟程序：真实 client-go Controller 有 Informer、Indexer、Workqueue、Scheme、typed client 等样板代码，新手容易被 API 淹没。本实验把 Kubernetes 外壳拿掉，只保留控制循环本质。
 
-### 5.6 预期输出
+### 5.5 预期输出
 
 运行 `go run .` 后，输出类似下面这样：
 
@@ -853,7 +853,7 @@ worker-1: shutdown
 - reconcile 在依赖未 Ready 时失败并重试。
 - 依赖全部 Ready 后 status 变成 Available。
 
-### 5.7 验证方法
+### 5.6 验证方法
 
 **第一层：程序可运行**
 
@@ -897,7 +897,7 @@ go run . | grep 'queue: retry'
 
 判断标准：重试延迟最多增长到 `240ms`，说明队列退避参数会直接影响故障期间的重试频率。验证后把数值改回 `5`。
 
-### 5.8 清理步骤
+### 5.7 清理步骤
 
 如果当前目录是 `operator/controller-lab`，并且只想删除实验文件：
 

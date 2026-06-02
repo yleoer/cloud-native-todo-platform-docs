@@ -402,7 +402,9 @@ deployments/kustomize/
 
 `.secrets/` 目录只服务本地实验，不应提交到 Git。本篇会同步建议 `.gitignore` 规则。
 
-### 5.4 完整配置
+### 5.4 执行命令
+
+先按下面内容创建或更新实验文件；保存完成后，再继续执行后续命令。
 
 先创建目录：
 
@@ -822,7 +824,6 @@ patches:
         value: todo-prod
 ```
 
-### 5.5 执行命令
 
 先本地渲染三个 overlay：
 
@@ -906,7 +907,7 @@ curl -fsS http://127.0.0.1:18085/readyz
 
 验证完成后，在运行 `port-forward` 的终端按 `Ctrl+C` 停止端口转发。
 
-### 5.6 预期输出
+### 5.5 预期输出
 
 `kubectl kustomize` 渲染后，能看到 Namespace 差异：
 
@@ -957,7 +958,7 @@ Todo API readyz OK
 
 如果你的 Todo API 镜像返回的是 JSON 或不同短文本，只要 `curl -fsS` 退出码为 0，并且 Pod Ready，就表示主线验证通过。
 
-### 5.7 验证方法
+### 5.6 验证方法
 
 验证三套环境副本数：
 
@@ -1070,7 +1071,7 @@ kubectl -n todo-prod get deployment todo-platform \
 cpu=200m memory=256Mi
 ```
 
-### 5.8 清理步骤
+### 5.7 清理步骤
 
 删除三套 overlay 创建的资源：
 
@@ -1113,7 +1114,7 @@ rm -rf deployments/kustomize
 
   如果前两条没有返回 0，说明 base 文件缺失。`pwd` 应该是课程项目根目录。
 
-- **修复**：回到 5.4 节重新创建 base，确认命令从包含 `deployments/` 的仓库根目录执行。
+- **修复**：回到执行命令中的 base 文件创建步骤，确认命令从包含 `deployments/` 的仓库根目录执行。
 - **预防**：不要在 `overlays/dev` 目录里直接运行复制命令；课程所有路径都按项目根目录书写。
 
 ### 错误 2：环境 ConfigMap 没有 hash 或应用仍读取 base 配置
@@ -1253,7 +1254,7 @@ rm -rf deployments/kustomize
   git status --short
   ```
 
-- **修复**：按 5.4 节重新生成 `.env` 文件，并在 `.gitignore` 中加入：
+- **修复**：按执行命令中的 `.env` 文件生成步骤重新创建文件，并在 `.gitignore` 中加入：
 
   ```gitignore linenums="0"
   deployments/kustomize/overlays/**/.secrets/

@@ -329,7 +329,9 @@ cloud-native-todo-platform/
         └── 000001_create_todos.down.sql
 ```
 
-### 5.4 完整代码
+### 5.4 执行命令
+
+先按下面内容创建或更新实验文件；保存完成后，再继续执行后续命令。
 
 创建 `docker-compose.yml`：
 
@@ -1017,7 +1019,6 @@ func buildRepository(ctx context.Context, cfg config, logger *slog.Logger) (serv
 
 这里保留了内存 Repository 作为默认值，是为了让前面章节的基础测试和本地快速启动仍然可用。设置 `TODO_DATABASE_DSN` 后，API 才切换到 PostgreSQL。
 
-### 5.5 执行命令
 
 确认 Go 代理配置。第 7 篇已经设置过 `GOPROXY`，这里再检查一次，避免依赖拉取卡在网络问题上：
 
@@ -1103,7 +1104,7 @@ curl -s http://127.0.0.1:18080/api/v2/todos
 
 如果重启后还能看到刚才创建的 Todo，说明数据已经持久化到 PostgreSQL。
 
-### 5.6 预期输出
+### 5.5 预期输出
 
 迁移执行后，`\dt` 输出类似：
 
@@ -1137,7 +1138,7 @@ API 启动日志中应能看到：
 {"level":"INFO","msg":"todo api starting","addr":"127.0.0.1:18080"}
 ```
 
-### 5.7 验证方法
+### 5.6 验证方法
 
 验证数据库表存在：
 
@@ -1165,7 +1166,7 @@ TODO_API_ADDR=127.0.0.1:18080 ./bin/todo-api
 
 这时日志应显示 `using memory repository`。
 
-### 5.8 清理步骤
+### 5.7 清理步骤
 
 停止 API 后，停止数据库容器但保留数据卷：
 

@@ -354,7 +354,9 @@ grep -F 'deployments/k8s-base/*.local.yaml' .gitignore || \
   printf '\ndeployments/k8s-base/*.local.yaml\n' >> .gitignore
 ```
 
-### 5.4 完整代码或配置
+### 5.4 执行命令
+
+先按下面内容创建或更新实验文件；保存完成后，再继续执行后续命令。
 
 创建 PostgreSQL ConfigMap。这里保存非敏感配置：数据库名、数据目录和服务地址。
 
@@ -639,7 +641,6 @@ spec:
             name: todo-api-config-file
 ```
 
-### 5.5 执行命令
 
 先用 API Server 做 YAML 语法和字段校验：
 
@@ -802,7 +803,7 @@ kubectl -n todo-workloads exec todo-postgres-0 -- \
   dropdb -U todo todo_platform_restore_check
 ```
 
-### 5.6 预期输出
+### 5.5 预期输出
 
 StatefulSet Ready 后，应看到：
 
@@ -864,7 +865,7 @@ todo-postgres-0.todo-postgres-headless.todo-workloads.svc.cluster.local
      1
 ```
 
-### 5.7 验证方法
+### 5.6 验证方法
 
 完成实验后，用下面的清单做最终验收。
 
@@ -923,7 +924,7 @@ test -s todo-platform-backup.sql
 
 判断标准：命令返回成功，且前面恢复检查库中的 `count` 大于等于 `1`。如果 `todo-platform-backup.sql` 为空或恢复失败，不能把这次备份视为有效备份。
 
-### 5.8 清理步骤
+### 5.7 清理步骤
 
 本篇产生了真实 PVC 数据。为了后续章节继续使用 Todo Platform，建议默认保留 PostgreSQL、PVC 和 API 数据库配置，只清理一次性迁移 Job：
 

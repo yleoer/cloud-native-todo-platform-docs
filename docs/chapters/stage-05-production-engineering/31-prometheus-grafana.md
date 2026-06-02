@@ -369,9 +369,11 @@ cloud-native-todo-platform/
         └── todo-servicemonitor.yaml
 ```
 
-### 5.4 完整代码或配置
+### 5.4 执行命令
 
-#### 5.4.1 增加 Go 指标依赖
+先按下面内容创建或更新实验文件；保存完成后，再继续执行后续命令。
+
+#### 增加 Go 指标依赖
 
 安装 Prometheus Go client：
 
@@ -382,7 +384,7 @@ go mod tidy
 
 这里使用官方 Go client，而不是自己拼接 `/metrics` 文本。Prometheus exposition format 有严格格式，client 库能处理并发安全、Counter 重置、Histogram bucket 和 OpenMetrics 输出。
 
-#### 5.4.2 创建 HTTP 指标包
+#### 创建 HTTP 指标包
 
 创建 `api/internal/metrics/http.go`：
 
@@ -516,7 +518,7 @@ func TestHTTPMetrics(t *testing.T) {
 }
 ```
 
-#### 5.4.3 把指标接入 Gin Router
+#### 把指标接入 Gin Router
 
 更新 `api/internal/handler/gin/handler.go` 的 import，新增 metrics 包：
 
@@ -560,7 +562,7 @@ router.POST("/api/v2/auth/login", h.login)
 go test ./api/internal/metrics ./api/internal/handler/gin
 ```
 
-#### 5.4.4 创建 kube-prometheus-stack values
+#### 创建 kube-prometheus-stack values
 
 创建 `observability/prometheus/kube-prometheus-stack-values.yaml`：
 
@@ -621,7 +623,7 @@ prometheus-node-exporter:
 
 `serviceMonitorSelectorNilUsesHelmValues: false` 和 `ruleSelectorNilUsesHelmValues: false` 的含义是：不要只选择 Helm release 自己打标签的 ServiceMonitor / PrometheusRule，而是允许 Prometheus 发现我们后续创建的 Todo API 监控对象。
 
-#### 5.4.5 创建 ServiceMonitor
+#### 创建 ServiceMonitor
 
 创建 `observability/prometheus/todo-servicemonitor.yaml`：
 
@@ -662,7 +664,7 @@ kubectl -n todo-dev get svc todo-platform -o jsonpath='{.spec.ports[*].name}{"\n
 
 然后把 ServiceMonitor 的 `selector.matchLabels` 改成和 Service 一致。
 
-#### 5.4.6 创建 PrometheusRule
+#### 创建 PrometheusRule
 
 创建 `observability/prometheus/todo-prometheus-rules.yaml`：
 
@@ -724,7 +726,7 @@ spec:
 
 `clamp_min(..., 1)` 用于避免请求量为 0 时分母过小导致查询结果异常。生产环境里错误率通常会结合最小流量门槛，例如“过去 5 分钟请求数超过 100 且错误率超过 5%”才告警。
 
-#### 5.4.7 创建 Grafana Dashboard ConfigMap
+#### 创建 Grafana Dashboard ConfigMap
 
 创建 `observability/grafana/todo-api-dashboard-configmap.yaml`：
 
@@ -918,7 +920,7 @@ data:
 
 这个 dashboard 使用固定的 `todo-dev` namespace，是为了让新手第一次打开就能看到数据。生产环境建议增加 Grafana 变量，让团队能在 namespace、service、pod 之间切换。
 
-#### 5.4.8 允许 Prometheus 跨 namespace 抓取指标
+#### 允许 Prometheus 跨 namespace 抓取指标
 
 第 27 篇 Helm Chart 已经为 Todo API 创建了 NetworkPolicy，只允许同 namespace 内的 Pod 访问 Todo API。Prometheus 安装在 `monitoring` namespace，如果 CNI 启用了 NetworkPolicy，这条默认策略会阻断 Prometheus 抓取 `/metrics`。因此本篇需要显式增加一条入口放行策略。
 
@@ -956,9 +958,8 @@ spec:
 
 这条策略不会删除第 27 篇已有的同 namespace 访问规则。Kubernetes NetworkPolicy 的 ingress 规则是叠加生效的：已有策略允许 `todo-dev` 内部访问，本篇新增策略允许 `monitoring` namespace 访问。生产环境可以进一步加上 `podSelector`，只允许 Prometheus Pod 抓取，而不是放行整个 `monitoring` namespace。
 
-### 5.5 执行命令
 
-#### 5.5.1 本地验证 Go 指标
+#### 5.4.1 本地验证 Go 指标
 
 先运行测试：
 
@@ -986,7 +987,7 @@ curl -s http://127.0.0.1:18080/metrics | grep -E 'todo_api_http_requests_total|t
 
 本地验证能证明代码埋点正确；后面的 Kubernetes 验证会证明 Prometheus 能抓到这些指标。
 
-#### 5.5.2 构建并加载新镜像
+#### 5.4.2 构建并加载新镜像
 
 停止本地 `go run` 后，构建带指标的新镜像：
 
@@ -1029,7 +1030,7 @@ kubectl apply -k deployments/gitops/envs/dev
 kubectl -n todo-dev rollout status deployment/todo-platform --timeout=180s
 ```
 
-#### 5.5.3 安装 kube-prometheus-stack
+#### 5.4.3 安装 kube-prometheus-stack
 
 添加 Helm 仓库并安装：
 
@@ -1092,7 +1093,7 @@ kubectl -n monitoring describe pod -l app.kubernetes.io/name=prometheus
 kubectl -n monitoring get deployment monitoring-grafana -o jsonpath='{.spec.template.spec.containers[0].image}{"\n"}'
 ```
 
-#### 5.5.4 应用 ServiceMonitor、PrometheusRule 和 Dashboard
+#### 5.4.4 应用 ServiceMonitor、PrometheusRule 和 Dashboard
 
 先做 server-side dry-run。这里必须在安装 kube-prometheus-stack 之后执行，因为 `ServiceMonitor` 和 `PrometheusRule` 的 CRD 由 Prometheus Operator 安装：
 
@@ -1121,7 +1122,7 @@ kubectl -n todo-dev get networkpolicy todo-platform-allow-prometheus
 kubectl -n monitoring get configmap todo-api-dashboard
 ```
 
-#### 5.5.5 生成测试流量
+#### 5.4.5 生成测试流量
 
 先确认 Service 能访问：
 
@@ -1158,7 +1159,7 @@ kubectl -n todo-dev get pod todo-load
 kubectl -n todo-dev logs todo-load --tail=5
 ```
 
-#### 5.5.6 打开 Prometheus 和 Grafana
+#### 5.4.6 打开 Prometheus 和 Grafana
 
 打开 Prometheus：
 
@@ -1199,7 +1200,7 @@ password: admin
 
 打开 `Dashboards -> Todo API Overview`，等待 1-2 分钟后应能看到 QPS、P95 延迟、请求状态、CPU 和内存曲线。
 
-#### 5.5.7 执行 PromQL 查询
+#### 5.4.7 执行 PromQL 查询
 
 在 Prometheus UI 的 Graph 页面执行以下查询。
 
@@ -1256,7 +1257,7 @@ todo_api:p95_latency_seconds5m
 sum(rate(container_cpu_usage_seconds_total{namespace="todo-dev", pod=~"todo-platform-.*", container="todo-api"}[5m]))
 ```
 
-### 5.6 预期输出
+### 5.5 预期输出
 
 Go 测试输出类似：
 
@@ -1314,7 +1315,7 @@ CPU Usage: 有曲线
 Memory Working Set: 有曲线
 ```
 
-### 5.7 验证方法
+### 5.6 验证方法
 
 **第一层：应用指标端点**
 
@@ -1381,7 +1382,7 @@ curl -s 'http://127.0.0.1:9090/api/v1/alerts' | grep TodoApiHighP95Latency || tr
 
 判断标准：`rules` API 能看到告警规则。`alerts` API 不一定立刻出现 firing，因为本地服务延迟通常低于 500ms，这是正常现象。
 
-### 5.8 清理步骤
+### 5.7 清理步骤
 
 停止本地 port-forward 进程后，按需要选择清理范围。
 

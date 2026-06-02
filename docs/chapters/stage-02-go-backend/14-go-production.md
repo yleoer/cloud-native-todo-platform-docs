@@ -339,7 +339,9 @@ cloud-native-todo-platform/
                 └── response.go
 ```
 
-### 5.4 完整代码
+### 5.4 执行命令
+
+先按下面内容创建或更新实验文件；保存完成后，再继续执行后续命令。
 
 创建 `configs/base.json`：
 
@@ -2284,7 +2286,6 @@ func slogLevel(level string) slog.Level {
 - `migrate` 复用第 12 篇迁移文件。本篇的 `migrate` 是教学简化版，只执行 up 迁移文件，不记录迁移版本；生产项目应使用 `golang-migrate`、`goose` 等工具管理版本、回滚和幂等执行。
 - pprof 使用独立端口，并默认关闭。
 
-### 5.5 执行命令
 
 本篇代码量比前几章更大，建议按三段完成：先运行内存模式，确认认证、配置和中间件链路可用；再按需启动 PostgreSQL 与 Redis，验证持久化、缓存和限流仍然保留；最后单独启用 pprof，抓取 goroutine、heap 和 CPU profile。这样即使某个外部依赖暂时不可用，也能先完成生产化主线。
 
@@ -2390,7 +2391,7 @@ go tool pprof -top http://127.0.0.1:18081/debug/pprof/heap
 go tool pprof -top "http://127.0.0.1:18081/debug/pprof/profile?seconds=5"
 ```
 
-### 5.6 预期输出
+### 5.5 预期输出
 
 无 Token 请求应返回：
 
@@ -2424,7 +2425,7 @@ HTTP/1.1 401 Unauthorized
 
 pprof 输出中应能看到 goroutine、heap 或 CPU profile 对应的函数和采样数量。
 
-### 5.7 验证方法
+### 5.6 验证方法
 
 验证配置检查：
 
@@ -2472,7 +2473,7 @@ curl -i http://127.0.0.1:18080/healthz
 curl -s http://127.0.0.1:18081/debug/pprof/ | head
 ```
 
-### 5.8 清理步骤
+### 5.7 清理步骤
 
 停止 API 后，清理当前终端里的敏感环境变量：
 

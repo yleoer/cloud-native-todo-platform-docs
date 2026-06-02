@@ -350,7 +350,9 @@ deployments/k8s-network
     └── todo-network-policy.yaml
 ```
 
-### 5.4 完整代码或配置
+### 5.4 执行命令
+
+先按下面内容创建或更新实验文件；保存完成后，再继续执行后续命令。
 
 创建 kind 配置。这里禁用默认 CNI，让 Calico 接管 Pod 网络：
 
@@ -591,7 +593,6 @@ spec:
           port: 5432
 ```
 
-### 5.5 执行命令
 
 创建临时网络实验集群：
 
@@ -802,7 +803,7 @@ kubectl apply -f deployments/k8s-network/manifests/todo-network-egress-policy.ya
 
 再次从 Todo API Pod 访问 PostgreSQL，仍应看到 `postgres tcp endpoint`。如果去掉 DNS 放行规则，使用 Service DNS 访问数据库时可能会先卡在名称解析阶段，这就是生产 Egress 策略容易误伤业务的典型原因。
 
-### 5.6 预期输出
+### 5.5 预期输出
 
 Calico Pod 应处于 Running：
 
@@ -857,7 +858,7 @@ Todo API Pod 访问 PostgreSQL 应成功：
 postgres tcp endpoint
 ```
 
-### 5.7 验证方法
+### 5.6 验证方法
 
 完成实验后，用下面的清单做最终验收。
 
@@ -895,7 +896,7 @@ kubectl -n todo-clients exec allowed-client -- \
 
 判断标准：授权客户端能访问 Todo API；未授权客户端访问 Todo API 输出 `blocked`；客户端 Namespace 不能直接访问 PostgreSQL。
 
-### 5.8 清理步骤
+### 5.7 清理步骤
 
 本篇使用的是临时网络实验集群。确认不再需要后，直接删除集群：
 
